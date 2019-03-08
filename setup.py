@@ -14,7 +14,6 @@ setuptools.setup(
     url="https://github.com/comprhys/sampnn",
     packages=['sampnn'],
     package_dir={'sampnn': 'sampnn'},
-    # package_data={'sampnn': ['tables/*.dat']},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
