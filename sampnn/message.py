@@ -1,14 +1,13 @@
 import torch
 import torch.nn as nn
 
-
 class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
     """
     def __init__(self, atom_fea_len, nbr_fea_len):
         """
-        Parameters
+        Inputs
         ----------
         atom_fea_len: int
             Number of atom hidden features.
@@ -29,53 +28,58 @@ class MessageLayer(nn.Module):
         self.core_transform = nn.Softplus()
         self.output_transform = nn.Softplus()
 
-    def forward(self, atom_in_fea, bond_nbr_fea, nbr_fea_idx):
+    def forward(self, atom_in_fea, bond_nbr_fea, self_fea_idx, nbr_fea_idx, atom_bond_idx):
         """
         Forward pass
 
         Parameters
         ----------
-        N: Total number of atoms in the batch
-        M: Max number of neighbours
+        N: Total number of atoms (nodes) in the batch
+        M: Total number of bonds (edges) in the batch
+        C: Total number of crystals (graphs) in the batch
 
         Inputs
         ----------
-        atom_in_fea: Variable(torch.Tensor) shape (N, atom_fea_len)
+        atom_in_fea: torch.Tensor shape (N, atom_fea_len)
             Atom hidden features before message passing
-        bond_nbr_fea: Variable(torch.Tensor) shape (N, M, nbr_fea_len)
+        bond_nbr_fea: torch.Tensor shape (M, nbr_fea_len)
             Bond features of each atom's M neighbours
-        nbr_fea_idx: torch.LongTensor shape (N, M)
+        self_fea_idx: torch.Tensor shape (M,)
             Indices of M neighbours of each atom
+        nbr_fea_idx: torch.Tensor shape (M,)
+            Indices of M neighbours of each atom
+        atom_bond_idx: list of torch.Tensor of length N
+            mapping from the atom idx to bond idx
 
         Returns
         -------
         atom_out_fea: nn.Variable shape (N, atom_fea_len)
             Atom hidden features after message passing
         """
-        # TODO will there be problems with the index zero padding?
-        N, M = nbr_fea_idx.shape
-
-        # define the message passing operation
 
         # construct the total features for passing
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
-        atom_self_fea = atom_in_fea.unsqueeze(1).expand(N, M, self.atom_fea_len)
-        total_fea = torch.cat([atom_self_fea, atom_nbr_fea, bond_nbr_fea], dim=2)
+        atom_self_fea = atom_in_fea.[self_fea_idx,:]
+        total_fea = torch.cat([atom_self_fea, atom_nbr_fea, bond_nbr_fea], dim=1)
 
-        # pass infomation
+        # define the message passing operation
         total_fea = self.pass_msg(total_fea)
-        total_fea = self.batchnorm2(total_fea.view(-1, self.atom_fea_len*2))
-        total_fea = total_fea.view(N, M, self.atom_fea_len*2)
+        total_fea = self.batchnorm2(total_fea)
         
         # separate out into the sigmoid and softplus sets
-        nbr_filter, nbr_core = total_fea.chunk(2, dim=2)
+        nbr_filter, nbr_core = total_fea.chunk(2, dim=1)
 
         # apply non-linear transformations
         nbr_filter = self.filter_transform(nbr_filter)
         nbr_core = self.core_transform(nbr_core)
 
         # take the elementwise product of the filter and core
-        nbr_sumed = torch.sum(nbr_filter * nbr_core, dim=1)
+        nrb_message = nbr_filter * nbr_core
+
+        # sum selectivity over the neighbours to
+        nbr_sumed = [torch.sum(atom_fea[idx_map], dim=0, keepdim=True)
+                        for idx_map in atom_bond_idx]
+        nbr_sumed = torch.cat(nbr_sumed, dim=0)
         nbr_sumed = self.batchnorm1(nbr_sumed)
 
         atom_out_fea = self.output_transform(atom_in_fea + nbr_sumed)
@@ -102,6 +106,10 @@ class CompositionNet(nn.Module):
 
         Parameters
         ----------
+        n_h: Number of hidden layers after pooling
+
+        Inputs
+        ----------
         orig_atom_fea_len: int
             Number of atom features in the input.
         nbr_fea_len: int
@@ -110,15 +118,14 @@ class CompositionNet(nn.Module):
             Number of hidden atom features in the graph layers
         n_graph: int
             Number of graph layers
-        n_h: int
-            Number of hidden layers after pooling
-        h_fea_len: list
+        h_fea_list: list int of length n_h
             Number of hidden features in each fc layer after pooling
+        n_out: int
+            Number of outputs for the fc network
         """
         super(CompositionNet, self).__init__()
 
-        # transform the given input features to get an embedding,
-        # does it make any sense to do this if orig_atom_fea_len < atom_fea_len?
+        # apply linear transform to the input features to get a trainable embedding
         self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len)
 
         # create a list of Message passing layers
@@ -127,39 +134,42 @@ class CompositionNet(nn.Module):
                                     for _ in range(n_graph)])
 
         # note 2*atom_fea_len due to including the mean and std of atom features
-        self.graph_to_fc = nn.Linear(2*atom_fea_len, h_fea_len[0])
+        self.graph_to_fc = nn.Linear(2*atom_fea_len, h_fea_list[0])
         self.graph_to_fc_softplus = nn.Softplus()
 
-        if n_h > 1:
+        if len(h_fea_list) > 1:
             # create a list of fully connected passing layers
-            self.fcs = nn.ModuleList([nn.Linear(h_fea_len[i], h_fea_len[i+1])
+            self.fcs = nn.ModuleList([nn.Linear(h_fea_list[i], h_fea_list[i+1])
                                       for i in range(n_h-1)])
             self.softpluses = nn.ModuleList([nn.Softplus()
                                              for i in range(n_h-1)])
 
-        self.fc_out = nn.Linear(h_fea_len[-1], 1)
+        self.fc_out = nn.Linear(h_fea_list[-1], n_out)
 
     def forward(self, orig_atom_fea, nbr_fea, nbr_fea_idx, crystal_atom_idx):
         """
         Forward pass
 
-        N: Total number of atoms in the batch
-        M: Max number of neighbours
-        N0: Total number of crystals in the batch
-
         Parameters
+        ----------
+        N: Total number of atoms (nodes) in the batch
+        M: Total number of bonds (edges) in the batch
+        C: Total number of crystals (graphs) in the batch
+
+        Inputs
         ----------
         orig_atom_fea: Variable(torch.Tensor) shape (N, orig_atom_fea_len)
             Atom features from atom type
-        nbr_fea: Variable(torch.Tensor) shape (N, M, nbr_fea_len)
+        nbr_fea: Variable(torch.Tensor) shape (M, nbr_fea_len)
             Bond features of each atom's M neighbours
-        nbr_fea_idx: torch.LongTensor shape (N, M)
+        nbr_fea_idx: torch.Tensor shape (M,)
             Indices of M neighbours of each atom
-        crystal_atom_idx: list of torch.LongTensor of length N0
+        crystal_atom_idx: list of torch.LongTensor of length C
             Mapping from the crystal idx to atom idx
+        
         Returns
         -------
-        prediction: nn.Variable shape (N, )
+        out: nn.Variable shape (C,)
             Atom hidden features after message passing
         """
 
@@ -190,19 +200,22 @@ class CompositionNet(nn.Module):
     def pooling(self, atom_fea, crystal_atom_idx):
         """
         Pooling the atom features to crystal features
-        N: Total number of atoms in the batch
-        N0: Total number of crystals in the batch
 
         Parameters
         ----------
-        atom_fea: Variable(torch.Tensor) shape (N, atom_fea_len)
+        N: Total number of atoms (nodes) in the batch
+        C: Total number of crystals (graphs) in the batch
+
+        Inputs
+        ----------
+        atom_fea: torch.Tensor shape (N, atom_fea_len)
             Atom feature vectors of the batch
-        crystal_atom_idx: list of torch.LongTensor of length N0
+        crystal_atom_idx: list of torch.Tensor of length C
             Mapping from the crystal idx to atom idx
 
         Return
         ----------
-        pooled: Variable(torch.Tensor) shape (N0, 2*atom_fea_len)
+        pooled: torch.Tensor shape (C, 2*atom_fea_len)
             crystal feature vectors for the batch
         
         """
