@@ -40,10 +40,10 @@ class MessageLayer(nn.Module):
 
         Inputs
         ----------
-        atom_in_fea: torch.Tensor shape (N, atom_fea_len)
+        atom_in_fea: Variable(torch.Tensor) shape (N, atom_fea_len)
             Atom hidden features before message passing
-        bond_nbr_fea: torch.Tensor shape (M, nbr_fea_len)
-            Bond features of each atom's M neighbours
+        bond_nbr_fea: Variable(torch.Tensor) shape (M, nbr_fea_len)
+            Bond features of atom's neighbours
         self_fea_idx: torch.Tensor shape (M,)
             Indices of M neighbours of each atom
         nbr_fea_idx: torch.Tensor shape (M,)

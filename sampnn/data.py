@@ -10,13 +10,18 @@ def magpy_featurise(compositions, features):
 
     Parameters
     ----------
-    compositions: list of strings shape N0
+    orig_atom_fea_len: 
+
+    Inputs
+    ----------
+    compositions: list of strings shape C
         list of compositions of interest
-    features: list of Strings of length 
+    features: list of strings of length orig_atom_fea_len 
         list of features to use as atom descriptors
     Returns
-    -------
-    df
+    ---------
+    df: pandas.DataFrame of shape (C,orig_atom_fea_len)
+        dataframe containing the features having been looked up for each
     '''
     elements, weights = magpy.parse_input(compositions)
     df_list = magpy.look_up(elements, weights, features=features)
@@ -27,7 +32,7 @@ def crystal_lists(df_list):
     '''
     Parameters
     ----------
-    df: list of pandas.DataFrame of length N0
+    df: list of pandas.DataFrame of length C
         DataFrame containing the features for different atoms
     Returns
     -------
@@ -35,23 +40,22 @@ def crystal_lists(df_list):
         returns a list of which other atoms in the dataset 
         are related to a given atom.
     '''
+    self_list = []
     nbr_list = []
-    cry_list = []
-    max_nbrs = 0
+    crystal_atom_idx = []
+    atom_bond_idx = []
+    crystal_id = 0
     crystal_start = 0
     for df in df_list:
-        cry_list.append(list(range(crystal_start,crystal_start+len(df))))
         crystal_elements = set(range(crystal_start,crystal_start+len(df)))
         for j in range(df.shape[0]):
             nbrs = list(crystal_elements.difference(set([crystal_start+j])))
-            nbr_list.append(nbrs)
+            nbr_list += nbrs
+            self_list += [crystal_start+j]*len(nbrs)
+            atom_bond_idx.append()
         crystal_start += df.shape[0]
-        if len(df)-1 > max_nbrs:
-            max_nbrs = len(df)-1
-    for nbr in nbr_list:
-        nbr += [0]*(max_nbrs-len(nbr))
-    # nbr_list = torch.cat(nbr_list, dim=0)
-    return cry_list, nbr_list
+
+    return cry_list, nbr_list, self_list
 
 def edge_embeddings():
     '''
@@ -85,9 +89,11 @@ feat = ['CovalentRadius', 'Polarizability', 'Electronegativity', 'ElectronAffini
 def main():
     data = magpy_featurise(comp, feat)
 
+    cluster, nbr, slf = crystal_lists(data)
     
-    print(crystal_lists(data))
-    print(edge_embeddings())
+    print(cluster)
+    print(nbr)
+    print(slf)
 
 main()
 
