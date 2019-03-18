@@ -18,7 +18,7 @@ class MessageLayer(nn.Module):
         self.atom_fea_len = atom_fea_len
         self.nbr_fea_len = nbr_fea_len
         
-        self.pass_msg = nn.Linear(  2*self.atom_fea_len+self.nbr_fea_len, 
+        self.pass_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, 
                                     2*self.atom_fea_len)
 
         self.batchnorm2 = nn.BatchNorm1d(2*self.atom_fea_len)
