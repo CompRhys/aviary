@@ -1,29 +1,40 @@
-import numpy as np
+import os
+import json
 import warnings
+import numpy as np
 import pandas as pd
 from scipy.special import gamma
 
 class AtomEmbedding(object):
     '''
-    construct a dictionary of features using the atom as a key.
-    save the dictionary as a .JSON file. 
+    construct a dictionary of features using the atom as a key with 
+    the option to save the dictionary as a .JSON file. 
     '''
 
-    def __init__(self,):
+    def __init__(self, data_dir, target_dir):
         assert os.path.exists(data_dir), 'data_dir does not exist!'
         self.data_dir = data_dir
 
-    def construct_embedding(features):
+        assert os.path.exists(target_dir), 'target_dir does not exist!'
+        self.target_dir = target_dir
+
+        self._embedding = {}
+
+    def construct_embedding(self, features):
         """
         take the given features and construct a feature embedding
+        the inputs for the features should be in their own folders
+        with a meta.csv of infomation about the feature and a data.csv
+        consisting of the key (i.e. element) and value for a given 
+        feature. 
 
         Parameters
         ----------
         features: list of length F
             list of features to use in embedding
-        expand: str
-            feature expansion to use on non-categorical features
         """
+
+        series_list = []
 
         for feature in features:
             feature_file = os.path.join(self.data_dir, feature+'/data.csv')
@@ -32,13 +43,13 @@ class AtomEmbedding(object):
             assert os.path.exists(meta_file), '{} does not exist!'.format(meta_file)
 
             meta_data = pd.read_csv(meta_file, header=None, index_col=0, squeeze=True).to_dict()
-            df = pd.read_csv(feature_file, delimiter=' ', index_col=0)
+            series = pd.read_csv(feature_file, header=None, index_col=0, squeeze=True)
 
             if (meta_data.get('categorical') == False) & (meta_data.get('expand') != None):
                 if meta_data.get('steps') == None:
                     print('number of steps not given for feature expansion, using default value of 5')
                     meta_data.update({'steps': 5})
-                data = df.values
+                data = series.values
 
                 if meta_data.get('fmin') != None:
                     meta_data.update({'fmin': np.min(data)})
@@ -49,35 +60,74 @@ class AtomEmbedding(object):
                 if meta_data.get('expand') == 'onehot':
                     onehot = OneHotEmbedding(meta_data.get('fmin'), meta_data.get('fmax'),
                                                 meta_data.get('steps'))
-                    expanded_df = onehot(data)
+                    expanded_values = onehot.expand(data)
                 elif meta_data.get('expand') == 'gaussian':
                     gaussian = GaussianEmbedding(meta_data.get('fmin'), meta_data.get('fmax'),
                                                  meta_data.get('steps'), meta_data.get('var'))
-                    expanded_df = gaussian(data)
+                    expanded_values = gaussian.expand(data)
                 else:
                     raise NameError('Only \'onehot\' or \'gaussian\' feature expansions are implemented')
+                
+                for i in range(expanded_values.shape[1]):
+                    series_list.append(pd.Series(expanded_values[:,i], index=series.index))
+            else:
+                series_list.append(series)
 
+        df = pd.concat(series_list, axis=1)
+        keys=df.index.values
+        self._embedding = dict(zip(keys, df.loc[keys].values.tolist()))
 
+    def save_embedding(self):
+        """
+        Save the embedding
+        """
+        with open('output.json', 'w+') as f:
+            json.dump(self._embedding, f)
 
-    def save():
+    def get_embedding(self):
+        """
+        Return the embedding
+        """
+        return self._embedding
 
 
 class BondEmbedding(object):
     '''
-    Use the idea of van Arkel-Ketelaar triangle and then 
-    gamma distribution to define a number of electrons
-    and the expected type of bond between two nodes.
+    construct a dictionary of features using the concatenation of the 
+    two relevant atoms as a key with the option to save the dictionary
+    as a .JSON file. 
     '''
 
-    def __init__(self,):
+    def __init__(self, data_dir):
+        assert os.path.exists(data_dir), 'data_dir does not exist!'
+        self.data_dir = data_dir
+        self._embedding = {}
 
+    def construct_embedding(self,):
+        """
+        Parameters
+        ----------
+        """
 
-    def evaluate():
-        '''
-        evaluate the weighted bond embedding idea
-        '''
-        eff_prob = gamma(5)/gamma(6)
-        return eff_prob
+        series_list = []      
+                
+        series_list.append([])
+        df = pd.concat(series_list, axis=1)
+        keys=df.index.values
+        self._embedding = dict(zip(keys, df.loc[keys].values.tolist()))
+
+    def save_embedding(self):
+        """
+        Save the embedding
+        """
+        with open('output.json', 'w+') as f:
+            json.dump(self._embedding, f)
+
+    def get_embedding(self):
+        """
+        Return the embedding
+        """
+        return self._embedding
 
 
 class GaussianEmbedding(object):
@@ -157,4 +207,19 @@ class OneHotEmbedding(object):
         """
         expand = distances[..., np.newaxis]-self.filter
         return np.where(np.logical_and(expand<self.step/2, expand>=-self.step/2), 1, 0)
+
+def ArkelKetelaarType(A, B):
+    """
+    Use the idea of van Arkel-Ketelaar triangle to define the 
+    expected type of bond between nodes A and B.
+
+    Parameters
+    ----------
+    A: str
+        Key for the atom
+    B: str
+        Key for the neighbour
+    """
+
+    pass
 

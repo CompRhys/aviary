@@ -60,7 +60,7 @@ class MessageLayer(nn.Module):
 
         # construct the total features for passing
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
-        atom_self_fea = atom_in_fea.[self_fea_idx,:]
+        atom_self_fea = atom_in_fea[self_fea_idx,:]
         total_fea = torch.cat([atom_self_fea, atom_nbr_fea, bond_nbr_fea], dim=1)
 
         # define the message passing operation
@@ -75,10 +75,10 @@ class MessageLayer(nn.Module):
         nbr_core = self.core_transform(nbr_core)
 
         # take the elementwise product of the filter and core
-        nrb_message = nbr_filter * nbr_core
+        nbr_message = nbr_filter * nbr_core
 
         # sum selectivity over the neighbours to
-        nbr_sumed = [torch.sum(atom_fea[idx_map], dim=0, keepdim=True)
+        nbr_sumed = [torch.sum(nbr_message[idx_map], dim=0, keepdim=True)
                         for idx_map in atom_bond_idx]
         nbr_sumed = torch.cat(nbr_sumed, dim=0)
         nbr_sumed = self.batchnorm1(nbr_sumed)
@@ -101,7 +101,8 @@ class CompositionNet(nn.Module):
     approaches.
     """
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
-                 atom_fea_len=64, n_graph=3, h_fea_len=[128]):
+                 atom_fea_len=64, n_graph=3, h_fea_list=[128], 
+                 n_out = 1):
         """
         Initialize CompositionNet.
 
