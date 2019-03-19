@@ -24,7 +24,6 @@ def input_parser():
     parser = argparse.ArgumentParser(description='Structure Agnostic Message Passing Neural Network')
     parser.add_argument('data_options', metavar='OPTIONS', nargs='+', help='dataset options, started with the path to root dir,then other options')
     parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
-    parser.add_argument('--task', choices=['regression', 'classification'], default='regression', help='complete a regression or classification task (default: regression)')
     parser.add_argument('-j', '--workers', default=0, type=int, metavar='N', help='number of data loading workers (default: 0)')
     parser.add_argument('--epochs', default=30, type=int, metavar='N', help='number of total epochs to run (default: 30)')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
@@ -41,7 +40,7 @@ def input_parser():
     parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', help='choose an optimizer, SGD or Adam, (default: SGD)')
     parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', help='number of hidden atom features in conv layers')
     parser.add_argument('--h-fea-len', default=[128], nargs='+', type=int, metavar='N', help='number of hidden features after pooling')
-    parser.add_argument('--n-conv', default=3, type=int, metavar='N', help='number of conv layers')
+    parser.add_argument('--n-graph', default=3, type=int, metavar='N', help='number of conv layers')
     parser.add_argument('--n-h', default=1, type=int, metavar='N', help='number of hidden layers after pooling')
 
     args = parser.parse_args(sys.argv[1:])
@@ -140,10 +139,8 @@ def collate_expand(dataset_list):
     # define counters
     cry_base_idx = 0
     atom_base_idx = 0
-    for i, (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id\
-            in enumerate(dataset_list):
+    for (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id in dataset_list):
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
-        b_i = bond_fea.shape[0]  # number of bonds for this crystal
 
         batch_atom_fea.append(atom_fea)
         batch_bond_fea.append(bond_fea)
@@ -152,28 +149,27 @@ def collate_expand(dataset_list):
         batch_nbr_fea_idx.append(nbr_fea_idx+base_idx)
 
         # mapping from bonds to atoms
-        atom_idx = np.repeat(np.arange(n_i), n_i-1)
-        atom_idx = torch.Tensor(np.repeat, dtype=torch.int)
-        atom_bond_idx.append(atom_idx)
+        for i in range(n_i):
+            atom_idx = torch.arange(n_i-1, dtype=torch.int)+atom_base_idx
+            atom_bond_idx.append(atom_idx)
+            atom_base_idx += n_i-1
 
         # mapping from atoms to crystals
-        cry_idx = torch.arange(cry_base_idx, n_i, dtype=torch.int)
+        cry_idx = torch.arange(n_i, dtype=torch.int)+cry_base_idx
         crystal_atom_idx.append(cry_idx)
-
-        # update neighbour counters
         cry_base_idx += n_i
-        atom_base_idx += b_i
 
         batch_target.append(target)
-        batch_cif_ids.append(cry_id)
+        batch_cry_ids.append(cry_id)
 
     return (torch.cat(batch_atom_fea, dim=0),
             torch.cat(batch_bond_fea, dim=0),
             torch.cat(batch_self_fea_idx, dim=0),
             torch.cat(batch_nbr_fea_idx, dim=0),
-            crystal_atom_idx),\
-            torch.stack(batch_target, dim=0),\
-            batch_cif_ids
+            atom_bond_idx,
+            crystal_atom_idx),
+            torch.stack(batch_target, dim=0),
+            batch_cry_ids
 
 
 class CompositionData(Dataset):

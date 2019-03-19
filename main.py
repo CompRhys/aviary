@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import csv
 import shutil
 import time
 import warnings
@@ -27,47 +28,33 @@ def main():
     global args, best_mae_error
 
     # load data
-    dataset = CIFData(*args.data_options)
+    dataset = CompositionData(*args.data_options)
     train_loader, val_loader, test_loader = get_train_val_test_loader(
         dataset=dataset, batch_size=args.batch_size,
         train_size=args.train_size, num_workers=args.workers,
         val_size=args.val_size, test_size=args.test_size,
         pin_memory=args.cuda, return_test=True)
 
-    # obtain target value normalizer
-    if args.task == 'classification':
-        normalizer = Normalizer(torch.zeros(2))
-        normalizer.load_state_dict({'mean': 0., 'std': 1.})
-    else:
-        if len(dataset) < 500:
-            warnings.warn('Dataset has less than 500 data points. '
-                          'Lower accuracy is expected. ')
-            sample_data_list = [dataset[i] for i in range(len(dataset))]
-        else:
-            sample_data_list = [dataset[i] for i in
-                                sample(range(len(dataset)), 500)]
-        _, sample_target, _ = collate_pool(sample_data_list)
-        normalizer = Normalizer(sample_target)
+
+    # for large data sets we can use a subset for the normaliser
+    _, sample_target, _ = collate_pool(dataset)
+    normalizer = Normalizer(sample_target)
 
     # build model
     structures, _, _ = dataset[0]
     orig_atom_fea_len = structures[0].shape[-1]
     nbr_fea_len = structures[1].shape[-1]
-    model = CrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,
+    model = CompositionNetNet(orig_atom_fea_len, nbr_fea_len,
                                 atom_fea_len=args.atom_fea_len,
-                                n_conv=args.n_conv,
-                                h_fea_len=args.h_fea_len,
-                                n_h=args.n_h,
-                                classification=True if args.task ==
-                                'classification' else False)
+                                n_graph=args.n_conv,
+                                h_fea_len=args.h_fea_len)
     if args.cuda:
         model.cuda()
 
-    # define loss func and optimizer
-    if args.task == 'classification':
-        criterion = nn.NLLLoss()
-    else:
-        criterion = nn.MSELoss()
+    # Loss Function
+    criterion = nn.MSELoss()
+
+    # Choose Optimiser
     if args.optim == 'SGD':
         optimizer = optim.SGD(model.parameters(), args.lr,
                               momentum=args.momentum,
@@ -112,20 +99,8 @@ def main():
         scheduler.step()
 
         # remember the best mae_eror and save checkpoint
-        if args.task == 'regression':
-            is_best = mae_error < best_mae_error
-            best_mae_error = min(mae_error, best_mae_error)
-        else:
-            is_best = mae_error > best_mae_error
-            best_mae_error = max(mae_error, best_mae_error)
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'best_mae_error': best_mae_error,
-            'optimizer': optimizer.state_dict(),
-            'normalizer': normalizer.state_dict(),
-            'args': vars(args)
-        }, is_best)
+        is_best = mae_error < best_mae_error
+        best_mae_error = min(mae_error, best_mae_error)
 
     # test best model
     print('---------Evaluate Model on Test Set---------------')
@@ -138,14 +113,7 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    if args.task == 'regression':
-        mae_errors = AverageMeter()
-    else:
-        accuracies = AverageMeter()
-        precisions = AverageMeter()
-        recalls = AverageMeter()
-        fscores = AverageMeter()
-        auc_scores = AverageMeter()
+    mae_errors = AverageMeter()
 
     # switch to train mode
     model.train()
@@ -166,10 +134,8 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
                          input[2],
                          input[3])
         # normalize target
-        if args.task == 'regression':
-            target_normed = normalizer.norm(target)
-        else:
-            target_normed = target.view(-1).long()
+        target_normed = normalizer.norm(target)
+
         if args.cuda:
             target_var = Variable(target_normed.cuda(async=True))
         else:
@@ -180,19 +146,9 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
         loss = criterion(output, target_var)
 
         # measure accuracy and record loss
-        if args.task == 'regression':
-            mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-            losses.update(loss.data.cpu()[0], target.size(0))
-            mae_errors.update(mae_error, target.size(0))
-        else:
-            accuracy, precision, recall, fscore, auc_score =\
-                class_eval(output.data.cpu(), target)
-            losses.update(loss.data.cpu()[0], target.size(0))
-            accuracies.update(accuracy, target.size(0))
-            precisions.update(precision, target.size(0))
-            recalls.update(recall, target.size(0))
-            fscores.update(fscore, target.size(0))
-            auc_scores.update(auc_score, target.size(0))
+        mae_error = mae(normalizer.denorm(output.data.cpu()), target)
+        losses.update(loss.data.cpu()[0], target.size(0))
+        mae_errors.update(mae_error, target.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -204,43 +160,21 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
         end = time.time()
 
         if i % args.print_freq == 0:
-            if args.task == 'regression':
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
-                       epoch, i, len(train_loader), batch_time=batch_time,
-                       data_time=data_time, loss=losses, mae_errors=mae_errors)
-                      )
-            else:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
-                      'Precision {prec.val:.3f} ({prec.avg:.3f})\t'
-                      'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
-                      'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
-                      'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
-                       epoch, i, len(train_loader), batch_time=batch_time,
-                       data_time=data_time, loss=losses, accu=accuracies,
-                       prec=precisions, recall=recalls, f1=fscores,
-                       auc=auc_scores)
-                      )
-
+            print('Epoch: [{0}][{1}/{2}]\t'
+                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
+                    epoch, i, len(train_loader), batch_time=batch_time,
+                    data_time=data_time, loss=losses, mae_errors=mae_errors)
+                    )
 
 def validate(val_loader, model, criterion, normalizer, test=False):
     batch_time = AverageMeter()
     losses = AverageMeter()
-    if args.task == 'regression':
-        mae_errors = AverageMeter()
-    else:
-        accuracies = AverageMeter()
-        precisions = AverageMeter()
-        recalls = AverageMeter()
-        fscores = AverageMeter()
-        auc_scores = AverageMeter()
+
+    mae_errors = AverageMeter()
+
     if test:
         test_targets = []
         test_preds = []
@@ -255,19 +189,21 @@ def validate(val_loader, model, criterion, normalizer, test=False):
             input_var = (Variable(input[0].cuda(async=True), volatile=True),
                          Variable(input[1].cuda(async=True), volatile=True),
                          input[2].cuda(async=True),
-                         [crys_idx.cuda(async=True) for crys_idx in input[3]])
+                         input[3].cuda(async=True),
+                         [atom_idx.cuda(async=True) for atom_idx in input[4]],
+                         [crys_idx.cuda(async=True) for crys_idx in input[5]])
         else:
             input_var = (Variable(input[0], volatile=True),
                          Variable(input[1], volatile=True),
                          input[2],
-                         input[3])
-        if args.task == 'regression':
-            target_normed = normalizer.norm(target)
-        else:
-            target_normed = target.view(-1).long()
+                         input[3],
+                         input[4],
+                         input[5])
+
+        target_normed = normalizer.norm(target)
+
         if args.cuda:
-            target_var = Variable(target_normed.cuda(async=True),
-                                  volatile=True)
+            target_var = Variable(target_normed.cuda(async=True), volatile=True)
         else:
             target_var = Variable(target_normed, volatile=True)
 
@@ -276,115 +212,44 @@ def validate(val_loader, model, criterion, normalizer, test=False):
         loss = criterion(output, target_var)
 
         # measure accuracy and record loss
-        if args.task == 'regression':
-            mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-            losses.update(loss.data.cpu()[0], target.size(0))
-            mae_errors.update(mae_error, target.size(0))
-            if test:
-                test_pred = normalizer.denorm(output.data.cpu())
-                test_target = target
-                test_preds += test_pred.view(-1).tolist()
-                test_targets += test_target.view(-1).tolist()
-                test_cif_ids += batch_cif_ids
-        else:
-            accuracy, precision, recall, fscore, auc_score =\
-                class_eval(output.data.cpu(), target)
-            losses.update(loss.data.cpu()[0], target.size(0))
-            accuracies.update(accuracy, target.size(0))
-            precisions.update(precision, target.size(0))
-            recalls.update(recall, target.size(0))
-            fscores.update(fscore, target.size(0))
-            auc_scores.update(auc_score, target.size(0))
-            if test:
-                test_pred = torch.exp(output.data.cpu())
-                test_target = target
-                assert test_pred.shape[1] == 2
-                test_preds += test_pred[:, 1].tolist()
-                test_targets += test_target.view(-1).tolist()
-                test_cif_ids += batch_cif_ids
+        mae_error = mae(normalizer.denorm(output.data.cpu()), target)
+        losses.update(loss.data.cpu()[0], target.size(0))
+        mae_errors.update(mae_error, target.size(0))
+        if test:
+            test_pred = normalizer.denorm(output.data.cpu())
+            test_target = target
+            test_preds += test_pred.view(-1).tolist()
+            test_targets += test_target.view(-1).tolist()
+            test_cif_ids += batch_cif_ids
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % args.print_freq == 0:
-            if args.task == 'regression':
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
-                       i, len(val_loader), batch_time=batch_time, loss=losses,
-                       mae_errors=mae_errors))
-            else:
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
-                      'Precision {prec.val:.3f} ({prec.avg:.3f})\t'
-                      'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
-                      'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
-                      'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
-                       i, len(val_loader), batch_time=batch_time, loss=losses,
-                       accu=accuracies, prec=precisions, recall=recalls,
-                       f1=fscores, auc=auc_scores))
+            print('Test: [{0}/{1}]\t'
+                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
+                    i, len(val_loader), batch_time=batch_time, loss=losses,
+                    mae_errors=mae_errors))
+
 
     if test:
         star_label = '**'
-        import csv
-        with open('test_results.csv', 'w') as f:
-            writer = csv.writer(f)
-            for cif_id, target, pred in zip(test_cif_ids, test_targets,
-                                            test_preds):
-                writer.writerow((cif_id, target, pred))
     else:
         star_label = '*'
-    if args.task == 'regression':
-        print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
-                                                        mae_errors=mae_errors))
-        return mae_errors.avg
-    else:
-        print(' {star} AUC {auc.avg:.3f}'.format(star=star_label,
-                                                 auc=auc_scores))
-        return auc_scores.avg
 
+    print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
+                                                    mae_errors=mae_errors))
 
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-class Normalizer(object):
-    """Normalize a Tensor and restore it later. """
-    def __init__(self, tensor):
-        """tensor is taken as a sample to calculate the mean and std"""
-        self.mean = torch.mean(tensor)
-        self.std = torch.std(tensor)
-
-    def norm(self, tensor):
-        return (tensor - self.mean) / self.std
-
-    def denorm(self, normed_tensor):
-        return normed_tensor * self.std + self.mean
-
-    def state_dict(self):
-        return {'mean': self.mean,
-                'std': self.std}
-
-    def load_state_dict(self, state_dict):
-        self.mean = state_dict['mean']
-        self.std = state_dict['std']
+    if test:  
+        with open('test_results.csv', 'w') as f:
+            writer = csv.writer(f)
+            for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
+                writer.writerow((cif_id, target, pred))
+                                                 
+    return mae_errors.avg
 
 
 def mae(prediction, target):
@@ -426,6 +291,44 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     if is_best:
         shutil.copyfile(filename, 'model_best.pth.tar')
 
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+class Normalizer(object):
+    """Normalize a Tensor and restore it later. """
+    def __init__(self, tensor):
+        """tensor is taken as a sample to calculate the mean and std"""
+        self.mean = torch.mean(tensor)
+        self.std = torch.std(tensor)
+
+    def norm(self, tensor):
+        return (tensor - self.mean) / self.std
+
+    def denorm(self, normed_tensor):
+        return normed_tensor * self.std + self.mean
+
+    def state_dict(self):
+        return {'mean': self.mean,
+                'std': self.std}
+
+    def load_state_dict(self, state_dict):
+        self.mean = state_dict['mean']
+        self.std = state_dict['std']
 
 if __name__ == '__main__':
     main()

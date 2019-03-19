@@ -28,7 +28,8 @@ class MessageLayer(nn.Module):
         self.core_transform = nn.Softplus()
         self.output_transform = nn.Softplus()
 
-    def forward(self, atom_in_fea, bond_nbr_fea, self_fea_idx, nbr_fea_idx, atom_bond_idx):
+    def forward(self, atom_in_fea, bond_nbr_fea, 
+                self_fea_idx, nbr_fea_idx, atom_bond_idx):
         """
         Forward pass
 
@@ -100,7 +101,7 @@ class CompositionNet(nn.Module):
     approaches.
     """
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
-                 atom_fea_len=64, n_graph=3, h_fea_len=[128], n_h=1):
+                 atom_fea_len=64, n_graph=3, h_fea_len=[128]):
         """
         Initialize CompositionNet.
 
@@ -140,13 +141,14 @@ class CompositionNet(nn.Module):
         if len(h_fea_list) > 1:
             # create a list of fully connected passing layers
             self.fcs = nn.ModuleList([nn.Linear(h_fea_list[i], h_fea_list[i+1])
-                                      for i in range(n_h-1)])
+                                      for i in range(len(h_fea_list)-1)])
             self.softpluses = nn.ModuleList([nn.Softplus()
-                                             for i in range(n_h-1)])
+                                             for i in range(len(h_fea_list)-1)])
 
         self.fc_out = nn.Linear(h_fea_list[-1], n_out)
 
-    def forward(self, orig_atom_fea, nbr_fea, nbr_fea_idx, crystal_atom_idx):
+    def forward(self, orig_atom_fea, nbr_fea, self_fea_idx, 
+                nbr_fea_idx, atom_bond_idx, crystal_atom_idx):
         """
         Forward pass
 
@@ -159,13 +161,17 @@ class CompositionNet(nn.Module):
         Inputs
         ----------
         orig_atom_fea: Variable(torch.Tensor) shape (N, orig_atom_fea_len)
-            Atom features from atom type
+            Atom features of each of the N atoms in the batch
         nbr_fea: Variable(torch.Tensor) shape (M, nbr_fea_len)
-            Bond features of each atom's M neighbours
+            Bond features of each M bonds in the batch
+        self_fea_idx: torch.Tensor shape (M,)
+            Indices of the atom each of the M bonds correspond to
         nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of M neighbours of each atom
+            Indices of of the neighbours of the M bonds connect to
+        atom_bond_idx: list of torch.LongTensor of length C
+            Mapping from the bond idx to atom idx
         crystal_atom_idx: list of torch.LongTensor of length C
-            Mapping from the crystal idx to atom idx
+            Mapping from the atom idx to crystal idx
         
         Returns
         -------
@@ -178,7 +184,7 @@ class CompositionNet(nn.Module):
 
         # apply the graph message passing functions 
         for graph_func in self.graphs:
-            atom_fea = graph_func(atom_fea, nbr_fea, nbr_fea_idx)
+            atom_fea = graph_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, atom_bond_idx)
 
         # generate crystal features by pooling the atomic features
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
