@@ -113,7 +113,7 @@ class BondEmbedding(NewEmbedding):
         Parameters
         ----------
         """
-        feature_file = os.path.join(self.data_dir, 'Electronegativity/Electronegativity.csv')
+        feature_file = os.path.join(self.data_dir, 'Electronegativity.csv')
         assert os.path.exists(feature_file), '{} does not exist!'.format(feature_file)
         series = pd.read_csv(feature_file, header=None, index_col=0, squeeze=True).to_dict()
 

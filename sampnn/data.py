@@ -9,44 +9,48 @@ import functools
 import argparse
 import numpy as np
 
-from scipy.special import gamma
+# from scipy.special import gamma
 
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from sampnn.features import LoadFeaturiser
 
-'''
-we need a dataset class
-a data loader class
-a collate function to take batches of crystal idx and return atoms
-'''
 
 def input_parser():
     '''
     parse input
     '''
     parser = argparse.ArgumentParser(description='Structure Agnostic Message Passing Neural Network')
+
+    # misc inputs
     parser.add_argument('data_options', metavar='OPTIONS', nargs='+', help='dataset options, started with the path to root dir,then other options')
     parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
-    parser.add_argument('-j', '--workers', default=0, type=int, metavar='N', help='number of data loading workers (default: 0)')
-    parser.add_argument('--epochs', default=30, type=int, metavar='N', help='number of total epochs to run (default: 30)')
-    parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('-b', '--batch-size', default=256, type=int, metavar='N', help='mini-batch size (default: 256)')
-    parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate (default: 0.01)')
-    parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', help='milestones for scheduler (default: [100])')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
-    parser.add_argument('--weight-decay', '--wd', default=0, type=float, metavar='W', help='weight decay (default: 0)')
-    parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency (default: 10)')
+    parser.add_argument('--print-freq', default=10, type=int, metavar='N', help='print frequency (default: 10)')
+    
+    # restart inputs
     parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
+    parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
+    
+    # dataloader inputs
+    parser.add_argument('--workers', default=0, type=int, metavar='N', help='number of data loading workers (default: 0)')
+    parser.add_argument('--batch-size', default=256, type=int, metavar='N', help='mini-batch size (default: 256)')    
     parser.add_argument('--train-size', default=0.6, type=float, metavar='N', help='proportion of data for training')
     parser.add_argument('--val-size', default=0.2, type=float, metavar='N', help='proportion of data for validation')
     parser.add_argument('--test-size', default=0.2, type=float, metavar='N', help='proportion of data for testing')
+    
+    # optimiser inputs
     parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', help='choose an optimizer, SGD or Adam, (default: SGD)')
+    parser.add_argument('--epochs', default=30, type=int, metavar='N', help='number of total epochs to run (default: 30)')
+    parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', help='initial learning rate (default: 0.01)')
+    parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', help='milestones for scheduler (default: [100])')
+    parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
+    parser.add_argument('--weight-decay', default=0, type=float, metavar='W', help='weight decay (default: 0)')
+    
+    # graph inputs
     parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', help='number of hidden atom features in conv layers')
-    parser.add_argument('--h-fea-len', default=[128], nargs='+', type=int, metavar='N', help='number of hidden features after pooling')
-    parser.add_argument('--n-graph', default=3, type=int, metavar='N', help='number of conv layers')
-    parser.add_argument('--n-h', default=1, type=int, metavar='N', help='number of hidden layers after pooling')
+    parser.add_argument('--h-fea-list', default=[128], nargs='+', type=int, metavar='N', help='number of hidden features after pooling')
+    parser.add_argument('--n-conv', default=3, type=int, metavar='N', help='number of conv layers')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -146,17 +150,17 @@ def collate_batch(dataset_list):
         batch_atom_fea.append(atom_fea)
         batch_bond_fea.append(bond_fea)
 
-        batch_self_fea_idx.append(self_fea_idx+atom_base_idx)
-        batch_nbr_fea_idx.append(nbr_fea_idx+atom_base_idx)
+        batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
+        batch_nbr_fea_idx.append(nbr_fea_idx+cry_base_idx)
 
         # mapping from bonds to atoms
         for _ in range(n_i):
-            atom_idx = torch.arange(n_i-1, dtype=torch.int)+atom_base_idx
+            atom_idx = torch.arange(n_i-1, dtype=torch.long)+atom_base_idx
             atom_bond_idx.append(atom_idx)
             atom_base_idx += n_i-1
 
         # mapping from atoms to crystals
-        cry_idx = torch.arange(n_i, dtype=torch.int)+cry_base_idx
+        cry_idx = torch.arange(n_i, dtype=torch.long)+cry_base_idx
         crystal_atom_idx.append(cry_idx)
         cry_base_idx += n_i
 
@@ -191,11 +195,11 @@ class CompositionData(Dataset):
         random.seed(random_seed)
         random.shuffle(self.id_prop_data)
 
-        atom_fea_file = os.path.join(self.data_dir, 'atom_init.json')
-        assert os.path.exists(atom_fea_file), 'atom_init.json does not exist!'
+        atom_fea_file = os.path.join(self.data_dir, 'atom_fea.json')
+        assert os.path.exists(atom_fea_file), 'atom_fea.json does not exist!'
 
-        bond_fea_file = os.path.join(self.data_dir, 'bond_init.json')
-        assert os.path.exists(atom_fea_file), 'bond_init.json does not exist!'
+        bond_fea_file = os.path.join(self.data_dir, 'bond_fea.json')
+        assert os.path.exists(atom_fea_file), 'bond_fea.json does not exist!'
 
         self.atom_features = LoadFeaturiser(atom_fea_file)
         self.bond_features = LoadFeaturiser(bond_fea_file)
@@ -212,22 +216,24 @@ class CompositionData(Dataset):
         '''
         cry_id, composition, target = self.id_prop_data[idx]
         elements, weights = parse_composition(composition)
+        if len(elements) == 1:
+            # bad data point work out how to handle
+            pass
         atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
-
-        elements = set(elements)
-        set_idx = set(range(len(elements)))
+        env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
-        for i, element in enumerate(elements):  
-            nbrs = list(elements.difference(set([element])))
-            bond_fea = np.vstack([self.bond_features.get_fea(element+nbr) for nbr in nbrs])
+        bond_fea = []
+        for i, element in enumerate(elements):
+            nbrs = elements[:i]+elements[i+1:]
+            bond_fea.append(torch.Tensor(np.vstack([self.bond_features.get_fea(element+nbr) for nbr in nbrs])))
             self_fea_idx += [i]*len(nbrs)
-            nbr_fea_idx += list(set_idx.difference(set([i])))
+            nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
 
         atom_fea = torch.Tensor(atom_fea)
-        bond_fea = torch.Tensor(bond_fea)
-        self_fea_idx = torch.IntTensor(self_fea_idx)
-        nbr_fea_idx = torch.IntTensor(nbr_fea_idx)
+        bond_fea = torch.cat(bond_fea, dim=0)
+        self_fea_idx = torch.LongTensor(self_fea_idx)
+        nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
         return (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
 

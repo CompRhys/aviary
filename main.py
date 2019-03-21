@@ -15,39 +15,36 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import MultiStepLR
 
-from sampnn.utils import input_parser
+from sampnn.message import CompositionNet
+from sampnn.data import input_parser, CompositionData 
+from sampnn.data import collate_batch, get_data_loaders
 
 args = input_parser()
-
-if args.task == 'regression':
-    best_mae_error = 1e10
-else:
-    best_mae_error = 0.
 
 def main():
     global args, best_mae_error
 
     # load data
     dataset = CompositionData(*args.data_options)
-    train_loader, val_loader, test_loader = get_train_val_test_loader(
+    train_loader, val_loader, test_loader = get_data_loaders(
         dataset=dataset, batch_size=args.batch_size,
         train_size=args.train_size, num_workers=args.workers,
         val_size=args.val_size, test_size=args.test_size,
-        pin_memory=args.cuda, return_test=True)
+        pin_memory=args.cuda)
 
 
     # for large data sets we can use a subset for the normaliser
-    _, sample_target, _ = collate_pool(dataset)
+    _, sample_target, _ = collate_batch(dataset)
     normalizer = Normalizer(sample_target)
 
     # build model
     structures, _, _ = dataset[0]
     orig_atom_fea_len = structures[0].shape[-1]
     nbr_fea_len = structures[1].shape[-1]
-    model = CompositionNetNet(orig_atom_fea_len, nbr_fea_len,
+    model = CompositionNet(orig_atom_fea_len, nbr_fea_len,
                                 atom_fea_len=args.atom_fea_len,
                                 n_graph=args.n_conv,
-                                h_fea_len=args.h_fea_len)
+                                h_fea_list=args.h_fea_list)
     if args.cuda:
         model.cuda()
 
@@ -56,11 +53,11 @@ def main():
 
     # Choose Optimiser
     if args.optim == 'SGD':
-        optimizer = optim.SGD(model.parameters(), args.lr,
+        optimizer = optim.SGD(model.parameters(), args.learning_rate,
                               momentum=args.momentum,
                               weight_decay=args.weight_decay)
     elif args.optim == 'Adam':
-        optimizer = optim.Adam(model.parameters(), args.lr,
+        optimizer = optim.Adam(model.parameters(), args.learning_rate,
                                weight_decay=args.weight_decay)
     else:
         raise NameError('Only SGD or Adam is allowed as --optim')
@@ -84,6 +81,8 @@ def main():
     # milestone is reached.
     scheduler = MultiStepLR(optimizer, milestones=args.lr_milestones,
                             gamma=0.1)
+
+    best_mae_error = validate(val_loader, model, criterion, normalizer)
 
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
@@ -127,12 +126,19 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
             input_var = (Variable(input[0].cuda(async=True)),
                          Variable(input[1].cuda(async=True)),
                          input[2].cuda(async=True),
-                         [crys_idx.cuda(async=True) for crys_idx in input[3]])
+                         input[3].cuda(async=True),
+                         [atom_idx.cuda(async=True) for atom_idx in input[4]],
+                         [crys_idx.cuda(async=True) for crys_idx in input[5]])
         else:
             input_var = (Variable(input[0]),
                          Variable(input[1]),
                          input[2],
-                         input[3])
+                         input[3],
+                         input[4],
+                         input[5])
+
+
+
         # normalize target
         target_normed = normalizer.norm(target)
 
@@ -147,7 +153,7 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
 
         # measure accuracy and record loss
         mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-        losses.update(loss.data.cpu()[0], target.size(0))
+        losses.update(loss.data.cpu().item(), target.size(0))
         mae_errors.update(mae_error, target.size(0))
 
         # compute gradient and do SGD step
@@ -186,15 +192,15 @@ def validate(val_loader, model, criterion, normalizer, test=False):
     end = time.time()
     for i, (input, target, batch_cif_ids) in enumerate(val_loader):
         if args.cuda:
-            input_var = (Variable(input[0].cuda(async=True), volatile=True),
-                         Variable(input[1].cuda(async=True), volatile=True),
+            input_var = (Variable(input[0].cuda(async=True)),
+                         Variable(input[1].cuda(async=True)),
                          input[2].cuda(async=True),
                          input[3].cuda(async=True),
                          [atom_idx.cuda(async=True) for atom_idx in input[4]],
                          [crys_idx.cuda(async=True) for crys_idx in input[5]])
         else:
-            input_var = (Variable(input[0], volatile=True),
-                         Variable(input[1], volatile=True),
+            input_var = (Variable(input[0]),
+                         Variable(input[1]),
                          input[2],
                          input[3],
                          input[4],
@@ -203,9 +209,9 @@ def validate(val_loader, model, criterion, normalizer, test=False):
         target_normed = normalizer.norm(target)
 
         if args.cuda:
-            target_var = Variable(target_normed.cuda(async=True), volatile=True)
+            target_var = Variable(target_normed.cuda(async=True))
         else:
-            target_var = Variable(target_normed, volatile=True)
+            target_var = Variable(target_normed)
 
         # compute output
         output = model(*input_var)
@@ -213,7 +219,7 @@ def validate(val_loader, model, criterion, normalizer, test=False):
 
         # measure accuracy and record loss
         mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-        losses.update(loss.data.cpu()[0], target.size(0))
+        losses.update(loss.data.cpu().item(), target.size(0))
         mae_errors.update(mae_error, target.size(0))
         if test:
             test_pred = normalizer.denorm(output.data.cpu())
@@ -263,24 +269,6 @@ def mae(prediction, target):
     target: torch.Tensor (N, 1)
     """
     return torch.mean(torch.abs(target - prediction))
-
-
-def class_eval(prediction, target):
-    '''
-    Evaluate metrics for classification problems
-    '''
-    prediction = np.exp(prediction.numpy())
-    target = target.numpy()
-    pred_label = np.argmax(prediction, axis=1)
-    target_label = np.squeeze(target)
-    if prediction.shape[1] == 2:
-        precision, recall, fscore, _ = metrics.precision_recall_fscore_support(
-            target_label, pred_label, average='binary')
-        auc_score = metrics.roc_auc_score(target_label, prediction[:, 1])
-        accuracy = metrics.accuracy_score(target_label, pred_label)
-    else:
-        raise NotImplementedError
-    return accuracy, precision, recall, fscore, auc_score
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):

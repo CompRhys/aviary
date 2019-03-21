@@ -57,10 +57,11 @@ class MessageLayer(nn.Module):
         atom_out_fea: nn.Variable shape (N, atom_fea_len)
             Atom hidden features after message passing
         """
-
+        # print('in', atom_in_fea)
         # construct the total features for passing
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
         atom_self_fea = atom_in_fea[self_fea_idx,:]
+
         total_fea = torch.cat([atom_self_fea, atom_nbr_fea, bond_nbr_fea], dim=1)
 
         # define the message passing operation
@@ -84,6 +85,7 @@ class MessageLayer(nn.Module):
         nbr_sumed = self.batchnorm1(nbr_sumed)
 
         atom_out_fea = self.output_transform(atom_in_fea + nbr_sumed)
+        # print('out', atom_out_fea)
         return atom_out_fea
 
       
@@ -101,7 +103,7 @@ class CompositionNet(nn.Module):
     approaches.
     """
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
-                 atom_fea_len=64, n_graph=3, h_fea_list=[128], 
+                 atom_fea_len=12, n_graph=3, h_fea_list=[128], 
                  n_out = 1):
         """
         Initialize CompositionNet.
@@ -136,7 +138,7 @@ class CompositionNet(nn.Module):
                                     for _ in range(n_graph)])
 
         # note 2*atom_fea_len due to including the mean and std of atom features
-        self.graph_to_fc = nn.Linear(2*atom_fea_len, h_fea_list[0])
+        self.graph_to_fc = nn.Linear(atom_fea_len, h_fea_list[0])
         self.graph_to_fc_softplus = nn.Softplus()
 
         if len(h_fea_list) > 1:
@@ -237,11 +239,4 @@ class CompositionNet(nn.Module):
                     for idx_map in crystal_atom_idx]
         mean_fea = torch.cat(mean_fea, dim=0)
 
-        # Pool to get the standard deviation of the atomic features
-        std_fea = [torch.std(atom_fea[idx_map], dim=0, keepdim=True)
-                    for idx_map in crystal_atom_idx]
-        std_fea = torch.cat(std_fea, dim=0)
-
-        # concatenate the pooled means and standard deviations.
-        pooled = torch.cat((mean_fea, std_fea), dim=1)
-        return pooled
+        return mean_fea
