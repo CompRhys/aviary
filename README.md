@@ -19,11 +19,11 @@ Recent progress in the study of small molecules has built upon the use of messag
 
 If you use this code please cite our work for which this model was built:
 
-[Structure Agnostic Message Passing Neural Networks](http://www.tcm.phy.cam.ac.uk/profiles/reag2/)
+[Structure Agnostic Message Passing Neural Networks (placeholder)](http://www.tcm.phy.cam.ac.uk/profiles/reag2/)
 
 please also consider citing the following paper whose CGCNN framework we took as a starting point for developing Sampnn:
 
 [Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties](https://link.aps.org/doi/10.1103/PhysRevLett.120.145301)
 
 ## Disclaimer
-This in research code and it is shared without support or any guarentee on it's quality. However if you do find an error please submit a pull request or raise an issue and I will try my best to solve it.
+This in research code and it is shared without support or any guarentee on its quality. However, if you do find an error please submit a pull request or raise an issue and I will try my best to solve it.
