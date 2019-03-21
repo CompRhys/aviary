@@ -1,0 +1,29 @@
+Metadata-Version: 2.1
+Name: sampnn
+Version: 0.0.1
+Summary: Structure Agnostic Message Passing Neural Network
+Home-page: https://github.com/comprhys/sampnn
+Author: Rhys Goodall
+Author-email: reag2@cam.ac.uk
+License: UNKNOWN
+Description: # Sampnn
+        Structure Agnostic Message Passing Neural Network
+        
+        ## Premise
+        In materials discovery applications often we know the composition of trial materials but have little knowledge about the structure.
+        
+        Most current SOTA results within the field of machine learning for materials discovery are reliant on already knowing the structure of the material. Whilst this can be helpful for interpolating within given systems it means that out ML applications must be intrinsically  dependant on costly DFT calculations to first find structures fro trial compositions. Whilst this would not be prohibitive it adds an additional level of complexity.
+        
+        In a similar vein to other materials agnostic platforms (i.e. [MAGPIE](http://oqmd.org/static/analytics/magpie/doc/)) the aim of this model is to be able to determine properties (to reasonable accuracy) based solely on the composition of a material.
+        
+        ## Message Passing Neural Networks
+        Recent progress in the study of small molecules has built upon the use of message passing neural networks. The structure of the graphs can be described by an adjacency matrix and the nodes contain relevant atomic features. Similar attempts are already progressing in application of such networks to extended periodic crystals although notable issues exist in how to represent dopants in such graphs and how much of the structure we can take as prior knowledge. This work is motivated by a case study on High Temperature Superconductors where the role of dopants is critical therefore here we hope to develop a structure agnostic approach that therefore enables dopants to be handled trivially.
+        
+        ### TODO:
+        * adjacency matrix distributed based on valance.
+        * Update via hebbian type algorithm to strengthen anion-cation type weights and weaken anion-anion and cation-cation weights.
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Description-Content-Type: text/markdown

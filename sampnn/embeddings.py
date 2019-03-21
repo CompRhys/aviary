@@ -1,24 +1,38 @@
 import os
 import json
-import warnings
 import numpy as np
 import pandas as pd
-from scipy.special import gamma
 
-class AtomEmbedding(object):
-    '''
-    construct a dictionary of features using the atom as a key with 
-    the option to save the dictionary as a .JSON file. 
-    '''
+class NewEmbedding(object):
 
-    def __init__(self, data_dir, target_dir):
-        assert os.path.exists(data_dir), 'data_dir does not exist!'
+    def __init__(self, data_dir):
+        assert os.path.exists(data_dir), '{} does not exist!'.format(data_dir)
         self.data_dir = data_dir
 
-        assert os.path.exists(target_dir), 'target_dir does not exist!'
-        self.target_dir = target_dir
-
         self._embedding = {}
+
+    def save_embedding(self, save_dir, save_file):
+        """
+        Save the embedding
+        """
+        assert os.path.exists(save_dir), 'save_dir does not exist!'
+        save_path = os.path.join(save_dir, save_file)
+        with open(save_path, 'w+') as f:
+            json.dump(self._embedding, f)
+
+    def get_embedding(self):
+        """
+        Return the embedding
+        """
+        return self._embedding
+
+class AtomEmbedding(NewEmbedding):
+    '''
+    construct a dictionary of features using the atom as a key
+    '''
+
+    def __init__(self, data_dir):
+        super().__init__(data_dir)
 
     def construct_embedding(self, features):
         """
@@ -37,26 +51,31 @@ class AtomEmbedding(object):
         series_list = []
 
         for feature in features:
-            feature_file = os.path.join(self.data_dir, feature+'/data.csv')
-            meta_file = os.path.join(self.data_dir, feature+'/meta.csv')
+            feature_file = os.path.join(self.data_dir, feature, feature+'.csv')
+            meta_file = os.path.join(self.data_dir, feature, 'meta.json')
             assert os.path.exists(feature_file), '{} does not exist!'.format(feature_file)
             assert os.path.exists(meta_file), '{} does not exist!'.format(meta_file)
 
-            meta_data = pd.read_csv(meta_file, header=None, index_col=0, squeeze=True).to_dict()
+            # load the feature data and its meta data
             series = pd.read_csv(feature_file, header=None, index_col=0, squeeze=True)
+            with open(meta_file) as f:
+                meta_data = json.load(f)
 
-            if (meta_data.get('categorical') == False) & (meta_data.get('expand') != None):
-                if meta_data.get('steps') == None:
-                    print('number of steps not given for feature expansion, using default value of 5')
-                    meta_data.update({'steps': 5})
+            if meta_data.get('expand') != None:
                 data = series.values
 
-                if meta_data.get('fmin') != None:
+                # ensure that we have valid inputs for expansion
+                if meta_data.get('steps') == None:
+                    print('{}: number of steps not given for feature expansion, using default value of 5'.format(feature))
+                    meta_data.update({'steps': 5})
+                if meta_data.get('fmin') == None:
+                    print('{}: fmin not specified, using minimum as default'.format(feature))
                     meta_data.update({'fmin': np.min(data)})
-
-                if meta_data.get('fmax') != None:
+                if meta_data.get('fmax') == None:
+                    print('{}: fmax not specified, using maximum as default'.format(feature))
                     meta_data.update({'fmax': np.max(data)})
 
+                # carry out expansion
                 if meta_data.get('expand') == 'onehot':
                     onehot = OneHotEmbedding(meta_data.get('fmin'), meta_data.get('fmax'),
                                                 meta_data.get('steps'))
@@ -65,6 +84,7 @@ class AtomEmbedding(object):
                     gaussian = GaussianEmbedding(meta_data.get('fmin'), meta_data.get('fmax'),
                                                  meta_data.get('steps'), meta_data.get('var'))
                     expanded_values = gaussian.expand(data)
+                    expanded_values[expanded_values < 1e-3] = 0
                 else:
                     raise NameError('Only \'onehot\' or \'gaussian\' feature expansions are implemented')
                 
@@ -73,61 +93,34 @@ class AtomEmbedding(object):
             else:
                 series_list.append(series)
 
+        # combine the series into a dataframe and convert to a dictionary
         df = pd.concat(series_list, axis=1)
         keys=df.index.values
         self._embedding = dict(zip(keys, df.loc[keys].values.tolist()))
 
-    def save_embedding(self):
-        """
-        Save the embedding
-        """
-        with open('output.json', 'w+') as f:
-            json.dump(self._embedding, f)
 
-    def get_embedding(self):
-        """
-        Return the embedding
-        """
-        return self._embedding
-
-
-class BondEmbedding(object):
+class BondEmbedding(NewEmbedding):
     '''
     construct a dictionary of features using the concatenation of the 
-    two relevant atoms as a key with the option to save the dictionary
-    as a .JSON file. 
+    two relevant atoms as a key
     '''
 
     def __init__(self, data_dir):
-        assert os.path.exists(data_dir), 'data_dir does not exist!'
-        self.data_dir = data_dir
-        self._embedding = {}
+        super().__init__(data_dir)
 
-    def construct_embedding(self,):
+    def construct_embedding(self):
         """
         Parameters
         ----------
         """
+        feature_file = os.path.join(self.data_dir, 'Electronegativity/Electronegativity.csv')
+        assert os.path.exists(feature_file), '{} does not exist!'.format(feature_file)
+        series = pd.read_csv(feature_file, header=None, index_col=0, squeeze=True).to_dict()
 
-        series_list = []      
-                
-        series_list.append([])
-        df = pd.concat(series_list, axis=1)
-        keys=df.index.values
-        self._embedding = dict(zip(keys, df.loc[keys].values.tolist()))
-
-    def save_embedding(self):
-        """
-        Save the embedding
-        """
-        with open('output.json', 'w+') as f:
-            json.dump(self._embedding, f)
-
-    def get_embedding(self):
-        """
-        Return the embedding
-        """
-        return self._embedding
+        for key_a, value_a in series.items():
+            for key_b, value_b in series.items():
+                key_ab = key_a+key_b
+                self._embedding[key_ab] = [value_a-value_b, (value_a+value_b)/2.]
 
 
 class GaussianEmbedding(object):
@@ -207,6 +200,7 @@ class OneHotEmbedding(object):
         """
         expand = distances[..., np.newaxis]-self.filter
         return np.where(np.logical_and(expand<self.step/2, expand>=-self.step/2), 1, 0)
+
 
 def ArkelKetelaarType(A, B):
     """

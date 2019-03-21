@@ -12,8 +12,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/comprhys/sampnn",
-    packages=['sampnn'],
-    package_dir={'sampnn': 'sampnn'},
+    packages=setuptools.find_packages(),
+    # packages=['sampnn'],
+    # package_dir={'sampnn': 'sampnn'},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

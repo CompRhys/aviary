@@ -1,0 +1,11 @@
+README.md
+setup.py
+sampnn/__init__.py
+sampnn/data.py
+sampnn/embeddings.py
+sampnn/features.py
+sampnn/message.py
+sampnn.egg-info/PKG-INFO
+sampnn.egg-info/SOURCES.txt
+sampnn.egg-info/dependency_links.txt
+sampnn.egg-info/top_level.txt

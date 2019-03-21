@@ -9,10 +9,12 @@ import functools
 import argparse
 import numpy as np
 
+from scipy.special import gamma
+
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from features import LoadFeaturiser
+from sampnn.features import LoadFeaturiser
 
 '''
 we need a dataset class
