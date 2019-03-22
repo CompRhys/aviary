@@ -82,11 +82,17 @@ def main():
     scheduler = MultiStepLR(optimizer, milestones=args.lr_milestones,
                             gamma=0.1)
 
-    best_mae_error = validate(val_loader, model, criterion, normalizer)
+    best_mae_error = validate(val_loader, model, criterion, normalizer,
+                                verbose=False)
 
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, normalizer)
+        losses, mae_errors = train(train_loader, model, criterion, optimizer, epoch, normalizer)
+
+        print('Epoch: [{0}/{1}]\t'
+                'Loss {loss.avg:.4f}\t'
+                'MAE {mae_errors.avg:.3f}'.format(
+                epoch, args.epochs, loss=losses, mae_errors=mae_errors))
 
         # evaluate on validation set
         mae_error = validate(val_loader, model, criterion, normalizer)
@@ -101,6 +107,15 @@ def main():
         is_best = mae_error < best_mae_error
         best_mae_error = min(mae_error, best_mae_error)
 
+        save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.state_dict(),
+                'best_mae_error': best_mae_error,
+                'optimizer': optimizer.state_dict(),
+                'normalizer': normalizer.state_dict(),
+                'args': vars(args)
+            }, is_best)
+
     # test best model
     print('---------Evaluate Model on Test Set---------------')
     best_checkpoint = torch.load('model_best.pth.tar')
@@ -108,20 +123,18 @@ def main():
     validate(test_loader, model, criterion, normalizer, test=True)
 
 
-def train(train_loader, model, criterion, optimizer, epoch, normalizer):
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
+def train(train_loader, model, criterion, optimizer, 
+            epoch, normalizer, verbose = False):
+    """
+    run a forward pass, backwards pass and then update weights
+    """
     losses = AverageMeter()
     mae_errors = AverageMeter()
 
     # switch to train mode
     model.train()
 
-    end = time.time()
     for i, (input, target, _) in enumerate(train_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-
         if args.cuda:
             input_var = (Variable(input[0].cuda(async=True)),
                          Variable(input[1].cuda(async=True)),
@@ -136,8 +149,6 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
                          input[3],
                          input[4],
                          input[5])
-
-
 
         # normalize target
         target_normed = normalizer.norm(target)
@@ -161,24 +172,18 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
         loss.backward()
         optimizer.step()
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+        if verbose:
+            print('Batch: [{0}/{1}]\t'
+                    'Loss {loss.val:.4f}\t'
+                    'MAE {mae_errors.val:.3f}'.format(
+                    i, len(train_loader), loss=losses, mae_errors=mae_errors))
 
-        if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                    'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
-                    epoch, i, len(train_loader), batch_time=batch_time,
-                    data_time=data_time, loss=losses, mae_errors=mae_errors)
-                    )
+    return losses, mae_errors
+    
 
-def validate(val_loader, model, criterion, normalizer, test=False):
-    batch_time = AverageMeter()
+def validate(val_loader, model, criterion, normalizer, test=False, verbose=True):
+
     losses = AverageMeter()
-
     mae_errors = AverageMeter()
 
     if test:
@@ -228,26 +233,16 @@ def validate(val_loader, model, criterion, normalizer, test=False):
             test_targets += test_target.view(-1).tolist()
             test_cif_ids += batch_cif_ids
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            print('Test: [{0}/{1}]\t'
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
-                    i, len(val_loader), batch_time=batch_time, loss=losses,
-                    mae_errors=mae_errors))
-
-
     if test:
-        star_label = '**'
+       label = 'Test'
     else:
-        star_label = '*'
+        label = 'Validate'
 
-    print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
-                                                    mae_errors=mae_errors))
+    if verbose:
+        print('{0}: \t'
+            'Loss {loss.avg:.4f}\t'
+            'MAE {mae_errors.avg:.3f}\n'.format(
+            label, loss=losses, mae_errors=mae_errors))
 
     if test:  
         with open('test_results.csv', 'w') as f:

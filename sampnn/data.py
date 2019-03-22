@@ -247,7 +247,10 @@ def parse_composition(composition):
     example: BaCu3 -> Ba1Cu3
     example: Ba1Cu3 -> (Ba Cu) & (1 3)
     """
+    # regex3 = r"(\(.+\))([^\([A-z]+)"
+    # Add 1 after Aa
     regex = r"([A-Z][a-z](?![0-9]))"
+    # Add 1 after A
     regex2 = r"([A-Z](?![0-9]|[a-z]))"
     subst = r"\g<1>1"
     composition = re.sub(regex, subst, composition.rstrip())
@@ -260,3 +263,28 @@ def parse_composition(composition):
     elements += parsed[0::2]
     weights += parsed[1::2]
     return elements, weights    
+
+# def insert_unit_weights(composition):
+#     """
+#     Add unit weights after elements where no weight given.
+#     """
+#     # Add 1 after Aa
+#     regex = r"([A-Z][a-z](?![0-9]))"
+#     # Add 1 after A
+#     regex2 = r"([A-Z](?![0-9]|[a-z]))"
+#     subst = r"\g<1>1"
+#     composition = re.sub(regex, subst, composition.rstrip())
+#     return re.sub(regex2, subst, composition)
+
+# def parenthetic_contents(string):
+#     """
+#     Generate parenthesized contents in string as pairs (level, contents).
+#     """
+#     stack = []
+#     for i, c in enumerate(string):
+#         if c == '(':
+#             stack.append(i)
+#         elif c == ')' and stack:
+#             start = stack.pop()
+#             yield (len(stack), string[start + 1: i])
+

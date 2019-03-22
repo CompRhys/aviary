@@ -103,7 +103,7 @@ class CompositionNet(nn.Module):
     approaches.
     """
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
-                 atom_fea_len=12, n_graph=3, h_fea_list=[128], 
+                 atom_fea_len=48, n_graph=3, h_fea_list=[128], 
                  n_out = 1):
         """
         Initialize CompositionNet.

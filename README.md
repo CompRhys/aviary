@@ -9,11 +9,9 @@ Most current SOTA results within the field of machine learning for materials dis
 In a similar vein to other materials agnostic platforms (i.e. [MAGPIE](http://oqmd.org/static/analytics/magpie/doc/)) the aim of this model is to be able to determine properties (to reasonable accuracy) based solely on the composition of a material.
 
 ## Message Passing Neural Networks
-Recent progress in the study of small molecules has built upon the use of message passing neural networks. The structure of the graphs can be described by an adjacency matrix and the nodes contain relevant atomic features. Similar attempts are already progressing in application of such networks to extended periodic crystals although notable issues exist in how to represent dopants in such graphs and how much of the structure we can take as prior knowledge. This work is motivated by a case study on High Temperature Superconductors where the role of dopants is critical therefore here we hope to develop a structure agnostic approach that therefore enables dopants to be handled trivially.
+Recent progress in the study of small molecules has built upon the use of message passing neural networks. Similar attempts are already progressing in application of such networks to extended periodic crystals although notable issues exist in how to represent dopants in such graphs and how much of the structure we can take as prior knowledge. 
 
-### TODO:
-* Include the stiochiometric weights in the message function
-* Update via hebbian type algorithm to strengthen anion-cation type weights and weaken anion-anion and cation-cation weights.
+This work is motivated by a case study on High Temperature Superconductors where the role of dopants is critical therefore here we hope to develop a structure agnostic approach that therefore enables dopants to be handled trivially.
 
 ## Acknowledgements
 
@@ -27,3 +25,9 @@ please also consider citing the following paper whose CGCNN framework we took as
 
 ## Disclaimer
 This in research code and it is shared without support or any guarentee on its quality. However, if you do find an error please submit a pull request or raise an issue and I will try my best to solve it.
+
+## TODO:
+* Include the stiochiometric weights in the message function
+* Update weighting via hebbian type algorithm to strengthen anion-cation type weights and weaken anion-anion and cation-cation weights.
+* Recursive passing of structures
+* Implement Common ion embeddings for inorganic ions

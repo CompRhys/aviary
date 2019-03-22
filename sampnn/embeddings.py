@@ -63,8 +63,14 @@ class AtomEmbedding(NewEmbedding):
 
             if meta_data.get('expand') != None:
                 data = series.values
-
+                
                 # ensure that we have valid inputs for expansion
+                if meta_data.get('expand') == 'categorical':
+                    meta_data.update({'expand': 'onehot'})
+                    meta_data.update({'steps': np.max(data).astype(int)})
+                if meta_data.get('log-scale') == True:
+                    meta_data.update({'expand': 'onehot'})
+                    data = np.log(data)
                 if meta_data.get('steps') == None:
                     print('{}: number of steps not given for feature expansion, using default value of 5'.format(feature))
                     meta_data.update({'steps': 5})
@@ -148,7 +154,7 @@ class GaussianEmbedding(object):
         """
         Apply Gaussian distance filter to a numpy distance array
 
-        TODO normalise the rows
+        TODO maybe we should normalise the rows?
 
         Parameters
         ----------
@@ -206,6 +212,9 @@ def ArkelKetelaarType(A, B):
     """
     Use the idea of van Arkel-Ketelaar triangle to define the 
     expected type of bond between nodes A and B.
+
+    TODO implement bond categorisation based on the 
+        electronegativities of the two elements
 
     Parameters
     ----------
