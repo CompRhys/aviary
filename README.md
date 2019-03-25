@@ -1,4 +1,4 @@
-# `Sampnn`
+# Sampnn
 
 Structure Agnostic Message-Passing Neural Network
 
@@ -23,7 +23,7 @@ If you use this code please cite our work for which this model was built:
 
 [Structure Agnostic Message-Passing Neural Networks (placeholder)](http://www.tcm.phy.cam.ac.uk/profiles/reag2/)
 
-Please also consider citing the following paper whose CGCNN framework we took as a starting point for developing `Sampnn`:
+Please also consider citing the following paper whose CGCNN framework we took as a starting point for developing Sampnn:
 
 [Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties](https://link.aps.org/doi/10.1103/PhysRevLett.120.145301)
 

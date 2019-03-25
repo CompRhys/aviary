@@ -18,11 +18,15 @@ class MessageLayer(nn.Module):
         self.atom_fea_len = atom_fea_len
         self.nbr_fea_len = nbr_fea_len
         
-        self.pass_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, 
-                                    2*self.atom_fea_len)
+        self.filter_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, 
+                                    self.atom_fea_len)
 
-        self.batchnorm2 = nn.BatchNorm1d(2*self.atom_fea_len)
-        self.batchnorm1 = nn.BatchNorm1d(self.atom_fea_len)
+        self.core_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, 
+                                    self.atom_fea_len)
+
+        self.bn_filter = nn.BatchNorm1d(self.atom_fea_len)
+        self.bn_core = nn.BatchNorm1d(self.atom_fea_len)
+        self.bn_output = nn.BatchNorm1d(self.atom_fea_len)
 
         self.filter_transform = nn.Sigmoid()
         self.core_transform = nn.Softplus()
@@ -57,35 +61,34 @@ class MessageLayer(nn.Module):
         atom_out_fea: nn.Variable shape (N, atom_fea_len)
             Atom hidden features after message passing
         """
-        # print('in', atom_in_fea)
         # construct the total features for passing
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
         atom_self_fea = atom_in_fea[self_fea_idx,:]
 
         total_fea = torch.cat([atom_self_fea, atom_nbr_fea, bond_nbr_fea], dim=1)
 
-        # define the message passing operation
-        total_fea = self.pass_msg(total_fea)
-        total_fea = self.batchnorm2(total_fea)
-        
-        # separate out into the sigmoid and softplus sets
-        nbr_filter, nbr_core = total_fea.chunk(2, dim=1)
+        # multiply input by weight matrix
+        filter_fea = self.filter_msg(total_fea)
+        core_fea = self.core_msg(total_fea)
+
+        # apply batch-normalisation (regularise and reduce covariate shift)
+        filter_fea = self.bn_filter(filter_fea)
+        core_fea = self.bn_core(core_fea)
 
         # apply non-linear transformations
-        nbr_filter = self.filter_transform(nbr_filter)
-        nbr_core = self.core_transform(nbr_core)
+        filter_fea = self.filter_transform(filter_fea)
+        core_fea = self.core_transform(core_fea)
 
         # take the elementwise product of the filter and core
-        nbr_message = nbr_filter * nbr_core
+        nbr_message = filter_fea * core_fea
 
-        # sum selectivity over the neighbours to
+        # sum selectivity over the neighbours to get atoms
         nbr_sumed = [torch.sum(nbr_message[idx_map], dim=0, keepdim=True)
                         for idx_map in atom_bond_idx]
         nbr_sumed = torch.cat(nbr_sumed, dim=0)
-        nbr_sumed = self.batchnorm1(nbr_sumed)
+        nbr_sumed = self.bn_output(nbr_sumed)
 
         atom_out_fea = self.output_transform(atom_in_fea + nbr_sumed)
-        # print('out', atom_out_fea)
         return atom_out_fea
 
       
@@ -137,16 +140,18 @@ class CompositionNet(nn.Module):
                                                  nbr_fea_len=nbr_fea_len)
                                     for _ in range(n_graph)])
 
-        # note 2*atom_fea_len due to including the mean and std of atom features
         self.graph_to_fc = nn.Linear(atom_fea_len, h_fea_list[0])
+        self.graph_to_fc_bn = nn.BatchNorm1d(h_fea_list[0])
         self.graph_to_fc_softplus = nn.Softplus()
 
         if len(h_fea_list) > 1:
             # create a list of fully connected passing layers
-            self.fcs = nn.ModuleList([nn.Linear(h_fea_list[i], h_fea_list[i+1])
-                                      for i in range(len(h_fea_list)-1)])
+            self.weightings = nn.ModuleList([nn.Linear(h_fea_list[i], h_fea_list[i+1])
+                                        for i in range(len(h_fea_list)-1)])
             self.softpluses = nn.ModuleList([nn.Softplus()
-                                             for i in range(len(h_fea_list)-1)])
+                                        for i in range(len(h_fea_list)-1)])
+            self.batchnorms = nn.ModuleList([nn.BatchNorm1d(h_fea_list[i+1])
+                                        for i in range(len(h_fea_list)-1)])
 
         self.fc_out = nn.Linear(h_fea_list[-1], n_out)
 
@@ -195,13 +200,14 @@ class CompositionNet(nn.Module):
 
         # prepate the crystal features for the full connected neural network
         crys_fea = self.graph_to_fc(crys_fea)
+        crys_fea = self.graph_to_fc_bn(crys_fea)
         crys_fea = self.graph_to_fc_softplus(crys_fea)
 
-        if hasattr(self, 'fcs') and hasattr(self, 'softpluses'):
+        if hasattr(self, 'weightings') and hasattr(self, 'softpluses'):
             # join together the linear layers and non-linear activation functions
             # and apply recursively to build up the fully connected neural network
-            for fc, softplus in zip(self.fcs, self.softpluses):
-                crys_fea = softplus(fc(crys_fea))
+            for wm, bn, sp in zip(self.weightings, self.batchnorms, self.softpluses):
+                crys_fea = sp(bn(wm(crys_fea)))
 
         out = self.fc_out(crys_fea)
         return out

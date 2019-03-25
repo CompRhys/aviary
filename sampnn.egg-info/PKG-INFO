@@ -17,7 +17,9 @@ Description: # Sampnn
         In a similar vein to other materials agnostic platforms (i.e. [MAGPIE](http://oqmd.org/static/analytics/magpie/doc/)) the aim of this model is to be able to determine properties (to reasonable accuracy) based solely on the composition of a material.
         
         ## Message Passing Neural Networks
-        Recent progress in the study of small molecules has built upon the use of message passing neural networks. The structure of the graphs can be described by an adjacency matrix and the nodes contain relevant atomic features. Similar attempts are already progressing in application of such networks to extended periodic crystals although notable issues exist in how to represent dopants in such graphs and how much of the structure we can take as prior knowledge. This work is motivated by a case study on High Temperature Superconductors where the role of dopants is critical therefore here we hope to develop a structure agnostic approach that therefore enables dopants to be handled trivially.
+        Recent progress in the study of small molecules has built upon the use of message passing neural networks. Similar attempts are already progressing in application of such networks to extended periodic crystals although notable issues exist in how to represent dopants in such graphs and how much of the structure we can take as prior knowledge. 
+        
+        This work is motivated by a case study on High Temperature Superconductors where the role of dopants is critical therefore here we hope to develop a structure agnostic approach that therefore enables dopants to be handled trivially.
         
         ## Acknowledgements
         

@@ -34,14 +34,14 @@ def input_parser():
     
     # dataloader inputs
     parser.add_argument('--workers', default=0, type=int, metavar='N', help='number of data loading workers (default: 0)')
-    parser.add_argument('--batch-size', default=256, type=int, metavar='N', help='mini-batch size (default: 256)')    
+    parser.add_argument('--batch-size', default=64, type=int, metavar='N', help='mini-batch size (default: 256)')    
     parser.add_argument('--train-size', default=0.6, type=float, metavar='N', help='proportion of data for training')
     parser.add_argument('--val-size', default=0.2, type=float, metavar='N', help='proportion of data for validation')
     parser.add_argument('--test-size', default=0.2, type=float, metavar='N', help='proportion of data for testing')
     
     # optimiser inputs
     parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', help='choose an optimizer, SGD or Adam, (default: SGD)')
-    parser.add_argument('--epochs', default=30, type=int, metavar='N', help='number of total epochs to run (default: 30)')
+    parser.add_argument('--epochs', default=1100, type=int, metavar='N', help='number of total epochs to run (default: 30)')
     parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', help='initial learning rate (default: 0.01)')
     parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', help='milestones for scheduler (default: [100])')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
@@ -49,7 +49,7 @@ def input_parser():
     
     # graph inputs
     parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', help='number of hidden atom features in conv layers')
-    parser.add_argument('--h-fea-list', default=[128], nargs='+', type=int, metavar='N', help='number of hidden features after pooling')
+    parser.add_argument('--h-fea-list', default=[128,64,32], nargs='+', type=int, metavar='N', help='number of hidden features after pooling')
     parser.add_argument('--n-conv', default=3, type=int, metavar='N', help='number of conv layers')
 
     args = parser.parse_args(sys.argv[1:])
@@ -216,10 +216,14 @@ class CompositionData(Dataset):
         '''
         cry_id, composition, target = self.id_prop_data[idx]
         elements, weights = parse_composition(composition)
+        weights = np.atleast_2d(weights).T
+        # print(weights)
         if len(elements) == 1:
             # bad data point work out how to handle
             pass
         atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
+        atom_fea = np.hstack((atom_fea,weights))
+        # print(atom_fea.shape, weights.shape)
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
@@ -262,6 +266,7 @@ def parse_composition(composition):
     parsed = [j for j in re.split(regex3, composition) if j]
     elements += parsed[0::2]
     weights += parsed[1::2]
+    weights = [float(w) for w in weights]
     return elements, weights    
 
 # def insert_unit_weights(composition):

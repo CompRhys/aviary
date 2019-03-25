@@ -126,7 +126,8 @@ class BondEmbedding(NewEmbedding):
         for key_a, value_a in series.items():
             for key_b, value_b in series.items():
                 key_ab = key_a+key_b
-                self._embedding[key_ab] = [value_a-value_b, (value_a+value_b)/2.]
+                # self._embedding[key_ab] = [value_a-value_b, (value_a+value_b)/2.]
+                self._embedding[key_ab] = []
 
 
 class GaussianEmbedding(object):

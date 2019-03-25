@@ -84,6 +84,7 @@ def main():
 
     best_mae_error = validate(val_loader, model, criterion, normalizer,
                                 verbose=False)
+    print(best_mae_error)
 
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
