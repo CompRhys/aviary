@@ -15,6 +15,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from sampnn.features import LoadFeaturiser
+from sampnn.parse import parse
 
 
 def input_parser():
@@ -215,9 +216,9 @@ class CompositionData(Dataset):
         TODO think about how we want to implement weights into the features
         '''
         cry_id, composition, target = self.id_prop_data[idx]
-        elements, weights = parse_composition(composition)
+        elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T
-        # print(weights)
+        print(composition)
         if len(elements) == 1:
             # bad data point work out how to handle
             pass
@@ -240,56 +241,3 @@ class CompositionData(Dataset):
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
         return (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
-
-def parse_composition(composition):
-    """
-    take an input composition string and return an array of elements
-    and an array of stoichometric coefficients.
-    example: La2Cu04 -> (La Cu O) and (2 1 4)
-    this is done in two stages, first formatting to ensure weights
-    are explicate then parsing into sections:
-    example: BaCu3 -> Ba1Cu3
-    example: Ba1Cu3 -> (Ba Cu) & (1 3)
-    """
-    # regex3 = r"(\(.+\))([^\([A-z]+)"
-    # Add 1 after Aa
-    regex = r"([A-Z][a-z](?![0-9]))"
-    # Add 1 after A
-    regex2 = r"([A-Z](?![0-9]|[a-z]))"
-    subst = r"\g<1>1"
-    composition = re.sub(regex, subst, composition.rstrip())
-    composition = re.sub(regex2, subst, composition)
-
-    elements = []
-    weights = []
-    regex3 = r"(\d+\.\d+)|(\d+)"
-    parsed = [j for j in re.split(regex3, composition) if j]
-    elements += parsed[0::2]
-    weights += parsed[1::2]
-    weights = [float(w) for w in weights]
-    return elements, weights    
-
-# def insert_unit_weights(composition):
-#     """
-#     Add unit weights after elements where no weight given.
-#     """
-#     # Add 1 after Aa
-#     regex = r"([A-Z][a-z](?![0-9]))"
-#     # Add 1 after A
-#     regex2 = r"([A-Z](?![0-9]|[a-z]))"
-#     subst = r"\g<1>1"
-#     composition = re.sub(regex, subst, composition.rstrip())
-#     return re.sub(regex2, subst, composition)
-
-# def parenthetic_contents(string):
-#     """
-#     Generate parenthesized contents in string as pairs (level, contents).
-#     """
-#     stack = []
-#     for i, c in enumerate(string):
-#         if c == '(':
-#             stack.append(i)
-#         elif c == ')' and stack:
-#             start = stack.pop()
-#             yield (len(stack), string[start + 1: i])
-
