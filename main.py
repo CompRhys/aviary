@@ -34,7 +34,7 @@ def main():
 
 
     # for large data sets we can use a subset for the normaliser
-    _, sample_target, _ = collate_batch(dataset)
+    _, sample_target, _ = collate_batch(dataset[math.floor(len(dataset) * train_size)])
     normalizer = Normalizer(sample_target)
 
     # build model
