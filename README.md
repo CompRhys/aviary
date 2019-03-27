@@ -33,7 +33,8 @@ This is research code shared without support or any guarentee on its quality. Ho
 
 ## TODO:
 
-- Include the stochiometric weights in the message function
-- Update weighting via hebbian-type algorithm to strengthen anion-cation type weights and weaken anion-anion and cation-cation weights.
-- Recursive passing of structures
-- Implement common ion embeddings for inorganic ions
+- [] Include the stochiometric weights in the message function
+- [] Update weighting via hebbian-type algorithm to strengthen anion-cation type weights and weaken anion-anion and cation-cation weights.
+- [x] Recursive passing of structures
+- [] Implement common ion embeddings for inorganic ions
+- [] Add global features i.e. entropy, weight norms
