@@ -11,8 +11,7 @@ import numpy as np
 
 # from scipy.special import gamma
 
-from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import Dataset
 
 from sampnn.features import LoadFeaturiser
 from sampnn.parse import parse
@@ -42,7 +41,7 @@ def input_parser():
     
     # optimiser inputs
     parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', help='choose an optimizer, SGD or Adam, (default: SGD)')
-    parser.add_argument('--epochs', default=1100, type=int, metavar='N', help='number of total epochs to run (default: 30)')
+    parser.add_argument('--epochs', default=100, type=int, metavar='N', help='number of total epochs to run (default: 30)')
     parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', help='initial learning rate (default: 0.01)')
     parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', help='milestones for scheduler (default: [100])')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
@@ -55,48 +54,53 @@ def input_parser():
 
     args = parser.parse_args(sys.argv[1:])
 
+    assert args.train_size + args.val_size + args.test_size <= 1
     args.cuda = not args.disable_cuda and torch.cuda.is_available()
 
     return args
 
 
-def get_data_loaders(dataset, batch_size=64, train_size=0.6,
-                    val_size=0.2, test_size=0.2,
-                    num_workers=1, pin_memory=False):
-    """
-    Utility function for dividing a dataset to train, val, test datasets.
-    """
+# def get_data_loaders(dataset, splits, batch_size=64, train_size=0.6,
+#                     val_size=0.2, test_size=0.2,
+#                     num_workers=1, pin_memory=False):
+#     """
+#     Utility function for dividing a dataset to train, val, test datasets.
+#     """
 
-    assert train_size + val_size + test_size <= 1
-    total = len(dataset)
-    indices = list(range(len(dataset)))
-    train = math.floor(total * train_size)
-    val = math.floor(total * val_size)
-    test = math.floor(total * test_size)
+#     assert train_size + val_size + test_size <= 1
+#     total = len(dataset)
+#     indices = list(range(len(dataset)))
+#     train = math.floor(total * train_size)
+#     val = math.floor(total * val_size)
+#     test = math.floor(total * test_size)
 
-    train_sampler = SubsetRandomSampler(indices[:train])
-    val_sampler = SubsetRandomSampler(indices[train:train+val])
-    test_sampler = SubsetRandomSampler(indices[-test:])
+#     train_sampler = SubsetRandomSampler(indices[:train])
+#     val_sampler = SubsetRandomSampler(indices[train:train+val])
+#     test_sampler = SubsetRandomSampler(indices[-test:])
 
-    train_loader = DataLoader(dataset, batch_size=batch_size,
-                                sampler=train_sampler,
-                                num_workers=num_workers,
-                                collate_fn=collate_batch, 
-                                pin_memory=pin_memory)
+#     train_loader = DataLoader(dataset, batch_size=batch_size,
+#                                     sampler=train_sampler,
+#                                     num_workers=num_workers,
+#                                     collate_fn=collate_batch, 
+#                                     pin_memory=pin_memory))
 
-    val_loader = DataLoader(dataset, batch_size=batch_size,
-                                sampler=val_sampler,
-                                num_workers=num_workers,
-                                collate_fn=collate_batch, 
-                                pin_memory=pin_memory)
+#     val_loader = DataLoader(dataset, batch_size=batch_size,
+#                                 sampler=val_sampler,
+#                                 num_workers=num_workers,
+#                                 collate_fn=collate_batch, 
+#                                 pin_memory=pin_memory)
 
-    test_loader = DataLoader(dataset, batch_size=batch_size,
-                                sampler=test_sampler,
-                                num_workers=num_workers,
-                                collate_fn=collate_batch, 
-                                pin_memory=pin_memory)
+#     test_loader = DataLoader(dataset, batch_size=batch_size,
+#                                 sampler=test_sampler,
+#                                 num_workers=num_workers,
+#                                 collate_fn=collate_batch, 
+#                                 pin_memory=pin_memory)
 
-    return train_loader, val_loader, test_loader
+
+
+
+#     return tuple(loaders)
+#     # return train_loader, val_loader, test_loader
 
 
 def collate_batch(dataset_list):
@@ -213,18 +217,17 @@ class CompositionData(Dataset):
         '''
         specify how to include weights into the featurisation
 
-        TODO think about how we want to implement weights into the features
+        TODO * include weights in more meaningful way
+             * add global features like MEGnet? 
         '''
         cry_id, composition, target = self.id_prop_data[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T
-        print(composition)
         if len(elements) == 1:
             # bad data point work out how to handle
             pass
         atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
         atom_fea = np.hstack((atom_fea,weights))
-        # print(atom_fea.shape, weights.shape)
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
@@ -235,9 +238,51 @@ class CompositionData(Dataset):
             self_fea_idx += [i]*len(nbrs)
             nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
 
+        # convert all data to tensors
         atom_fea = torch.Tensor(atom_fea)
         bond_fea = torch.cat(bond_fea, dim=0)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
+
         return (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+class Normalizer(object):
+    """Normalize a Tensor and restore it later. """
+    def __init__(self, tensor, dim=0, keepdim=False):
+        """tensor is taken as a sample to calculate the mean and std"""
+        self.mean = torch.mean(tensor, dim, keepdim)
+        self.std = torch.std(tensor, dim, keepdim)
+
+    def norm(self, tensor):
+        return (tensor - self.mean) / self.std
+
+    def denorm(self, normed_tensor):
+        return normed_tensor * self.std + self.mean
+
+    def state_dict(self):
+        return {'mean': self.mean,
+                'std': self.std}
+
+    def load_state_dict(self, state_dict):
+        self.mean = state_dict['mean']
+        self.std = state_dict['std']

@@ -112,7 +112,6 @@ def update_parent(child):
 def parse(string):
     # format the string to remove edge cases
     string = format_composition(string)
-    print(string)
     # get nested bracket structure
     nested_levels = list(parenthetic_contents(string))
     if len(nested_levels) > 1:

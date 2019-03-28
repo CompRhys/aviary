@@ -1,1 +1,1 @@
-from . import embeddings, data, features, message, parse
+from . import data, features, message, parse
