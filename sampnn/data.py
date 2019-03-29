@@ -55,131 +55,12 @@ def input_parser():
     args = parser.parse_args(sys.argv[1:])
 
     assert args.train_size + args.val_size + args.test_size <= 1
-    args.cuda = not args.disable_cuda and torch.cuda.is_available()
+    args.cuda = (not args.disable_cuda) and torch.cuda.is_available()
 
     return args
 
 
-# def get_data_loaders(dataset, splits, batch_size=64, train_size=0.6,
-#                     val_size=0.2, test_size=0.2,
-#                     num_workers=1, pin_memory=False):
-#     """
-#     Utility function for dividing a dataset to train, val, test datasets.
-#     """
 
-#     assert train_size + val_size + test_size <= 1
-#     total = len(dataset)
-#     indices = list(range(len(dataset)))
-#     train = math.floor(total * train_size)
-#     val = math.floor(total * val_size)
-#     test = math.floor(total * test_size)
-
-#     train_sampler = SubsetRandomSampler(indices[:train])
-#     val_sampler = SubsetRandomSampler(indices[train:train+val])
-#     test_sampler = SubsetRandomSampler(indices[-test:])
-
-#     train_loader = DataLoader(dataset, batch_size=batch_size,
-#                                     sampler=train_sampler,
-#                                     num_workers=num_workers,
-#                                     collate_fn=collate_batch, 
-#                                     pin_memory=pin_memory))
-
-#     val_loader = DataLoader(dataset, batch_size=batch_size,
-#                                 sampler=val_sampler,
-#                                 num_workers=num_workers,
-#                                 collate_fn=collate_batch, 
-#                                 pin_memory=pin_memory)
-
-#     test_loader = DataLoader(dataset, batch_size=batch_size,
-#                                 sampler=test_sampler,
-#                                 num_workers=num_workers,
-#                                 collate_fn=collate_batch, 
-#                                 pin_memory=pin_memory)
-
-
-
-
-#     return tuple(loaders)
-#     # return train_loader, val_loader, test_loader
-
-
-def collate_batch(dataset_list):
-    """
-    Collate a list of data and return a batch for predicting crystal
-    properties.
-
-    Parameters
-    ----------
-
-    dataset_list: list of tuples for each data point.
-      (atom_fea, nbr_fea, nbr_fea_idx, target)
-
-      atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-      nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
-      nbr_fea_idx: torch.LongTensor shape (n_i, M)
-      target: torch.Tensor shape (1, )
-      cif_id: str or int
-
-    Returns
-    -------
-    N = sum(n_i); N0 = sum(i)
-
-    batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
-        Atom features from atom type
-    batch_nbr_fea: torch.Tensor shape (N, M, nbr_fea_len)
-        Bond features of each atom's M neighbors
-    batch_nbr_fea_idx: torch.LongTensor shape (N, M)
-        Indices of M neighbors of each atom
-    crystal_atom_idx: list of torch.LongTensor of length N0
-        Mapping from the crystal idx to atom idx
-    target: torch.Tensor shape (N, 1)
-        Target value for prediction
-    batch_cif_ids: list
-    """
-    # define the lists
-    batch_atom_fea = [] 
-    batch_bond_fea = []
-    batch_self_fea_idx = []
-    batch_nbr_fea_idx = []
-    atom_bond_idx = []
-    crystal_atom_idx = [] 
-    batch_target = []
-    batch_cry_ids = []
-
-    # define counters
-    cry_base_idx = 0
-    atom_base_idx = 0
-    for (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id in dataset_list:
-        n_i = atom_fea.shape[0]  # number of atoms for this crystal
-
-        batch_atom_fea.append(atom_fea)
-        batch_bond_fea.append(bond_fea)
-
-        batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
-        batch_nbr_fea_idx.append(nbr_fea_idx+cry_base_idx)
-
-        # mapping from bonds to atoms
-        for _ in range(n_i):
-            atom_idx = torch.arange(n_i-1, dtype=torch.long)+atom_base_idx
-            atom_bond_idx.append(atom_idx)
-            atom_base_idx += n_i-1
-
-        # mapping from atoms to crystals
-        cry_idx = torch.arange(n_i, dtype=torch.long)+cry_base_idx
-        crystal_atom_idx.append(cry_idx)
-        cry_base_idx += n_i
-
-        batch_target.append(target)
-        batch_cry_ids.append(cry_id)
-
-    return (torch.cat(batch_atom_fea, dim=0),
-            torch.cat(batch_bond_fea, dim=0),
-            torch.cat(batch_self_fea_idx, dim=0),
-            torch.cat(batch_nbr_fea_idx, dim=0),
-            atom_bond_idx,
-            crystal_atom_idx), \
-            torch.stack(batch_target, dim=0), \
-            batch_cry_ids
 
 
 class CompositionData(Dataset):
@@ -246,6 +127,102 @@ class CompositionData(Dataset):
         target = torch.Tensor([float(target)])
 
         return (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
+
+
+def collate_batch(dataset_list):
+    """
+    Collate a list of data and return a batch for predicting crystal
+    properties.
+
+    Parameters
+    ----------
+
+    dataset_list: list of tuples for each data point.
+      (atom_fea, nbr_fea, nbr_fea_idx, target)
+
+      atom_fea: torch.Tensor shape (n_i, atom_fea_len)
+      nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
+      nbr_fea_idx: torch.LongTensor shape (n_i, M)
+      target: torch.Tensor shape (1, )
+      cif_id: str or int
+
+    Returns
+    -------
+    N = sum(n_i); N0 = sum(i)
+
+    batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
+        Atom features from atom type
+    batch_nbr_fea: torch.Tensor shape (N, M, nbr_fea_len)
+        Bond features of each atom's M neighbors
+    batch_nbr_fea_idx: torch.LongTensor shape (N, M)
+        Indices of M neighbors of each atom
+    crystal_atom_idx: list of torch.LongTensor of length N0
+        Mapping from the crystal idx to atom idx
+    target: torch.Tensor shape (N, 1)
+        Target value for prediction
+    batch_cif_ids: list
+    """
+    # define the lists
+    batch_atom_fea = [] 
+    batch_bond_fea = []
+    batch_self_fea_idx = []
+    batch_nbr_fea_idx = []
+    atom_bond_idx = []
+    crystal_atom_idx = [] 
+    batch_target = []
+    batch_cry_ids = []
+
+    # define counters
+    cry_base_idx = 0
+    atom_base_idx = 0
+    for (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id in dataset_list:
+        n_i = atom_fea.shape[0]  # number of atoms for this crystal
+
+        batch_atom_fea.append(atom_fea)
+        batch_bond_fea.append(bond_fea)
+
+        batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
+        batch_nbr_fea_idx.append(nbr_fea_idx+cry_base_idx)
+
+        # TODO: use better data structure than list of tensors
+        # mapping from bonds to atoms
+        for _ in range(n_i):
+            atom_bond_idx.append(torch.tensor([atom_base_idx,atom_base_idx+n_i-1]))
+            atom_base_idx += n_i-1
+
+        # mapping from atoms to crystals
+        crystal_atom_idx.append(torch.tensor([cry_base_idx,cry_base_idx+n_i]))
+        cry_base_idx += n_i
+
+        batch_target.append(target)
+        batch_cry_ids.append(cry_id)
+
+    return (torch.cat(batch_atom_fea, dim=0),
+            torch.cat(batch_bond_fea, dim=0),
+            torch.cat(batch_self_fea_idx, dim=0),
+            torch.cat(batch_nbr_fea_idx, dim=0),
+            torch.stack(atom_bond_idx, dim=0),
+            torch.stack(crystal_atom_idx, dim=0)), \
+            torch.stack(batch_target, dim=0), \
+            batch_cry_ids
+
+
+# def split_dataset(dataset, points, train_size, val_size, test_size, params):
+    # """ take only a subset of the data """
+    # indices = list(range(points))
+    # train_idx = int(points * train_size) # note int() truncates but this same as floor for +ve 
+    # val_idx = int(points * val_size)
+    # test_idx = int(points * val_size)
+    # train_set, val_set, test_set = indices[:train_idx], indices[train_idx:train_idx+val_idx], indices[-test_idx:]
+
+    # train_sampler = SubsetRandomSampler(train_set)
+    # train_generator = DataLoader(dataset, sampler=train_sampler, **params)
+
+    # val_sampler = SubsetRandomSampler(val_set)
+    # val_generator = DataLoader(dataset, sampler=val_sampler, **params)
+
+    # test_sampler = SubsetRandomSampler(test_set)
+    # test_generator = DataLoader(dataset, sampler=test_sampler, **params)
 
 
 class AverageMeter(object):

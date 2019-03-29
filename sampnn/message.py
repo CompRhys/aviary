@@ -83,8 +83,9 @@ class MessageLayer(nn.Module):
         nbr_message = filter_fea * core_fea
 
         # sum selectivity over the neighbours to get atoms
-        nbr_sumed = [torch.sum(nbr_message[idx_map], dim=0, keepdim=True)
-                        for idx_map in atom_bond_idx]
+        assert atom_bond_idx[-1,-1] == bond_nbr_fea.data.shape[0]
+        nbr_sumed = [torch.sum(nbr_message[idx[0]:idx[1]], dim=0, keepdim=True)
+                        for idx in atom_bond_idx]
         nbr_sumed = torch.cat(nbr_sumed, dim=0)
         nbr_sumed = self.bn_output(nbr_sumed)
 
@@ -237,12 +238,11 @@ class CompositionNet(nn.Module):
 
         # check that the sum of all the groups of atoms corresponding
         # to different crystals is equal to the total number of atoms
-        assert sum([len(idx_map) for idx_map in crystal_atom_idx]) ==\
-            atom_fea.data.shape[0]
+        assert crystal_atom_idx[-1,-1] == atom_fea.data.shape[0]
         
         # Pool to get the mean atomic features
-        mean_fea = [torch.mean(atom_fea[idx_map], dim=0, keepdim=True)
-                    for idx_map in crystal_atom_idx]
+        mean_fea = [torch.mean(atom_fea[idx[0]:idx[1]], dim=0, keepdim=True)
+                    for idx in crystal_atom_idx]
         mean_fea = torch.cat(mean_fea, dim=0)
 
         return mean_fea
