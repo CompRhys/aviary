@@ -7,10 +7,8 @@ import csv
 import torch
 import functools
 import argparse
+import tensorflow as tf
 import numpy as np
-
-# from scipy.special import gamma
-
 from torch.utils.data import Dataset
 
 from sampnn.features import LoadFeaturiser
@@ -24,33 +22,52 @@ def input_parser():
     parser = argparse.ArgumentParser(description='Structure Agnostic Message Passing Neural Network')
 
     # misc inputs
-    parser.add_argument('data_options', metavar='OPTIONS', nargs='+', help='dataset options, started with the path to root dir,then other options')
-    parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
-    parser.add_argument('--print-freq', default=10, type=int, metavar='N', help='print frequency (default: 10)')
+    parser.add_argument('data_options', metavar='OPTIONS', nargs='+', 
+    help='dataset options, started with the path to root dir,then other options')
+    parser.add_argument('--disable-cuda', action='store_true', 
+    help='Disable CUDA')
+    parser.add_argument('--print-freq', default=10, type=int, metavar='N', 
+    help='print frequency (default: 10)')
     
     # restart inputs
-    parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
-    parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
+    parser.add_argument('--resume', default='', type=str, metavar='PATH', 
+    help='path to latest checkpoint (default: none)')
+    parser.add_argument('--start-epoch', default=0, type=int, metavar='N', 
+    help='manual epoch number (useful on restarts)')
     
     # dataloader inputs
-    parser.add_argument('--workers', default=0, type=int, metavar='N', help='number of data loading workers (default: 0)')
-    parser.add_argument('--batch-size', default=64, type=int, metavar='N', help='mini-batch size (default: 256)')    
-    parser.add_argument('--train-size', default=0.6, type=float, metavar='N', help='proportion of data for training')
-    parser.add_argument('--val-size', default=0.2, type=float, metavar='N', help='proportion of data for validation')
-    parser.add_argument('--test-size', default=0.2, type=float, metavar='N', help='proportion of data for testing')
+    parser.add_argument('--workers', default=0, type=int, metavar='N', 
+    help='number of data loading workers (default: 0)')
+    parser.add_argument('--batch-size', default=64, type=int, metavar='N', 
+    help='mini-batch size (default: 256)')    
+    parser.add_argument('--train-size', default=0.6, type=float, metavar='N', 
+    help='proportion of data for training')
+    parser.add_argument('--val-size', default=0.2, type=float, metavar='N', 
+    help='proportion of data for validation')
+    parser.add_argument('--test-size', default=0.2, type=float, metavar='N', 
+    help='proportion of data for testing')
     
     # optimiser inputs
-    parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', help='choose an optimizer, SGD or Adam, (default: SGD)')
-    parser.add_argument('--epochs', default=100, type=int, metavar='N', help='number of total epochs to run (default: 30)')
-    parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', help='initial learning rate (default: 0.01)')
-    parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', help='milestones for scheduler (default: [100])')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
-    parser.add_argument('--weight-decay', default=0, type=float, metavar='W', help='weight decay (default: 0)')
+    parser.add_argument('--optim', default='Adam', type=str, metavar='SGD', 
+    help='choose an optimizer, SGD or Adam, (default: SGD)')
+    parser.add_argument('--epochs', default=1000, type=int, metavar='N', 
+    help='number of total epochs to run (default: 30)')
+    parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', 
+    help='initial learning rate (default: 0.01)')
+    parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', 
+    help='milestones for scheduler (default: [100])')
+    parser.add_argument('--momentum', default=0.9, type=float, metavar='M', 
+    help='momentum')
+    parser.add_argument('--weight-decay', default=0, type=float, metavar='W', 
+    help='weight decay (default: 0)')
     
     # graph inputs
-    parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', help='number of hidden atom features in conv layers')
-    parser.add_argument('--h-fea-list', default=[128,64,32], nargs='+', type=int, metavar='N', help='number of hidden features after pooling')
-    parser.add_argument('--n-conv', default=3, type=int, metavar='N', help='number of conv layers')
+    parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', 
+    help='number of hidden atom features in conv layers')
+    parser.add_argument('--h-fea-list', default=[128,64,32], nargs='+', type=int, metavar='N', 
+    help='number of hidden features after pooling')
+    parser.add_argument('--n-conv', default=3, type=int, metavar='N', 
+    help='number of conv layers')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -263,3 +280,17 @@ class Normalizer(object):
     def load_state_dict(self, state_dict):
         self.mean = state_dict['mean']
         self.std = state_dict['std']
+
+class Logger(object):
+    """ 
+    Code referenced from https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514
+    """
+    def __init__(self, log_dir):
+        """Create a summary writer logging to log_dir."""
+        assert not os.path.exists(log_dir), 'log_dir already exists!'
+        self.writer = tf.summary.FileWriter(log_dir)
+
+    def scalar_summary(self, tag, value, step):
+        """Log a scalar variable."""
+        summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+        self.writer.add_summary(summary, step)

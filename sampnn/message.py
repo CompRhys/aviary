@@ -84,9 +84,10 @@ class MessageLayer(nn.Module):
 
         # sum selectivity over the neighbours to get atoms
         assert atom_bond_idx[-1,-1] == bond_nbr_fea.data.shape[0]
-        nbr_sumed = [torch.sum(nbr_message[idx[0]:idx[1]], dim=0, keepdim=True)
+        nbr_sumed = [torch.mean(nbr_message[idx[0]:idx[1]], dim=0, keepdim=True)
                         for idx in atom_bond_idx]
         nbr_sumed = torch.cat(nbr_sumed, dim=0)
+
         nbr_sumed = self.bn_output(nbr_sumed)
 
         atom_out_fea = self.output_transform(atom_in_fea + nbr_sumed)
