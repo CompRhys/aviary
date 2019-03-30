@@ -28,6 +28,8 @@ def input_parser():
     help='Disable CUDA')
     parser.add_argument('--print-freq', default=10, type=int, metavar='N', 
     help='print frequency (default: 10)')
+    parser.add_argument('--logs', default='./logs', type=str, metavar='PATH', 
+    help='path to latest checkpoint (default: none)')
     
     # restart inputs
     parser.add_argument('--resume', default='', type=str, metavar='PATH', 
@@ -121,9 +123,7 @@ class CompositionData(Dataset):
         cry_id, composition, target = self.id_prop_data[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T
-        if len(elements) == 1:
-            # bad data point work out how to handle
-            pass
+        assert len(elements) != 1, 'crystal {}: {}, is a pure system'.format(cry_id, composition)
         atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
         atom_fea = np.hstack((atom_fea,weights))
         env_idx = list(range(len(elements)))
@@ -145,6 +145,13 @@ class CompositionData(Dataset):
 
         return (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
 
+def entropic_fea(elements, weights):
+    """ calculate entropic features for the crystal """
+    entropic_fea = []
+
+
+
+    return entropic_fea
 
 def collate_batch(dataset_list):
     """
@@ -189,10 +196,8 @@ def collate_batch(dataset_list):
     batch_target = []
     batch_cry_ids = []
 
-    # define counters
     cry_base_idx = 0
-    atom_base_idx = 0
-    for (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id in dataset_list:
+    for i, ((atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id) in enumerate(dataset_list):
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
         batch_atom_fea.append(atom_fea)
@@ -200,16 +205,10 @@ def collate_batch(dataset_list):
 
         batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
         batch_nbr_fea_idx.append(nbr_fea_idx+cry_base_idx)
-
-        # TODO: use better data structure than list of tensors
-        # mapping from bonds to atoms
-        for _ in range(n_i):
-            atom_bond_idx.append(torch.tensor([atom_base_idx,atom_base_idx+n_i-1]))
-            atom_base_idx += n_i-1
+        cry_base_idx += n_i
 
         # mapping from atoms to crystals
-        crystal_atom_idx.append(torch.tensor([cry_base_idx,cry_base_idx+n_i]))
-        cry_base_idx += n_i
+        crystal_atom_idx.append(torch.tensor([i]*n_i))
 
         batch_target.append(target)
         batch_cry_ids.append(cry_id)
@@ -218,8 +217,7 @@ def collate_batch(dataset_list):
             torch.cat(batch_bond_fea, dim=0),
             torch.cat(batch_self_fea_idx, dim=0),
             torch.cat(batch_nbr_fea_idx, dim=0),
-            torch.stack(atom_bond_idx, dim=0),
-            torch.stack(crystal_atom_idx, dim=0)), \
+            torch.cat(crystal_atom_idx)), \
             torch.stack(batch_target, dim=0), \
             batch_cry_ids
 
@@ -280,17 +278,3 @@ class Normalizer(object):
     def load_state_dict(self, state_dict):
         self.mean = state_dict['mean']
         self.std = state_dict['std']
-
-class Logger(object):
-    """ 
-    Code referenced from https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514
-    """
-    def __init__(self, log_dir):
-        """Create a summary writer logging to log_dir."""
-        assert not os.path.exists(log_dir), 'log_dir already exists!'
-        self.writer = tf.summary.FileWriter(log_dir)
-
-    def scalar_summary(self, tag, value, step):
-        """Log a scalar variable."""
-        summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-        self.writer.add_summary(summary, step)

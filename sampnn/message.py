@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch_scatter import scatter_mean
 
 class MessageLayer(nn.Module):
     """
@@ -33,7 +34,7 @@ class MessageLayer(nn.Module):
         self.output_transform = nn.Softplus()
 
     def forward(self, atom_in_fea, bond_nbr_fea, 
-                self_fea_idx, nbr_fea_idx, atom_bond_idx):
+                self_fea_idx, nbr_fea_idx):
         """
         Forward pass
 
@@ -83,10 +84,7 @@ class MessageLayer(nn.Module):
         nbr_message = filter_fea * core_fea
 
         # sum selectivity over the neighbours to get atoms
-        assert atom_bond_idx[-1,-1] == bond_nbr_fea.data.shape[0]
-        nbr_sumed = [torch.mean(nbr_message[idx[0]:idx[1]], dim=0, keepdim=True)
-                        for idx in atom_bond_idx]
-        nbr_sumed = torch.cat(nbr_sumed, dim=0)
+        nbr_sumed = scatter_mean(nbr_message, self_fea_idx, dim=0)
 
         nbr_sumed = self.bn_output(nbr_sumed)
 
@@ -158,7 +156,7 @@ class CompositionNet(nn.Module):
         self.fc_out = nn.Linear(h_fea_list[-1], n_out)
 
     def forward(self, orig_atom_fea, nbr_fea, self_fea_idx, 
-                nbr_fea_idx, atom_bond_idx, crystal_atom_idx):
+                nbr_fea_idx, crystal_atom_idx):
         """
         Forward pass
 
@@ -194,10 +192,10 @@ class CompositionNet(nn.Module):
 
         # apply the graph message passing functions 
         for graph_func in self.graphs:
-            atom_fea = graph_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, atom_bond_idx)
+            atom_fea = graph_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
 
         # generate crystal features by pooling the atomic features
-        crys_fea = self.pooling(atom_fea, crystal_atom_idx)
+        crys_fea = scatter_mean(atom_fea, crystal_atom_idx, dim=0)
         crys_fea = self.graph_to_fc_softplus(crys_fea)
 
         # prepate the crystal features for the full connected neural network
