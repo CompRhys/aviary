@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
@@ -109,3 +110,4 @@ checkpoint.pth.tar
 model_best.pth.tar
 test_results.csv
 
+runs/
