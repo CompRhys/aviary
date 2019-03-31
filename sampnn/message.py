@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from torch_scatter import scatter_mean
+from torch_scatter import scatter_max, scatter_mean, \
+                            scatter_add, scatter_mul
 
 class MessageLayer(nn.Module):
     """
@@ -91,6 +92,9 @@ class MessageLayer(nn.Module):
         atom_out_fea = self.output_transform(atom_in_fea + nbr_sumed)
         return atom_out_fea
 
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
+
       
 class CompositionNet(nn.Module):
     """
@@ -140,22 +144,27 @@ class CompositionNet(nn.Module):
                                                  nbr_fea_len=nbr_fea_len)
                                     for _ in range(n_graph)])
 
+        # self.pooling = WeightedMeanPooling()
+        self.pooling = GlobalAttention(atom_fea_len, 16)
+
         self.graph_to_fc = nn.Linear(atom_fea_len, h_fea_list[0])
         self.graph_to_fc_bn = nn.BatchNorm1d(h_fea_list[0])
-        self.graph_to_fc_softplus = nn.Softplus()
+        self.graph_to_fc_act = nn.Softplus()
+        # self.graph_to_fc_act = nn.ReLU()
 
         if len(h_fea_list) > 1:
             # create a list of fully connected passing layers
             self.weightings = nn.ModuleList([nn.Linear(h_fea_list[i], h_fea_list[i+1])
                                         for i in range(len(h_fea_list)-1)])
-            self.softpluses = nn.ModuleList([nn.Softplus()
+            self.activations = nn.ModuleList([nn.Softplus()
+            # self.activations = nn.ModuleList([nn.ReLU()
                                         for i in range(len(h_fea_list)-1)])
             self.batchnorms = nn.ModuleList([nn.BatchNorm1d(h_fea_list[i+1])
                                         for i in range(len(h_fea_list)-1)])
 
         self.fc_out = nn.Linear(h_fea_list[-1], n_out)
 
-    def forward(self, orig_atom_fea, nbr_fea, self_fea_idx, 
+    def forward(self, atom_weights, orig_atom_fea, nbr_fea, self_fea_idx, 
                 nbr_fea_idx, crystal_atom_idx):
         """
         Forward pass
@@ -191,57 +200,70 @@ class CompositionNet(nn.Module):
         atom_fea = self.embedding(orig_atom_fea)
 
         # apply the graph message passing functions 
-        for graph_func in self.graphs:
-            atom_fea = graph_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
+        # for graph_func in self.graphs:
+        #     atom_fea = graph_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
 
         # generate crystal features by pooling the atomic features
-        crys_fea = scatter_mean(atom_fea, crystal_atom_idx, dim=0)
-        crys_fea = self.graph_to_fc_softplus(crys_fea)
+        crys_fea = self.pooling(atom_fea, crystal_atom_idx, atom_weights)
 
         # prepate the crystal features for the full connected neural network
         crys_fea = self.graph_to_fc(crys_fea)
         crys_fea = self.graph_to_fc_bn(crys_fea)
-        crys_fea = self.graph_to_fc_softplus(crys_fea)
+        crys_fea = self.graph_to_fc_act(crys_fea)
 
-        if hasattr(self, 'weightings') and hasattr(self, 'softpluses'):
+        if hasattr(self, 'weightings') and hasattr(self, 'activations'):
             # join together the linear layers and non-linear activation functions
             # and apply recursively to build up the fully connected neural network
-            for wm, bn, sp in zip(self.weightings, self.batchnorms, self.softpluses):
-                crys_fea = sp(bn(wm(crys_fea)))
+            for wm, bn, sig in zip(self.weightings, self.batchnorms, self.activations):
+                crys_fea = sig(bn(wm(crys_fea)))
 
         out = self.fc_out(crys_fea)
         return out
 
-    def pooling(self, atom_fea, crystal_atom_idx):
-        """
-        Pooling the atom features to crystal features
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
 
-        Parameters
-        ----------
-        N: Total number of atoms (nodes) in the batch
-        C: Total number of crystals (graphs) in the batch
+class WeightedMeanPooling(torch.nn.Module):
+    """
+    mean pooling
+    """
+    def __init__(self):
+        super(WeightedMeanPooling, self).__init__()
 
-        Inputs
-        ----------
-        atom_fea: torch.Tensor shape (N, atom_fea_len)
-            Atom feature vectors of the batch
-        crystal_atom_idx: list of torch.Tensor of length C
-            Mapping from the crystal idx to atom idx
+    def forward(self, x, index, weights):
+        weights = weights.unsqueeze(-1) if weights.dim() == 1 else weights
+        x = weights * x 
+        return scatter_mean(x, index, dim=0)
 
-        Return
-        ----------
-        pooled: torch.Tensor shape (C, 2*atom_fea_len)
-            crystal feature vectors for the batch
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
         
-        """
+class GlobalAttention(torch.nn.Module):
+    """
+    Global soft attention layer from the `"Gated Graph Sequence Neural
+    Networks" <https://arxiv.org/abs/1511.05493>`_ paper
+    """
 
-        # check that the sum of all the groups of atoms corresponding
-        # to different crystals is equal to the total number of atoms
-        assert crystal_atom_idx[-1,-1] == atom_fea.data.shape[0]
-        
-        # Pool to get the mean atomic features
-        mean_fea = [torch.mean(atom_fea[idx[0]:idx[1]], dim=0, keepdim=True)
-                    for idx in crystal_atom_idx]
-        mean_fea = torch.cat(mean_fea, dim=0)
+    def __init__(self, fea_len, hidden_len):
+        super(GlobalAttention, self).__init__()
+        self.gate_nn = nn.Sequential(nn.Linear(fea_len, hidden_len), \
+            nn.BatchNorm1d(hidden_len), nn.ReLU(), nn.Linear(hidden_len, 1))
 
-        return mean_fea
+    def forward(self, x, index, weights):
+        """ forward pass """
+        x = x.unsqueeze(-1) if x.dim() == 1 else x
+
+        gate = self.gate_nn(x).view(-1,1)
+        assert gate.dim() == x.dim() and gate.size(0) == x.size(0)
+
+        gate = gate - scatter_max(gate, index, dim=0)[0][index]
+        gate = weights * gate.exp() 
+        gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
+
+        out = scatter_add(gate * x, index, dim=0)
+
+        return out
+
+    def __repr__(self):
+        return '{}(gate_nn={})'.format(self.__class__.__name__,
+                                              self.gate_nn)

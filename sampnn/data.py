@@ -50,13 +50,13 @@ def input_parser():
     help='proportion of data for testing')
     
     # optimiser inputs
-    parser.add_argument('--optim', default='Adam', type=str, metavar='SGD', 
+    parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', 
     help='choose an optimizer, SGD or Adam, (default: SGD)')
-    parser.add_argument('--epochs', default=1000, type=int, metavar='N', 
+    parser.add_argument('--epochs', default=300, type=int, metavar='N', 
     help='number of total epochs to run (default: 30)')
     parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', 
     help='initial learning rate (default: 0.01)')
-    parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', 
+    parser.add_argument('--lr-milestones', default=[50,100,150,200], nargs='+', type=int, metavar='N', 
     help='milestones for scheduler (default: [100])')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', 
     help='momentum')
@@ -137,13 +137,14 @@ class CompositionData(Dataset):
             nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
 
         # convert all data to tensors
+        atom_weights = torch.Tensor(weights)
         atom_fea = torch.Tensor(atom_fea)
         bond_fea = torch.cat(bond_fea, dim=0)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
 
-        return (atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
+        return (atom_weights, atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
 
 def entropic_fea(elements, weights):
     """ calculate entropic features for the crystal """
@@ -187,6 +188,7 @@ def collate_batch(dataset_list):
     batch_cif_ids: list
     """
     # define the lists
+    batch_atom_weights = [] 
     batch_atom_fea = [] 
     batch_bond_fea = []
     batch_self_fea_idx = []
@@ -197,23 +199,31 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, ((atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id) in enumerate(dataset_list):
-        n_i = atom_fea.shape[0]  # number of atoms for this crystal
+    for i, ((atom_weights, atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id) in enumerate(dataset_list):
+        # number of atoms for this crystal
+        n_i = atom_fea.shape[0]  
 
+        # batch the features together
+        batch_atom_weights.append(atom_weights)
         batch_atom_fea.append(atom_fea)
         batch_bond_fea.append(bond_fea)
 
+        # mappings from bonds to atoms
         batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
         batch_nbr_fea_idx.append(nbr_fea_idx+cry_base_idx)
-        cry_base_idx += n_i
 
         # mapping from atoms to crystals
         crystal_atom_idx.append(torch.tensor([i]*n_i))
 
+        # batch the targets and ids
         batch_target.append(target)
         batch_cry_ids.append(cry_id)
 
-    return (torch.cat(batch_atom_fea, dim=0),
+        # increment the id counter
+        cry_base_idx += n_i
+
+    return (torch.cat(batch_atom_weights, dim=0),
+            torch.cat(batch_atom_fea, dim=0),
             torch.cat(batch_bond_fea, dim=0),
             torch.cat(batch_self_fea_idx, dim=0),
             torch.cat(batch_nbr_fea_idx, dim=0),
