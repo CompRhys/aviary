@@ -5,6 +5,7 @@ sampnn/data.py
 sampnn/features.py
 sampnn/message.py
 sampnn/parse.py
+sampnn/utils.py
 sampnn.egg-info/PKG-INFO
 sampnn.egg-info/SOURCES.txt
 sampnn.egg-info/dependency_links.txt

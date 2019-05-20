@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 from torch_scatter import scatter_max, scatter_mean, \
                             scatter_add, scatter_mul
+import copy
 
 class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
     """
-    def __init__(self, atom_fea_len, nbr_fea_len):
+    def __init__(self, atom_fea_len, nbr_fea_len, atom_gate):
         """
         Inputs
         ----------
@@ -20,21 +21,22 @@ class MessageLayer(nn.Module):
         self.atom_fea_len = atom_fea_len
         self.nbr_fea_len = nbr_fea_len
         
-        self.filter_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, 
-                                    self.atom_fea_len)
+        self.filter_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, self.atom_fea_len)
+        self.filter_bn = nn.BatchNorm1d(self.atom_fea_len)
+        self.filter_act = nn.Sigmoid()
 
-        self.core_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, 
-                                    self.atom_fea_len)
+        self.core_msg = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len, self.atom_fea_len)
+        self.core_bn = nn.BatchNorm1d(self.atom_fea_len)
+        self.core_act = nn.ELU()
 
-        self.bn_filter = nn.BatchNorm1d(self.atom_fea_len)
-        self.bn_core = nn.BatchNorm1d(self.atom_fea_len)
-        self.bn_output = nn.BatchNorm1d(self.atom_fea_len)
+        # self.pooling = WeightedMeanPooling()
+        self.pooling = GlobalAttention(atom_gate)
 
-        self.filter_transform = nn.Sigmoid()
-        self.core_transform = nn.Softplus()
-        self.output_transform = nn.Softplus()
+        self.out_act = nn.ELU()
 
-    def forward(self, atom_in_fea, bond_nbr_fea, 
+
+
+    def forward(self, atom_weights, atom_in_fea, bond_nbr_fea, 
                 self_fea_idx, nbr_fea_idx):
         """
         Forward pass
@@ -64,33 +66,31 @@ class MessageLayer(nn.Module):
             Atom hidden features after message passing
         """
         # construct the total features for passing
+        atom_nbr_weights = atom_weights[nbr_fea_idx,:]
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
         atom_self_fea = atom_in_fea[self_fea_idx,:]
 
         total_fea = torch.cat([atom_self_fea, atom_nbr_fea, bond_nbr_fea], dim=1)
 
-        # multiply input by weight matrix
         filter_fea = self.filter_msg(total_fea)
+        filter_fea = self.filter_bn(filter_fea)
+        filter_fea = self.filter_act(filter_fea)
+
         core_fea = self.core_msg(total_fea)
-
-        # apply batch-normalisation (regularise and reduce covariate shift)
-        filter_fea = self.bn_filter(filter_fea)
-        core_fea = self.bn_core(core_fea)
-
-        # apply non-linear transformations
-        filter_fea = self.filter_transform(filter_fea)
-        core_fea = self.core_transform(core_fea)
+        core_fea = self.core_bn(core_fea)
+        core_fea = self.core_act(core_fea)
 
         # take the elementwise product of the filter and core
         nbr_message = filter_fea * core_fea
+        # nbr_message = filter_fea 
+        # nbr_message = core_fea
 
         # sum selectivity over the neighbours to get atoms
-        nbr_sumed = scatter_mean(nbr_message, self_fea_idx, dim=0)
+        out = self.pooling(nbr_message, self_fea_idx, atom_nbr_weights)
 
-        nbr_sumed = self.bn_output(nbr_sumed)
-
-        atom_out_fea = self.output_transform(atom_in_fea + nbr_sumed)
-        return atom_out_fea
+        # out = torch.cat([atom_in_fea, out], dim=1)
+        
+        return out
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
@@ -110,8 +110,9 @@ class CompositionNet(nn.Module):
     approaches.
     """
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
-                 atom_fea_len=48, n_graph=3, h_fea_list=[128], 
-                 n_out = 1):
+                 atom_gate, crys_gate, 
+                 atom_fea_len, n_graph, 
+                 output_nn=None):
         """
         Initialize CompositionNet.
 
@@ -129,10 +130,6 @@ class CompositionNet(nn.Module):
             Number of hidden atom features in the graph layers
         n_graph: int
             Number of graph layers
-        h_fea_list: list int of length n_h
-            Number of hidden features in each fc layer after pooling
-        n_out: int
-            Number of outputs for the fc network
         """
         super(CompositionNet, self).__init__()
 
@@ -141,28 +138,15 @@ class CompositionNet(nn.Module):
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList([MessageLayer(atom_fea_len=atom_fea_len,
-                                                 nbr_fea_len=nbr_fea_len)
-                                    for _ in range(n_graph)])
+                                                 nbr_fea_len=nbr_fea_len,
+                                                 atom_gate=copy.deepcopy(atom_gate))
+                                    for i in range(n_graph)])
 
         # self.pooling = WeightedMeanPooling()
-        self.pooling = GlobalAttention(atom_fea_len, 16)
+        self.pooling = GlobalAttention(crys_gate)
 
-        self.graph_to_fc = nn.Linear(atom_fea_len, h_fea_list[0])
-        self.graph_to_fc_bn = nn.BatchNorm1d(h_fea_list[0])
-        self.graph_to_fc_act = nn.Softplus()
-        # self.graph_to_fc_act = nn.ReLU()
-
-        if len(h_fea_list) > 1:
-            # create a list of fully connected passing layers
-            self.weightings = nn.ModuleList([nn.Linear(h_fea_list[i], h_fea_list[i+1])
-                                        for i in range(len(h_fea_list)-1)])
-            self.activations = nn.ModuleList([nn.Softplus()
-            # self.activations = nn.ModuleList([nn.ReLU()
-                                        for i in range(len(h_fea_list)-1)])
-            self.batchnorms = nn.ModuleList([nn.BatchNorm1d(h_fea_list[i+1])
-                                        for i in range(len(h_fea_list)-1)])
-
-        self.fc_out = nn.Linear(h_fea_list[-1], n_out)
+        if output_nn:
+            self.output_nn = output_nn
 
     def forward(self, atom_weights, orig_atom_fea, nbr_fea, self_fea_idx, 
                 nbr_fea_idx, crystal_atom_idx):
@@ -200,30 +184,22 @@ class CompositionNet(nn.Module):
         atom_fea = self.embedding(orig_atom_fea)
 
         # apply the graph message passing functions 
-        # for graph_func in self.graphs:
-        #     atom_fea = graph_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
+        for graph_func in self.graphs:
+            atom_fea = graph_func(atom_weights, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
 
         # generate crystal features by pooling the atomic features
         crys_fea = self.pooling(atom_fea, crystal_atom_idx, atom_weights)
 
-        # prepate the crystal features for the full connected neural network
-        crys_fea = self.graph_to_fc(crys_fea)
-        crys_fea = self.graph_to_fc_bn(crys_fea)
-        crys_fea = self.graph_to_fc_act(crys_fea)
+        if self.output_nn:
+            crys_fea = self.output_nn(crys_fea)
 
-        if hasattr(self, 'weightings') and hasattr(self, 'activations'):
-            # join together the linear layers and non-linear activation functions
-            # and apply recursively to build up the fully connected neural network
-            for wm, bn, sig in zip(self.weightings, self.batchnorms, self.activations):
-                crys_fea = sig(bn(wm(crys_fea)))
-
-        out = self.fc_out(crys_fea)
-        return out
+        return crys_fea
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
 
-class WeightedMeanPooling(torch.nn.Module):
+
+class WeightedMeanPooling(nn.Module):
     """
     mean pooling
     """
@@ -233,21 +209,19 @@ class WeightedMeanPooling(torch.nn.Module):
     def forward(self, x, index, weights):
         weights = weights.unsqueeze(-1) if weights.dim() == 1 else weights
         x = weights * x 
-        return scatter_mean(x, index, dim=0)
+
+        weighted_mean = scatter_mul(x, index, dim=0)/scatter_mul(weights, index, dim=0)
+
+        return weighted_mean
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
         
-class GlobalAttention(torch.nn.Module):
-    """
-    Global soft attention layer from the `"Gated Graph Sequence Neural
-    Networks" <https://arxiv.org/abs/1511.05493>`_ paper
-    """
-
-    def __init__(self, fea_len, hidden_len):
+class GlobalAttention(nn.Module):
+    """  Weighted softmax attention layer  """
+    def __init__(self, gate_nn):
         super(GlobalAttention, self).__init__()
-        self.gate_nn = nn.Sequential(nn.Linear(fea_len, hidden_len), \
-            nn.BatchNorm1d(hidden_len), nn.ReLU(), nn.Linear(hidden_len, 1))
+        self.gate_nn = gate_nn
 
     def forward(self, x, index, weights):
         """ forward pass """

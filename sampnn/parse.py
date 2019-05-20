@@ -105,7 +105,6 @@ def update_parent(child):
     new_str = update_weights(input_str, child.value[1])
     pattern = re.escape("("+child.value[0]+")"+str(child.value[1]))
     old_str = child.parent.value[2] or child.parent.value[0]
-    print(new_str, pattern, old_str)
     child.parent.value[2] = re.sub(pattern, new_str, old_str, 0)
 
 
@@ -122,7 +121,6 @@ def parse(string):
         build_tree(root, nested_levels)
         # reduce the tree to get compositions
         reduce_tree(root)
-        print_tree(root)
         return splitout_weights(root.children[0].value[2])
 
     else:

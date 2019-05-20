@@ -1,13 +1,11 @@
 import os
-import re
 import random
 import sys
-import math
+import argparse
 import csv
 import torch
 import functools
-import argparse
-import tensorflow as tf
+
 import numpy as np
 from torch.utils.data import Dataset
 
@@ -22,14 +20,12 @@ def input_parser():
     parser = argparse.ArgumentParser(description='Structure Agnostic Message Passing Neural Network')
 
     # misc inputs
-    parser.add_argument('data_options', metavar='OPTIONS', nargs='+', 
-    help='dataset options, started with the path to root dir,then other options')
+    parser.add_argument('--data_dir', type=str, default='/home/rhys/PhD/sampnn/data/', metavar='PATH',
+    help='dataset directory')
     parser.add_argument('--disable-cuda', action='store_true', 
     help='Disable CUDA')
     parser.add_argument('--print-freq', default=10, type=int, metavar='N', 
     help='print frequency (default: 10)')
-    parser.add_argument('--logs', default='./logs', type=str, metavar='PATH', 
-    help='path to latest checkpoint (default: none)')
     
     # restart inputs
     parser.add_argument('--resume', default='', type=str, metavar='PATH', 
@@ -40,23 +36,23 @@ def input_parser():
     # dataloader inputs
     parser.add_argument('--workers', default=0, type=int, metavar='N', 
     help='number of data loading workers (default: 0)')
-    parser.add_argument('--batch-size', default=64, type=int, metavar='N', 
+    parser.add_argument('--batch-size', default=128, type=int, metavar='N', 
     help='mini-batch size (default: 256)')    
-    parser.add_argument('--train-size', default=0.6, type=float, metavar='N', 
+    parser.add_argument('--train-size', default=0.8, type=float, metavar='N', 
     help='proportion of data for training')
-    parser.add_argument('--val-size', default=0.2, type=float, metavar='N', 
+    parser.add_argument('--val-size', default=0.1, type=float, metavar='N', 
     help='proportion of data for validation')
-    parser.add_argument('--test-size', default=0.2, type=float, metavar='N', 
+    parser.add_argument('--test-size', default=0.0, type=float, metavar='N', 
     help='proportion of data for testing')
     
     # optimiser inputs
     parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', 
     help='choose an optimizer, SGD or Adam, (default: SGD)')
-    parser.add_argument('--epochs', default=300, type=int, metavar='N', 
+    parser.add_argument('--epochs', default=200, type=int, metavar='N', 
     help='number of total epochs to run (default: 30)')
-    parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR', 
+    parser.add_argument('--learning-rate', default=0.005, type=float, metavar='LR', 
     help='initial learning rate (default: 0.01)')
-    parser.add_argument('--lr-milestones', default=[50,100,150,200], nargs='+', type=int, metavar='N', 
+    parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', 
     help='milestones for scheduler (default: [100])')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', 
     help='momentum')
@@ -64,10 +60,8 @@ def input_parser():
     help='weight decay (default: 0)')
     
     # graph inputs
-    parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', 
+    parser.add_argument('--atom-fea-len', default=16, type=int, metavar='N', 
     help='number of hidden atom features in conv layers')
-    parser.add_argument('--h-fea-list', default=[128,64,32], nargs='+', type=int, metavar='N', 
-    help='number of hidden features after pooling')
     parser.add_argument('--n-conv', default=3, type=int, metavar='N', 
     help='number of conv layers')
 
@@ -87,8 +81,8 @@ class CompositionData(Dataset):
     The CompositionData dataset is a wrapper for a dataset data points are
     automatically constructed from composition strings.
     """
-    def __init__(self, data_dir, random_seed=123):
-        assert os.path.exists(data_dir), 'data_dir does not exist!'
+    def __init__(self, data_dir, seed=123):
+        assert os.path.exists(data_dir), 'data_dir ({}) does not exist!'.format(data_dir)
         self.data_dir = data_dir
 
         id_comp_prop_file = os.path.join(self.data_dir, 'id_comp_prop.csv')
@@ -97,7 +91,7 @@ class CompositionData(Dataset):
         with open(id_comp_prop_file) as f:
             reader = csv.reader(f)
             self.id_prop_data = [row for row in reader]
-        random.seed(random_seed)
+        random.seed(seed)
         random.shuffle(self.id_prop_data)
 
         atom_fea_file = os.path.join(self.data_dir, 'atom_fea.json')
@@ -122,7 +116,7 @@ class CompositionData(Dataset):
         '''
         cry_id, composition, target = self.id_prop_data[idx]
         elements, weights = parse(composition)
-        weights = np.atleast_2d(weights).T
+        weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, 'crystal {}: {}, is a pure system'.format(cry_id, composition)
         atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
         atom_fea = np.hstack((atom_fea,weights))
@@ -230,24 +224,6 @@ def collate_batch(dataset_list):
             torch.cat(crystal_atom_idx)), \
             torch.stack(batch_target, dim=0), \
             batch_cry_ids
-
-
-# def split_dataset(dataset, points, train_size, val_size, test_size, params):
-    # """ take only a subset of the data """
-    # indices = list(range(points))
-    # train_idx = int(points * train_size) # note int() truncates but this same as floor for +ve 
-    # val_idx = int(points * val_size)
-    # test_idx = int(points * val_size)
-    # train_set, val_set, test_set = indices[:train_idx], indices[train_idx:train_idx+val_idx], indices[-test_idx:]
-
-    # train_sampler = SubsetRandomSampler(train_set)
-    # train_generator = DataLoader(dataset, sampler=train_sampler, **params)
-
-    # val_sampler = SubsetRandomSampler(val_set)
-    # val_generator = DataLoader(dataset, sampler=val_sampler, **params)
-
-    # test_sampler = SubsetRandomSampler(test_set)
-    # test_generator = DataLoader(dataset, sampler=test_sampler, **params)
 
 
 class AverageMeter(object):
