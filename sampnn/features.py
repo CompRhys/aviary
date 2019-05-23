@@ -20,6 +20,9 @@ class Featuriser(object):
     def get_state_dict(self):
         return self._embedding
 
+    def embedding_size(self):
+        return len(self._embedding[list(self._embedding.keys())[0]])
+
 class LoadFeaturiser(Featuriser):
     """
     Initialize atom feature vectors using a JSON file, which is a python

@@ -2,6 +2,7 @@ import torch
 from tqdm import trange
 import shutil
 import csv
+import numpy as np
 
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
@@ -14,7 +15,7 @@ def train(train_loader, model, criterion, optimizer,
     run a forward pass, backwards pass and then update weights
     """
     losses = AverageMeter()
-    mae_errors = AverageMeter()
+    errors = AverageMeter()
 
     with trange(len(train_loader)) as t:
         for i, (input_, target, _) in enumerate(train_loader):
@@ -22,24 +23,20 @@ def train(train_loader, model, criterion, optimizer,
             # normalize target
             target_var = normalizer.norm(target)
             
+            # move tensors to GPU
             if cuda:
-                input_ = (input_[0].cuda(async=True),
-                            input_[1].cuda(async=True),
-                            input_[2].cuda(async=True),
-                            input_[3].cuda(async=True),
-                            input_[4].cuda(async=True),
-                            input_[5].cuda(async=True))
+                input_ = ( tensor.cuda(async=True) for tensor in input_ )
                 target_var = target_var.cuda(async=True)
 
             # compute output
             output = model(*input_)
             loss = criterion(output, target_var)
+            losses.update(loss.data.cpu().item(), target.size(0))
 
             # measure accuracy and record loss
             mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-            mse_error = torch.sqrt(mse(normalizer.denorm(output.data.cpu()), target))
-            losses.update(loss.data.cpu().item(), target.size(0))
-            mae_errors.update(mae_error, target.size(0))
+            mse_error = mse(normalizer.denorm(output.data.cpu()), target)
+            errors.update(mse_error, target.size(0))
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
@@ -49,7 +46,7 @@ def train(train_loader, model, criterion, optimizer,
             t.set_postfix(loss=losses.avg)
             t.update()
 
-    return losses.avg, mae_errors.avg
+    return losses.avg, errors.avg
     
 
 def evaluate(generator, model, criterion, normalizer, 
@@ -64,59 +61,123 @@ def evaluate(generator, model, criterion, normalizer,
         test_cif_ids = []
 
     if test:
-       label = 'Test'
+       label = "Test"
     else:
-        label = 'Validate'
+        label = "Validate"
 
     for i, (input_, target, batch_cif_ids) in enumerate(generator):
         
         # normalize target
         target_var = normalizer.norm(target)
         
+        # move tensors to GPU
         if cuda:
-            input_ = (input_[0].cuda(async=True),
-                        input_[1].cuda(async=True),
-                        input_[2].cuda(async=True),
-                        input_[3].cuda(async=True),
-                        input_[4].cuda(async=True),
-                        input_[5].cuda(async=True))
+            input_ = (tensor.cuda(async=True) for tensor in input_ )
             target_var = target_var.cuda(async=True)
 
         # compute output
         output = model(*input_)
+
         loss = criterion(output, target_var)
+        losses.update(loss.data.cpu().item(), target.size(0))
 
         # measure accuracy and record loss
-        mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-        mse_error = mse(normalizer.denorm(output.data.cpu()), target)
-        losses.update(loss.data.cpu().item(), target.size(0))
+        pred = normalizer.denorm(output.data.cpu())
+        mae_error = mae(pred, target)
+        mse_error = mse(pred, target)
         errors.update(mse_error, target.size(0))
 
         if test:
-            test_pred = normalizer.denorm(output.data.cpu())
-            test_target = target
-            test_preds += test_pred.view(-1).tolist()
-            test_targets += test_target.view(-1).tolist()
             test_cif_ids += batch_cif_ids
+            test_targets += target.view(-1).tolist()
+            test_preds += pred.view(-1).tolist()
 
     if test:  
-        with open('test_results.csv', 'w') as f:
-            writer = csv.writer(f)
-            for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
-                writer.writerow((cif_id, target, pred))
-
-        print('Test : Loss {loss.avg:.4f}\t'
-                    'MAE {error.avg:.3f}\n'.format(loss=losses, error=errors))
-
-        pass
+        print("Test : Loss {loss.avg:.4f}\t Error {error.avg:.3f}\n".format(loss=losses, error=errors))
+        return test_cif_ids, test_targets, test_preds
     else:
         return losses.avg, errors.avg
-                                                
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
-    '''
+
+
+def partitions(number, k):
+    """
+    Distribution of the folds to allow for cases where the folds do not divide evenly
+
+    Inputs
+    --------
+    k: int
+        The number of folds to split the data into
+    number: int
+        The number of datapoints in the dataset
+    """
+    n_partitions = np.ones(k) * int(number/k)
+    n_partitions[0:(number % k)] += 1
+    return n_partitions
+
+
+
+def get_indices(n_splits, points):
+    """
+    Indices of the set test
+
+    Inputs
+    --------
+    n_splits: int
+        The number of folds to split the data into
+    points: int
+        The number of datapoints in the dataset
+    """
+    fold_sizes = partitions(points, n_splits)
+    indices = np.arange(points).astype(int)
+    current = 0
+    for fold_size in fold_sizes:
+        start = current
+        stop =  current + fold_size
+        current = stop
+        yield(indices[int(start):int(stop)])
+
+
+
+def k_fold_split(n_splits = 3, points = 3001):
+    """
+    Generates folds for cross validation
+
+    Inputs
+    --------
+    n_splits: int
+        The number of folds to split the data into
+    points: int
+        The number of datapoints in the dataset
+
+    """
+    indices = np.arange(points).astype(int)
+    for test_idx in get_indices(n_splits, points):
+        train_idx = np.setdiff1d(indices, test_idx)
+        yield train_idx, test_idx
+
+
+
+def save_checkpoint(state, is_best, checkpoint="checkpoint.pth.tar", best="best.pth.tar" ):
+    """
     Saves a checkpoint and overwrites the best model when is_best = True
-    '''
-    torch.save(state, filename)
+    """
+
+    torch.save(state, checkpoint)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        shutil.copyfile(checkpoint, best)
+
+
+
+def resume():
+    assert os.path.isfile(args.resume), "=> no checkpoint found at '{}'".format(args.resume) 
+
+    print("=> loading checkpoint '{}'".format(args.resume))
+    checkpoint = torch.load(args.resume)
+    args.start_epoch = checkpoint["epoch"]
+    best_error = checkpoint["best_error"]
+    model.load_state_dict(checkpoint["state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer"])
+    normalizer.load_state_dict(checkpoint["normalizer"])
+    print("=> loaded checkpoint '{}' (epoch {})"
+            .format(args.resume, checkpoint["epoch"]))

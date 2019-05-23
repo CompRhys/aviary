@@ -38,17 +38,17 @@ def input_parser():
     help='number of data loading workers (default: 0)')
     parser.add_argument('--batch-size', default=128, type=int, metavar='N', 
     help='mini-batch size (default: 256)')    
-    parser.add_argument('--train-size', default=0.8, type=float, metavar='N', 
+    parser.add_argument('--train-size', default=0.7, type=float, metavar='N', 
     help='proportion of data for training')
     parser.add_argument('--val-size', default=0.1, type=float, metavar='N', 
     help='proportion of data for validation')
-    parser.add_argument('--test-size', default=0.0, type=float, metavar='N', 
+    parser.add_argument('--test-size', default=0.2, type=float, metavar='N', 
     help='proportion of data for testing')
     
     # optimiser inputs
     parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', 
     help='choose an optimizer, SGD or Adam, (default: SGD)')
-    parser.add_argument('--epochs', default=200, type=int, metavar='N', 
+    parser.add_argument('--epochs', default=100, type=int, metavar='N', 
     help='number of total epochs to run (default: 30)')
     parser.add_argument('--learning-rate', default=0.005, type=float, metavar='LR', 
     help='initial learning rate (default: 0.01)')
@@ -60,10 +60,10 @@ def input_parser():
     help='weight decay (default: 0)')
     
     # graph inputs
-    parser.add_argument('--atom-fea-len', default=16, type=int, metavar='N', 
+    parser.add_argument('--atom-fea-len', default=24, type=int, metavar='N', 
     help='number of hidden atom features in conv layers')
-    parser.add_argument('--n-conv', default=3, type=int, metavar='N', 
-    help='number of conv layers')
+    parser.add_argument('--n-graph', default=3, type=int, metavar='N', 
+    help='number of graph layers')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -91,6 +91,7 @@ class CompositionData(Dataset):
         with open(id_comp_prop_file) as f:
             reader = csv.reader(f)
             self.id_prop_data = [row for row in reader]
+
         random.seed(seed)
         random.shuffle(self.id_prop_data)
 
@@ -101,7 +102,8 @@ class CompositionData(Dataset):
         assert os.path.exists(atom_fea_file), 'bond_fea.json does not exist!'
 
         self.atom_features = LoadFeaturiser(atom_fea_file)
-        self.bond_features = LoadFeaturiser(bond_fea_file)
+
+        self.atom_fea_dim = self.atom_features.embedding_size()
 
     def __len__(self):
         return len(self.id_prop_data)
@@ -119,34 +121,23 @@ class CompositionData(Dataset):
         weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, 'crystal {}: {}, is a pure system'.format(cry_id, composition)
         atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
-        atom_fea = np.hstack((atom_fea,weights))
+        # atom_fea = np.hstack((atom_fea,weights))
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
-        bond_fea = []
         for i, element in enumerate(elements):
             nbrs = elements[:i]+elements[i+1:]
-            bond_fea.append(torch.Tensor(np.vstack([self.bond_features.get_fea(element+nbr) for nbr in nbrs])))
             self_fea_idx += [i]*len(nbrs)
             nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
 
         # convert all data to tensors
         atom_weights = torch.Tensor(weights)
         atom_fea = torch.Tensor(atom_fea)
-        bond_fea = torch.cat(bond_fea, dim=0)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
 
-        return (atom_weights, atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id
-
-def entropic_fea(elements, weights):
-    """ calculate entropic features for the crystal """
-    entropic_fea = []
-
-
-
-    return entropic_fea
+        return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, cry_id
 
 def collate_batch(dataset_list):
     """
@@ -184,23 +175,20 @@ def collate_batch(dataset_list):
     # define the lists
     batch_atom_weights = [] 
     batch_atom_fea = [] 
-    batch_bond_fea = []
     batch_self_fea_idx = []
     batch_nbr_fea_idx = []
-    atom_bond_idx = []
     crystal_atom_idx = [] 
     batch_target = []
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, ((atom_weights, atom_fea, bond_fea, self_fea_idx, nbr_fea_idx), target, cry_id) in enumerate(dataset_list):
+    for i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, cry_id) in enumerate(dataset_list):
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]  
 
         # batch the features together
         batch_atom_weights.append(atom_weights)
         batch_atom_fea.append(atom_fea)
-        batch_bond_fea.append(bond_fea)
 
         # mappings from bonds to atoms
         batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
@@ -218,7 +206,6 @@ def collate_batch(dataset_list):
 
     return (torch.cat(batch_atom_weights, dim=0),
             torch.cat(batch_atom_fea, dim=0),
-            torch.cat(batch_bond_fea, dim=0),
             torch.cat(batch_self_fea_idx, dim=0),
             torch.cat(batch_nbr_fea_idx, dim=0),
             torch.cat(crystal_atom_idx)), \
@@ -246,7 +233,12 @@ class AverageMeter(object):
 
 class Normalizer(object):
     """Normalize a Tensor and restore it later. """
-    def __init__(self, tensor, dim=0, keepdim=False):
+    def __init__(self, ):
+        """tensor is taken as a sample to calculate the mean and std"""
+        self.mean = torch.tensor((0))
+        self.std = torch.tensor((1))
+
+    def fit(self, tensor, dim=0, keepdim=False):
         """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.mean(tensor, dim, keepdim)
         self.std = torch.std(tensor, dim, keepdim)
