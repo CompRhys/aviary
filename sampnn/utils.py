@@ -34,9 +34,14 @@ def train(train_loader, model, criterion, optimizer,
             losses.update(loss.data.cpu().item(), target.size(0))
 
             # measure accuracy and record loss
-            mae_error = mae(normalizer.denorm(output.data.cpu()), target)
-            mse_error = mse(normalizer.denorm(output.data.cpu()), target)
-            errors.update(mse_error, target.size(0))
+            pred = normalizer.denorm(output.data.cpu())
+            
+            mae_error = mae(pred, target)
+            errors.update(mae_error, target.size(0))
+
+            # rmse_error = mse(pred.exp_(), target.exp_()).sqrt_()
+            # rmse_error = mse(pred, target).sqrt_()
+            # errors.update(rmse_error, target.size(0))
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
@@ -83,9 +88,13 @@ def evaluate(generator, model, criterion, normalizer,
 
         # measure accuracy and record loss
         pred = normalizer.denorm(output.data.cpu())
+        
         mae_error = mae(pred, target)
-        mse_error = mse(pred, target)
-        errors.update(mse_error, target.size(0))
+        errors.update(mae_error, target.size(0))
+
+        # rmse_error = mse(pred.exp_(), target.exp_()).sqrt_()
+        # rmse_error = mse(pred, target).sqrt_()
+        # errors.update(rmse_error, target.size(0))
 
         if test:
             test_cif_ids += batch_cif_ids
@@ -158,7 +167,7 @@ def k_fold_split(n_splits = 3, points = 3001):
 
 
 
-def save_checkpoint(state, is_best, checkpoint="checkpoint.pth.tar", best="best.pth.tar" ):
+def save_checkpoint(state, is_best, checkpoint="models/checkpoint.pth.tar", best="models/best.pth.tar" ):
     """
     Saves a checkpoint and overwrites the best model when is_best = True
     """

@@ -20,18 +20,22 @@ class MessageLayer(nn.Module):
         super(MessageLayer, self).__init__()
         self.atom_fea_len = atom_fea_len
         
-        self.filter_msg = nn.Linear(2*self.atom_fea_len, self.atom_fea_len)
-        self.filter_bn = nn.BatchNorm1d(self.atom_fea_len)
-        self.filter_act = nn.Sigmoid()
+        # self.linear = nn.Linear(2*self.atom_fea_len, self.atom_fea_len)
+        # # self.bn = nn.BatchNorm1d(self.atom_fea_len)
+        # self.act = nn.ReLU()
 
-        self.core_msg = nn.Linear(2*self.atom_fea_len, self.atom_fea_len)
-        self.core_bn = nn.BatchNorm1d(self.atom_fea_len)
-        self.core_act = nn.ELU()
+        self.net = nn.Sequential(nn.Linear(2*atom_fea_len,atom_fea_len*4),
+                          nn.ReLU(),nn.Linear(atom_fea_len*4,atom_fea_len))
 
-        # self.pooling = WeightedMeanPooling()
+        # self.linear = nn.Linear(2*self.atom_fea_len, 2*self.atom_fea_len)
+        # self.bn = nn.BatchNorm1d(2*self.atom_fea_len)
+
+        # self.filter_act = nn.Sigmoid()
+        # self.core_act = nn.Softplus()
+
         self.pooling = GlobalAttention(atom_gate)
-
-        self.out_act = nn.ELU()
+        # self.out_act = nn.ReLU()
+        # self.out_act = nn.Softplus()
 
 
 
@@ -69,23 +73,25 @@ class MessageLayer(nn.Module):
 
         total_fea = torch.cat([atom_self_fea, atom_nbr_fea], dim=1)
 
-        filter_fea = self.filter_msg(total_fea)
-        filter_fea = self.filter_bn(filter_fea)
-        filter_fea = self.filter_act(filter_fea)
+        # total_fea = self.linear(total_fea)
+        # # total_fea = self.bn(total_fea)
+        # nbr_message = self.act(total_fea)
 
-        core_fea = self.core_msg(total_fea)
-        core_fea = self.core_bn(core_fea)
-        core_fea = self.core_act(core_fea)
+        nbr_message = self.net(total_fea)
 
-        # take the elementwise product of the filter and core
-        nbr_message = filter_fea * core_fea
-        # nbr_message = filter_fea 
-        # nbr_message = core_fea
+        # # GRU based model
+        # filter_fea, core_fea = total_fea.chunk(2, dim=1)
+        
+        # filter_fea = self.filter_act(filter_fea)
+        # core_fea = self.core_act(core_fea)
+
+        # # take the elementwise product of the filter and core
+        # nbr_message = filter_fea * core_fea
 
         # sum selectivity over the neighbours to get atoms
         out = self.pooling(nbr_message, self_fea_idx, atom_nbr_weights)
 
-        # out = atom_in_fea + out
+        # out = self.out_act(atom_in_fea + out)
 
         # out = torch.cat([atom_in_fea, out], dim=1)
         
@@ -132,18 +138,21 @@ class CompositionNet(nn.Module):
         self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len)
 
         # define the necessary neural networks for the pooling 
-        output_nn = nn.Sequential(nn.Linear(atom_fea_len,96), nn.BatchNorm1d(96),
-                          nn.ELU(),nn.Linear(96,48), nn.BatchNorm1d(48), 
-                          nn.ELU(), nn.Linear(48,1))
+        output_nn = nn.Sequential(nn.Linear(atom_fea_len,atom_fea_len*5),
+                          nn.ReLU(),nn.Linear(atom_fea_len*5,atom_fea_len*3), 
+                          nn.ReLU(),nn.Linear(atom_fea_len*3,atom_fea_len), 
+                          nn.ReLU(), nn.Linear(atom_fea_len,1))
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList([MessageLayer(atom_fea_len=atom_fea_len,
-                                                    atom_gate=nn.Sequential(nn.Linear(atom_fea_len, 96), 
-                                                    nn.BatchNorm1d(96), nn.ELU(), nn.Linear(96,1)))
+                                                    atom_gate=nn.Sequential(nn.Linear(atom_fea_len, atom_fea_len*3),
+                                                    # nn.ReLU(),nn.Linear(atom_fea_len*3,atom_fea_len*2), 
+                                                    nn.ReLU(), nn.Linear(atom_fea_len*3,1)))
                                     for _ in range(n_graph)])
 
-        self.pooling = GlobalAttention(nn.Sequential(nn.Linear(atom_fea_len, 96), 
-                                        nn.BatchNorm1d(96), nn.ELU(),nn.Linear(96,1)))
+        self.pooling = GlobalAttention(nn.Sequential(nn.Linear(atom_fea_len, atom_fea_len*3), 
+                                        # nn.ReLU(),nn.Linear(atom_fea_len*3,atom_fea_len*2), 
+                                        nn.ReLU(),nn.Linear(atom_fea_len*3,1)))
 
         if output_nn:
             self.output_nn = output_nn

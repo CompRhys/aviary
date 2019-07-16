@@ -10,7 +10,7 @@ class Featuriser(object):
         self._embedding = {}
 
     def get_fea(self, key):
-        assert key in self.allowed_types
+        assert key in self.allowed_types, "{} is not an allowed atom type".format(key)
         return self._embedding[key]
 
     def load_state_dict(self, state_dict):
