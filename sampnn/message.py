@@ -73,7 +73,7 @@ class MessageLayer(nn.Module):
         fea = torch.cat([atom_self_fea, atom_nbr_fea], dim=1)
 
         fea = self.linear_in(fea)
-        fea = self.bn(fea)
+        # fea = self.bn(fea)
         fea = self.act(fea)
         fea = self.linear_out(fea)
 
