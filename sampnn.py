@@ -38,7 +38,7 @@ def init_model(orig_atom_fea_len):
     print("Total Number of Trainable Parameters: {}".format(num_param))
 
     if args.cuda:
-        model.cuda()
+        model.to(device)
 
     if args.loss == "L1":
         criterion = nn.L1Loss()
