@@ -47,7 +47,7 @@ def train(train_loader, model, criterion, optimizer,
             loss.backward()
             optimizer.step()
 
-            t.set_postfix(loss=losses.avg)
+            t.set_postfix(loss=losses.val)
             t.update()
 
     return losses.avg, errors.avg

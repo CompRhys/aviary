@@ -113,3 +113,5 @@ test_results.csv
 runs/
 
 *.pth.tar
+
+sampnn/other.py

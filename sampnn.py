@@ -85,17 +85,22 @@ def main():
     # train_set = torch.utils.data.Subset(dataset, train_idx)
     # test_set = torch.utils.data.Subset(dataset, test_idx)
 
-    train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", fea_path=args.fea_path)
+    train_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
     test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
 
 
     orig_atom_fea_len = train_set.atom_fea_dim + 1
-    single(5, train_set, test_set, orig_atom_fea_len)
 
-    # ensemble(2, train_set, test_set, 10, orig_atom_fea_len)
+    model_dir = "models/"
+    if not os.path.isdir(model_dir):
+        os.makedirs(model_dir)
+
+    single(model_dir, 5, train_set, test_set, orig_atom_fea_len)
+
+    # ensemble(model_dir, 2, train_set, test_set, 10, orig_atom_fea_len)
 
 
-def single(fold_id, dataset, test_set, fea_len, test=True):
+def single(model_dir, fold_id, dataset, test_set, fea_len, test=True):
     """
     Train a single model
     """
@@ -127,15 +132,15 @@ def single(fold_id, dataset, test_set, fea_len, test=True):
     _, sample_target, _ = collate_batch(train_subset)
     normalizer.fit(sample_target)
 
-    experiment(fold_id, 9, args, train_generator, val_generator, 
+    experiment(model_dir, fold_id, 9, args, train_generator, val_generator, 
                 model, optimizer, criterion, normalizer)
 
     if test:
-        test_model(fold_id, 9, test_set, fea_len)
+        test_model(model_dir, fold_id, 9, test_set, fea_len)
 
 
 
-def ensemble(fold_id, dataset, test_set, ensemble_folds, fea_len, test=True):
+def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, test=True):
     """
     Train multiple models
     """
@@ -168,81 +173,14 @@ def ensemble(fold_id, dataset, test_set, ensemble_folds, fea_len, test=True):
         _, sample_target, _ = collate_batch(train_subset)
         normalizer.fit(sample_target)
 
-        experiment(fold_id, run_id, args, train_generator, val_generator, 
+        experiment(model_dir, fold_id, run_id, args, train_generator, val_generator, 
                     model, optimizer, criterion, normalizer)        
 
     if test:
-        test_ensemble(fold_id, ensemble_folds, test_set, fea_len)
+        test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
 
 
-def nested_cv(cv_folds=5):
-    """
-    Divide the total dataset into X folds.
-
-    Keeping one fold as a hold out set train 
-    an ensemble of models on the remaining data.
-
-    Iterate such that each fold is used as the 
-    hold out set once and return the cross validation error.
-    """
-
-    dataset = CompositionData(args.data_dir, seed=43)
-
-    orig_atom_fea_len = dataset.atom_fea_dim
-
-    total = len(dataset)
-
-    splits = k_fold_split(cv_folds, total)
-
-    for fold_id, (training, hold_out) in enumerate(splits):
-        training_set = torch.utils.data.Subset(dataset, training)
-        hold_out_set = torch.utils.data.Subset(dataset, hold_out)
-
-        ensemble_folds = 10
-        cv_ensemble(fold_id, training_set, ensemble_folds, orig_atom_fea_len)
-
-        break
-
-def cv_ensemble(fold_id, dataset, ensemble_folds, fea_len):
-    """
-    Divide the dataset into X folds.
-
-    Keeping one fold as a hold-out set train a 
-    model on the next fold for a given number of epochs.
-
-    using the hold-out set keep the best 
-    performing model over the whole training period.
-    """
-
-    params = {  "batch_size": args.batch_size,
-                "num_workers": args.workers, 
-                "pin_memory": False,
-                "shuffle":False,
-                "collate_fn": collate_batch}
-
-    total = len(dataset)
-    splits = k_fold_split(ensemble_folds, total)
-
-    for run_id, (train, val) in enumerate(splits):
-
-        device, model, criterion, optimizer, normalizer = init_model(fea_len)
-
-        train_subset = torch.utils.data.Subset(dataset, train)
-        val_subset = torch.utils.data.Subset(dataset, val)
-
-        train_generator = DataLoader(train_subset, **params)
-        val_generator = DataLoader(val_subset, **params)
-
-        _, sample_target, _ = collate_batch(train_subset)
-        normalizer.fit(sample_target)
-
-        experiment(fold_id, run_id, args, train_generator, val_generator, 
-            model, optimizer, criterion, normalizer)
-     
-
-    test_ensemble(fold_id, ensemble_folds, test_set, orig_atom_fea_len)
-
-def experiment(fold_id, run_id, args, train_generator, val_generator, 
+def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator, 
                 model, optimizer, criterion, normalizer):
     """
     for a given training an validation set run an experiment.
@@ -258,8 +196,8 @@ def experiment(fold_id, run_id, args, train_generator, val_generator,
     _, best_error = evaluate(val_generator, model, criterion, 
                             normalizer, args.device, verbose=False)
 
-    checkpoint_file = "models/checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
-    best_file = "models/best_{}_{}.pth.tar".format(fold_id, run_id)
+    checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
+    best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
 
     try:
         for epoch in range(args.start_epoch, args.start_epoch + args.epochs):
@@ -320,7 +258,7 @@ def experiment(fold_id, run_id, args, train_generator, val_generator,
 
     
 
-def test_model(fold_id, run_id, hold_out_set, fea_len):
+def test_model(model_dir, fold_id, run_id, hold_out_set, fea_len):
     """
     """
 
@@ -328,7 +266,7 @@ def test_model(fold_id, run_id, hold_out_set, fea_len):
             "------------Evaluate Model on Test Set------------\n"
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    device, model, criterion, _, normalizer = init_model(fea_len)
+    model, criterion, _, normalizer = init_model(fea_len)
 
     params = {  "batch_size": args.batch_size,
                 "num_workers": args.workers, 
@@ -340,7 +278,7 @@ def test_model(fold_id, run_id, hold_out_set, fea_len):
 
 
     # best_checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,run_id))
-    best_checkpoint = torch.load("models/checkpoint_{}_{}.pth.tar".format(fold_id,run_id))
+    best_checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,run_id))
     model.load_state_dict(best_checkpoint["state_dict"])
     normalizer.load_state_dict(best_checkpoint["normalizer"])
 
@@ -348,7 +286,7 @@ def test_model(fold_id, run_id, hold_out_set, fea_len):
     #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
 
     model.eval()
-    ids, targets, preds = evaluate(test_generator, model, criterion, normalizer, test=True)
+    ids, targets, preds = evaluate(test_generator, model, criterion, normalizer, args.device, test=True)
 
     with open("test_results.csv", "w") as f:
         writer = csv.writer(f)
@@ -357,7 +295,7 @@ def test_model(fold_id, run_id, hold_out_set, fea_len):
 
 
 
-def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
+def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     """
     """
 
@@ -380,7 +318,7 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
     for j in range(ensemble_folds):
 
         # best_checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,j))
-        best_checkpoint = torch.load("models/checkpoint_{}_{}.pth.tar".format(fold_id,j))
+        best_checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,j))
         model.load_state_dict(best_checkpoint["state_dict"])
         normalizer.load_state_dict(best_checkpoint["normalizer"])
 
@@ -389,7 +327,7 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
         #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
 
         model.eval()
-        id_, tar_, pred_ = evaluate(test_generator, model, criterion, normalizer, test=True)
+        id_, tar_, pred_ = evaluate(test_generator, model, criterion, normalizer, args.device, test=True)
 
         ensemble_preds.append(pred_)
 
