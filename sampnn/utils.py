@@ -178,15 +178,17 @@ def save_checkpoint(state, is_best, checkpoint="models/checkpoint.pth.tar", best
 
 
 
-def resume():
-    assert os.path.isfile(args.resume), "=> no checkpoint found at '{}'".format(args.resume) 
+def load_previous_state(path):
+    """
+    """
+    assert os.path.isfile(path), "=> no checkpoint found at '{}'".format(path) 
 
-    print("=> loading checkpoint '{}'".format(args.resume))
-    checkpoint = torch.load(args.resume)
+    print("Loading Previous Model '{}'".format(path))
+    checkpoint = torch.load(path)
     args.start_epoch = checkpoint["epoch"]
     best_error = checkpoint["best_error"]
     model.load_state_dict(checkpoint["state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer"])
     normalizer.load_state_dict(checkpoint["normalizer"])
-    print("=> loaded checkpoint '{}' (epoch {})"
-            .format(args.resume, checkpoint["epoch"]))
+    print("Loaded Previous Model '{}' (epoch {})"
+            .format(path, checkpoint["epoch"]))
