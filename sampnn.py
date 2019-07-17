@@ -85,7 +85,7 @@ def main():
     # train_set = torch.utils.data.Subset(dataset, train_idx)
     # test_set = torch.utils.data.Subset(dataset, test_idx)
 
-    train_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
+    train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", fea_path=args.fea_path)
     test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
 
 
