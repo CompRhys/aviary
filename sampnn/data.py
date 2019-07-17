@@ -22,7 +22,7 @@ def input_parser():
     # misc inputs
     parser.add_argument('--data_path', type=str, default='/home/rhys/PhD/sampnn/data/id_comp_prop.csv', metavar='PATH',
     help='dataset path')
-    parser.add_argument('--fea_path', type=str, default='/home/rhys/PhD/datasets/embeddings/onehot-embedding.json', metavar='PATH',
+    parser.add_argument('--fea_path', type=str, default='data/embeddings/onehot_embedding.json', metavar='PATH',
     help='atom feature path')
     parser.add_argument('--disable-cuda', action='store_true', 
     help='Disable CUDA')
