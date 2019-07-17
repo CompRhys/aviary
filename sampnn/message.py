@@ -145,10 +145,10 @@ class CompositionNet(nn.Module):
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList([MessageLayer(atom_fea_len=atom_fea_len,
-                                                    atom_gate=nn.Sequential(nn.Linear(atom_fea_len, atom_fea_len*3),
-                                                                            nn.ReLU(), nn.Linear(atom_fea_len*3,atom_fea_len),
-                                                                            nn.ReLU(), nn.Linear(atom_fea_len,1)),
-                                                                            )
+                                    atom_gate=nn.Sequential(nn.Linear(atom_fea_len, atom_fea_len*3),
+                                    nn.ReLU(), nn.Linear(atom_fea_len*3,atom_fea_len),
+                                    nn.ReLU(), nn.Linear(atom_fea_len,1)),
+                                    )
                                     for _ in range(n_graph)])
 
         self.pooling = GlobalAttention(nn.Sequential(nn.Linear(atom_fea_len, atom_fea_len*3), 
@@ -230,7 +230,6 @@ class GlobalAttention(nn.Module):
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
         gate = weights * gate.exp() 
-        # gate = gate.exp() 
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
 
         out = scatter_add(gate * x, index, dim=0)

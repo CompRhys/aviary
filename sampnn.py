@@ -7,6 +7,8 @@ import copy
 import csv
 
 import numpy as np
+import pandas as pd
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -17,6 +19,8 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 from sklearn.model_selection import train_test_split as split
+from sklearn.metrics import mean_absolute_error as mae
+from sklearn.metrics import mean_squared_error as mse
 
 from sampnn.message import CompositionNet
 from sampnn.data import input_parser, CompositionData 
@@ -85,7 +89,7 @@ def main():
     # train_set = torch.utils.data.Subset(dataset, train_idx)
     # test_set = torch.utils.data.Subset(dataset, test_idx)
 
-    train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", fea_path=args.fea_path)
+    train_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
     test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
 
 
@@ -95,49 +99,7 @@ def main():
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
 
-    single(model_dir, 5, train_set, test_set, orig_atom_fea_len)
-
-    # ensemble(model_dir, 2, train_set, test_set, 10, orig_atom_fea_len)
-
-
-def single(model_dir, fold_id, dataset, test_set, fea_len, test=True):
-    """
-    Train a single model
-    """
-
-    params = {  "batch_size": args.batch_size,
-                "num_workers": args.workers, 
-                "pin_memory": False,
-                "shuffle":False,
-                "collate_fn": collate_batch}
-
-    if args.val_size == 0.0:
-        print("No validation set used, using test set for evaluation purposes")
-        print("{} points for training, {} points for validation".format(len(dataset), len(test_set)))
-        train_subset = dataset
-        val_subset = test_set
-    else:
-        print("reserving {}% of test set for evaluation purposes".format(100*args.val_size))
-        indices = list(range(len(dataset)))
-        train_idx, val_idx = split(indices, test_size=args.val_size, 
-                                    random_state=0)
-        train_subset = torch.utils.data.Subset(dataset, train_idx)
-        val_subset = torch.utils.data.Subset(dataset, val_idx)
-
-    train_generator = DataLoader(dataset, **params)
-    val_generator = DataLoader(test_set, **params)
-
-    model, criterion, optimizer, normalizer = init_model(fea_len)
-
-    _, sample_target, _ = collate_batch(train_subset)
-    normalizer.fit(sample_target)
-
-    experiment(model_dir, fold_id, 9, args, train_generator, val_generator, 
-                model, optimizer, criterion, normalizer)
-
-    if test:
-        test_model(model_dir, fold_id, 9, test_set, fea_len)
-
+    ensemble(model_dir, 2, train_set, test_set, args.n_repeat, orig_atom_fea_len)
 
 
 def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, test=True):
@@ -170,7 +132,7 @@ def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, tes
 
         model, criterion, optimizer, normalizer = init_model(fea_len)
 
-        _, sample_target, _ = collate_batch(train_subset)
+        _, sample_target, _, _ = collate_batch(train_subset)
         normalizer.fit(sample_target)
 
         experiment(model_dir, fold_id, run_id, args, train_generator, val_generator, 
@@ -256,54 +218,16 @@ def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator,
     except KeyboardInterrupt:
         pass
 
-    
-
-def test_model(model_dir, fold_id, run_id, hold_out_set, fea_len):
-    """
-    """
-
-    print(  "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-            "------------Evaluate Model on Test Set------------\n"
-            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-
-    model, criterion, _, normalizer = init_model(fea_len)
-
-    params = {  "batch_size": args.batch_size,
-                "num_workers": args.workers, 
-                "pin_memory": False,
-                "shuffle":False,
-                "collate_fn": collate_batch}
-        
-    test_generator = DataLoader(hold_out_set, **params)
-
-
-    # best_checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,run_id))
-    best_checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,run_id))
-    model.load_state_dict(best_checkpoint["state_dict"])
-    normalizer.load_state_dict(best_checkpoint["normalizer"])
-
-    # print("The best model performance on the validation" 
-    #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
-
-    model.eval()
-    ids, targets, preds = evaluate(test_generator, model, criterion, normalizer, args.device, test=True)
-
-    with open("test_results.csv", "w") as f:
-        writer = csv.writer(f)
-        for id_, target, pred in zip(ids, targets, preds):
-            writer.writerow((id_, target, pred))
-
-
 
 def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     """
     """
 
     print(  "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-            "----------Evaluate Ensemble on Test Set-----------\n"
+            "----------Evaluate model on Test Set-----------\n"
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    device, model, criterion, _, normalizer = init_model(fea_len)
+    model, criterion, _, normalizer = init_model(fea_len)
 
     params = {  "batch_size": args.batch_size,
                 "num_workers": args.workers, 
@@ -317,6 +241,8 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
     for j in range(ensemble_folds):
 
+        print("Model {}/{}".format(j+1, ensemble_folds))
+
         # best_checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,j))
         best_checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,j))
         model.load_state_dict(best_checkpoint["state_dict"])
@@ -327,20 +253,23 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
 
         model.eval()
-        id_, tar_, pred_ = evaluate(test_generator, model, criterion, normalizer, args.device, test=True)
+        id_, comp_, tar_, pred_ = evaluate(test_generator, model, criterion, normalizer, args.device, test=True)
 
         ensemble_preds.append(pred_)
 
     ensemble_preds = np.array(ensemble_preds)
-    mean_preds = np.mean(ensemble_preds, axis=0).tolist()
-    mean_std = np.std(ensemble_preds, axis=0).tolist()
+    mean_preds = np.mean(ensemble_preds, axis=0)
+    std_preds = np.std(ensemble_preds, axis=0)
 
-    with open("test_results.csv", "w") as f:
-        writer = csv.writer(f)
-        for id_, target, pred, std in zip(id_, tar_, mean_preds, mean_std):
-            writer.writerow((id_, target, pred, std))
+    print("Ensemble Performance")
+    print("MAE {:.2f} +/- {:.2f}".format(mae(tar_, mean_preds), np.linalg.norm(std_preds)/np.sqrt(len(mean_preds))))
+    print("MSE {:.2f} +/- {:.2f}".format(mse(tar_, mean_preds), np.linalg.norm(2*(mean_preds-tar_)*std_preds)/np.sqrt(len(mean_preds))))
 
+    mean_preds = mean_preds.tolist()
+    std_preds = std_preds.tolist()
 
+    df = pd.DataFrame({"id" : id_, "composition" : comp_, "target" : tar_, "mean" : mean_preds, "std" : std_preds})
+    df.to_csv("test_results.csv", index=False)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 import torch
 from tqdm import trange
 import shutil
-import csv
 import numpy as np
 
 from torch.nn.functional import l1_loss as mae
@@ -10,7 +9,7 @@ from sampnn.data import AverageMeter, Normalizer
 
 
 def train(train_loader, model, criterion, optimizer, 
-          normalizer, device, verbose = False, cuda=False):
+          normalizer, device, verbose = False):
     """
     run a forward pass, backwards pass and then update weights
     """
@@ -18,7 +17,7 @@ def train(train_loader, model, criterion, optimizer,
     errors = AverageMeter()
 
     with trange(len(train_loader)) as t:
-        for i, (input_, target, _) in enumerate(train_loader):
+        for input_, target, _, _ in train_loader:
             
             # normalize target
             target_var = normalizer.norm(target)
@@ -63,13 +62,9 @@ def evaluate(generator, model, criterion, normalizer, device,
         test_targets = []
         test_preds = []
         test_cif_ids = []
+        test_comp = []
 
-    if test:
-       label = "Test"
-    else:
-        label = "Validate"
-
-    for i, (input_, target, batch_cif_ids) in enumerate(generator):
+    for input_, target, batch_comp, batch_cif_ids in generator:
         
         # normalize target
         target_var = normalizer.norm(target)
@@ -96,12 +91,13 @@ def evaluate(generator, model, criterion, normalizer, device,
 
         if test:
             test_cif_ids += batch_cif_ids
+            test_comp += batch_comp
             test_targets += target.view(-1).tolist()
             test_preds += pred.view(-1).tolist()
 
     if test:  
         print("Test : Loss {loss.avg:.4f}\t Error {error.avg:.3f}\n".format(loss=losses, error=errors))
-        return test_cif_ids, test_targets, test_preds
+        return test_cif_ids, test_comp, test_targets, test_preds
     else:
         return losses.avg, errors.avg
 
@@ -176,17 +172,19 @@ def save_checkpoint(state, is_best, checkpoint="models/checkpoint.pth.tar", best
 
 
 
-def load_previous_state(path):
-    """
-    """
-    assert os.path.isfile(path), "=> no checkpoint found at '{}'".format(path) 
+# def load_previous_state(path):
+#     """
+#     """
+#     assert os.path.isfile(path), "=> no checkpoint found at '{}'".format(path) 
 
-    print("Loading Previous Model '{}'".format(path))
-    checkpoint = torch.load(path)
-    args.start_epoch = checkpoint["epoch"]
-    best_error = checkpoint["best_error"]
-    model.load_state_dict(checkpoint["state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
-    normalizer.load_state_dict(checkpoint["normalizer"])
-    print("Loaded Previous Model '{}' (epoch {})"
-            .format(path, checkpoint["epoch"]))
+#     print("Loading Previous Model '{}'".format(path))
+#     checkpoint = torch.load(path)
+#     args.start_epoch = checkpoint["epoch"]
+#     best_error = checkpoint["best_error"]
+#     model.load_state_dict(checkpoint["state_dict"])
+#     optimizer.load_state_dict(checkpoint["optimizer"])
+#     normalizer.load_state_dict(checkpoint["normalizer"])
+#     print("Loaded Previous Model '{}' (epoch {})"
+#             .format(path, checkpoint["epoch"]))
+
+#     return model, optimizer, normalizer, best_error, args.start_epoch

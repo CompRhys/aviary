@@ -2,11 +2,12 @@ import os
 import random
 import sys
 import argparse
-import csv
 import torch
 import functools
+import csv
 
 import numpy as np
+import pandas as pd
 from torch.utils.data import Dataset
 
 from sampnn.features import LoadFeaturiser
@@ -67,6 +68,10 @@ def input_parser():
     parser.add_argument('--n-graph', default=1, type=int, metavar='N', 
     help='number of graph layers')
 
+    # ensemble inputs
+    parser.add_argument('--n-repeat', default=1, type=int, metavar='N', 
+    help='number ensemble repeats')
+
     args = parser.parse_args(sys.argv[1:])
 
     assert args.train_size + args.test_size <= 1
@@ -87,19 +92,14 @@ class CompositionData(Dataset):
         """
         """
         assert os.path.exists(data_path), '{} does not exist!'.format(data_path)
-
-        with open(data_path) as f:
-            reader = csv.reader(f)
-            self.id_prop_data = [row for row in reader]
+        self.df = pd.read_csv(data_path)
 
         assert os.path.exists(fea_path), '{} does not exist!'.format(fea_path)
-
         self.atom_features = LoadFeaturiser(fea_path)
-
         self.atom_fea_dim = self.atom_features.embedding_size()
 
     def __len__(self):
-        return len(self.id_prop_data)
+        return len(self.df)
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
@@ -120,7 +120,8 @@ class CompositionData(Dataset):
         cry_id: torch.Tensor shape (1,)
             input id for the material
         """
-        cry_id, composition, target = self.id_prop_data[idx]
+        # cry_id, composition, target = self.id_prop_data[idx]
+        cry_id, composition, target = self.df.iloc[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, 'crystal {}: {}, is a pure system'.format(cry_id, composition)
@@ -133,7 +134,7 @@ class CompositionData(Dataset):
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
-        for i, element in enumerate(elements):
+        for i, _ in enumerate(elements):
             nbrs = elements[:i]+elements[i+1:]
             self_fea_idx += [i]*len(nbrs)
             nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
@@ -146,7 +147,7 @@ class CompositionData(Dataset):
         # target = torch.Tensor([np.log(float(target))])
         target = torch.Tensor([float(target)])
 
-        return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, cry_id
+        return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, composition, cry_id
 
 def collate_batch(dataset_list):
     """
@@ -188,10 +189,11 @@ def collate_batch(dataset_list):
     batch_nbr_fea_idx = []
     crystal_atom_idx = [] 
     batch_target = []
+    batch_comp = []
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, cry_id) in enumerate(dataset_list):
+    for i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, comp, cry_id) in enumerate(dataset_list):
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]  
 
@@ -208,6 +210,7 @@ def collate_batch(dataset_list):
 
         # batch the targets and ids
         batch_target.append(target)
+        batch_comp.append(comp)
         batch_cry_ids.append(cry_id)
 
         # increment the id counter
@@ -219,6 +222,7 @@ def collate_batch(dataset_list):
             torch.cat(batch_nbr_fea_idx, dim=0),
             torch.cat(crystal_atom_idx)), \
             torch.stack(batch_target, dim=0), \
+            batch_comp, \
             batch_cry_ids
 
 
