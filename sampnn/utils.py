@@ -10,7 +10,7 @@ from sampnn.data import AverageMeter, Normalizer
 
 
 def train(train_loader, model, criterion, optimizer, 
-          normalizer, verbose = False, cuda=False):
+          normalizer, device, verbose = False, cuda=False):
     """
     run a forward pass, backwards pass and then update weights
     """
@@ -24,9 +24,8 @@ def train(train_loader, model, criterion, optimizer,
             target_var = normalizer.norm(target)
             
             # move tensors to GPU
-            if cuda:
-                input_ = ( tensor.cuda(async=True) for tensor in input_ )
-                target_var = target_var.cuda(async=True)
+            input_ = (tensor.to(device) for tensor in input_ )
+            target_var = target_var.to(device)
 
             # compute output
             output = model(*input_)
@@ -54,8 +53,8 @@ def train(train_loader, model, criterion, optimizer,
     return losses.avg, errors.avg
     
 
-def evaluate(generator, model, criterion, normalizer, 
-                test=False, verbose=False, cuda=False):
+def evaluate(generator, model, criterion, normalizer, device,
+                test=False, verbose=False):
     """ evaluate the model """
     losses = AverageMeter()
     errors = AverageMeter()
@@ -76,9 +75,8 @@ def evaluate(generator, model, criterion, normalizer,
         target_var = normalizer.norm(target)
         
         # move tensors to GPU
-        if cuda:
-            input_ = (tensor.cuda(async=True) for tensor in input_ )
-            target_var = target_var.cuda(async=True)
+        input_ = (tensor.to(device) for tensor in input_ )
+        target_var = target_var.to(device)
 
         # compute output
         output = model(*input_)

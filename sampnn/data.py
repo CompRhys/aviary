@@ -70,7 +70,7 @@ def input_parser():
     args = parser.parse_args(sys.argv[1:])
 
     assert args.train_size + args.test_size <= 1
-    args.cuda = (not args.disable_cuda) and torch.cuda.is_available()
+    args.device = torch.device("cuda") if (not args.disable_cuda) and torch.cuda.is_available() else torch.device("cpu")
 
     return args
 

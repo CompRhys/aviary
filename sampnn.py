@@ -28,17 +28,11 @@ from sampnn.utils import k_fold_split
 
 def init_model(orig_atom_fea_len):
 
-    device = torch.device("cuda") if args.cuda else torch.device("cpu")
-
     model = CompositionNet(orig_atom_fea_len, 
                             atom_fea_len=args.atom_fea_len,
                             n_graph=args.n_graph)
 
-    num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("Total Number of Trainable Parameters: {}".format(num_param))
-
-    if args.cuda:
-        model.to(device)
+    model.to(args.device)
 
     if args.loss == "L1":
         criterion = nn.L1Loss()
@@ -73,7 +67,7 @@ def init_model(orig_atom_fea_len):
 
     normalizer = Normalizer()
 
-    objects = (device, model, criterion, optimizer, normalizer)
+    objects = (model, criterion, optimizer, normalizer)
 
     return objects
 
@@ -128,7 +122,7 @@ def single(fold_id, dataset, test_set, fea_len, test=True):
     train_generator = DataLoader(dataset, **params)
     val_generator = DataLoader(test_set, **params)
 
-    device, model, criterion, optimizer, normalizer = init_model(fea_len)
+    model, criterion, optimizer, normalizer = init_model(fea_len)
 
     _, sample_target, _ = collate_batch(train_subset)
     normalizer.fit(sample_target)
@@ -169,7 +163,7 @@ def ensemble(fold_id, dataset, test_set, ensemble_folds, fea_len, test=True):
 
     for run_id in range(ensemble_folds):
 
-        device, model, criterion, optimizer, normalizer = init_model(fea_len)
+        model, criterion, optimizer, normalizer = init_model(fea_len)
 
         _, sample_target, _ = collate_batch(train_subset)
         normalizer.fit(sample_target)
@@ -256,10 +250,13 @@ def experiment(fold_id, run_id, args, train_generator, val_generator,
     return the model that performed best on the validation set.
     """
 
+    num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Total Number of Trainable Parameters: {}".format(num_param))
+
     writer = SummaryWriter()
 
-    _, best_error = evaluate(val_generator, model, criterion, normalizer,
-                        verbose=False)
+    _, best_error = evaluate(val_generator, model, criterion, 
+                            normalizer, args.device, verbose=False)
 
     checkpoint_file = "models/checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
     best_file = "models/best_{}_{}.pth.tar".format(fold_id, run_id)
@@ -269,7 +266,7 @@ def experiment(fold_id, run_id, args, train_generator, val_generator,
             # Training
             model.train()
             train_loss, train_error = train(train_generator, model, criterion, 
-                                            optimizer, normalizer, args.cuda)
+                                            optimizer, normalizer, args.device)
 
             # Validation
             with torch.set_grad_enabled(False):
@@ -277,7 +274,7 @@ def experiment(fold_id, run_id, args, train_generator, val_generator,
                 model.eval()
                 # evaluate on validation set
                 val_loss, val_error = evaluate(val_generator, model, criterion, 
-                                                normalizer, args.cuda)
+                                                normalizer, args.device)
 
             print("Epoch: [{0}/{1}]\t"
                     "Train : Loss {2:.4f}\t"
