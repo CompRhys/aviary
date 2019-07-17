@@ -274,6 +274,8 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
 if __name__ == "__main__":
     args = input_parser()
+    
+    print(args.device)
 
     # nested_cv()
     main()
