@@ -64,7 +64,7 @@ def input_parser():
     # graph inputs
     parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', 
     help='number of hidden atom features in conv layers')
-    parser.add_argument('--n-graph', default=2, type=int, metavar='N', 
+    parser.add_argument('--n-graph', default=1, type=int, metavar='N', 
     help='number of graph layers')
 
     args = parser.parse_args(sys.argv[1:])

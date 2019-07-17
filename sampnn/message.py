@@ -138,10 +138,10 @@ class CompositionNet(nn.Module):
 
         # define the necessary neural networks for the pooling 
         output_nn = nn.Sequential(nn.Linear(atom_fea_len,atom_fea_len*7),
-                          nn.SELU(),nn.Linear(atom_fea_len*7,atom_fea_len*5), 
-                          nn.SELU(),nn.Linear(atom_fea_len*5,atom_fea_len*3), 
-                          nn.SELU(),nn.Linear(atom_fea_len*3,atom_fea_len), 
-                          nn.SELU(), nn.Linear(atom_fea_len,1))
+                          nn.ReLU(),nn.Linear(atom_fea_len*7,atom_fea_len*5), 
+                          nn.ReLU(),nn.Linear(atom_fea_len*5,atom_fea_len*3), 
+                          nn.ReLU(),nn.Linear(atom_fea_len*3,atom_fea_len), 
+                          nn.ReLU(), nn.Linear(atom_fea_len,1))
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList([MessageLayer(atom_fea_len=atom_fea_len,
