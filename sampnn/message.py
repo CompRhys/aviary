@@ -21,7 +21,7 @@ class MessageLayer(nn.Module):
         self.atom_fea_len = atom_fea_len
         
         self.linear_in = nn.Linear(2*self.atom_fea_len, 4*self.atom_fea_len)
-        self.bn = nn.BatchNorm1d(4*self.atom_fea_len)
+        # self.bn = nn.BatchNorm1d(4*self.atom_fea_len)
         self.act = nn.ReLU()
         self.linear_out = nn.Linear(4*self.atom_fea_len, self.atom_fea_len)
 
