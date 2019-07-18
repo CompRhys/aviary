@@ -67,29 +67,32 @@ def init_model(orig_atom_fea_len):
 
 def main():
 
-    # dataset = CompositionData(data_path=args.data_path, fea_path=args.fea_path)
-    # orig_atom_fea_len = dataset.atom_fea_dim + 1
+    dataset = CompositionData(data_path=args.data_path, fea_path=args.fea_path)
+    orig_atom_fea_len = dataset.atom_fea_dim + 1
     
-    # indices = list(range(len(dataset)))
+    indices = list(range(len(dataset)))
 
-    # train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
-    #                             random_state=0)
+    train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
+                                random_state=0)
 
-    # train_set = torch.utils.data.Subset(dataset, train_idx[::100])
-    # test_set = torch.utils.data.Subset(dataset, test_idx[::100])
+    train_set = torch.utils.data.Subset(dataset, train_idx[::20])
+    test_set = torch.utils.data.Subset(dataset, test_idx[::20])
 
-    train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", fea_path=args.fea_path)
-    test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", fea_path=args.fea_path)
-    orig_atom_fea_len = train_set.atom_fea_dim + 1
+    # train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", 
+    #                             fea_path=args.fea_path)
+    # test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", 
+    #                             fea_path=args.fea_path)
+    # orig_atom_fea_len = train_set.atom_fea_dim + 1
 
     model_dir = "models/"
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
 
-    ensemble(model_dir, 2, train_set, test_set, args.n_repeat, orig_atom_fea_len)
+    ensemble(model_dir, args.fold_id, train_set, test_set, args.n_repeat, orig_atom_fea_len)
 
 
-def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, test=True):
+def ensemble(model_dir, fold_id, dataset, test_set, 
+                ensemble_folds, fea_len, test=True):
     """
     Train multiple models
     """
@@ -129,7 +132,8 @@ def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, tes
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
 
 
-def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator, 
+def experiment(model_dir, fold_id, run_id, args, 
+                train_generator, val_generator, 
                 model, optimizer, criterion, normalizer):
     """
     for a given training an validation set run an experiment.
@@ -234,7 +238,8 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         
     test_generator = DataLoader(hold_out_set, **params)
 
-    ensemble_preds = []
+    y_ensemble = []
+    y_aleatoric = []
 
     for j in range(ensemble_folds):
 
@@ -250,16 +255,22 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
 
         model.eval()
-        idx, comp, y_tar, pred = evaluate(generator=test_generator, model=model, 
+        idx, comp, y_tar, pred, sigma = evaluate(generator=test_generator, model=model, 
                                             criterion=criterion, optimizer=None, 
                                             normalizer=normalizer, device=args.device, 
                                             task="test", verbose=True)
 
-        ensemble_preds.append(pred)
+        y_ensemble.append(pred)
+        y_aleatoric.append(np.square(sigma))
 
-    y_pred = np.mean(ensemble_preds, axis=0)
-    y_std = np.std(ensemble_preds, axis=0)
 
+    y_pred = np.mean(y_ensemble, axis=0)
+    y_epistemic = np.var(y_ensemble, axis=0)
+    y_aleatoric = np.mean(y_aleatoric, axis=0)
+    y_std = np.sqrt(y_epistemic + y_aleatoric)
+
+    # calculate metrics and errors with associated errors for ensembles
+    # errors in the MAE and MSE are estimated using 
     mae_avg = mae(y_tar, y_pred)
     mae_std = np.linalg.norm(y_std)/np.sqrt(len(y_pred))
 
@@ -274,14 +285,18 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
     print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
 
-    df = pd.DataFrame({"id" : idx, "composition" : comp, "target" : y_tar, "mean" : y_pred, "std" : y_std})
+    df = pd.DataFrame({"id" : idx, "composition" : comp, "target" : y_tar, 
+                        "mean" : y_pred, "std" : y_std,
+                        "epistemic" : np.sqrt(y_epistemic), 
+                        "aleatoric" : np.sqrt(y_aleatoric),  
+                        })
     df.to_csv("test_results.csv", index=False)
 
 
 if __name__ == "__main__":
     args = input_parser()
     
-    print(args.device)
+    print("The model will run on the {}".format(args.device))
 
     # nested_cv()
     main()

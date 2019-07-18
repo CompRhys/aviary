@@ -20,54 +20,107 @@ def input_parser():
     parser = argparse.ArgumentParser(description='Structure Agnostic Message Passing Neural Network')
 
     # misc inputs
-    parser.add_argument('--data_path', type=str, default='/home/rhys/PhD/sampnn/data/id_comp_prop.csv', metavar='PATH',
-    help='dataset path')
-    parser.add_argument('--fea_path', type=str, default='data/embeddings/onehot_embedding.json', metavar='PATH',
-    help='atom feature path')
-    parser.add_argument('--disable-cuda', action='store_true', 
-    help='Disable CUDA')
-    parser.add_argument('--print-freq', default=10, type=int, metavar='N', 
-    help='print frequency (default: 10)')
+    parser.add_argument('--data_path', 
+                        type=str, 
+                        default='data/id_comp_prop.csv', metavar='PATH',
+                        help='dataset path')
+    parser.add_argument('--fea_path', 
+                        type=str, 
+                        default='data/embeddings/onehot_embedding.json', 
+                        metavar='PATH',
+                        help='atom feature path')
+    parser.add_argument('--disable-cuda', 
+                        action='store_true', 
+                        help='Disable CUDA')
+
     
     # restart inputs
-    parser.add_argument('--resume', action='store_true', 
-    help='resume from previous checkpoint')
+    parser.add_argument('--resume', 
+                        action='store_true', 
+                        help='resume from previous checkpoint')
     
     # dataloader inputs
-    parser.add_argument('--workers', default=0, type=int, metavar='N', 
-    help='number of data loading workers (default: 0)')
-    parser.add_argument('--batch-size', default=128, type=int, metavar='N', 
-    help='mini-batch size (default: 256)')    
-    parser.add_argument('--train-size', default=0.8, type=float, metavar='N', 
-    help='proportion of data for training')
-    parser.add_argument('--val-size', default=0.0, type=float, metavar='N', 
-    help='proportion of training data used for validation')
-    parser.add_argument('--test-size', default=0.2, type=float, metavar='N', 
-    help='proportion of data for testing')
+    parser.add_argument('--workers', 
+                        default=0, 
+                        type=int, 
+                        metavar='N', 
+                        help='number of data loading workers (default: 0)')
+    parser.add_argument('--batch-size', 
+                        default=128, 
+                        type=int, 
+                        metavar='N', 
+                        help='mini-batch size (default: 256)')    
+    parser.add_argument('--train-size', 
+                        default=0.8, 
+                        type=float, 
+                        metavar='N', 
+                        help='proportion of data for training')
+    parser.add_argument('--val-size', 
+                        default=0.0, 
+                        type=float, 
+                        metavar='N', 
+                        help='proportion of training data used for validation')
+    parser.add_argument('--test-size', 
+                        default=0.2, 
+                        type=float, 
+                        metavar='N', 
+                        help='proportion of data for testing')
     
     # optimiser inputs
-    parser.add_argument('--optim', default='Adam', type=str, metavar='SGD', 
-    help='choose an optimizer; SGD or Adam or RMSprop (default: Adam)')
-    parser.add_argument('--loss', default='L1', type=str, metavar='L2', 
-    help='choose an Loss Function; L2 or L1 (default: L2)')
-    parser.add_argument('--epochs', default=500, type=int, metavar='N', 
-    help='number of total epochs to run (default: 500)')
-    parser.add_argument('--learning-rate', default=0.0001, type=float, metavar='LR', 
-    help='initial learning rate (default: 0.0001)')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='W', 
-    help='momentum (default: 0.9)')
-    parser.add_argument('--weight-decay', default=0, type=float, metavar='W', 
-    help='weight decay (default: 0)')
+    parser.add_argument('--optim', 
+                        default='Adam', 
+                        type=str, 
+                        metavar='SGD', 
+                        help='choose an optimizer; SGD or Adam or RMSprop (default: Adam)')
+    parser.add_argument('--loss', 
+                        default='L1', 
+                        type=str, 
+                        metavar='L2', 
+                        help='choose an Loss Function; L2 or L1 (default: L2)')
+    parser.add_argument('--epochs', 
+                        default=500, 
+                        type=int, 
+                        metavar='N', 
+                        help='number of total epochs to run (default: 500)')
+    parser.add_argument('--learning-rate', 
+                        default=0.0001, 
+                        type=float, 
+                        metavar='LR', 
+                        help='initial learning rate (default: 0.0001)')
+    parser.add_argument('--momentum', 
+                        default=0.9, 
+                        type=float, 
+                        metavar='W', 
+                        help='momentum (default: 0.9)')
+    parser.add_argument('--weight-decay', 
+                        default=0, 
+                        type=float, 
+                        metavar='W', 
+                        help='weight decay (default: 0)')
     
     # graph inputs
-    parser.add_argument('--atom-fea-len', default=64, type=int, metavar='N', 
-    help='number of hidden atom features in conv layers')
-    parser.add_argument('--n-graph', default=1, type=int, metavar='N', 
-    help='number of graph layers')
+    parser.add_argument('--atom-fea-len', 
+                        default=64, 
+                        type=int, 
+                        metavar='N', 
+                        help='number of hidden atom features in conv layers')
+    parser.add_argument('--n-graph', 
+                        default=1, 
+                        type=int, 
+                        metavar='N', 
+                        help='number of graph layers')
 
     # ensemble inputs
-    parser.add_argument('--n-repeat', default=1, type=int, metavar='N', 
-    help='number ensemble repeats')
+    parser.add_argument('--fold-id', 
+                        default=0, 
+                        type=int, 
+                        metavar='N', 
+                        help='number ensemble repeats')
+    parser.add_argument('--n-repeat', 
+                        default=1, 
+                        type=int, 
+                        metavar='N', 
+                        help='number ensemble repeats')
 
     args = parser.parse_args(sys.argv[1:])
 

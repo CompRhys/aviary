@@ -24,7 +24,8 @@ def evaluate(generator, model, criterion, optimizer,
     elif task == "test":
         model.eval()
         test_targets = []
-        test_preds = []
+        test_pred = []
+        test_err = []
         test_cif_ids = []
         test_comp = []
     else:
@@ -42,14 +43,15 @@ def evaluate(generator, model, criterion, optimizer,
 
             # compute output
             # output = model(*input_)
-            output, output_err = model(*input_).chunk(2,dim=1)
+            output, log_std = model(*input_).chunk(2,dim=1)
 
             # loss = criterion(output, target_norm)
-            loss = criterion(output, output_err, target_norm)
+            loss = criterion(output, log_std, target_norm)
             losses.update(loss.data.cpu().item(), target.size(0))
 
             # measure accuracy and record loss
             pred = normalizer.denorm(output.data.cpu())
+            sigma = torch.exp(log_std).data.cpu() * normalizer.std
             
             mae_error = mae(pred, target)
             errors.update(mae_error, target.size(0))
@@ -63,7 +65,8 @@ def evaluate(generator, model, criterion, optimizer,
                 test_cif_ids += batch_cif_ids
                 test_comp += batch_comp
                 test_targets += target.view(-1).tolist()
-                test_preds += pred.view(-1).tolist()
+                test_pred += pred.view(-1).tolist()
+                test_err += sigma.view(-1).tolist()
             elif task == "train":
                 # compute gradient and do SGD step
                 optimizer.zero_grad()
@@ -77,7 +80,7 @@ def evaluate(generator, model, criterion, optimizer,
     if task == "test":  
         print("Test : Loss {loss.avg:.4f}\t "
               "Error {error.avg:.3f}\n".format(loss=losses, error=errors))
-        return test_cif_ids, test_comp, test_targets, test_preds
+        return test_cif_ids, test_comp, test_targets, test_pred, test_err
     else:
         return losses.avg, errors.avg
 
@@ -112,12 +115,12 @@ def load_previous_state(path, model, optimizer, normalizer):
     return model, optimizer, normalizer, best_error, start_epoch
 
 
-def RobustL1(output, output_std, target):
+def RobustL1(output, log_std, target):
     loss = np.sqrt(2) * torch.abs(output - target) * \
-           torch.exp(-output_std) + output_std
+           torch.exp(-log_std) + log_std
     return torch.mean(loss)
 
-def RobustL2(output, output_var, target):
-    loss = torch.pow(output - target, 2) * \
-           torch.exp(-output_var) + 0.5 * output_var
+def RobustL2(output, log_std, target):
+    loss = torch.pow(output - target, 2.0) * \
+           torch.exp(-2.0 * log_std) + log_std
     return torch.mean(loss)
