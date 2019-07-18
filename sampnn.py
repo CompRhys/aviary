@@ -117,16 +117,17 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     train_generator = DataLoader(train_subset, **params)
     val_generator = DataLoader(val_subset, **params)
 
-    for run_id in range(ensemble_folds):
+    if not args.evaluate:
+        for run_id in range(ensemble_folds):
 
-        model, criterion, optimizer, normalizer = init_model(fea_len)
+            model, criterion, optimizer, normalizer = init_model(fea_len)
 
-        _, sample_target, _, _ = collate_batch(train_subset)
-        normalizer.fit(sample_target)
+            _, sample_target, _, _ = collate_batch(train_subset)
+            normalizer.fit(sample_target)
 
-        experiment(model_dir, fold_id, run_id, args, 
-                    train_generator, val_generator, 
-                    model, optimizer, criterion, normalizer)        
+            experiment(model_dir, fold_id, run_id, args, 
+                        train_generator, val_generator, 
+                        model, optimizer, criterion, normalizer)        
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)

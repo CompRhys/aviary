@@ -38,6 +38,9 @@ def input_parser():
     parser.add_argument('--resume', 
                         action='store_true', 
                         help='resume from previous checkpoint')
+    parser.add_argument('--evaluate', 
+                        action='store_true', 
+                        help='skip network training stages checkpoint')
     
     # dataloader inputs
     parser.add_argument('--workers', 
