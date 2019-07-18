@@ -138,7 +138,7 @@ class CompositionNet(nn.Module):
                         nn.Linear(atom_fea_len*7,atom_fea_len*5), nn.ReLU(),
                         nn.Linear(atom_fea_len*5,atom_fea_len*3), nn.ReLU(),
                         nn.Linear(atom_fea_len*3,atom_fea_len), nn.ReLU(), 
-                        nn.Linear(atom_fea_len,1)
+                        nn.Linear(atom_fea_len,2)
                         )
 
 

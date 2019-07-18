@@ -34,16 +34,18 @@ def evaluate(generator, model, criterion, optimizer,
         for input_, target, batch_comp, batch_cif_ids in generator:
             
             # normalize target
-            target_var = normalizer.norm(target)
+            target_norm = normalizer.norm(target)
             
             # move tensors to GPU
             input_ = (tensor.to(device) for tensor in input_ )
-            target_var = target_var.to(device)
+            target_norm = target_norm.to(device)
 
             # compute output
-            output = model(*input_)
+            # output = model(*input_)
+            output, output_err = model(*input_).chunk(2,dim=1)
 
-            loss = criterion(output, target_var)
+            # loss = criterion(output, target_norm)
+            loss = criterion(output, output_err, target_norm)
             losses.update(loss.data.cpu().item(), target.size(0))
 
             # measure accuracy and record loss
@@ -108,3 +110,14 @@ def load_previous_state(path, model, optimizer, normalizer):
             .format(path, checkpoint["epoch"]))
 
     return model, optimizer, normalizer, best_error, start_epoch
+
+
+def RobustL1(output, output_std, target):
+    loss = np.sqrt(2) * torch.abs(output - target) * \
+           torch.exp(-output_std) + output_std
+    return torch.mean(loss)
+
+def RobustL2(output, output_var, target):
+    loss = torch.pow(output - target, 2) * \
+           torch.exp(-output_var) + 0.5 * output_var
+    return torch.mean(loss)
