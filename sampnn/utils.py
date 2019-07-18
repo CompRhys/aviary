@@ -1,3 +1,4 @@
+import os
 import torch
 from tqdm import trange
 import shutil
@@ -79,66 +80,6 @@ def evaluate(generator, model, criterion, optimizer,
         return losses.avg, errors.avg
 
 
-
-def partitions(number, k):
-    """
-    Distribution of the folds allowing for cases where 
-    the folds do not divide evenly
-
-    Inputs
-    --------
-    k: int
-        The number of folds to split the data into
-    number: int
-        The number of datapoints in the dataset
-    """
-    n_partitions = np.ones(k) * int(number/k)
-    n_partitions[0:(number % k)] += 1
-    return n_partitions
-
-
-
-def get_indices(n_splits, points):
-    """
-    Indices of the set test
-
-    Inputs
-    --------
-    n_splits: int
-        The number of folds to split the data into
-    points: int
-        The number of datapoints in the dataset
-    """
-    fold_sizes = partitions(points, n_splits)
-    indices = np.arange(points).astype(int)
-    current = 0
-    for fold_size in fold_sizes:
-        start = current
-        stop =  current + fold_size
-        current = stop
-        yield(indices[int(start):int(stop)])
-
-
-
-def k_fold_split(n_splits = 3, points = 3001):
-    """
-    Generates folds for cross validation
-
-    Inputs
-    --------
-    n_splits: int
-        The number of folds to split the data into
-    points: int
-        The number of datapoints in the dataset
-
-    """
-    indices = np.arange(points).astype(int)
-    for test_idx in get_indices(n_splits, points):
-        train_idx = np.setdiff1d(indices, test_idx)
-        yield train_idx, test_idx
-
-
-
 def save_checkpoint(state, is_best, 
                     checkpoint="checkpoint.pth.tar", 
                     best="best.pth.tar" ):
@@ -152,19 +93,18 @@ def save_checkpoint(state, is_best,
 
 
 
-# def load_previous_state(path):
-#     """
-#     """
-#     assert os.path.isfile(path), "=> no checkpoint found at '{}'".format(path) 
+def load_previous_state(path, model, optimizer, normalizer):
+    """
+    """
+    assert os.path.isfile(path), "no checkpoint found at '{}'".format(path) 
 
-#     print("Loading Previous Model '{}'".format(path))
-#     checkpoint = torch.load(path)
-#     args.start_epoch = checkpoint["epoch"]
-#     best_error = checkpoint["best_error"]
-#     model.load_state_dict(checkpoint["state_dict"])
-#     optimizer.load_state_dict(checkpoint["optimizer"])
-#     normalizer.load_state_dict(checkpoint["normalizer"])
-#     print("Loaded Previous Model '{}' (epoch {})"
-#             .format(path, checkpoint["epoch"]))
+    checkpoint = torch.load(path)
+    start_epoch = checkpoint["epoch"]
+    best_error = checkpoint["best_error"]
+    model.load_state_dict(checkpoint["state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer"])
+    normalizer.load_state_dict(checkpoint["normalizer"])
+    print("Loaded Previous Model '{}' (epoch {})"
+            .format(path, checkpoint["epoch"]))
 
-#     return model, optimizer, normalizer, best_error, args.start_epoch
+    return model, optimizer, normalizer, best_error, start_epoch

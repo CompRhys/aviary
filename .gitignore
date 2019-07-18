@@ -114,4 +114,4 @@ runs/
 
 *.pth.tar
 
-sampnn/other.py
+sampnn/crossval.py

@@ -17,10 +17,8 @@ from sklearn.metrics import r2_score
 
 from sampnn.message import CompositionNet
 from sampnn.data import input_parser, CompositionData 
-from sampnn.data import Normalizer
-from sampnn.data import collate_batch
-from sampnn.utils import evaluate, save_checkpoint
-from sampnn.utils import k_fold_split
+from sampnn.data import Normalizer, collate_batch
+from sampnn.utils import evaluate, save_checkpoint, load_previous_state
 
 
 def init_model(orig_atom_fea_len):
@@ -144,16 +142,23 @@ def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator,
 
     writer = SummaryWriter()
 
-    _, best_error = evaluate(generator=val_generator, model=model, 
-                            criterion=criterion, optimizer=None, 
-                            normalizer=normalizer, device=args.device, 
-                            task="val", verbose=False)
-
     checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
     best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
 
+    if args.resume:
+        previous_state = load_previous_state(checkpoint_file, model, optimizer, normalizer)
+        model, optimizer, normalizer, best_error, start_epoch = previous_state
+    else:
+        _, best_error = evaluate(generator=val_generator, model=model, 
+                        criterion=criterion, optimizer=None, 
+                        normalizer=normalizer, device=args.device, 
+                        task="val", verbose=False)
+        start_epoch = 0
+
+    # try except structure used to allow keyboard interupts to stop training
+    # without breaking the code
     try:
-        for epoch in range(args.start_epoch, args.start_epoch + args.epochs):
+        for epoch in range(start_epoch, start_epoch+ args.epochs):
             # Training
             train_loss, train_error = evaluate(generator=train_generator, model=model, 
                                                 criterion=criterion, optimizer=optimizer, 
@@ -173,7 +178,7 @@ def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator,
                     "Error {3:.3f}\t"
                     "Validation : Loss {4:.4f}\t"
                     "Error {5:.3f}\n".format(
-                    epoch+1, args.start_epoch + args.epochs, train_loss, train_error,
+                    epoch+1, start_epoch + args.epochs, train_loss, train_error,
                     val_loss, val_error))
 
             # scheduler.step()
