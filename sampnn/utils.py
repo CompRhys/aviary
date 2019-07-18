@@ -7,17 +7,30 @@ from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
 from sampnn.data import AverageMeter, Normalizer
 
+def evaluate(generator, model, criterion, optimizer, 
+            normalizer, device, task="train", verbose=True):
+    """ 
+    evaluate the model 
+    """
 
-def train(train_loader, model, criterion, optimizer, 
-          normalizer, device, verbose = False):
-    """
-    run a forward pass, backwards pass and then update weights
-    """
     losses = AverageMeter()
     errors = AverageMeter()
 
-    with trange(len(train_loader)) as t:
-        for input_, target, _, _ in train_loader:
+    if task == "train":
+        model.train()
+    elif task == "val":
+        model.eval()
+    elif task == "test":
+        model.eval()
+        test_targets = []
+        test_preds = []
+        test_cif_ids = []
+        test_comp = []
+    else:
+        raise NameError("Only train, val or test is allowed as task")
+    
+    with trange(len(generator), disable=(not verbose)) as t:
+        for input_, target, batch_comp, batch_cif_ids in generator:
             
             # normalize target
             target_var = normalizer.norm(target)
@@ -28,6 +41,7 @@ def train(train_loader, model, criterion, optimizer,
 
             # compute output
             output = model(*input_)
+
             loss = criterion(output, target_var)
             losses.update(loss.data.cpu().item(), target.size(0))
 
@@ -41,62 +55,25 @@ def train(train_loader, model, criterion, optimizer,
             # rmse_error = mse(pred, target).sqrt_()
             # errors.update(rmse_error, target.size(0))
 
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            if task == "test":
+                # collect the model outputs
+                test_cif_ids += batch_cif_ids
+                test_comp += batch_comp
+                test_targets += target.view(-1).tolist()
+                test_preds += pred.view(-1).tolist()
+            elif task == "train":
+                # compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             t.set_postfix(loss=losses.val)
             t.update()
 
-    return losses.avg, errors.avg
-    
 
-def evaluate(generator, model, criterion, normalizer, device,
-                test=False, verbose=False):
-    """ evaluate the model """
-    losses = AverageMeter()
-    errors = AverageMeter()
-
-    if test:
-        test_targets = []
-        test_preds = []
-        test_cif_ids = []
-        test_comp = []
-
-    for input_, target, batch_comp, batch_cif_ids in generator:
-        
-        # normalize target
-        target_var = normalizer.norm(target)
-        
-        # move tensors to GPU
-        input_ = (tensor.to(device) for tensor in input_ )
-        target_var = target_var.to(device)
-
-        # compute output
-        output = model(*input_)
-
-        loss = criterion(output, target_var)
-        losses.update(loss.data.cpu().item(), target.size(0))
-
-        # measure accuracy and record loss
-        pred = normalizer.denorm(output.data.cpu())
-        
-        mae_error = mae(pred, target)
-        errors.update(mae_error, target.size(0))
-
-        # rmse_error = mse(pred.exp_(), target.exp_()).sqrt_()
-        # rmse_error = mse(pred, target).sqrt_()
-        # errors.update(rmse_error, target.size(0))
-
-        if test:
-            test_cif_ids += batch_cif_ids
-            test_comp += batch_comp
-            test_targets += target.view(-1).tolist()
-            test_preds += pred.view(-1).tolist()
-
-    if test:  
-        print("Test : Loss {loss.avg:.4f}\t Error {error.avg:.3f}\n".format(loss=losses, error=errors))
+    if task == "test":  
+        print("Test : Loss {loss.avg:.4f}\t "
+              "Error {error.avg:.3f}\n".format(loss=losses, error=errors))
         return test_cif_ids, test_comp, test_targets, test_preds
     else:
         return losses.avg, errors.avg
@@ -105,7 +82,8 @@ def evaluate(generator, model, criterion, normalizer, device,
 
 def partitions(number, k):
     """
-    Distribution of the folds to allow for cases where the folds do not divide evenly
+    Distribution of the folds allowing for cases where 
+    the folds do not divide evenly
 
     Inputs
     --------
@@ -161,7 +139,9 @@ def k_fold_split(n_splits = 3, points = 3001):
 
 
 
-def save_checkpoint(state, is_best, checkpoint="models/checkpoint.pth.tar", best="models/best.pth.tar" ):
+def save_checkpoint(state, is_best, 
+                    checkpoint="checkpoint.pth.tar", 
+                    best="best.pth.tar" ):
     """
     Saves a checkpoint and overwrites the best model when is_best = True
     """

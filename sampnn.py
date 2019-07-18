@@ -1,10 +1,5 @@
-import argparse
-import sys
 import os
-import warnings
 import gc
-import copy
-import csv
 
 import numpy as np
 import pandas as pd
@@ -12,21 +7,19 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchcontrib.optim import SWA
-from torch.optim.lr_scheduler import MultiStepLR
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import mean_absolute_error as mae
 from sklearn.metrics import mean_squared_error as mse
+from sklearn.metrics import r2_score
 
 from sampnn.message import CompositionNet
 from sampnn.data import input_parser, CompositionData 
 from sampnn.data import Normalizer
 from sampnn.data import collate_batch
-from sampnn.utils import train, evaluate, save_checkpoint
+from sampnn.utils import evaluate, save_checkpoint
 from sampnn.utils import k_fold_split
 
 
@@ -50,24 +43,20 @@ def init_model(orig_atom_fea_len):
 
     # Choose Optimiser
     if args.optim == "SGD":
-        base_optim = optim.SGD(model.parameters(), 
+        optimizer = optim.SGD(model.parameters(), 
                                 lr=args.learning_rate,
                                 weight_decay=args.weight_decay,
                                 momentum=args.momentum)
     elif args.optim == "Adam":
-        base_optim = optim.Adam(model.parameters(), 
+        optimizer = optim.Adam(model.parameters(), 
                                 lr=args.learning_rate,
                                 weight_decay=args.weight_decay)
     elif args.optim == "RMSprop":
-        base_optim = optim.RMSprop(model.parameters(), 
+        optimizer = optim.RMSprop(model.parameters(), 
                                 lr=args.learning_rate,
                                 weight_decay=args.weight_decay)
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
-
-    # Note that stochastic weight averaging increases the bias
-    # optimizer = SWA(base_optim, swa_start=10, swa_freq=5, swa_lr=0.05)
-    optimizer = base_optim
 
     normalizer = Normalizer()
 
@@ -118,7 +107,6 @@ def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, tes
         train_subset = dataset
         val_subset = test_set
     else:
-        print("reserving {}% of test set for evaluation purposes".format(100*args.val_size))
         indices = list(range(len(dataset)))
         train_idx, val_idx = split(indices, test_size=args.val_size, 
                                     random_state=0)
@@ -135,7 +123,8 @@ def ensemble(model_dir, fold_id, dataset, test_set, ensemble_folds, fea_len, tes
         _, sample_target, _, _ = collate_batch(train_subset)
         normalizer.fit(sample_target)
 
-        experiment(model_dir, fold_id, run_id, args, train_generator, val_generator, 
+        experiment(model_dir, fold_id, run_id, args, 
+                    train_generator, val_generator, 
                     model, optimizer, criterion, normalizer)        
 
     if test:
@@ -155,8 +144,10 @@ def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator,
 
     writer = SummaryWriter()
 
-    _, best_error = evaluate(val_generator, model, criterion, 
-                            normalizer, args.device, verbose=False)
+    _, best_error = evaluate(generator=val_generator, model=model, 
+                            criterion=criterion, optimizer=None, 
+                            normalizer=normalizer, device=args.device, 
+                            task="val", verbose=False)
 
     checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
     best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
@@ -164,17 +155,18 @@ def experiment(model_dir, fold_id, run_id, args, train_generator, val_generator,
     try:
         for epoch in range(args.start_epoch, args.start_epoch + args.epochs):
             # Training
-            model.train()
-            train_loss, train_error = train(train_generator, model, criterion, 
-                                            optimizer, normalizer, args.device)
+            train_loss, train_error = evaluate(generator=train_generator, model=model, 
+                                                criterion=criterion, optimizer=optimizer, 
+                                                normalizer=normalizer, device=args.device, 
+                                                task="train", verbose=True)
 
             # Validation
             with torch.set_grad_enabled(False):
-                # switch to evaluate mode
-                model.eval()
                 # evaluate on validation set
-                val_loss, val_error = evaluate(val_generator, model, criterion, 
-                                                normalizer, args.device)
+                val_loss, val_error = evaluate(generator=val_generator, model=model, 
+                                                criterion=criterion, optimizer=None, 
+                                                normalizer=normalizer, device=args.device, 
+                                                task="val", verbose=False)
 
             print("Epoch: [{0}/{1}]\t"
                     "Train : Loss {2:.4f}\t"
@@ -253,22 +245,31 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
 
         model.eval()
-        id_, comp_, tar_, pred_ = evaluate(test_generator, model, criterion, normalizer, args.device, test=True)
+        idx, comp, y_tar, pred = evaluate(generator=test_generator, model=model, 
+                                            criterion=criterion, optimizer=None, 
+                                            normalizer=normalizer, device=args.device, 
+                                            task="test", verbose=True)
 
-        ensemble_preds.append(pred_)
+        ensemble_preds.append(pred)
 
-    ensemble_preds = np.array(ensemble_preds)
-    mean_preds = np.mean(ensemble_preds, axis=0)
-    std_preds = np.std(ensemble_preds, axis=0)
+    y_pred = np.mean(ensemble_preds, axis=0)
+    y_std = np.std(ensemble_preds, axis=0)
 
-    print("Ensemble Performance")
-    print("MAE {:.2f} +/- {:.2f}".format(mae(tar_, mean_preds), np.linalg.norm(std_preds)/np.sqrt(len(mean_preds))))
-    print("MSE {:.2f} +/- {:.2f}".format(mse(tar_, mean_preds), np.linalg.norm(2*(mean_preds-tar_)*std_preds)/np.sqrt(len(mean_preds))))
+    mae_avg = mae(y_tar, y_pred)
+    mae_std = np.linalg.norm(y_std)/np.sqrt(len(y_pred))
 
-    mean_preds = mean_preds.tolist()
-    std_preds = std_preds.tolist()
+    mse_avg = mse(y_tar, y_pred)
+    mse_std = np.linalg.norm(2*(y_pred-y_tar)*y_std)/np.sqrt(len(y_pred))
 
-    df = pd.DataFrame({"id" : id_, "composition" : comp_, "target" : tar_, "mean" : mean_preds, "std" : std_preds})
+    rmse_avg = np.sqrt(mse_avg)
+    rmse_std = 0.5 * rmse_avg * mse_std / mse_avg
+
+    print("Ensemble Performance Metrics:")
+    print("R2 Score: {:.4f} ".format(r2_score(y_tar,y_pred)))
+    print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
+    print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
+
+    df = pd.DataFrame({"id" : idx, "composition" : comp, "target" : y_tar, "mean" : y_pred, "std" : y_std})
     df.to_csv("test_results.csv", index=False)
 
 

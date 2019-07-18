@@ -50,13 +50,13 @@ def input_parser():
     
     # optimiser inputs
     parser.add_argument('--optim', default='Adam', type=str, metavar='SGD', 
-    help='choose an optimizer; SGD or Adam or RMSprop (default: SGD)')
-    parser.add_argument('--loss', default='L1', type=str, metavar='L2', 
+    help='choose an optimizer; SGD or Adam or RMSprop (default: Adam)')
+    parser.add_argument('--loss', default='L2', type=str, metavar='L2', 
     help='choose an Loss Function; L2, L1 or Huber (default: L2)')
-    parser.add_argument('--epochs', default=2000, type=int, metavar='N', 
-    help='number of total epochs to run (default: 100)')
+    parser.add_argument('--epochs', default=500, type=int, metavar='N', 
+    help='number of total epochs to run (default: 500)')
     parser.add_argument('--learning-rate', default=0.0001, type=float, metavar='LR', 
-    help='initial learning rate (default: 0.01)')
+    help='initial learning rate (default: 0.0001)')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='W', 
     help='momentum (default: 0.9)')
     parser.add_argument('--weight-decay', default=0, type=float, metavar='W', 
