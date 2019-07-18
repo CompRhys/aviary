@@ -67,22 +67,22 @@ def init_model(orig_atom_fea_len):
 
 def main():
 
-    dataset = CompositionData(data_path=args.data_path, fea_path=args.fea_path)
-    orig_atom_fea_len = dataset.atom_fea_dim + 1
+    # dataset = CompositionData(data_path=args.data_path, fea_path=args.fea_path)
+    # orig_atom_fea_len = dataset.atom_fea_dim + 1
     
-    indices = list(range(len(dataset)))
+    # indices = list(range(len(dataset)))
 
-    train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
-                                random_state=0)
+    # train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
+    #                             random_state=0)
 
-    train_set = torch.utils.data.Subset(dataset, train_idx[::20])
-    test_set = torch.utils.data.Subset(dataset, test_idx[::20])
+    # train_set = torch.utils.data.Subset(dataset, train_idx[::20])
+    # test_set = torch.utils.data.Subset(dataset, test_idx[::20])
 
-    # train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", 
-    #                             fea_path=args.fea_path)
-    # test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", 
-    #                             fea_path=args.fea_path)
-    # orig_atom_fea_len = train_set.atom_fea_dim + 1
+    train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", 
+                                fea_path=args.fea_path)
+    test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", 
+                                fea_path=args.fea_path)
+    orig_atom_fea_len = train_set.atom_fea_dim + 1
 
     model_dir = "models/"
     if not os.path.isdir(model_dir):
