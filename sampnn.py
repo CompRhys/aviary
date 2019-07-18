@@ -11,8 +11,6 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 from sklearn.model_selection import train_test_split as split
-from sklearn.metrics import mean_absolute_error as mae
-from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import r2_score
 
 from sampnn.message import CompositionNet
@@ -256,14 +254,13 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
 
         model.eval()
-        idx, comp, y_tar, pred, sigma = evaluate(generator=test_generator, model=model, 
+        idx, comp, y_test, pred, sigma = evaluate(generator=test_generator, model=model, 
                                             criterion=criterion, optimizer=None, 
                                             normalizer=normalizer, device=args.device, 
                                             task="test", verbose=True)
 
         y_ensemble.append(pred)
         y_aleatoric.append(np.square(sigma))
-
 
     y_pred = np.mean(y_ensemble, axis=0)
     y_epistemic = np.var(y_ensemble, axis=0)
@@ -272,21 +269,23 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
     # calculate metrics and errors with associated errors for ensembles
     # errors in the MAE and MSE are estimated using 
-    mae_avg = mae(y_tar, y_pred)
-    mae_std = np.linalg.norm(y_std)/np.sqrt(len(y_pred))
+    res = np.abs(y_test - y_pred)
+    mae_avg = np.mean(res)
+    mae_std = np.std(res)/np.sqrt(len(res))
 
-    mse_avg = mse(y_tar, y_pred)
-    mse_std = np.linalg.norm(2*(y_pred-y_tar)*y_std)/np.sqrt(len(y_pred))
+    se = np.square(y_test - y_pred)
+    mse_avg = np.mean(se)
+    mse_std = np.std(se)/np.sqrt(len(se))
 
     rmse_avg = np.sqrt(mse_avg)
     rmse_std = 0.5 * rmse_avg * mse_std / mse_avg
 
     print("Ensemble Performance Metrics:")
-    print("R2 Score: {:.4f} ".format(r2_score(y_tar,y_pred)))
+    print("R2 Score: {:.4f} ".format(r2_score(y_test,y_pred)))
     print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
     print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
 
-    df = pd.DataFrame({"id" : idx, "composition" : comp, "target" : y_tar, 
+    df = pd.DataFrame({"id" : idx, "composition" : comp, "target" : y_test, 
                         "mean" : y_pred, "std" : y_std,
                         "epistemic" : np.sqrt(y_epistemic), 
                         "aleatoric" : np.sqrt(y_aleatoric),  
