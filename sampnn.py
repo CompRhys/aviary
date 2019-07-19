@@ -8,16 +8,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
 
 from sampnn.message import CompositionNet
-from sampnn.data import input_parser, CompositionData 
-from sampnn.data import Normalizer, collate_batch
-from sampnn.utils import evaluate, save_checkpoint, load_previous_state
-from sampnn.utils import RobustL1, RobustL2
+from sampnn.data import input_parser, CompositionData, \
+                        Normalizer, collate_batch
+from sampnn.utils import evaluate, save_checkpoint, \
+                        load_previous_state, RobustL1, \
+                        RobustL2
 
 
 def init_model(orig_atom_fea_len):
@@ -30,12 +31,10 @@ def init_model(orig_atom_fea_len):
 
     if args.loss == "L1":
         criterion = RobustL1
-        # criterion = nn.L1Loss()
     elif args.loss == "L2":
         criterion = RobustL2
-        # criterion = nn.MSELoss()
     else:
-        raise NameError("Only L1, L2 or Huber is allowed as --loss")
+        raise NameError("Only L1 or L2 are allowed as --loss")
         
 
     # Choose Optimiser
@@ -65,22 +64,24 @@ def init_model(orig_atom_fea_len):
 
 def main():
 
-    # dataset = CompositionData(data_path=args.data_path, fea_path=args.fea_path)
-    # orig_atom_fea_len = dataset.atom_fea_dim + 1
-    
-    # indices = list(range(len(dataset)))
+    if args.debug:
+        dataset = CompositionData(data_path=args.data_path, 
+                                    fea_path=args.fea_path)
+        orig_atom_fea_len = dataset.atom_fea_dim + 1
+        
+        indices = list(range(len(dataset)))
+        train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
+                                    random_state=0)
 
-    # train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
-    #                             random_state=0)
+        train_set = torch.utils.data.Subset(dataset, train_idx)
+        test_set = torch.utils.data.Subset(dataset, test_idx)
 
-    # train_set = torch.utils.data.Subset(dataset, train_idx[::20])
-    # test_set = torch.utils.data.Subset(dataset, test_idx[::20])
-
-    train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", 
-                                fea_path=args.fea_path)
-    test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", 
-                                fea_path=args.fea_path)
-    orig_atom_fea_len = train_set.atom_fea_dim + 1
+    else:
+        train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", 
+                                    fea_path=args.fea_path)
+        test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", 
+                                    fea_path=args.fea_path)
+        orig_atom_fea_len = train_set.atom_fea_dim + 1
 
     model_dir = "models/"
     if not os.path.isdir(model_dir):
@@ -296,8 +297,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 if __name__ == "__main__":
     args = input_parser()
     
-    print("The model will run on the {}".format(args.device))
+    print("The model will run on the {} device".format(args.device))
 
-    # nested_cv()
     main()
 

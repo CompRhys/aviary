@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch_scatter import scatter_max, scatter_mean, \
                             scatter_add, scatter_mul
-import copy
+from itertools import zip_longest
 
 class MessageLayer(nn.Module):
     """
@@ -26,7 +26,7 @@ class MessageLayer(nn.Module):
         self.linear_out = nn.Linear(4*self.atom_fea_len, self.atom_fea_len)
 
         # Pooling and Output
-        self.pooling = GlobalAttention(atom_gate)
+        self.pooling = WeightedAttention(atom_gate)
         self.pool_act = nn.ReLU()
 
     def forward(self, atom_weights, atom_in_fea,
@@ -124,7 +124,7 @@ class CompositionNet(nn.Module):
                         )
 
         hidden = [x * atom_fea_len for x in [5,3]]
-        self.cry_pool = GlobalAttention(
+        self.cry_pool = WeightedAttention(
                             gate_nn = PyramidNetwork(atom_fea_len, 1, hidden)
                         )
 
@@ -184,7 +184,7 @@ class CompositionNet(nn.Module):
         return '{}'.format(self.__class__.__name__)
 
 
-class GlobalAttention(nn.Module):
+class WeightedAttention(nn.Module):
     """  
     Weighted softmax attention layer  
     """
@@ -194,7 +194,7 @@ class GlobalAttention(nn.Module):
         ----------
         gate_nn: Variable(nn.Module)
         """
-        super(GlobalAttention, self).__init__()
+        super(WeightedAttention, self).__init__()
         self.gate_nn = gate_nn
 
     def forward(self, x, index, weights):
@@ -237,9 +237,8 @@ class PyramidNetwork(nn.Module):
 
         nodes = [nn.Linear(dims[i],dims[i+1]) for i in range(len(dims)-1)]
         acts = [nn.ReLU() for _ in range(len(dims)-2)]
-        func = lambda *x: x
-        modules = [y for x in map(func,nodes,acts) \
-                    for y in x if y is not None] + [nodes[-1]]
+        modules = [y for x in zip_longest(nodes,acts, fillvalue=None) 
+                    for y in x if y is not None]
         modules = nn.ModuleList(modules)  
         self.network = nn.Sequential(*modules)
 

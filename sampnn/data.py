@@ -22,7 +22,8 @@ def input_parser():
     # misc inputs
     parser.add_argument('--data_path', 
                         type=str, 
-                        default='data/id_comp_prop.csv', metavar='PATH',
+                        default='data/datasets/stanev.csv', 
+                        metavar='PATH',
                         help='dataset path')
     parser.add_argument('--fea_path', 
                         type=str, 
@@ -41,6 +42,9 @@ def input_parser():
     parser.add_argument('--evaluate', 
                         action='store_true', 
                         help='skip network training stages checkpoint')
+    parser.add_argument('--debug', 
+                        action='store_true', 
+                        help='use a small subset of the data to test features')
     
     # dataloader inputs
     parser.add_argument('--workers', 
@@ -52,7 +56,7 @@ def input_parser():
                         default=128, 
                         type=int, 
                         metavar='N', 
-                        help='mini-batch size (default: 256)')    
+                        help='mini-batch size (default: 128)')    
     parser.add_argument('--train-size', 
                         default=0.8, 
                         type=float, 
@@ -73,32 +77,33 @@ def input_parser():
     parser.add_argument('--optim', 
                         default='Adam', 
                         type=str, 
-                        metavar='SGD', 
+                        metavar='str', 
                         help='choose an optimizer; SGD or Adam or RMSprop (default: Adam)')
     parser.add_argument('--loss', 
-                        default='L1', 
+                        default='L2', 
                         type=str, 
-                        metavar='L2', 
-                        help='choose an Loss Function; L2 or L1 (default: L2)')
+                        metavar='str', 
+                        help='choose a (Robust) Loss Function; L2 or L1 (default: L2)')
     parser.add_argument('--epochs', 
-                        default=500, 
+                        default=100, 
                         type=int, 
                         metavar='N', 
-                        help='number of total epochs to run (default: 500)')
-    parser.add_argument('--learning-rate', 
-                        default=0.001, 
+                        help='number of total epochs to run (default: 100)')
+    parser.add_argument('--learning-rate',
+                        # 3e-4 is the best learning rate for Adam, hands down. - Andrej Karpathy
+                        default=3e-4, 
                         type=float, 
-                        metavar='LR', 
-                        help='initial learning rate (default: 0.0001)')
+                        metavar='float',
+                        help='initial learning rate (default: 0.0003)')
     parser.add_argument('--momentum', 
                         default=0.9, 
                         type=float, 
-                        metavar='W', 
+                        metavar='float [0,1]', 
                         help='momentum (default: 0.9)')
     parser.add_argument('--weight-decay', 
                         default=0, 
                         type=float, 
-                        metavar='W', 
+                        metavar='float [0,1]', 
                         help='weight decay (default: 0)')
     
     # graph inputs
@@ -128,7 +133,8 @@ def input_parser():
     args = parser.parse_args(sys.argv[1:])
 
     assert args.train_size + args.test_size <= 1
-    args.device = torch.device("cuda") if (not args.disable_cuda) and torch.cuda.is_available() else torch.device("cpu")
+    args.device = torch.device("cuda") if (not args.disable_cuda) and  \
+        torch.cuda.is_available() else torch.device("cpu")
 
     return args
 
