@@ -116,30 +116,22 @@ class CompositionNet(nn.Module):
 
         # define the necessary neural networks for the pooling
         # create a list of Message passing layers
+        hidden = [x * atom_fea_len for x in [3]]
         self.graphs = nn.ModuleList(
-            [MessageLayer(atom_fea_len=atom_fea_len,
-                            atom_gate=nn.Sequential(
-                                nn.Linear(atom_fea_len, atom_fea_len*3), nn.ReLU(), 
-                                nn.Linear(atom_fea_len*3,atom_fea_len), nn.ReLU(), 
-                                nn.Linear(atom_fea_len,1)),
-                            ) for _ in range(n_graph)]
-                                )
-
-        self.pooling = GlobalAttention(
-                            nn.Sequential(
-                                nn.Linear(atom_fea_len, atom_fea_len*3), nn.ReLU(),
-                                nn.Linear(atom_fea_len*3,atom_fea_len), nn.ReLU(),
-                                nn.Linear(atom_fea_len,1)
-                                )
-                            )
-
-        self.output_nn = nn.Sequential(
-                        nn.Linear(atom_fea_len,atom_fea_len*7), nn.ReLU(),
-                        nn.Linear(atom_fea_len*7,atom_fea_len*5), nn.ReLU(),
-                        nn.Linear(atom_fea_len*5,atom_fea_len*3), nn.ReLU(),
-                        nn.Linear(atom_fea_len*3,atom_fea_len), nn.ReLU(), 
-                        nn.Linear(atom_fea_len,2)
+                            [MessageLayer(atom_fea_len=atom_fea_len,
+                            atom_gate=PyramidNetwork(atom_fea_len, 1, hidden))
+                            for _ in range(n_graph)]
                         )
+
+        hidden = [x * atom_fea_len for x in [5,3]]
+        self.cry_pool = GlobalAttention(
+                            gate_nn = PyramidNetwork(atom_fea_len, 1, hidden)
+                        )
+
+        hidden = [x * atom_fea_len for x in [7,5,3,1]]
+        self.output_nn = PyramidNetwork(atom_fea_len, 2, hidden)
+
+        
 
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx, 
@@ -177,10 +169,12 @@ class CompositionNet(nn.Module):
 
         # apply the graph message passing functions 
         for graph_func in self.graphs:
-            atom_fea = graph_func(atom_weights, atom_fea, self_fea_idx, nbr_fea_idx)
+            atom_fea = graph_func(atom_weights, atom_fea, 
+                                    self_fea_idx, nbr_fea_idx)
 
         # generate crystal features by pooling the atomic features
-        crys_fea = self.pooling(atom_fea, crystal_atom_idx, atom_weights)
+        crys_fea = self.cry_pool(atom_fea, crystal_atom_idx, 
+                                atom_weights)
 
         crys_fea = self.output_nn(crys_fea)
 
@@ -221,3 +215,33 @@ class GlobalAttention(nn.Module):
     def __repr__(self):
         return '{}(gate_nn={})'.format(self.__class__.__name__,
                                               self.gate_nn)
+
+
+class PyramidNetwork(nn.Module):
+    """
+    make a pyramid network
+    """
+    def __init__(self, input_dim, output_dim, 
+                hidden_layer_dims):
+        """
+        Inputs
+        ----------
+        input_dim: int
+        output_dim: int
+        hidden_layer_dims: list(int)
+
+        """
+        super(PyramidNetwork, self).__init__()
+
+        dims = [input_dim]+hidden_layer_dims+[output_dim]
+
+        nodes = [nn.Linear(dims[i],dims[i+1]) for i in range(len(dims)-1)]
+        acts = [nn.ReLU() for _ in range(len(dims)-2)]
+        func = lambda *x: x
+        modules = [y for x in map(func,nodes,acts) \
+                    for y in x if y is not None] + [nodes[-1]]
+        modules = nn.ModuleList(modules)  
+        self.network = nn.Sequential(*modules)
+
+    def forward(self, fea):
+        return self.network(fea)

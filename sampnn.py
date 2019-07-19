@@ -86,7 +86,7 @@ def main():
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
 
-    ensemble(model_dir, args.fold_id, train_set, test_set, args.n_repeat, orig_atom_fea_len)
+    ensemble(model_dir, args.fold_id, train_set, test_set, args.ensemble, orig_atom_fea_len)
 
 
 def ensemble(model_dir, fold_id, dataset, test_set, 

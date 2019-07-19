@@ -116,7 +116,7 @@ def load_previous_state(path, model, optimizer, normalizer):
 
 
 def RobustL1(output, log_std, target):
-    loss = np.sqrt(2) * torch.abs(output - target) * \
+    loss = np.sqrt(2.0) * torch.abs(output - target) * \
            torch.exp(-log_std) + log_std
     return torch.mean(loss)
 

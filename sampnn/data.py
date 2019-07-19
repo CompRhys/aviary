@@ -86,7 +86,7 @@ def input_parser():
                         metavar='N', 
                         help='number of total epochs to run (default: 500)')
     parser.add_argument('--learning-rate', 
-                        default=0.0001, 
+                        default=0.001, 
                         type=float, 
                         metavar='LR', 
                         help='initial learning rate (default: 0.0001)')
@@ -119,7 +119,7 @@ def input_parser():
                         type=int, 
                         metavar='N', 
                         help='number ensemble repeats')
-    parser.add_argument('--n-repeat', 
+    parser.add_argument('--ensemble', 
                         default=1, 
                         type=int, 
                         metavar='N', 
