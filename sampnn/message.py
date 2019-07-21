@@ -8,7 +8,7 @@ class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
     """
-    def __init__(self, atom_fea_len, atom_gate):
+    def __init__(self, message_nn, pool_nn):
         """
         Inputs
         ----------
@@ -18,16 +18,13 @@ class MessageLayer(nn.Module):
             Number of bond features.
         """
         super(MessageLayer, self).__init__()
-        self.atom_fea_len = atom_fea_len
         
         # Message Passing
-        self.linear_in = nn.Linear(2*self.atom_fea_len, 4*self.atom_fea_len)
-        self.act = nn.ReLU()
-        self.linear_out = nn.Linear(4*self.atom_fea_len, self.atom_fea_len)
+        self.message_nn = message_nn
 
         # Pooling and Output
-        self.pooling = WeightedAttention(atom_gate)
-        self.pool_act = nn.ReLU()
+        self.pooling = WeightedAttention(pool_nn)
+        # self.pool_act = nn.ReLU()
 
     def forward(self, atom_weights, atom_in_fea,
                 self_fea_idx, nbr_fea_idx):
@@ -63,16 +60,13 @@ class MessageLayer(nn.Module):
         fea = torch.cat([atom_self_fea, atom_nbr_fea], dim=1)
 
         # pass messages between the pairs of atoms
-        fea = self.linear_in(fea)
-        fea = self.act(fea)
-        fea = self.linear_out(fea)
+        fea = self.message_nn(fea)
 
         # sum selectivity over the neighbours to get atoms
         fea = self.pooling(fea, self_fea_idx, atom_nbr_weights)
-        fea = self.pool_act(fea)
-        fea = atom_in_fea + fea
 
-        return fea
+        return fea + atom_in_fea
+        # return self.pool_act(fea) + atom_in_fea
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
@@ -116,23 +110,24 @@ class CompositionNet(nn.Module):
 
         # define the necessary neural networks for the pooling
         # create a list of Message passing layers
-        hidden = [x * atom_fea_len for x in [3,]]
+        hidden = [x * atom_fea_len for x in [4]]
+        hidden_pool = [x * atom_fea_len for x in [5,3,1]]
         self.graphs = nn.ModuleList(
-                            [MessageLayer(atom_fea_len=atom_fea_len,
-                            atom_gate=PyramidNetwork(atom_fea_len, 1, hidden))
+                        [MessageLayer(
+                            message_nn = PyramidNetwork(2*atom_fea_len, 
+                                                        atom_fea_len, hidden),
+                            pool_nn = PyramidNetwork(atom_fea_len, 
+                                                        1, hidden_pool))
                             for _ in range(n_graph)]
-                        )
+                    )
 
-        hidden = [x * atom_fea_len for x in [5,3,]]
+        hidden = [x * atom_fea_len for x in [5,3,1]]
         self.cry_pool = WeightedAttention(
                             gate_nn = PyramidNetwork(atom_fea_len, 1, hidden)
                         )
 
         hidden = [x * atom_fea_len for x in [7,5,3,1]]
-        self.output_nn = PyramidNetwork(atom_fea_len, 2, hidden)
-
-        
-
+        self.output_nn = ResidualNetwork(atom_fea_len, 2, hidden)
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx, 
                 nbr_fea_idx, crystal_atom_idx):
@@ -233,14 +228,57 @@ class PyramidNetwork(nn.Module):
         """
         super(PyramidNetwork, self).__init__()
 
-        dims = [input_dim]+hidden_layer_dims+[output_dim]
+        dims = [input_dim]+hidden_layer_dims
 
-        nodes = [nn.Linear(dims[i],dims[i+1]) for i in range(len(dims)-1)]
-        acts = [nn.ReLU() for _ in range(len(dims)-2)]
-        modules = [y for x in zip_longest(nodes,acts, fillvalue=None) 
-                    for y in x if y is not None]
-        modules = nn.ModuleList(modules)  
-        self.network = nn.Sequential(*modules)
+        self.fcs = nn.ModuleList([nn.Linear(dims[i],dims[i+1]) \
+                                    for i in range(len(dims)-1)])
+        self.acts = nn.ModuleList([nn.ReLU() for _ in range(len(dims)-1)])
+
+        self.fc_out = nn.Linear(dims[-1],output_dim)
 
     def forward(self, fea):
-        return self.network(fea)
+        for fc, act in zip(self.fcs, self.acts):
+            fea = act(fc(fea))
+
+        return self.fc_out(fea)
+
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
+
+
+
+class ResidualNetwork(nn.Module):
+    """
+    make a residual network
+    """
+    def __init__(self, input_dim, output_dim, 
+                hidden_layer_dims):
+        """
+        Inputs
+        ----------
+        input_dim: int
+        output_dim: int
+        hidden_layer_dims: list(int)
+
+        """
+        super(ResidualNetwork, self).__init__()
+
+        dims = [input_dim]+hidden_layer_dims
+
+        self.fcs = nn.ModuleList([nn.Linear(dims[i],dims[i+1]) \
+                                for i in range(len(dims)-1)])
+        self.res_fcs = nn.ModuleList([nn.Linear(dims[i],dims[i+1], bias=False) \
+                                        for i in range(len(dims)-1)])
+        self.acts = nn.ModuleList([nn.ReLU() for _ in range(len(dims)-1)])
+
+        self.fc_out = nn.Linear(dims[-1],output_dim)
+
+
+    def forward(self, fea):
+        for fc, res_fc, act in zip(self.fcs, self.res_fcs, self.acts):
+            fea = act(fc(fea))+res_fc(fea)
+
+        return self.fc_out(fea)
+    
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)

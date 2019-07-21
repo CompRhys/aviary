@@ -201,7 +201,6 @@ class CompositionData(Dataset):
         atom_fea = torch.Tensor(atom_fea)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
-        # target = torch.Tensor([np.log(float(target))])
         target = torch.Tensor([float(target)])
 
         return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, composition, cry_id
