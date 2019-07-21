@@ -14,121 +14,122 @@ from sampnn.parse import parse
 
 
 def input_parser():
-    '''
+    """
     parse input
-    '''
-    parser = argparse.ArgumentParser(description='Structure Agnostic Message Passing Neural Network')
+    """
+    parser = argparse.ArgumentParser(description="Structure Agnostic Message Passing Neural Network")
 
     # misc inputs
-    parser.add_argument('--data_path', 
+    parser.add_argument("--data_path", 
                         type=str, 
-                        default='data/datasets/stanev.csv', 
-                        metavar='PATH',
-                        help='dataset path')
-    parser.add_argument('--fea_path', 
+                        default="data/datasets/stanev.csv", 
+                        metavar="PATH",
+                        help="dataset path")
+    parser.add_argument("--fea_path", 
                         type=str, 
-                        default='data/embeddings/onehot_embedding.json', 
-                        metavar='PATH',
-                        help='atom feature path')
-    parser.add_argument('--disable-cuda', 
-                        action='store_true', 
-                        help='Disable CUDA')
+                        default="data/embeddings/onehot_embedding.json", 
+                        metavar="PATH",
+                        help="atom feature path")
+    parser.add_argument("--disable-cuda", 
+                        action="store_true", 
+                        help="Disable CUDA")
 
     
     # restart inputs
-    parser.add_argument('--resume', 
-                        action='store_true', 
-                        help='resume from previous checkpoint')
-    parser.add_argument('--evaluate', 
-                        action='store_true', 
-                        help='skip network training stages checkpoint')
-    parser.add_argument('--debug', 
-                        action='store_true', 
-                        help='use a small subset of the data to test features')
+    parser.add_argument("--resume", 
+                        action="store_true", 
+                        help="resume from previous checkpoint")
+    parser.add_argument("--evaluate", 
+                        action="store_true", 
+                        help="skip network training stages checkpoint")
+    parser.add_argument("--debug", 
+                        action="store_true", 
+                        help="use a small subset of the data to test features")
     
     # dataloader inputs
-    parser.add_argument('--workers', 
+    parser.add_argument("--workers", 
                         default=0, 
                         type=int, 
-                        metavar='N', 
-                        help='number of data loading workers (default: 0)')
-    parser.add_argument('--batch-size', 
+                        metavar="N", 
+                        help="number of data loading workers (default: 0)")
+    parser.add_argument("--batch-size", 
                         default=128, 
                         type=int, 
-                        metavar='N', 
-                        help='mini-batch size (default: 128)')    
-    parser.add_argument('--train-size', 
+                        metavar="N", 
+                        help="mini-batch size (default: 128)")    
+    parser.add_argument("--train-size", 
                         default=0.8, 
                         type=float, 
-                        metavar='N', 
-                        help='proportion of data for training')
-    parser.add_argument('--val-size', 
+                        metavar="N", 
+                        help="proportion of data for training")
+    parser.add_argument("--val-size", 
                         default=0.0, 
                         type=float, 
-                        metavar='N', 
-                        help='proportion of training data used for validation')
-    parser.add_argument('--test-size', 
+                        metavar="N", 
+                        help="proportion of training data used for validation")
+    parser.add_argument("--test-size", 
                         default=0.2, 
                         type=float, 
-                        metavar='N', 
-                        help='proportion of data for testing')
+                        metavar="N", 
+                        help="proportion of data for testing")
     
     # optimiser inputs
-    parser.add_argument('--optim', 
-                        default='Adam', 
-                        type=str, 
-                        metavar='str', 
-                        help='choose an optimizer; SGD or Adam or RMSprop (default: Adam)')
-    parser.add_argument('--loss', 
-                        default='L2', 
-                        type=str, 
-                        metavar='str', 
-                        help='choose a (Robust) Loss Function; L2 or L1 (default: L2)')
-    parser.add_argument('--epochs', 
+    parser.add_argument("--epochs", 
                         default=100, 
                         type=int, 
-                        metavar='N', 
-                        help='number of total epochs to run (default: 100)')
-    parser.add_argument('--learning-rate',
-                        # 3e-4 is the best learning rate for Adam, hands down. - Andrej Karpathy
+                        metavar="N", 
+                        help="number of total epochs to run (default: 100)")
+    parser.add_argument("--loss", 
+                        default="L2", 
+                        type=str, 
+                        metavar="str", 
+                        help="choose a (Robust) Loss Function; L2 or L1 (default: L2)")
+    parser.add_argument("--optim", 
+                        default="Adam", 
+                        type=str, 
+                        metavar="str", 
+                        help="choose an optimizer; SGD or Adam or RMSprop (default: Adam)")
+    parser.add_argument("--learning-rate",
+                        # 3e-4 is the best learning rate for 
+                        # Adam, hands down. - Andrej Karpathy 2016
                         default=3e-4, 
                         type=float, 
-                        metavar='float',
-                        help='initial learning rate (default: 0.0003)')
-    parser.add_argument('--momentum', 
+                        metavar="float",
+                        help="initial learning rate (default: 3e-4)")
+    parser.add_argument("--momentum", 
                         default=0.9, 
                         type=float, 
-                        metavar='float [0,1]', 
-                        help='momentum (default: 0.9)')
-    parser.add_argument('--weight-decay', 
+                        metavar="float [0,1]", 
+                        help="momentum (default: 0.9)")
+    parser.add_argument("--weight-decay", 
                         default=0, 
                         type=float, 
-                        metavar='float [0,1]', 
-                        help='weight decay (default: 0)')
+                        metavar="float [0,1]", 
+                        help="weight decay (default: 0)")
     
     # graph inputs
-    parser.add_argument('--atom-fea-len', 
+    parser.add_argument("--atom-fea-len", 
                         default=64, 
                         type=int, 
-                        metavar='N', 
-                        help='number of hidden atom features in conv layers')
-    parser.add_argument('--n-graph', 
+                        metavar="N", 
+                        help="number of hidden atom features in conv layers")
+    parser.add_argument("--n-graph", 
                         default=1, 
                         type=int, 
-                        metavar='N', 
-                        help='number of graph layers')
+                        metavar="N", 
+                        help="number of graph layers")
 
     # ensemble inputs
-    parser.add_argument('--fold-id', 
+    parser.add_argument("--fold-id", 
                         default=0, 
                         type=int, 
-                        metavar='N', 
-                        help='number ensemble repeats')
-    parser.add_argument('--ensemble', 
+                        metavar="N", 
+                        help="number ensemble repeats")
+    parser.add_argument("--ensemble", 
                         default=1, 
                         type=int, 
-                        metavar='N', 
-                        help='number ensemble repeats')
+                        metavar="N", 
+                        help="number ensemble repeats")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -139,9 +140,6 @@ def input_parser():
     return args
 
 
-
-
-
 class CompositionData(Dataset):
     """
     The CompositionData dataset is a wrapper for a dataset data points are
@@ -150,10 +148,10 @@ class CompositionData(Dataset):
     def __init__(self, data_path, fea_path):
         """
         """
-        assert os.path.exists(data_path), '{} does not exist!'.format(data_path)
+        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
         self.df = pd.read_csv(data_path)
 
-        assert os.path.exists(fea_path), '{} does not exist!'.format(fea_path)
+        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.atom_features = LoadFeaturiser(fea_path)
         self.atom_fea_dim = self.atom_features.embedding_size()
 
@@ -183,7 +181,7 @@ class CompositionData(Dataset):
         cry_id, composition, target = self.df.iloc[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
-        assert len(elements) != 1, 'crystal {}: {}, is a pure system'.format(cry_id, composition)
+        assert len(elements) != 1, "crystal {}: {}, is a pure system".format(cry_id, composition)
         try:
             atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
         except AssertionError:
@@ -207,6 +205,7 @@ class CompositionData(Dataset):
         target = torch.Tensor([float(target)])
 
         return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, composition, cry_id
+
 
 def collate_batch(dataset_list):
     """
@@ -232,7 +231,7 @@ def collate_batch(dataset_list):
     batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
         Atom features from atom type
     batch_nbr_fea: torch.Tensor shape (N, M, nbr_fea_len)
-        Bond features of each atom's M neighbors
+        Bond features of each atom"s M neighbors
     batch_nbr_fea_idx: torch.LongTensor shape (N, M)
         Indices of M neighbors of each atom
     crystal_atom_idx: list of torch.LongTensor of length N0
@@ -305,7 +304,7 @@ class AverageMeter(object):
 
 class Normalizer(object):
     """Normalize a Tensor and restore it later. """
-    def __init__(self, ):
+    def __init__(self, log=False):
         """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.tensor((0))
         self.std = torch.tensor((1))
@@ -321,10 +320,13 @@ class Normalizer(object):
     def denorm(self, normed_tensor):
         return normed_tensor * self.std + self.mean
 
+    def denorm_var(self, normed_tensor):
+        return normed_tensor * self.std * self.std
+
     def state_dict(self):
-        return {'mean': self.mean,
-                'std': self.std}
+        return {"mean": self.mean,
+                "std": self.std,}
 
     def load_state_dict(self, state_dict):
-        self.mean = state_dict['mean']
-        self.std = state_dict['std']
+        self.mean = state_dict["mean"]
+        self.std = state_dict["std"]

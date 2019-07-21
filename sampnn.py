@@ -18,7 +18,7 @@ from sampnn.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from sampnn.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
-                        RobustL2
+                        RobustL2, CosineAnnealingRestartsLR
 
 
 def init_model(orig_atom_fea_len):
@@ -47,16 +47,17 @@ def init_model(orig_atom_fea_len):
         optimizer = optim.Adam(model.parameters(), 
                                 lr=args.learning_rate,
                                 weight_decay=args.weight_decay)
-    elif args.optim == "RMSprop":
-        optimizer = optim.RMSprop(model.parameters(), 
-                                lr=args.learning_rate,
-                                weight_decay=args.weight_decay)
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    normalizer = Normalizer()
+    scheduler = CosineAnnealingRestartsLR(optimizer, 
+                                            T=30, 
+                                            eta_min=3e-5,
+                                            eta_mult=0.5 )
 
-    objects = (model, criterion, optimizer, normalizer)
+    normalizer = Normalizer()    
+
+    objects = (model, criterion, optimizer, scheduler, normalizer)
 
     return objects
 
@@ -70,7 +71,8 @@ def main():
         orig_atom_fea_len = dataset.atom_fea_dim + 1
         
         indices = list(range(len(dataset)))
-        train_idx, test_idx = split(indices, test_size=args.test_size, train_size=args.train_size,
+        train_idx, test_idx = split(indices, test_size=args.test_size, 
+                                    train_size=args.train_size,
                                     random_state=0)
 
         train_set = torch.utils.data.Subset(dataset, train_idx)
@@ -87,7 +89,8 @@ def main():
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
 
-    ensemble(model_dir, args.fold_id, train_set, test_set, args.ensemble, orig_atom_fea_len)
+    ensemble(model_dir, args.fold_id, train_set, test_set, 
+                args.ensemble, orig_atom_fea_len)
 
 
 def ensemble(model_dir, fold_id, dataset, test_set, 
@@ -119,14 +122,15 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     if not args.evaluate:
         for run_id in range(ensemble_folds):
 
-            model, criterion, optimizer, normalizer = init_model(fea_len)
+            model, criterion, optimizer, scheduler, normalizer = init_model(fea_len)
 
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
             experiment(model_dir, fold_id, run_id, args, 
                         train_generator, val_generator, 
-                        model, optimizer, criterion, normalizer)        
+                        model, optimizer, criterion, 
+                        scheduler, normalizer)        
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
@@ -134,11 +138,10 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 
 def experiment(model_dir, fold_id, run_id, args, 
                 train_generator, val_generator, 
-                model, optimizer, criterion, normalizer):
+                model, optimizer, criterion, 
+                scheduler, normalizer):
     """
-    for a given training an validation set run an experiment.
-
-    return the model that performed best on the validation set.
+    for given training and validation sets run an experiment.
     """
 
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -185,7 +188,7 @@ def experiment(model_dir, fold_id, run_id, args,
                     epoch+1, start_epoch + args.epochs, train_loss, train_error,
                     val_loss, val_error))
 
-            # scheduler.step()
+            scheduler.step()
 
             is_best = val_error < best_error
             if is_best:
@@ -196,6 +199,7 @@ def experiment(model_dir, fold_id, run_id, args,
                                 "best_error": best_error,
                                 "optimizer": optimizer.state_dict(),
                                 "normalizer": normalizer.state_dict(),
+                                "scheduler": scheduler.state_dict(),
                                 "args": vars(args)
                                 }
 
@@ -208,10 +212,17 @@ def experiment(model_dir, fold_id, run_id, args,
             writer.add_scalar("data/train", train_error, epoch+1)
             writer.add_scalar("data/validation", val_error, epoch+1)
 
-            if epoch % 25 == 0:
-                for name, param in model.named_parameters():
-                    writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch+1)
-                    # writer.add_histogram(name+"/grad", param.grad.clone().cpu().data.numpy(), epoch+1)
+            for param_group in optimizer.param_groups:
+                writer.add_scalar("data/lr", param_group["lr"], epoch+1)
+
+            # if epoch % 25 == 0:
+            #     for name, param in model.named_parameters():
+            #         writer.add_histogram(name, 
+            #                             param.clone().cpu().data.numpy(), 
+            #                             epoch+1)
+            #         writer.add_histogram(name+"/grad", 
+            #                             param.grad.clone().cpu().data.numpy(), 
+            #                             epoch+1)
 
             # catch memory leak
             gc.collect()
@@ -228,7 +239,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
             "----------Evaluate model on Test Set-----------\n"
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    model, criterion, _, normalizer = init_model(fea_len)
+    model, criterion, _, _, normalizer = init_model(fea_len)
 
     params = {  "batch_size": args.batch_size,
                 "num_workers": args.workers, 
@@ -245,23 +256,22 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
         print("Model {}/{}".format(j+1, ensemble_folds))
 
-        # best_checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,j))
-        best_checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,j))
-        model.load_state_dict(best_checkpoint["state_dict"])
-        normalizer.load_state_dict(best_checkpoint["normalizer"])
+        # checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,j))
+        checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,j))
+        model.load_state_dict(checkpoint["state_dict"])
+        normalizer.load_state_dict(checkpoint["normalizer"])
 
-        # print(best_checkpoint["normalizer"])
         # print("The best model performance on the validation" 
-        #     " set occured on epoch {}".format(best_checkpoint["epoch"]))
+        #     " set occured on epoch {}".format(checkpoint["epoch"]))
 
         model.eval()
-        idx, comp, y_test, pred, sigma = evaluate(generator=test_generator, model=model, 
+        idx, comp, y_test, pred, var = evaluate(generator=test_generator, model=model, 
                                             criterion=criterion, optimizer=None, 
                                             normalizer=normalizer, device=args.device, 
                                             task="test", verbose=True)
 
         y_ensemble.append(pred)
-        y_aleatoric.append(np.square(sigma))
+        y_aleatoric.append(var)
 
     y_pred = np.mean(y_ensemble, axis=0)
     y_epistemic = np.var(y_ensemble, axis=0)
@@ -286,11 +296,15 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
     print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
 
-    df = pd.DataFrame({"id" : idx, "composition" : comp, "target" : y_test, 
-                        "mean" : y_pred, "std" : y_std,
+    df = pd.DataFrame({ "id" : idx, 
+                        "composition" : comp, 
+                        "target" : y_test, 
+                        "mean" : y_pred, 
+                        "std" : y_std,
                         "epistemic" : np.sqrt(y_epistemic), 
                         "aleatoric" : np.sqrt(y_aleatoric),  
                         })
+
     df.to_csv("test_results.csv", index=False)
 
 
