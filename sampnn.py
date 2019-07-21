@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
@@ -50,14 +50,15 @@ def init_model(orig_atom_fea_len):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    scheduler = CosineAnnealingRestartsLR(optimizer, 
-                                            T=30, 
-                                            eta_min=3e-5,
-                                            eta_mult=0.5 )
+    # scheduler = CosineAnnealingRestartsLR(optimizer, 
+    #                                         T=30, 
+    #                                         eta_min=3e-5,
+    #                                         eta_mult=0.5 )
 
     normalizer = Normalizer()    
 
-    objects = (model, criterion, optimizer, scheduler, normalizer)
+    objects = (model, criterion, optimizer, normalizer)
+    # objects = (model, criterion, optimizer, scheduler, normalizer)
 
     return objects
 
@@ -122,7 +123,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     if not args.evaluate:
         for run_id in range(ensemble_folds):
 
-            model, criterion, optimizer, scheduler, normalizer = init_model(fea_len)
+            model, criterion, optimizer, normalizer = init_model(fea_len)
+            # model, criterion, optimizer, scheduler, normalizer = init_model(fea_len)
 
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
@@ -130,7 +132,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             experiment(model_dir, fold_id, run_id, args, 
                         train_generator, val_generator, 
                         model, optimizer, criterion, 
-                        scheduler, normalizer)        
+                        normalizer)        
+                        # scheduler, normalizer)        
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
@@ -139,7 +142,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 def experiment(model_dir, fold_id, run_id, args, 
                 train_generator, val_generator, 
                 model, optimizer, criterion, 
-                scheduler, normalizer):
+                normalizer):
+                # scheduler, normalizer):
     """
     for given training and validation sets run an experiment.
     """
@@ -188,7 +192,7 @@ def experiment(model_dir, fold_id, run_id, args,
                     epoch+1, start_epoch + args.epochs, train_loss, train_error,
                     val_loss, val_error))
 
-            scheduler.step()
+            # scheduler.step()
 
             is_best = val_error < best_error
             if is_best:
@@ -199,7 +203,7 @@ def experiment(model_dir, fold_id, run_id, args,
                                 "best_error": best_error,
                                 "optimizer": optimizer.state_dict(),
                                 "normalizer": normalizer.state_dict(),
-                                "scheduler": scheduler.state_dict(),
+                                # "scheduler": scheduler.state_dict(),
                                 "args": vars(args)
                                 }
 
@@ -212,8 +216,8 @@ def experiment(model_dir, fold_id, run_id, args,
             writer.add_scalar("data/train", train_error, epoch+1)
             writer.add_scalar("data/validation", val_error, epoch+1)
 
-            for param_group in optimizer.param_groups:
-                writer.add_scalar("data/lr", param_group["lr"], epoch+1)
+            # for param_group in optimizer.param_groups:
+            #     writer.add_scalar("data/lr", param_group["lr"], epoch+1)
 
             # if epoch % 25 == 0:
             #     for name, param in model.named_parameters():
@@ -239,7 +243,8 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
             "----------Evaluate model on Test Set-----------\n"
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    model, criterion, _, _, normalizer = init_model(fea_len)
+    model, criterion, _, normalizer = init_model(fea_len)
+    # model, criterion, _, _, normalizer = init_model(fea_len)
 
     params = {  "batch_size": args.batch_size,
                 "num_workers": args.workers, 

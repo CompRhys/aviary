@@ -116,14 +116,14 @@ class CompositionNet(nn.Module):
 
         # define the necessary neural networks for the pooling
         # create a list of Message passing layers
-        hidden = [x * atom_fea_len for x in [3,1]]
+        hidden = [x * atom_fea_len for x in [3,]]
         self.graphs = nn.ModuleList(
                             [MessageLayer(atom_fea_len=atom_fea_len,
                             atom_gate=PyramidNetwork(atom_fea_len, 1, hidden))
                             for _ in range(n_graph)]
                         )
 
-        hidden = [x * atom_fea_len for x in [5,3,1]]
+        hidden = [x * atom_fea_len for x in [5,3,]]
         self.cry_pool = WeightedAttention(
                             gate_nn = PyramidNetwork(atom_fea_len, 1, hidden)
                         )
