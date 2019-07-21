@@ -320,9 +320,6 @@ class Normalizer(object):
     def denorm(self, normed_tensor):
         return normed_tensor * self.std + self.mean
 
-    def denorm_var(self, normed_tensor):
-        return normed_tensor * self.std * self.std
-
     def state_dict(self):
         return {"mean": self.mean,
                 "std": self.std,}

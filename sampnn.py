@@ -270,17 +270,17 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         #     " set occured on epoch {}".format(checkpoint["epoch"]))
 
         model.eval()
-        idx, comp, y_test, pred, var = evaluate(generator=test_generator, model=model, 
+        idx, comp, y_test, pred, std = evaluate(generator=test_generator, model=model, 
                                             criterion=criterion, optimizer=None, 
                                             normalizer=normalizer, device=args.device, 
                                             task="test", verbose=True)
 
         y_ensemble.append(pred)
-        y_aleatoric.append(var)
+        y_aleatoric.append(std)
 
     y_pred = np.mean(y_ensemble, axis=0)
     y_epistemic = np.var(y_ensemble, axis=0)
-    y_aleatoric = np.mean(y_aleatoric, axis=0)
+    y_aleatoric = np.mean(np.square(y_aleatoric), axis=0)
     y_std = np.sqrt(y_epistemic + y_aleatoric)
 
     # calculate metrics and errors with associated errors for ensembles
