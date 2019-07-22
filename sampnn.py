@@ -168,7 +168,7 @@ def experiment(model_dir, fold_id, run_id, args,
     # try except structure used to allow keyboard interupts to stop training
     # without breaking the code
     try:
-        for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs)):
+        for epoch in range(start_epoch, start_epoch+ args.epochs):
             # Training
             train_loss, train_error = evaluate(generator=train_generator, model=model, 
                                                 criterion=criterion, optimizer=optimizer, 
@@ -183,14 +183,14 @@ def experiment(model_dir, fold_id, run_id, args,
                                                 normalizer=normalizer, device=args.device, 
                                                 task="val")
 
-            if epoch % args.print_freq == 0:
-                tqdm.write("Epoch: [{0}/{1}]\t"
-                    "Train : Loss {2:.4f}\t"
-                    "Error {3:.3f}\t"
-                    "Validation : Loss {4:.4f}\t"
-                    "Error {5:.3f}".format(
-                    epoch+1, start_epoch + args.epochs, train_loss, train_error,
-                    val_loss, val_error))
+            # if epoch % args.print_freq == 0:
+            print("Epoch: [{0}/{1}]\t"
+                "Train : Loss {2:.4f}\t"
+                "Error {3:.3f}\t"
+                "Validation : Loss {4:.4f}\t"
+                "Error {5:.3f}\n".format(
+                epoch+1, start_epoch + args.epochs, train_loss, train_error,
+                val_loss, val_error))
 
             is_best = val_error < best_error
             if is_best:

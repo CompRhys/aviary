@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm.autonotebook import trange
+from tqdm import trange
 import shutil
 import math
 import numpy as np
@@ -34,7 +34,7 @@ def evaluate(generator, model, criterion, optimizer,
     else:
         raise NameError("Only train, val or test is allowed as task")
     
-    with trange(len(generator), disable=(not verbose), position=1) as t:
+    with trange(len(generator), disable=(not verbose)) as t:
         for input_, target, batch_comp, batch_cif_ids in generator:
             
             # normalize target
