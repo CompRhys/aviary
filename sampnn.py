@@ -18,7 +18,7 @@ from sampnn.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from sampnn.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
-                        RobustL2, CosineAnnealingRestartsLR
+                        RobustL2
 
 
 def init_model(orig_atom_fea_len):
@@ -29,15 +29,16 @@ def init_model(orig_atom_fea_len):
 
     model.to(args.device)
 
+    # Select Loss Function, Note we use Robust loss functions that
+    # are used to train an aleatoric error estimate
     if args.loss == "L1":
         criterion = RobustL1
     elif args.loss == "L2":
         criterion = RobustL2
     else:
         raise NameError("Only L1 or L2 are allowed as --loss")
-        
 
-    # Choose Optimiser
+    # Select Optimiser
     if args.optim == "SGD":
         optimizer = optim.SGD(model.parameters(), 
                                 lr=args.learning_rate,
@@ -50,15 +51,9 @@ def init_model(orig_atom_fea_len):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    # scheduler = CosineAnnealingRestartsLR(optimizer, 
-    #                                         T=30, 
-    #                                         eta_min=3e-5,
-    #                                         eta_mult=0.5 )
-
     normalizer = Normalizer()    
 
     objects = (model, criterion, optimizer, normalizer)
-    # objects = (model, criterion, optimizer, scheduler, normalizer)
 
     return objects
 
@@ -124,7 +119,6 @@ def ensemble(model_dir, fold_id, dataset, test_set,
         for run_id in range(ensemble_folds):
 
             model, criterion, optimizer, normalizer = init_model(fea_len)
-            # model, criterion, optimizer, scheduler, normalizer = init_model(fea_len)
 
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
@@ -133,7 +127,6 @@ def ensemble(model_dir, fold_id, dataset, test_set,
                         train_generator, val_generator, 
                         model, optimizer, criterion, 
                         normalizer)        
-                        # scheduler, normalizer)        
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
@@ -143,7 +136,6 @@ def experiment(model_dir, fold_id, run_id, args,
                 train_generator, val_generator, 
                 model, optimizer, criterion, 
                 normalizer):
-                # scheduler, normalizer):
     """
     for given training and validation sets run an experiment.
     """
@@ -151,7 +143,7 @@ def experiment(model_dir, fold_id, run_id, args,
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total Number of Trainable Parameters: {}".format(num_param))
 
-    writer = SummaryWriter()
+    writer = SummaryWriter(flush_secs=30)
 
     checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
     best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
@@ -192,8 +184,6 @@ def experiment(model_dir, fold_id, run_id, args,
                     epoch+1, start_epoch + args.epochs, train_loss, train_error,
                     val_loss, val_error))
 
-            # scheduler.step()
-
             is_best = val_error < best_error
             if is_best:
                 best_error = val_error
@@ -203,7 +193,6 @@ def experiment(model_dir, fold_id, run_id, args,
                                 "best_error": best_error,
                                 "optimizer": optimizer.state_dict(),
                                 "normalizer": normalizer.state_dict(),
-                                # "scheduler": scheduler.state_dict(),
                                 "args": vars(args)
                                 }
 
@@ -212,21 +201,8 @@ def experiment(model_dir, fold_id, run_id, args,
                             checkpoint_file,
                             best_file)
 
-
             writer.add_scalar("data/train", train_error, epoch+1)
             writer.add_scalar("data/validation", val_error, epoch+1)
-
-            # for param_group in optimizer.param_groups:
-            #     writer.add_scalar("data/lr", param_group["lr"], epoch+1)
-
-            # if epoch % 25 == 0:
-            #     for name, param in model.named_parameters():
-            #         writer.add_histogram(name, 
-            #                             param.clone().cpu().data.numpy(), 
-            #                             epoch+1)
-            #         writer.add_histogram(name+"/grad", 
-            #                             param.grad.clone().cpu().data.numpy(), 
-            #                             epoch+1)
 
             # catch memory leak
             gc.collect()
@@ -234,9 +210,12 @@ def experiment(model_dir, fold_id, run_id, args,
     except KeyboardInterrupt:
         pass
 
+    writer.close()
+
 
 def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     """
+    take an ensemble of models and evaluate their performance on the test set
     """
 
     print(  "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
@@ -244,7 +223,6 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
     model, criterion, _, normalizer = init_model(fea_len)
-    # model, criterion, _, _, normalizer = init_model(fea_len)
 
     params = {  "batch_size": args.batch_size,
                 "num_workers": args.workers, 
@@ -261,13 +239,9 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
         print("Model {}/{}".format(j+1, ensemble_folds))
 
-        # checkpoint = torch.load("models/best_{}_{}.pth.tar".format(fold_id,j))
         checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,j))
         model.load_state_dict(checkpoint["state_dict"])
         normalizer.load_state_dict(checkpoint["normalizer"])
-
-        # print("The best model performance on the validation" 
-        #     " set occured on epoch {}".format(checkpoint["epoch"]))
 
         model.eval()
         idx, comp, y_test, pred, std = evaluate(generator=test_generator, model=model, 

@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch_scatter import scatter_max, scatter_mean, \
                             scatter_add, scatter_mul
-from itertools import zip_longest
 
 class MessageLayer(nn.Module):
     """
@@ -108,24 +107,25 @@ class CompositionNet(nn.Module):
         # apply linear transform to the input features to get a trainable embedding
         self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len)
 
-        # define the necessary neural networks for the pooling
         # create a list of Message passing layers
         hidden = [x * atom_fea_len for x in [4]]
         hidden_pool = [x * atom_fea_len for x in [5,3,1]]
         self.graphs = nn.ModuleList(
                         [MessageLayer(
-                            message_nn = PyramidNetwork(2*atom_fea_len, 
+                            message_nn = SimpleNetwork(2*atom_fea_len, 
                                                         atom_fea_len, hidden),
-                            pool_nn = PyramidNetwork(atom_fea_len, 
+                            pool_nn = SimpleNetwork(atom_fea_len, 
                                                         1, hidden_pool))
                             for _ in range(n_graph)]
                     )
 
+        # define a global pooling function for materials
         hidden = [x * atom_fea_len for x in [5,3,1]]
         self.cry_pool = WeightedAttention(
-                            gate_nn = PyramidNetwork(atom_fea_len, 1, hidden)
+                            gate_nn = SimpleNetwork(atom_fea_len, 1, hidden)
                         )
 
+        # define an output neural network
         hidden = [x * atom_fea_len for x in [7,5,3,1]]
         self.output_nn = ResidualNetwork(atom_fea_len, 2, hidden)
 
@@ -171,6 +171,7 @@ class CompositionNet(nn.Module):
         crys_fea = self.cry_pool(atom_fea, crystal_atom_idx, 
                                 atom_weights)
 
+        # apply neural network to map from learned features to target
         crys_fea = self.output_nn(crys_fea)
 
         return crys_fea
@@ -212,12 +213,11 @@ class WeightedAttention(nn.Module):
                                               self.gate_nn)
 
 
-class PyramidNetwork(nn.Module):
+class SimpleNetwork(nn.Module):
     """
-    make a pyramid network
+    Simple Feed Forward Neural Network
     """
-    def __init__(self, input_dim, output_dim, 
-                hidden_layer_dims):
+    def __init__(self, input_dim, output_dim, hidden_layer_dims):
         """
         Inputs
         ----------
@@ -226,7 +226,7 @@ class PyramidNetwork(nn.Module):
         hidden_layer_dims: list(int)
 
         """
-        super(PyramidNetwork, self).__init__()
+        super(SimpleNetwork, self).__init__()
 
         dims = [input_dim]+hidden_layer_dims
 
@@ -249,10 +249,9 @@ class PyramidNetwork(nn.Module):
 
 class ResidualNetwork(nn.Module):
     """
-    make a residual network
+    Feed forward Residual Neural Network
     """
-    def __init__(self, input_dim, output_dim, 
-                hidden_layer_dims):
+    def __init__(self, input_dim, output_dim, hidden_layer_dims):
         """
         Inputs
         ----------
