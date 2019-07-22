@@ -168,13 +168,12 @@ def experiment(model_dir, fold_id, run_id, args,
     # try except structure used to allow keyboard interupts to stop training
     # without breaking the code
     try:
-        for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs),
-                    disable=(not args.verbose),):
+        for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs)):
             # Training
             train_loss, train_error = evaluate(generator=train_generator, model=model, 
                                                 criterion=criterion, optimizer=optimizer, 
                                                 normalizer=normalizer, device=args.device, 
-                                                task="train", verbose=args.verbose)
+                                                task="train", verbose=True)
 
             # Validation
             with torch.set_grad_enabled(False):
@@ -182,7 +181,7 @@ def experiment(model_dir, fold_id, run_id, args,
                 val_loss, val_error = evaluate(generator=val_generator, model=model, 
                                                 criterion=criterion, optimizer=None, 
                                                 normalizer=normalizer, device=args.device, 
-                                                task="val", verbose=False)
+                                                task="val")
 
             if epoch % args.print_freq == 0:
                 tqdm.write("Epoch: [{0}/{1}]\t"
@@ -256,7 +255,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         idx, comp, y_test, pred, std = evaluate(generator=test_generator, model=model, 
                                             criterion=criterion, optimizer=None, 
                                             normalizer=normalizer, device=args.device, 
-                                            task="test", verbose=args.verbose)
+                                            task="test")
 
         y_ensemble.append(pred)
         y_aleatoric.append(std)

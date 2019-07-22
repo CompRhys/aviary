@@ -33,9 +33,6 @@ def input_parser():
     parser.add_argument("--disable-cuda", 
                         action="store_true", 
                         help="Disable CUDA")
-    parser.add_argument("--verbose", 
-                        action="store_true", 
-                        help="Show minibatch progress bar")
     parser.add_argument("--print-freq",
                         type=int,
                         default=1, 

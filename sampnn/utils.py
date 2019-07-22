@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 from sampnn.data import AverageMeter, Normalizer
 
 def evaluate(generator, model, criterion, optimizer, 
-            normalizer, device, task="train", verbose=True):
+            normalizer, device, task="train", verbose=False):
     """ 
     evaluate the model 
     """
@@ -34,7 +34,7 @@ def evaluate(generator, model, criterion, optimizer,
     else:
         raise NameError("Only train, val or test is allowed as task")
     
-    with trange(len(generator), disable=(not verbose), ) as t:
+    with trange(len(generator), disable=(not verbose)) as t:
         for input_, target, batch_comp, batch_cif_ids in generator:
             
             # normalize target
