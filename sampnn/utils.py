@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm import trange
+from tqdm.autonotebook import trange
 import shutil
 import math
 import numpy as np
