@@ -33,6 +33,15 @@ def input_parser():
     parser.add_argument("--disable-cuda", 
                         action="store_true", 
                         help="Disable CUDA")
+    parser.add_argument("--verbose", 
+                        action="store_true", 
+                        help="Show minibatch progress bar")
+    parser.add_argument("--print-freq",
+                        type=int,
+                        default=1, 
+                        metavar="N", 
+                        help="how often to print out results")
+
 
     
     # restart inputs
@@ -124,12 +133,18 @@ def input_parser():
                         default=0, 
                         type=int, 
                         metavar="N", 
-                        help="number ensemble repeats")
+                        help="identify the fold of the data")
+    parser.add_argument("--run-id", 
+                        default=0, 
+                        type=int, 
+                        metavar="N", 
+                        help="ensemble model id")
     parser.add_argument("--ensemble", 
                         default=1, 
                         type=int, 
                         metavar="N", 
                         help="number ensemble repeats")
+
 
     args = parser.parse_args(sys.argv[1:])
 

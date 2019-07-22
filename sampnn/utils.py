@@ -21,6 +21,7 @@ def evaluate(generator, model, criterion, optimizer,
 
     if task == "train":
         model.train()
+        leave = False
     elif task == "val":
         model.eval()
     elif task == "test":
@@ -33,7 +34,7 @@ def evaluate(generator, model, criterion, optimizer,
     else:
         raise NameError("Only train, val or test is allowed as task")
     
-    with trange(len(generator), disable=(not verbose)) as t:
+    with trange(len(generator), disable=(not verbose), leave=False) as t:
         for input_, target, batch_comp, batch_cif_ids in generator:
             
             # normalize target

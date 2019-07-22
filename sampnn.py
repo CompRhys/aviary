@@ -3,6 +3,7 @@ import gc
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -58,7 +59,6 @@ def init_model(orig_atom_fea_len):
     return objects
 
 
-
 def main():
 
     if args.debug:
@@ -103,6 +103,10 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 
     if args.val_size == 0.0:
         print("No validation set used, using test set for evaluation purposes")
+        # Note that when using this option care must be taken not to
+        # peak at the test-set. The only valid model to use is the one obtained
+        # after the final epoch where the epoch count is decided in advance of
+        # the experiment.
         train_subset = dataset
         val_subset = test_set
     else:
@@ -117,6 +121,9 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 
     if not args.evaluate:
         for run_id in range(ensemble_folds):
+
+            if ensemble_folds == 1:
+                run_id = args.run_id
 
             model, criterion, optimizer, normalizer = init_model(fea_len)
 
@@ -161,7 +168,7 @@ def experiment(model_dir, fold_id, run_id, args,
     # try except structure used to allow keyboard interupts to stop training
     # without breaking the code
     try:
-        for epoch in range(start_epoch, start_epoch+ args.epochs):
+        for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs), leave=False):
             # Training
             train_loss, train_error = evaluate(generator=train_generator, model=model, 
                                                 criterion=criterion, optimizer=optimizer, 
@@ -176,11 +183,12 @@ def experiment(model_dir, fold_id, run_id, args,
                                                 normalizer=normalizer, device=args.device, 
                                                 task="val", verbose=False)
 
-            print("Epoch: [{0}/{1}]\t"
+            if epoch % args.print_freq == 0:
+                tqdm.write("Epoch: [{0}/{1}]\t"
                     "Train : Loss {2:.4f}\t"
                     "Error {3:.3f}\t"
                     "Validation : Loss {4:.4f}\t"
-                    "Error {5:.3f}\n".format(
+                    "Error {5:.3f}".format(
                     epoch+1, start_epoch + args.epochs, train_loss, train_error,
                     val_loss, val_error))
 
@@ -219,7 +227,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     """
 
     print(  "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-            "----------Evaluate model on Test Set-----------\n"
+            "------------Evaluate model on Test Set------------\n"
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
     model, criterion, _, normalizer = init_model(fea_len)

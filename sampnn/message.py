@@ -109,7 +109,7 @@ class CompositionNet(nn.Module):
 
         # create a list of Message passing layers
         hidden = [x * atom_fea_len for x in [4]]
-        hidden_pool = [x * atom_fea_len for x in [5,3,1]]
+        hidden_pool = [x * atom_fea_len for x in [3,1]]
         self.graphs = nn.ModuleList(
                         [MessageLayer(
                             message_nn = SimpleNetwork(2*atom_fea_len, 
