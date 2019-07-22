@@ -168,12 +168,13 @@ def experiment(model_dir, fold_id, run_id, args,
     # try except structure used to allow keyboard interupts to stop training
     # without breaking the code
     try:
-        for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs), leave=False):
+        for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs),
+                    disable=(not args.verbose), leave=False):
             # Training
             train_loss, train_error = evaluate(generator=train_generator, model=model, 
                                                 criterion=criterion, optimizer=optimizer, 
                                                 normalizer=normalizer, device=args.device, 
-                                                task="train", verbose=True)
+                                                task="train", verbose=args.verbose)
 
             # Validation
             with torch.set_grad_enabled(False):
@@ -255,7 +256,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         idx, comp, y_test, pred, std = evaluate(generator=test_generator, model=model, 
                                             criterion=criterion, optimizer=None, 
                                             normalizer=normalizer, device=args.device, 
-                                            task="test", verbose=True)
+                                            task="test", verbose=args.verbose)
 
         y_ensemble.append(pred)
         y_aleatoric.append(std)
