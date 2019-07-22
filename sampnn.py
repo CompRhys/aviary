@@ -169,7 +169,7 @@ def experiment(model_dir, fold_id, run_id, args,
     # without breaking the code
     try:
         for epoch in tqdm(range(start_epoch, start_epoch+ args.epochs),
-                    disable=(not args.verbose), leave=False):
+                    disable=(not args.verbose),):
             # Training
             train_loss, train_error = evaluate(generator=train_generator, model=model, 
                                                 criterion=criterion, optimizer=optimizer, 
