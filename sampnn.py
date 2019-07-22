@@ -162,7 +162,7 @@ def experiment(model_dir, fold_id, run_id, args,
         _, best_error = evaluate(generator=val_generator, model=model, 
                         criterion=criterion, optimizer=None, 
                         normalizer=normalizer, device=args.device, 
-                        task="val", verbose=False)
+                        task="val")
         start_epoch = 0
 
     # try except structure used to allow keyboard interupts to stop training
