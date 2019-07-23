@@ -281,3 +281,7 @@ class ResidualNetwork(nn.Module):
     
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
+
+def weight_reset(m):
+    if isinstance(m, nn.Linear):
+        m.reset_parameters()

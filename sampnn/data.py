@@ -33,14 +33,8 @@ def input_parser():
     parser.add_argument("--disable-cuda", 
                         action="store_true", 
                         help="Disable CUDA")
-    # parser.add_argument("--print-freq",
-    #                     type=int,
-    #                     default=1, 
-    #                     metavar="N", 
-    #                     help="how often to print out results")
 
 
-    
     # restart inputs
     parser.add_argument("--resume", 
                         action="store_true", 
@@ -141,6 +135,12 @@ def input_parser():
                         type=int, 
                         metavar="N", 
                         help="number ensemble repeats")
+
+    # transfer learning
+    parser.add_argument("--transfer", 
+                    type=str,  
+                    metavar="PATH",
+                    help="atom feature path")
 
 
     args = parser.parse_args(sys.argv[1:])
