@@ -20,12 +20,12 @@ def input_parser():
     parser = argparse.ArgumentParser(description="Structure Agnostic Message Passing Neural Network")
 
     # misc inputs
-    parser.add_argument("--data_path", 
+    parser.add_argument("--data-path", 
                         type=str, 
                         default="data/datasets/stanev.csv", 
                         metavar="PATH",
                         help="dataset path")
-    parser.add_argument("--fea_path", 
+    parser.add_argument("--fea-path", 
                         type=str, 
                         default="data/embeddings/onehot_embedding.json", 
                         metavar="PATH",
@@ -193,7 +193,7 @@ class CompositionData(Dataset):
         cry_id, composition, target = self.df.iloc[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
-        assert len(elements) != 1, "crystal {}: {}, is a pure system".format(cry_id, composition)
+        assert len(elements) != 1, "crystal {}: {}, is a pure system".format(cry_id, composition)   
         try:
             atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
         except AssertionError:
