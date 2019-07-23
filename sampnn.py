@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
 
-from sampnn.message import CompositionNet, weight_reset
+from sampnn.message import CompositionNet, ResidualNetwork
 from sampnn.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from sampnn.utils import evaluate, save_checkpoint, \
@@ -161,7 +161,8 @@ def experiment(model_dir, fold_id, run_id, args,
     elif args.transfer:
         previous_state = load_previous_state(args.transfer, model, optimizer, normalizer)
         model, optimizer, normalizer, best_error, start_epoch = previous_state
-        model.output_nn.apply(weight_reset)
+        hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
+        model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)
     else:
         _, best_error = evaluate(generator=val_generator, model=model, 
                         criterion=criterion, optimizer=None, 
