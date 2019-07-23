@@ -166,10 +166,8 @@ def experiment(model_dir, fold_id, run_id, args,
         start_epoch = 0
         for p in model.parameters():
             p.requires_grad = False
-        hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
-        model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)
-        for p in model.output_nn.parameters():
-            p.requires_grad = True
+        num_ftrs = model.output_nn.fc_out.in_features
+        model.output_nn.fc_out = nn.Linear(num_ftrs, 2)  
         model.to(args.device)
     else:
         _, best_error = evaluate(generator=val_generator, model=model, 
