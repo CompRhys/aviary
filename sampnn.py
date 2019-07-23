@@ -156,13 +156,20 @@ def experiment(model_dir, fold_id, run_id, args,
     best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
 
     if args.resume:
+        print("Resume Training from previous model")
         previous_state = load_previous_state(checkpoint_file, model, optimizer, normalizer)
         model, optimizer, normalizer, best_error, start_epoch = previous_state
     elif args.transfer:
+        print("Perform Transfer Learning from different task")
         previous_state = load_previous_state(args.transfer, model, optimizer, normalizer)
-        model, optimizer, normalizer, best_error, start_epoch = previous_state
+        model, optimizer, normalizer, best_error, _ = previous_state
+        start_epoch = 0
+        for p in model.parameters():
+            p.requires_grad = False
         hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
         model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)
+        for p in model.output_nn.parameters():
+            p.requires_grad = True
         model.to(args.device)
     else:
         _, best_error = evaluate(generator=val_generator, model=model, 
