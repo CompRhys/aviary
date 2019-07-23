@@ -163,6 +163,7 @@ def experiment(model_dir, fold_id, run_id, args,
         model, optimizer, normalizer, best_error, start_epoch = previous_state
         hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
         model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)
+        model.to(args.device)
     else:
         _, best_error = evaluate(generator=val_generator, model=model, 
                         criterion=criterion, optimizer=None, 
