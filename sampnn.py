@@ -169,12 +169,12 @@ def experiment(model_dir, fold_id, run_id, args,
             print("Perform Transfer Learning from different task")
             previous_state = load_previous_state(args.transfer, model, None, None)
             model, _, _, _, _ = previous_state
-            for p in model.parameters():
-                p.requires_grad = False
+            # for p in model.parameters():
+            #     p.requires_grad = False
             # num_ftrs = model.output_nn.fc_out.in_features
             # model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
-            hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
-            model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)  
+            # hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
+            # model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)  
             model.to(args.device)
             criterion, optimizer = init_optim(model)
 
