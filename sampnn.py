@@ -14,7 +14,8 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
 
-from sampnn.message import CompositionNet, ResidualNetwork
+from sampnn.message import CompositionNet, ResidualNetwork, \
+                            SimpleNetwork
 from sampnn.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from sampnn.utils import evaluate, save_checkpoint, \
@@ -29,6 +30,13 @@ def init_model(orig_atom_fea_len):
                             n_graph=args.n_graph)
 
     model.to(args.device)
+
+    normalizer = Normalizer()
+
+    return model, normalizer    
+
+
+def init_optim(model):
 
     # Select Loss Function, Note we use Robust loss functions that
     # are used to train an aleatoric error estimate
@@ -52,11 +60,7 @@ def init_model(orig_atom_fea_len):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    normalizer = Normalizer()    
-
-    objects = (model, criterion, optimizer, normalizer)
-
-    return objects
+    return criterion, optimizer
 
 
 def main():
@@ -125,7 +129,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, criterion, optimizer, normalizer = init_model(fea_len)
+            model, normalizer = init_model(fea_len)
+            criterion, optimizer = init_optim(model)
 
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
@@ -162,13 +167,17 @@ def experiment(model_dir, fold_id, run_id, args,
     elif args.transfer:
         print("Perform Transfer Learning from different task")
         previous_state = load_previous_state(args.transfer, model, optimizer, normalizer)
-        model, optimizer, normalizer, best_error, _ = previous_state
+        model, _, normalizer, best_error, _ = previous_state
         start_epoch = 0
         for p in model.parameters():
             p.requires_grad = False
         num_ftrs = model.output_nn.fc_out.in_features
-        model.output_nn.fc_out = nn.Linear(num_ftrs, 2)  
+        model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
+        # hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
+        # model.output_nn = SimpleNetwork(args.atom_fea_len, 2, hidden)  
         model.to(args.device)
+        criterion, optimizer = init_optim(model)
+
     else:
         _, best_error = evaluate(generator=val_generator, model=model, 
                         criterion=criterion, optimizer=None, 
@@ -241,7 +250,8 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
             "------------Evaluate model on Test Set------------\n"
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    model, criterion, _, normalizer = init_model(fea_len)
+    model, normalizer = init_model(fea_len)
+    criterion, _, = init_optim(model)
 
     params = {  "batch_size": args.batch_size,
                 "num_workers": args.workers, 

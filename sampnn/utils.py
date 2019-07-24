@@ -132,6 +132,6 @@ def RobustL2(output, log_std, target):
     Robust L2 loss using a gaussian prior. Allows for estimation 
     of an aleatoric uncertainty.
     """
-    loss = torch.pow(output - target, 2.0) * \
+    loss = 0.5 * torch.pow(output - target, 2.0) * \
            torch.exp(- 2.0 * log_std) + log_std
     return torch.mean(loss)

@@ -89,7 +89,7 @@ def input_parser():
                         type=str, 
                         metavar="str", 
                         help="choose an optimizer; SGD or Adam or RMSprop (default: Adam)")
-    parser.add_argument("--learning-rate",
+    parser.add_argument("--learning-rate", "--lr",
                         # 3e-4 is the best learning rate for 
                         # Adam, hands down. - Andrej Karpathy 2016
                         default=3e-4, 
