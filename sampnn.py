@@ -164,21 +164,20 @@ def experiment(model_dir, fold_id, run_id, args,
         print("Resume Training from previous model")
         previous_state = load_previous_state(checkpoint_file, model, optimizer, normalizer)
         model, optimizer, normalizer, best_error, start_epoch = previous_state
-    elif args.transfer:
-        print("Perform Transfer Learning from different task")
-        previous_state = load_previous_state(args.transfer, model, optimizer, normalizer)
-        model, _, normalizer, best_error, _ = previous_state
-        start_epoch = 0
-        for p in model.parameters():
-            p.requires_grad = False
-        num_ftrs = model.output_nn.fc_out.in_features
-        model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
-        # hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
-        # model.output_nn = SimpleNetwork(args.atom_fea_len, 2, hidden)  
-        model.to(args.device)
-        criterion, optimizer = init_optim(model)
-
     else:
+        if args.transfer:
+            print("Perform Transfer Learning from different task")
+            previous_state = load_previous_state(args.transfer, model, None, None)
+            model, _, _, _, _ = previous_state
+            for p in model.parameters():
+                p.requires_grad = False
+            num_ftrs = model.output_nn.fc_out.in_features
+            model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
+            # hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
+            # model.output_nn = SimpleNetwork(args.atom_fea_len, 2, hidden)  
+            model.to(args.device)
+            criterion, optimizer = init_optim(model)
+            
         _, best_error = evaluate(generator=val_generator, model=model, 
                         criterion=criterion, optimizer=None, 
                         normalizer=normalizer, device=args.device, 

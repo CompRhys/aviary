@@ -109,10 +109,11 @@ def load_previous_state(path, model, optimizer, normalizer):
     start_epoch = checkpoint["epoch"]
     best_error = checkpoint["best_error"]
     model.load_state_dict(checkpoint["state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
-    normalizer.load_state_dict(checkpoint["normalizer"])
-    print("Loaded '{}'"
-            .format(path, checkpoint["epoch"]))
+    if optimizer:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+    if normalizer:
+        normalizer.load_state_dict(checkpoint["normalizer"])
+    print("Loaded '{}'".format(path, checkpoint["epoch"]))
 
     return model, optimizer, normalizer, best_error, start_epoch
 
