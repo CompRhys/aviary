@@ -103,7 +103,7 @@ class CompositionNet(nn.Module):
             Number of graph layers
         """
         super(CompositionNet, self).__init__()
-        print("Initialising CompositionNet")
+        # print("Initialising CompositionNet")
 
         # apply linear transform to the input features to get a trainable embedding
         self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len)
@@ -228,7 +228,7 @@ class SimpleNetwork(nn.Module):
 
         """
         super(SimpleNetwork, self).__init__()
-        print("Initialising SimpleNetwork")
+        # print("Initialising SimpleNetwork")
 
         dims = [input_dim]+hidden_layer_dims
 
@@ -263,7 +263,7 @@ class ResidualNetwork(nn.Module):
 
         """
         super(ResidualNetwork, self).__init__()
-        print("Initialising ResidualNetwork")
+        # print("Initialising ResidualNetwork")
 
 
         dims = [input_dim]+hidden_layer_dims

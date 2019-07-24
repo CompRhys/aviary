@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm import trange
+from tqdm.autonotebook import trange
 import shutil
 import math
 import numpy as np
@@ -16,15 +16,7 @@ def evaluate(generator, model, criterion, optimizer,
     evaluate the model 
     """
 
-    losses = AverageMeter()
-    errors = AverageMeter()
-
-    if task == "train":
-        model.train()
-        leave = False
-    elif task == "val":
-        model.eval()
-    elif task == "test":
+    if task == "test":
         model.eval()
         test_targets = []
         test_pred = []
@@ -32,8 +24,16 @@ def evaluate(generator, model, criterion, optimizer,
         test_cif_ids = []
         test_comp = []
     else:
-        raise NameError("Only train, val or test is allowed as task")
-    
+        loss_meter = AverageMeter()
+        rmse_meter = AverageMeter()
+        mae_meter = AverageMeter()
+        if task == "val":
+            model.eval()
+        elif task == "train":
+            model.train()
+        else:
+            raise NameError("Only train, val or test is allowed as task")
+
     with trange(len(generator), disable=(not verbose)) as t:
         for input_, target, batch_comp, batch_cif_ids in generator:
             
@@ -45,47 +45,44 @@ def evaluate(generator, model, criterion, optimizer,
             target_norm = target_norm.to(device)
 
             # compute output
-            # output = model(*input_)
             output, log_std = model(*input_).chunk(2,dim=1)
 
-            # loss = criterion(output, target_norm)
-            loss = criterion(output, log_std, target_norm)
-            losses.update(loss.data.cpu().item(), target.size(0))
-
-            # measure accuracy and record loss
+            # get predictions and error
             pred = normalizer.denorm(output.data.cpu())
-            std = torch.exp(log_std).data.cpu()*normalizer.std
-            
-            mae_error = mae(pred, target)
-            errors.update(mae_error, target.size(0))
-
-            # rmse_error = mse(pred.exp_(), target.exp_()).sqrt_()
-            # rmse_error = mse(pred, target).sqrt_()
-            # errors.update(rmse_error, target.size(0))
 
             if task == "test":
+                # get the aleatoric std
+                std = torch.exp(log_std).data.cpu()*normalizer.std
+
                 # collect the model outputs
                 test_cif_ids += batch_cif_ids
                 test_comp += batch_comp
                 test_targets += target.view(-1).tolist()
                 test_pred += pred.view(-1).tolist()
                 test_std += std.view(-1).tolist()
-            elif task == "train":
-                # compute gradient and do SGD step
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
 
-            t.set_postfix(loss=losses.val)
+            else:
+                loss = criterion(output, log_std, target_norm)
+                loss_meter.update(loss.data.cpu().item(), target.size(0))
+
+                mae_error = mae(pred, target)
+                mae_meter.update(mae_error, target.size(0))
+
+                rmse_error = mse(pred, target).sqrt_()
+                rmse_meter.update(rmse_error, target.size(0))
+
+                if task == "train":
+                    # compute gradient and do SGD step
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
             t.update()
 
-
-    if task == "test":  
-        print("Test : Loss {loss.avg:.4f}\t "
-              "Error {error.avg:.3f}\n".format(loss=losses, error=errors))
+    if task == "test":
         return test_cif_ids, test_comp, test_targets, test_pred, test_std
     else:
-        return losses.avg, errors.avg
+        return loss_meter.avg, mae_meter.avg, rmse_meter.avg
 
 
 def save_checkpoint(state, is_best, 
