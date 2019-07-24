@@ -163,7 +163,7 @@ def experiment(model_dir, fold_id, run_id, args,
     if args.resume:
         print("Resume Training from previous model")
         previous_state = load_previous_state(checkpoint_file, model, optimizer, normalizer)
-        model, optimizer, normalizer, best_error, start_epoch = previous_state)
+        model, optimizer, normalizer, best_error, start_epoch = previous_state
     else:
         if args.transfer:
             print("Perform Transfer Learning from different task")
