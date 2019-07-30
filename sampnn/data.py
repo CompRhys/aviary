@@ -28,7 +28,7 @@ def input_parser():
                         help="dataset path")
     parser.add_argument("--fea-path",
                         type=str,
-                        default="data/embeddings/onehot_embedding.json",
+                        default="data/embeddings/onehot-embedding.json",
                         metavar="PATH",
                         help="atom feature path")
     parser.add_argument("--disable-cuda",
