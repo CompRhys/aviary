@@ -35,7 +35,6 @@ def input_parser():
                         action="store_true",
                         help="Disable CUDA")
 
-
     # restart inputs
     parser.add_argument("--evaluate",
                         action="store_true",
@@ -72,6 +71,11 @@ def input_parser():
                         type=float,
                         metavar="N",
                         help="seed for random number generator")
+    parser.add_argument("--sub-sample",
+                        default=1,
+                        type=float,
+                        metavar="N",
+                        help="sub-sample the training set for learning curves")
 
     # optimiser inputs
     parser.add_argument("--epochs",

@@ -74,7 +74,7 @@ def main():
                                 train_size=args.train_size,
                                 random_state=args.seed)
 
-    train_set = torch.utils.data.Subset(dataset, train_idx)
+    train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sub_sample])
     test_set = torch.utils.data.Subset(dataset, test_idx)
 
     model_dir = "models/"
