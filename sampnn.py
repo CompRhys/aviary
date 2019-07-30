@@ -160,7 +160,7 @@ def experiment(model_dir, fold_id, run_id, args,
     else:
         if args.fine_tune:
             print("Fine tune from a network trained on a different dataset")
-            previous_state = load_previous_state(args.transfer, model, None, None)
+            previous_state = load_previous_state(args.fine_tune, model, None, None)
             model, _, _, _, _ = previous_state
             model.to(args.device)
             criterion, optimizer = init_optim(model)
