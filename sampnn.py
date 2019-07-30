@@ -25,7 +25,7 @@ from sampnn.utils import evaluate, save_checkpoint, \
 
 def init_model(orig_atom_fea_len):
 
-    model = CompositionNet(orig_atom_fea_len, 
+    model = CompositionNet(orig_atom_fea_len,
                             atom_fea_len=args.atom_fea_len,
                             n_graph=args.n_graph)
 
@@ -33,7 +33,7 @@ def init_model(orig_atom_fea_len):
 
     normalizer = Normalizer()
 
-    return model, normalizer    
+    return model, normalizer
 
 
 def init_optim(model):
@@ -49,12 +49,12 @@ def init_optim(model):
 
     # Select Optimiser
     if args.optim == "SGD":
-        optimizer = optim.SGD(model.parameters(), 
+        optimizer = optim.SGD(model.parameters(),
                                 lr=args.learning_rate,
                                 weight_decay=args.weight_decay,
                                 momentum=args.momentum)
     elif args.optim == "Adam":
-        optimizer = optim.Adam(model.parameters(), 
+        optimizer = optim.Adam(model.parameters(),
                                 lr=args.learning_rate,
                                 weight_decay=args.weight_decay)
     else:
@@ -65,42 +65,34 @@ def init_optim(model):
 
 def main():
 
-    if args.debug:
-        dataset = CompositionData(data_path=args.data_path, 
-                                    fea_path=args.fea_path)
-        orig_atom_fea_len = dataset.atom_fea_dim + 1
-        
-        indices = list(range(len(dataset)))
-        train_idx, test_idx = split(indices, test_size=args.test_size, 
-                                    train_size=args.train_size,
-                                    random_state=0)
+    dataset = CompositionData(data_path=args.data_path,
+                                fea_path=args.fea_path)
+    orig_atom_fea_len = dataset.atom_fea_dim + 1
 
-        train_set = torch.utils.data.Subset(dataset, train_idx)
-        test_set = torch.utils.data.Subset(dataset, test_idx)
+    indices = list(range(len(dataset)))
+    train_idx, test_idx = split(indices, test_size=args.test_size,
+                                train_size=args.train_size,
+                                random_state=args.seed)
 
-    else:
-        train_set = CompositionData(data_path="data/datasets/oqmd_train.csv", 
-                                    fea_path=args.fea_path)
-        test_set = CompositionData(data_path="data/datasets/oqmd_test.csv", 
-                                    fea_path=args.fea_path)
-        orig_atom_fea_len = train_set.atom_fea_dim + 1
+    train_set = torch.utils.data.Subset(dataset, train_idx)
+    test_set = torch.utils.data.Subset(dataset, test_idx)
 
     model_dir = "models/"
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
 
-    ensemble(model_dir, args.fold_id, train_set, test_set, 
+    ensemble(model_dir, args.fold_id, train_set, test_set,
                 args.ensemble, orig_atom_fea_len)
 
 
-def ensemble(model_dir, fold_id, dataset, test_set, 
+def ensemble(model_dir, fold_id, dataset, test_set,
                 ensemble_folds, fea_len, test=True):
     """
     Train multiple models
     """
 
-    params = {  "batch_size": args.batch_size,
-                "num_workers": args.workers, 
+    params = {"batch_size": args.batch_size,
+                "num_workers": args.workers,
                 "pin_memory": False,
                 "shuffle":False,
                 "collate_fn": collate_batch}
@@ -115,7 +107,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
         val_subset = test_set
     else:
         indices = list(range(len(dataset)))
-        train_idx, val_idx = split(indices, test_size=args.val_size, 
+        train_idx, val_idx = split(indices, test_size=args.val_size,
                                     random_state=0)
         train_subset = torch.utils.data.Subset(dataset, train_idx)
         val_subset = torch.utils.data.Subset(dataset, val_idx)
@@ -135,18 +127,18 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
-            experiment(model_dir, fold_id, run_id, args, 
-                        train_generator, val_generator, 
-                        model, optimizer, criterion, 
+            experiment(model_dir, fold_id, run_id, args,
+                        train_generator, val_generator,
+                        model, optimizer, criterion,
                         normalizer)        
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
 
 
-def experiment(model_dir, fold_id, run_id, args, 
-                train_generator, val_generator, 
-                model, optimizer, criterion, 
+def experiment(model_dir, fold_id, run_id, args,
+                train_generator, val_generator,
+                model, optimizer, criterion,
                 normalizer):
     """
     for given training and validation sets run an experiment.
@@ -162,19 +154,24 @@ def experiment(model_dir, fold_id, run_id, args,
 
     if args.resume:
         print("Resume Training from previous model")
-        previous_state = load_previous_state(checkpoint_file, model, optimizer, normalizer)
+        previous_state = load_previous_state(checkpoint_file, model, 
+                                                optimizer, normalizer)
         model, optimizer, normalizer, best_mae, start_epoch = previous_state
     else:
-        if args.transfer:
-            print("Perform Transfer Learning from different task")
+        if args.fine_tune:
+            print("Fine tune from a network trained on a different dataset")
             previous_state = load_previous_state(args.transfer, model, None, None)
             model, _, _, _, _ = previous_state
-            # for p in model.parameters():
-            #     p.requires_grad = False
-            # num_ftrs = model.output_nn.fc_out.in_features
-            # model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
-            # hidden = [x * args.atom_fea_len for x in [7,5,3,1]]
-            # model.output_nn = ResidualNetwork(args.atom_fea_len, 2, hidden)  
+            model.to(args.device)
+            criterion, optimizer = init_optim(model)
+        elif args.transfer:
+            print("Use model as a feature extractor and retrain last layer")
+            previous_state = load_previous_state(args.transfer, model, None, None)
+            model, _, _, _, _ = previous_state
+            for p in model.parameters():
+                p.requires_grad = False
+            num_ftrs = model.output_nn.fc_out.in_features
+            model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
             model.to(args.device)
             criterion, optimizer = init_optim(model)
 
@@ -190,7 +187,7 @@ def experiment(model_dir, fold_id, run_id, args,
     # try except structure used to allow keyboard interupts to stop training
     # without breaking the code
     try:
-        for epoch in range(start_epoch, start_epoch+ args.epochs):
+        for epoch in range(start_epoch, start_epoch+args.epochs):
             # Training
             train_loss, train_mae, train_rmse = evaluate(generator=train_generator,
                                                         model=model, 

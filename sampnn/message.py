@@ -113,21 +113,21 @@ class CompositionNet(nn.Module):
         hidden_pool = [x * atom_fea_len for x in [3,1]]
         self.graphs = nn.ModuleList(
                         [MessageLayer(
-                            message_nn = SimpleNetwork(2*atom_fea_len, 
-                                                        atom_fea_len, hidden),
-                            pool_nn = SimpleNetwork(atom_fea_len, 
-                                                        1, hidden_pool))
+                            message_nn=SimpleNetwork(2*atom_fea_len,
+                                                    atom_fea_len, hidden),
+                            pool_nn=SimpleNetwork(atom_fea_len, 
+                                                    1, hidden_pool))
                             for _ in range(n_graph)]
                     )
 
         # define a global pooling function for materials
-        hidden = [x * atom_fea_len for x in [5,3,1]]
+        hidden = [x * atom_fea_len for x in [5, 3, 1]]
         self.cry_pool = WeightedAttention(
-                            gate_nn = SimpleNetwork(atom_fea_len, 1, hidden)
+                            gate_nn=SimpleNetwork(atom_fea_len, 1, hidden)
                         )
 
         # define an output neural network
-        hidden = [x * atom_fea_len for x in [7,5,3,1]]
+        hidden = [x * atom_fea_len for x in [7, 5, 3, 1]]
         self.output_nn = ResidualNetwork(atom_fea_len, 2, hidden)
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx, 
@@ -165,11 +165,11 @@ class CompositionNet(nn.Module):
 
         # apply the graph message passing functions 
         for graph_func in self.graphs:
-            atom_fea = graph_func(atom_weights, atom_fea, 
+            atom_fea = graph_func(atom_weights, atom_fea,
                                     self_fea_idx, nbr_fea_idx)
 
         # generate crystal features by pooling the atomic features
-        crys_fea = self.cry_pool(atom_fea, crystal_atom_idx, 
+        crys_fea = self.cry_pool(atom_fea, crystal_atom_idx,
                                 atom_weights)
 
         # apply neural network to map from learned features to target
@@ -183,7 +183,7 @@ class CompositionNet(nn.Module):
 
 class WeightedAttention(nn.Module):
     """  
-    Weighted softmax attention layer  
+    Weighted softmax attention layer
     """
     def __init__(self, gate_nn):
         """
