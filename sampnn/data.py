@@ -73,7 +73,7 @@ def input_parser():
                         help="seed for random number generator")
     parser.add_argument("--sub-sample",
                         default=1,
-                        type=float,
+                        type=int,
                         metavar="N",
                         help="sub-sample the training set for learning curves")
 
