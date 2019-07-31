@@ -267,6 +267,8 @@ class ResidualNetwork(nn.Module):
 
         self.fcs = nn.ModuleList([nn.Linear(dims[i], dims[i+1])
                                   for i in range(len(dims)-1)])
+        self.bns = nn.ModuleList([nn.BatchNorm1d(dims[i+1])
+                                  for i in range(len(dims)-1)])
         self.res_fcs = nn.ModuleList([nn.Linear(dims[i], dims[i+1], bias=False)
                                       if (dims[i] != dims[i+1])
                                       else nn.Identity()
@@ -276,8 +278,8 @@ class ResidualNetwork(nn.Module):
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, fea):
-        for fc, res_fc, act in zip(self.fcs, self.res_fcs, self.acts):
-            fea = act(fc(fea))+res_fc(fea)
+        for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
+            fea = act(bn(fc(fea)))+res_fc(fea)
 
         return self.fc_out(fea)
 
