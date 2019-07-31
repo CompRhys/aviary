@@ -26,8 +26,8 @@ from sampnn.utils import evaluate, save_checkpoint, \
 def init_model(orig_atom_fea_len):
 
     model = CompositionNet(orig_atom_fea_len,
-                            atom_fea_len=args.atom_fea_len,
-                            n_graph=args.n_graph)
+                           atom_fea_len=args.atom_fea_len,
+                           n_graph=args.n_graph)
 
     model.to(args.device)
 
@@ -50,13 +50,13 @@ def init_optim(model):
     # Select Optimiser
     if args.optim == "SGD":
         optimizer = optim.SGD(model.parameters(),
-                                lr=args.learning_rate,
-                                weight_decay=args.weight_decay,
-                                momentum=args.momentum)
+                              lr=args.learning_rate,
+                              weight_decay=args.weight_decay,
+                              momentum=args.momentum)
     elif args.optim == "Adam":
         optimizer = optim.Adam(model.parameters(),
-                                lr=args.learning_rate,
-                                weight_decay=args.weight_decay)
+                               lr=args.learning_rate,
+                               weight_decay=args.weight_decay)
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
@@ -66,7 +66,7 @@ def init_optim(model):
 def main():
 
     dataset = CompositionData(data_path=args.data_path,
-                                fea_path=args.fea_path)
+                              fea_path=args.fea_path)
     orig_atom_fea_len = dataset.atom_fea_dim + 1
 
     indices = list(range(len(dataset)))
@@ -82,20 +82,20 @@ def main():
         os.makedirs(model_dir)
 
     ensemble(model_dir, args.fold_id, train_set, test_set,
-                args.ensemble, orig_atom_fea_len)
+             args.ensemble, orig_atom_fea_len)
 
 
 def ensemble(model_dir, fold_id, dataset, test_set,
-                ensemble_folds, fea_len, test=True):
+             ensemble_folds, fea_len, test=True):
     """
     Train multiple models
     """
 
     params = {"batch_size": args.batch_size,
-                "num_workers": args.workers,
-                "pin_memory": False,
-                "shuffle":False,
-                "collate_fn": collate_batch}
+              "num_workers": args.workers,
+              "pin_memory": False,
+              "shuffle": False,
+              "collate_fn": collate_batch}
 
     if args.val_size == 0.0:
         print("No validation set used, using test set for evaluation purposes")
@@ -108,7 +108,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     else:
         indices = list(range(len(dataset)))
         train_idx, val_idx = split(indices, test_size=args.val_size,
-                                    random_state=0)
+                                   random_state=0)
         train_subset = torch.utils.data.Subset(dataset, train_idx)
         val_subset = torch.utils.data.Subset(dataset, val_idx)
 
@@ -128,18 +128,18 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             normalizer.fit(sample_target)
 
             experiment(model_dir, fold_id, run_id, args,
-                        train_generator, val_generator,
-                        model, optimizer, criterion,
-                        normalizer)        
+                       train_generator, val_generator,
+                       model, optimizer, criterion,
+                       normalizer)
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
 
 
 def experiment(model_dir, fold_id, run_id, args,
-                train_generator, val_generator,
-                model, optimizer, criterion,
-                normalizer):
+               train_generator, val_generator,
+               model, optimizer, criterion,
+               normalizer):
     """
     for given training and validation sets run an experiment.
     """
@@ -149,24 +149,27 @@ def experiment(model_dir, fold_id, run_id, args,
 
     writer = SummaryWriter(flush_secs=30)
 
-    checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, run_id)
+    checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,
+                                                                  run_id)
     best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
 
     if args.resume:
         print("Resume Training from previous model")
-        previous_state = load_previous_state(checkpoint_file, model, 
-                                                optimizer, normalizer)
+        previous_state = load_previous_state(checkpoint_file, model,
+                                             optimizer, normalizer)
         model, optimizer, normalizer, best_mae, start_epoch = previous_state
     else:
         if args.fine_tune:
             print("Fine tune from a network trained on a different dataset")
-            previous_state = load_previous_state(args.fine_tune, model, None, None)
+            previous_state = load_previous_state(args.fine_tune, model,
+                                                 None, None)
             model, _, _, _, _ = previous_state
             model.to(args.device)
             criterion, optimizer = init_optim(model)
         elif args.transfer:
             print("Use model as a feature extractor and retrain last layer")
-            previous_state = load_previous_state(args.transfer, model, None, None)
+            previous_state = load_previous_state(args.transfer, model,
+                                                 None, None)
             model, _, _, _, _ = previous_state
             for p in model.parameters():
                 p.requires_grad = False
@@ -175,13 +178,13 @@ def experiment(model_dir, fold_id, run_id, args,
             model.to(args.device)
             criterion, optimizer = init_optim(model)
 
-        _, best_mae, _ = evaluate(generator=val_generator, 
-                                    model=model, 
-                                    criterion=criterion, 
-                                    optimizer=None, 
-                                    normalizer=normalizer, 
-                                    device=args.device, 
-                                    task="val")
+        _, best_mae, _ = evaluate(generator=val_generator,
+                                  model=model,
+                                  criterion=criterion,
+                                  optimizer=None,
+                                  normalizer=normalizer,
+                                  device=args.device,
+                                  task="val")
         start_epoch = 0
 
     # try except structure used to allow keyboard interupts to stop training
@@ -190,50 +193,47 @@ def experiment(model_dir, fold_id, run_id, args,
         for epoch in range(start_epoch, start_epoch+args.epochs):
             # Training
             train_loss, train_mae, train_rmse = evaluate(generator=train_generator,
-                                                        model=model, 
-                                                        criterion=criterion, 
-                                                        optimizer=optimizer,
-                                                        normalizer=normalizer, 
-                                                        device=args.device, 
-                                                        task="train", 
-                                                        verbose=True)
+                                                         model=model,
+                                                         criterion=criterion,
+                                                         optimizer=optimizer,
+                                                         normalizer=normalizer,
+                                                         device=args.device,
+                                                         task="train",
+                                                         verbose=True)
 
             # Validation
             with torch.no_grad():
                 # evaluate on validation set
-                val_loss, val_mae, val_rmse = evaluate(generator=val_generator, 
-                                                        model=model, 
-                                                        criterion=criterion, 
-                                                        optimizer=None, 
-                                                        normalizer=normalizer, 
-                                                        device=args.device, 
-                                                        task="val")
+                val_loss, val_mae, val_rmse = evaluate(generator=val_generator,
+                                                       model=model,
+                                                       criterion=criterion,
+                                                       optimizer=None,
+                                                       normalizer=normalizer,
+                                                       device=args.device,
+                                                       task="val")
 
             # if epoch % args.print_freq == 0:
             print("Epoch: [{}/{}]\n"
-                "Train      : Loss {:.4f}\t"
-                "MAE {:.3f}\t"
-                "RMSE {:.3f}\n"   
-                "Validation : Loss {:.4f}\t"
-                "MAE {:.3f}\t"
-                "RMSE {:.3f}\n".format(
-                epoch+1, start_epoch + args.epochs, 
-                train_loss, train_mae, train_rmse,
-                val_loss, val_mae, val_rmse))
+                  "Train      : Loss {:.4f}\t"
+                  "MAE {:.3f}\t RMSE {:.3f}\n"
+                  "Validation : Loss {:.4f}\t"
+                  "MAE {:.3f}\t RMSE {:.3f}\n".format(
+                    epoch+1, start_epoch + args.epochs,
+                    train_loss, train_mae, train_rmse,
+                    val_loss, val_mae, val_rmse))
 
             is_best = val_mae < best_mae
             if is_best:
                 best_mae = val_mae
 
-            checkpoint_dict = { "epoch": epoch + 1,
-                                "state_dict": model.state_dict(),
-                                "best_error": best_mae,
-                                "optimizer": optimizer.state_dict(),
-                                "normalizer": normalizer.state_dict(),
-                                "args": vars(args)
-                                }
+            checkpoint_dict = {"epoch": epoch + 1,
+                               "state_dict": model.state_dict(),
+                               "best_error": best_mae,
+                               "optimizer": optimizer.state_dict(),
+                               "normalizer": normalizer.state_dict(),
+                               "args": vars(args)}
 
-            save_checkpoint(checkpoint_dict, 
+            save_checkpoint(checkpoint_dict,
                             is_best,
                             checkpoint_file,
                             best_file)
@@ -255,19 +255,19 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     take an ensemble of models and evaluate their performance on the test set
     """
 
-    print(  "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-            "------------Evaluate model on Test Set------------\n"
-            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+          "------------Evaluate model on Test Set------------\n"
+          "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
     model, normalizer = init_model(fea_len)
     criterion, _, = init_optim(model)
 
-    params = {  "batch_size": args.batch_size,
-                "num_workers": args.workers, 
-                "pin_memory": False,
-                "shuffle":False,
-                "collate_fn": collate_batch}
-        
+    params = {"batch_size": args.batch_size,
+              "num_workers": args.workers,
+              "pin_memory": False,
+              "shuffle": False,
+              "collate_fn": collate_batch}
+
     test_generator = DataLoader(hold_out_set, **params)
 
     y_ensemble = []
@@ -277,17 +277,17 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
         print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
 
-        checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,j))
+        checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, j))
         model.load_state_dict(checkpoint["state_dict"])
         normalizer.load_state_dict(checkpoint["normalizer"])
 
         model.eval()
-        idx, comp, y_test, pred, std = evaluate(generator=test_generator, 
-                                                model=model, 
-                                                criterion=criterion, 
-                                                optimizer=None, 
-                                                normalizer=normalizer, 
-                                                device=args.device, 
+        idx, comp, y_test, pred, std = evaluate(generator=test_generator,
+                                                model=model,
+                                                criterion=criterion,
+                                                optimizer=None,
+                                                normalizer=normalizer,
+                                                device=args.device,
                                                 task="test")
 
         y_ensemble.append(pred)
@@ -311,26 +311,24 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     rmse_std = 0.5 * rmse_avg * mse_std / mse_avg
 
     print("Ensemble Performance Metrics:")
-    print("R2 Score: {:.4f} ".format(r2_score(y_test,y_pred)))
+    print("R2 Score: {:.4f} ".format(r2_score(y_test, y_pred)))
     print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
     print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
 
-    df = pd.DataFrame({ "id" : idx, 
-                        "composition" : comp, 
-                        "target" : y_test, 
-                        "mean" : y_pred, 
-                        "std" : y_std,
-                        "epistemic" : np.sqrt(y_epistemic), 
-                        "aleatoric" : np.sqrt(y_aleatoric),  
-                        })
+    df = pd.DataFrame({"id": idx,
+                       "composition": comp,
+                       "target": y_test,
+                       "mean": y_pred,
+                       "std": y_std,
+                       "epistemic": np.sqrt(y_epistemic),
+                       "aleatoric": np.sqrt(y_aleatoric)})
 
     df.to_csv("test_results.csv", index=False)
 
 
 if __name__ == "__main__":
     args = input_parser()
-    
+
     print("The model will run on the {} device".format(args.device))
 
     main()
-

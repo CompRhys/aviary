@@ -18,7 +18,7 @@ def input_parser():
     parse input
     """
     parser = argparse.ArgumentParser(description="Structure Agnostic "
-                                        "Message Passing Neural Network")
+                                     "Message Passing Neural Network")
 
     # misc inputs
     parser.add_argument("--data-path",
@@ -28,7 +28,7 @@ def input_parser():
                         help="dataset path")
     parser.add_argument("--fea-path",
                         type=str,
-                        default="data/embeddings/onehot-embedding.json",
+                        default="data/embeddings/matscholar-embedding.json",
                         metavar="PATH",
                         help="atom feature path")
     parser.add_argument("--disable-cuda",
@@ -92,7 +92,7 @@ def input_parser():
                         default="Adam",
                         type=str,
                         metavar="str",
-                        help="choose an optimizer; SGD or Adam (default: Adam)")
+                        help="choose an optimizer; SGD or Adam")
     parser.add_argument("--learning-rate", "--lr",
                         # 3e-4 is the best learning rate for
                         # Adam, hands down. - Andrej Karpathy 2016
@@ -153,7 +153,6 @@ def input_parser():
                         metavar="PATH",
                         help="checkpoint path for fine tuning")
 
-
     args = parser.parse_args(sys.argv[1:])
 
     assert args.train_size + args.test_size <= 1
@@ -171,8 +170,9 @@ class CompositionData(Dataset):
     def __init__(self, data_path, fea_path):
         """
         """
-        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
-        # make sure to use dense datasets, here do not use the default na values
+        assert os.path.exists(data_path), \
+            "{} does not exist!".format(data_path)
+        # make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
@@ -206,13 +206,15 @@ class CompositionData(Dataset):
         cry_id, composition, target = self.df.iloc[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
-        assert len(elements) != 1, "crystal {}: {}, is a pure system".format(cry_id, composition)
+        assert len(elements) != 1, \
+            "crystal {}: {}, is a pure system".format(cry_id, composition)
         try:
-            atom_fea = np.vstack([self.atom_features.get_fea(element) for element in elements])
+            atom_fea = np.vstack([self.atom_features.get_fea(element)
+                                  for element in elements])
         except AssertionError:
             print(composition)
             sys.exit()
-        atom_fea = np.hstack((atom_fea,weights))
+        atom_fea = np.hstack((atom_fea, weights))
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
@@ -228,7 +230,8 @@ class CompositionData(Dataset):
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
 
-        return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, composition, cry_id
+        return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), \
+            target, composition, cry_id
 
 
 def collate_batch(dataset_list):
@@ -275,7 +278,8 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, comp, cry_id) in enumerate(dataset_list):
+    for i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
+            target, comp, cry_id) in enumerate(dataset_list):
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]
 
@@ -303,9 +307,9 @@ def collate_batch(dataset_list):
             torch.cat(batch_self_fea_idx, dim=0),
             torch.cat(batch_nbr_fea_idx, dim=0),
             torch.cat(crystal_atom_idx)), \
-            torch.stack(batch_target, dim=0), \
-            batch_comp, \
-            batch_cry_ids
+        torch.stack(batch_target, dim=0), \
+        batch_comp, \
+        batch_cry_ids
 
 
 class AverageMeter(object):
@@ -346,7 +350,7 @@ class Normalizer(object):
 
     def state_dict(self):
         return {"mean": self.mean,
-                "std": self.std,}
+                "std": self.std}
 
     def load_state_dict(self, state_dict):
         self.mean = state_dict["mean"]
