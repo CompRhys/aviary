@@ -125,7 +125,8 @@ class CompositionNet(nn.Module):
                         )
 
         # define an output neural network
-        hidden = [x * atom_fea_len for x in [7, 5, 3, 1]]
+        # hidden = [x * atom_fea_len for x in [7, 5, 3, 1]]
+        hidden = [1024, 1024, 1024, 512, 512, 512, 256, 256, 128, 64, 32, 16]
         self.output_nn = ResidualNetwork(atom_fea_len, 2, hidden)
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx,
