@@ -126,8 +126,7 @@ class CompositionNet(nn.Module):
 
         # define an output neural network
         hidden = [x * atom_fea_len for x in [7, 5, 3, 1]]
-        # self.output_nn = ResidualNetwork(atom_fea_len, 2, hidden)
-        self.output_nn = SimpleNetwork(atom_fea_len, 2, hidden)
+        self.output_nn = ResidualNetwork(atom_fea_len, 2, hidden)
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx,
                 nbr_fea_idx, crystal_atom_idx):
@@ -269,7 +268,7 @@ class ResidualNetwork(nn.Module):
                                   for i in range(len(dims)-1)])
         self.res_fcs = nn.ModuleList([nn.Linear(dims[i], dims[i+1], bias=False)
                                       if (dims[i] != dims[i+1])
-                                      else nn.Sequential()
+                                      else nn.Identity()
                                       for i in range(len(dims)-1)])
         self.acts = nn.ModuleList([nn.ReLU() for _ in range(len(dims)-1)])
 
