@@ -111,6 +111,7 @@ model_best.pth.tar
 test_results.csv
 
 runs/
+cds3/
 
 *.pth.tar
 

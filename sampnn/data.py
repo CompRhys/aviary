@@ -46,7 +46,7 @@ def input_parser():
                         type=int,
                         metavar="N",
                         help="number of data loading workers (default: 0)")
-    parser.add_argument("--batch-size",
+    parser.add_argument("--batch-size", "--bsize",
                         default=128,
                         type=int,
                         metavar="N",

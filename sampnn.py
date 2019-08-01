@@ -118,6 +118,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     if not args.evaluate:
         for run_id in range(ensemble_folds):
 
+            # this allows us to run ensembles in parallel rather than in series
+            # by specifiying the run-id arg.
             if ensemble_folds == 1:
                 run_id = args.run_id
 
