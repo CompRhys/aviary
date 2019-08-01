@@ -23,9 +23,9 @@ class MessageLayer(nn.Module):
         # Message Passing
         self.message = nn.Identity()
 
-        hidden_ele = [x * atom_fea_len for x in [6, 4, 1]]
-        hidden_msg = [x * atom_fea_len for x in [6, 4, 2]]
-       
+        hidden_ele = [x * atom_fea_len for x in [6, 4, 2]]
+        hidden_msg = [x * atom_fea_len for x in [7, 5, 3]]
+
         # Pooling and Output
         self.pooling = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(2*atom_fea_len, 1, hidden_ele),
@@ -77,6 +77,7 @@ class MessageLayer(nn.Module):
 
         return fea + atom_in_fea
 
+        # # Comment in for concatenating
         # fea = torch.cat(head_fea, dim=1)
 
         # return fea
@@ -122,7 +123,7 @@ class CompositionNet(nn.Module):
         self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len, bias=False)
 
         # create a list of Message passing layers
-        
+
         msg_heads = 3
 
         self.graphs = nn.ModuleList(
@@ -131,21 +132,26 @@ class CompositionNet(nn.Module):
 
         fea_len = atom_fea_len
 
+        self.nl = nn.ReLU()
+
+        # # Comment in for concatenating
         # self.graphs = nn.ModuleList(
         #                 [MessageLayer(atom_fea_len * (msg_heads ** i), msg_heads)
         #                     for i in range(n_graph)])
+
         # fea_len = atom_fea_len * (msg_heads ** n_graph)
 
         # define a global pooling function for materials
         mat_heads = 3
-        mat_hidden = [x * fea_len for x in [5, 3, 1]]
+        mat_hidden = [x * fea_len for x in [6, 4, 2]]
+        msg_hidden = [x * fea_len for x in [7, 5, 3]]
         self.cry_pool = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(fea_len, 1, mat_hidden),
-            message_nn=nn.Identity()
+            message_nn=SimpleNetwork(fea_len, fea_len, msg_hidden)
             ) for _ in range(mat_heads)])
 
         # define an output neural network
-        out_hidden = [x * fea_len for x in [5, 3, 1]]
+        out_hidden = [x * fea_len for x in [7, 5, 3, 1]]
         self.output_nn = ResidualNetwork(fea_len, 2, out_hidden)
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx,
@@ -193,6 +199,8 @@ class CompositionNet(nn.Module):
                                      atom_weights))
 
         crys_fea = torch.mean(torch.stack(head_fea), dim=0)
+
+        crys_fea = self.nl(crys_fea)
 
         # apply neural network to map from learned features to target
         crys_fea = self.output_nn(crys_fea)
