@@ -70,9 +70,8 @@ def main():
     orig_atom_fea_len = dataset.atom_fea_dim + 1
 
     indices = list(range(len(dataset)))
-    train_idx, test_idx = split(indices, test_size=args.test_size,
-                                train_size=args.train_size,
-                                random_state=args.seed)
+    train_idx, test_idx = split(indices, random_state=args.seed,
+                                test_size=args.test_size)
 
     train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sub_sample])
     test_set = torch.utils.data.Subset(dataset, test_idx)
@@ -107,8 +106,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
         val_subset = test_set
     else:
         indices = list(range(len(dataset)))
-        train_idx, val_idx = split(indices, test_size=args.val_size,
-                                   random_state=0)
+        train_idx, val_idx = split(indices, random_state=0,
+                                   test_size=args.val_size/(1-args.test_size))
         train_subset = torch.utils.data.Subset(dataset, train_idx)
         val_subset = torch.utils.data.Subset(dataset, val_idx)
 

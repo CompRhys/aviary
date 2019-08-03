@@ -51,16 +51,11 @@ def input_parser():
                         type=int,
                         metavar="N",
                         help="mini-batch size (default: 128)")
-    parser.add_argument("--train-size",
-                        default=0.8,
-                        type=float,
-                        metavar="N",
-                        help="proportion of data for training")
     parser.add_argument("--val-size",
                         default=0.0,
                         type=float,
                         metavar="N",
-                        help="proportion of training data used for validation")
+                        help="proportion of data used for validation")
     parser.add_argument("--test-size",
                         default=0.2,
                         type=float,
