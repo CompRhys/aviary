@@ -129,10 +129,12 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
+            writer = SummaryWriter(flush_secs=30)
+
             experiment(model_dir, fold_id, run_id, args,
                        train_generator, val_generator,
                        model, optimizer, criterion,
-                       normalizer)
+                       normalizer, writer)
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
@@ -141,15 +143,13 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 def experiment(model_dir, fold_id, run_id, args,
                train_generator, val_generator,
                model, optimizer, criterion,
-               normalizer):
+               normalizer, writer):
     """
     for given training and validation sets run an experiment.
     """
 
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total Number of Trainable Parameters: {}".format(num_param))
-
-    writer = SummaryWriter(flush_secs=30)
 
     checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,
                                                                   run_id)
@@ -160,6 +160,7 @@ def experiment(model_dir, fold_id, run_id, args,
         previous_state = load_previous_state(checkpoint_file, model,
                                              optimizer, normalizer)
         model, optimizer, normalizer, best_mae, start_epoch = previous_state
+        model.to(args.device)
     else:
         if args.fine_tune:
             print("Fine tune from a network trained on a different dataset")

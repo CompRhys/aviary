@@ -77,11 +77,6 @@ class MessageLayer(nn.Module):
 
         return fea + atom_in_fea
 
-        # # Comment in for concatenating
-        # fea = torch.cat(head_fea, dim=1)
-
-        # return fea
-
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
 
@@ -133,13 +128,6 @@ class CompositionNet(nn.Module):
         fea_len = atom_fea_len
 
         self.nl = nn.ReLU()
-
-        # # Comment in for concatenating
-        # self.graphs = nn.ModuleList(
-        #                 [MessageLayer(atom_fea_len * (msg_heads ** i), msg_heads)
-        #                     for i in range(n_graph)])
-
-        # fea_len = atom_fea_len * (msg_heads ** n_graph)
 
         # define a global pooling function for materials
         mat_heads = 3

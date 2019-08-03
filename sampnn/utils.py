@@ -10,10 +10,11 @@ from torch.nn.functional import mse_loss as mse
 from torch.optim.lr_scheduler import _LRScheduler
 from sampnn.data import AverageMeter, Normalizer
 
-def evaluate(generator, model, criterion, optimizer, 
-            normalizer, device, task="train", verbose=False):
-    """ 
-    evaluate the model 
+
+def evaluate(generator, model, criterion, optimizer,
+             normalizer, device, task="train", verbose=False):
+    """
+    evaluate the model
     """
 
     if task == "test":
@@ -36,16 +37,16 @@ def evaluate(generator, model, criterion, optimizer,
 
     with trange(len(generator), disable=(not verbose)) as t:
         for input_, target, batch_comp, batch_cif_ids in generator:
-            
+
             # normalize target
             target_norm = normalizer.norm(target)
-            
+
             # move tensors to GPU
-            input_ = (tensor.to(device) for tensor in input_ )
+            input_ = (tensor.to(device) for tensor in input_)
             target_norm = target_norm.to(device)
 
             # compute output
-            output, log_std = model(*input_).chunk(2,dim=1)
+            output, log_std = model(*input_).chunk(2, dim=1)
 
             # get predictions and error
             pred = normalizer.denorm(output.data.cpu())
@@ -85,9 +86,9 @@ def evaluate(generator, model, criterion, optimizer,
         return loss_meter.avg, mae_meter.avg, rmse_meter.avg
 
 
-def save_checkpoint(state, is_best, 
-                    checkpoint="checkpoint.pth.tar", 
-                    best="best.pth.tar" ):
+def save_checkpoint(state, is_best,
+                    checkpoint="checkpoint.pth.tar",
+                    best="best.pth.tar"):
     """
     Saves a checkpoint and overwrites the best model when is_best = True
     """
@@ -100,7 +101,7 @@ def save_checkpoint(state, is_best,
 def load_previous_state(path, model, optimizer, normalizer):
     """
     """
-    assert os.path.isfile(path), "no checkpoint found at '{}'".format(path) 
+    assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
 
     checkpoint = torch.load(path)
     start_epoch = checkpoint["epoch"]
@@ -117,19 +118,19 @@ def load_previous_state(path, model, optimizer, normalizer):
 
 def RobustL1(output, log_std, target):
     """
-    Robust L1 loss using a lorentzian prior. Allows for estimation 
-    of an aleatoric uncertainty. 
+    Robust L1 loss using a lorentzian prior. Allows for estimation
+    of an aleatoric uncertainty.
     """
     loss = np.sqrt(2.0) * torch.abs(output - target) * \
-           torch.exp(- log_std) + log_std
+        torch.exp(- log_std) + log_std
     return torch.mean(loss)
 
 
 def RobustL2(output, log_std, target):
     """
-    Robust L2 loss using a gaussian prior. Allows for estimation 
+    Robust L2 loss using a gaussian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
     loss = 0.5 * torch.pow(output - target, 2.0) * \
-           torch.exp(- 2.0 * log_std) + log_std
+        torch.exp(- 2.0 * log_std) + log_std
     return torch.mean(loss)
