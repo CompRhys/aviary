@@ -7,7 +7,6 @@ import numpy as np
 
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
-from torch.optim.lr_scheduler import _LRScheduler
 from sampnn.data import AverageMeter, Normalizer
 
 
@@ -98,7 +97,8 @@ def save_checkpoint(state, is_best,
         shutil.copyfile(checkpoint, best)
 
 
-def load_previous_state(path, model, optimizer, normalizer):
+def load_previous_state(path, model, optimizer=None, 
+                        normalizer=None, scheduler=None):
     """
     """
     assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
@@ -111,9 +111,11 @@ def load_previous_state(path, model, optimizer, normalizer):
         optimizer.load_state_dict(checkpoint["optimizer"])
     if normalizer:
         normalizer.load_state_dict(checkpoint["normalizer"])
+    if scheduler:
+        scheduler.load_state_dict(checkpoint["scheduler"])
     print("Loaded '{}'".format(path, checkpoint["epoch"]))
 
-    return model, optimizer, normalizer, best_error, start_epoch
+    return model, optimizer, normalizer, scheduler, best_error, start_epoch
 
 
 def RobustL1(output, log_std, target):

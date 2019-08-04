@@ -120,27 +120,24 @@ class CompositionNet(nn.Module):
         # create a list of Message passing layers
 
         msg_heads = 3
-
         self.graphs = nn.ModuleList(
                         [MessageLayer(atom_fea_len, msg_heads)
                             for i in range(n_graph)])
 
-        fea_len = atom_fea_len
-
-        self.nl = nn.ReLU()
+        # self.nl = nn.ReLU()
 
         # define a global pooling function for materials
         mat_heads = 3
-        mat_hidden = [x * fea_len for x in [6, 4, 2]]
-        msg_hidden = [x * fea_len for x in [7, 5, 3]]
+        mat_hidden = [x * atom_fea_len for x in [6, 4, 2]]
+        msg_hidden = [x * atom_fea_len for x in [7, 5, 3]]
         self.cry_pool = nn.ModuleList([WeightedAttention(
-            gate_nn=SimpleNetwork(fea_len, 1, mat_hidden),
-            message_nn=SimpleNetwork(fea_len, fea_len, msg_hidden)
+            gate_nn=SimpleNetwork(atom_fea_len, 1, mat_hidden),
+            message_nn=SimpleNetwork(atom_fea_len, atom_fea_len, msg_hidden),
             ) for _ in range(mat_heads)])
 
         # define an output neural network
-        out_hidden = [x * fea_len for x in [7, 5, 3, 1]]
-        self.output_nn = ResidualNetwork(fea_len, 2, out_hidden)
+        out_hidden = [x * atom_fea_len for x in [7, 5, 3, 1]]
+        self.output_nn = ResidualNetwork(atom_fea_len, 2, out_hidden)
 
     def forward(self, atom_weights, orig_atom_fea, self_fea_idx,
                 nbr_fea_idx, crystal_atom_idx):
@@ -188,7 +185,7 @@ class CompositionNet(nn.Module):
 
         crys_fea = torch.mean(torch.stack(head_fea), dim=0)
 
-        crys_fea = self.nl(crys_fea)
+        # crys_fea = self.nl(crys_fea)
 
         # apply neural network to map from learned features to target
         crys_fea = self.output_nn(crys_fea)

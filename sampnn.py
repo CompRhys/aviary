@@ -60,7 +60,11 @@ def init_optim(model):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    return criterion, optimizer
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
+                                               milestones=[250],
+                                               gamma=0.1)
+
+    return criterion, optimizer, scheduler
 
 
 def main():
@@ -106,7 +110,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
         val_subset = test_set
     else:
         indices = list(range(len(dataset)))
-        train_idx, val_idx = split(indices, random_state=0,
+        train_idx, val_idx = split(indices, random_state=args.seed,
                                    test_size=args.val_size/(1-args.test_size))
         train_subset = torch.utils.data.Subset(dataset, train_idx)
         val_subset = torch.utils.data.Subset(dataset, val_idx)
@@ -123,17 +127,20 @@ def ensemble(model_dir, fold_id, dataset, test_set,
                 run_id = args.run_id
 
             model, normalizer = init_model(fea_len)
-            criterion, optimizer = init_optim(model)
+            criterion, optimizer, scheduler = init_optim(model)
 
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
             writer = SummaryWriter(flush_secs=30)
+         
+            # to be used once pypi index is updated
+            # writer.add_graph(model, next(iter(train_generator))[0])
 
             experiment(model_dir, fold_id, run_id, args,
                        train_generator, val_generator,
                        model, optimizer, criterion,
-                       normalizer, writer)
+                       normalizer,  scheduler, writer)
 
     if test:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
@@ -142,7 +149,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 def experiment(model_dir, fold_id, run_id, args,
                train_generator, val_generator,
                model, optimizer, criterion,
-               normalizer, writer):
+               normalizer,  scheduler, writer):
     """
     for given training and validation sets run an experiment.
     """
@@ -157,22 +164,21 @@ def experiment(model_dir, fold_id, run_id, args,
     if args.resume:
         print("Resume Training from previous model")
         previous_state = load_previous_state(checkpoint_file, model,
-                                             optimizer, normalizer)
-        model, optimizer, normalizer, best_mae, start_epoch = previous_state
+                                             optimizer, normalizer, scheduler)
+        model, optimizer, normalizer, scheduler, \
+            best_mae, start_epoch = previous_state
         model.to(args.device)
     else:
         if args.fine_tune:
             print("Fine tune from a network trained on a different dataset")
-            previous_state = load_previous_state(args.fine_tune, model,
-                                                 None, None)
-            model, _, _, _, _ = previous_state
+            previous_state = load_previous_state(args.fine_tune, model)
+            model, _, _, _, _, _ = previous_state
             model.to(args.device)
             criterion, optimizer = init_optim(model)
         elif args.transfer:
             print("Use model as a feature extractor and retrain last layer")
-            previous_state = load_previous_state(args.transfer, model,
-                                                 None, None)
-            model, _, _, _, _ = previous_state
+            previous_state = load_previous_state(args.transfer, model)
+            model, _, _, _, _, _ = previous_state
             for p in model.parameters():
                 p.requires_grad = False
             num_ftrs = model.output_nn.fc_out.in_features
@@ -233,6 +239,7 @@ def experiment(model_dir, fold_id, run_id, args,
                                "best_error": best_mae,
                                "optimizer": optimizer.state_dict(),
                                "normalizer": normalizer.state_dict(),
+                               "scheduler": scheduler.state_dict(),
                                "args": vars(args)}
 
             save_checkpoint(checkpoint_dict,
@@ -242,6 +249,8 @@ def experiment(model_dir, fold_id, run_id, args,
 
             writer.add_scalar("data/train", train_rmse, epoch+1)
             writer.add_scalar("data/validation", val_rmse, epoch+1)
+
+            scheduler.step()
 
             # catch memory leak
             gc.collect()
@@ -262,7 +271,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
           "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
     model, normalizer = init_model(fea_len)
-    criterion, _, = init_optim(model)
+    criterion, _, _, = init_optim(model)
 
     params = {"batch_size": args.batch_size,
               "num_workers": args.workers,
@@ -277,7 +286,11 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
 
     for j in range(ensemble_folds):
 
-        print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
+        if ensemble_folds == 1:
+            j = args.run_id
+            print("Evaluating Model")
+        else:
+            print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
 
         checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, j))
         model.load_state_dict(checkpoint["state_dict"])
