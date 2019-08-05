@@ -101,7 +101,7 @@ def input_parser():
                         metavar="float [0,1]",
                         help="momentum (default: 0.9)")
     parser.add_argument("--weight-decay",
-                        default=0,
+                        default=1e-5,
                         type=float,
                         metavar="float [0,1]",
                         help="weight decay (default: 0)")
@@ -113,7 +113,7 @@ def input_parser():
                         metavar="N",
                         help="number of hidden atom features in conv layers")
     parser.add_argument("--n-graph",
-                        default=1,
+                        default=3,
                         type=int,
                         metavar="N",
                         help="number of graph layers")

@@ -1,81 +1,79 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch_scatter import scatter_max, scatter_mean, \
-                            scatter_add, scatter_mul
+from torch_scatter import scatter_max, scatter_add
 
 
 class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
     """
-    def __init__(self, atom_fea_len, num_heads=1):
+    def __init__(self, elem_fea_len, num_heads=1):
         """
         Inputs
         ----------
-        atom_fea_len: int
-            Number of atom hidden features.
+        elem_fea_len: int
+            Number of elem hidden features.
         nbr_fea_len: int
             Number of bond features.
         """
         super(MessageLayer, self).__init__()
 
-        # Message Passing
-        self.message = nn.Identity()
-
-        hidden_ele = [x * atom_fea_len for x in [6, 4, 2]]
-        hidden_msg = [x * atom_fea_len for x in [7, 5, 3]]
-
         # Pooling and Output
+        hidden_ele = [256]
+        hidden_msg = [256]
+        # hidden_ele = [x * elem_fea_len for x in [6, 4, 2]]
+        # hidden_msg = [x * elem_fea_len for x in [7, 5, 3]]
         self.pooling = nn.ModuleList([WeightedAttention(
-            gate_nn=SimpleNetwork(2*atom_fea_len, 1, hidden_ele),
-            message_nn=SimpleNetwork(2*atom_fea_len, atom_fea_len, hidden_msg)
+            gate_nn=SimpleNetwork(2*elem_fea_len, 1, hidden_ele),
+            message_nn=SimpleNetwork(2*elem_fea_len, elem_fea_len, hidden_msg),
+            # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
+            # message_nn=nn.Identity(),
             ) for _ in range(num_heads)])
 
-    def forward(self, atom_weights, atom_in_fea,
+    def forward(self, elem_weights, elem_in_fea,
                 self_fea_idx, nbr_fea_idx):
         """
         Forward pass
 
         Parameters
         ----------
-        N: Total number of atoms (nodes) in the batch
+        N: Total number of elems (nodes) in the batch
         M: Total number of bonds (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
         Inputs
         ----------
-        atom_weights: Variable(torch.Tensor) shape (N,)
-            The fractional weights of atoms in their materials
-        atom_in_fea: Variable(torch.Tensor) shape (N, atom_fea_len)
+        elem_weights: Variable(torch.Tensor) shape (N,)
+            The fractional weights of elems in their materials
+        elem_in_fea: Variable(torch.Tensor) shape (N, elem_fea_len)
             Atom hidden features before message passing
         self_fea_idx: torch.Tensor shape (M,)
-            Indices of M neighbours of each atom
+            Indices of M neighbours of each elem
         nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of M neighbours of each atom
+            Indices of M neighbours of each elem
 
         Returns
         -------
-        atom_out_fea: nn.Variable shape (N, atom_fea_len)
+        elem_out_fea: nn.Variable shape (N, elem_fea_len)
             Atom hidden features after message passing
         """
         # construct the total features for passing
-        atom_nbr_weights = atom_weights[nbr_fea_idx, :]
-        atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
-        atom_self_fea = atom_in_fea[self_fea_idx, :]
-        fea = torch.cat([atom_self_fea, atom_nbr_fea], dim=1)
+        elem_nbr_weights = elem_weights[nbr_fea_idx, :]
+        elem_nbr_fea = elem_in_fea[nbr_fea_idx, :]
+        elem_self_fea = elem_in_fea[self_fea_idx, :]
+        fea = torch.cat([elem_self_fea, elem_nbr_fea], dim=1)
 
-        # pass messages between the pairs of atoms
-        fea = self.message(fea)
-
-        # sum selectivity over the neighbours to get atoms
+        # sum selectivity over the neighbours to get elems
         head_fea = []
         for attnhead in self.pooling:
-            head_fea.append(attnhead(fea, self_fea_idx, atom_nbr_weights))
+            head_fea.append(attnhead(fea=fea,
+                                     index=self_fea_idx,
+                                     weights=elem_nbr_weights))
 
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
-        return fea + atom_in_fea
+        return fea + elem_in_fea
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
@@ -94,7 +92,7 @@ class CompositionNet(nn.Module):
     but contain trainable parameters unlike other structure agnostic
     approaches.
     """
-    def __init__(self, orig_atom_fea_len, atom_fea_len, n_graph):
+    def __init__(self, orig_elem_fea_len, elem_fea_len, n_graph):
         """
         Initialize CompositionNet.
 
@@ -104,64 +102,66 @@ class CompositionNet(nn.Module):
 
         Inputs
         ----------
-        orig_atom_fea_len: int
-            Number of atom features in the input.
-        atom_fea_len: int
-            Number of hidden atom features in the graph layers
+        orig_elem_fea_len: int
+            Number of elem features in the input.
+        elem_fea_len: int
+            Number of hidden elem features in the graph layers
         n_graph: int
             Number of graph layers
         """
         super(CompositionNet, self).__init__()
-        # print("Initialising CompositionNet")
 
         # apply linear transform to the input to get a trainable embedding
-        self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len, bias=False)
+        self.embedding = nn.Linear(orig_elem_fea_len, elem_fea_len, bias=False)
 
         # create a list of Message passing layers
 
         msg_heads = 3
         self.graphs = nn.ModuleList(
-                        [MessageLayer(atom_fea_len, msg_heads)
+                        [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
-
-        # self.nl = nn.ReLU()
 
         # define a global pooling function for materials
         mat_heads = 3
-        mat_hidden = [x * atom_fea_len for x in [6, 4, 2]]
-        msg_hidden = [x * atom_fea_len for x in [7, 5, 3]]
+        mat_hidden = [256]
+        msg_hidden = [256]
+        # mat_hidden = [x * elem_fea_len for x in [6, 4, 2]]
+        # msg_hidden = [x * elem_fea_len for x in [7, 5, 3]]
         self.cry_pool = nn.ModuleList([WeightedAttention(
-            gate_nn=SimpleNetwork(atom_fea_len, 1, mat_hidden),
-            message_nn=SimpleNetwork(atom_fea_len, atom_fea_len, msg_hidden),
+            gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
+            message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
+            # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
+            # message_nn=nn.Identity(),
             ) for _ in range(mat_heads)])
 
         # define an output neural network
-        out_hidden = [x * atom_fea_len for x in [7, 5, 3, 1]]
-        self.output_nn = ResidualNetwork(atom_fea_len, 2, out_hidden)
+        out_hidden = [1024, 512, 256, 128, 64, 32]
+        # out_hidden = [x * elem_fea_len for x in [7, 5, 3, 1]]
+        self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
 
-    def forward(self, atom_weights, orig_atom_fea, self_fea_idx,
-                nbr_fea_idx, crystal_atom_idx):
+    def forward(self, elem_weights, orig_elem_fea, self_fea_idx,
+                nbr_fea_idx, crystal_elem_idx):
         """
         Forward pass
 
         Parameters
         ----------
-        N: Total number of atoms (nodes) in the batch
+        N: Total number of elems (nodes) in the batch
         M: Total number of bonds (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
         Inputs
         ----------
-        orig_atom_fea: Variable(torch.Tensor) shape (N, orig_atom_fea_len)
-            Atom features of each of the N atoms in the batch
+        orig_elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
+            Atom features of each of the N elems in the batch
         self_fea_idx: torch.Tensor shape (M,)
-            Indices of the atom each of the M bonds correspond to
+            Indices of the elem each of the M bonds correspond to
         nbr_fea_idx: torch.Tensor shape (M,)
             Indices of of the neighbours of the M bonds connect to
-        atom_bond_idx: list of torch.LongTensor of length C
-            Mapping from the bond idx to atom idx
-        crystal_atom_idx: list of torch.LongTensor of length C
-            Mapping from the atom idx to crystal idx
+        elem_bond_idx: list of torch.LongTensor of length C
+            Mapping from the bond idx to elem idx
+        crystal_elem_idx: list of torch.LongTensor of length C
+            Mapping from the elem idx to crystal idx
 
         Returns
         -------
@@ -170,22 +170,21 @@ class CompositionNet(nn.Module):
         """
 
         # embed the original features into the graph layer description
-        atom_fea = self.embedding(orig_atom_fea)
+        elem_fea = self.embedding(orig_elem_fea)
 
         # apply the graph message passing functions
         for graph_func in self.graphs:
-            atom_fea = graph_func(atom_weights, atom_fea,
+            elem_fea = graph_func(elem_weights, elem_fea,
                                   self_fea_idx, nbr_fea_idx)
 
-        # generate crystal features by pooling the atomic features
+        # generate crystal features by pooling the elemental features
         head_fea = []
         for attnhead in self.cry_pool:
-            head_fea.append(attnhead(atom_fea, crystal_atom_idx,
-                                     atom_weights))
+            head_fea.append(attnhead(fea=elem_fea,
+                                     index=crystal_elem_idx,
+                                     weights=elem_weights))
 
         crys_fea = torch.mean(torch.stack(head_fea), dim=0)
-
-        # crys_fea = self.nl(crys_fea)
 
         # apply neural network to map from learned features to target
         crys_fea = self.output_nn(crys_fea)
@@ -210,19 +209,17 @@ class WeightedAttention(nn.Module):
         self.gate_nn = gate_nn
         self.message_nn = message_nn
 
-    def forward(self, x, index, weights):
+    def forward(self, fea, index, weights):
         """ forward pass """
-        # x = x.unsqueeze(-1) if x.dim() == 1 else x
 
-        gate = self.gate_nn(x)
-        assert gate.dim() == x.dim() and gate.size(0) == x.size(0)
+        gate = self.gate_nn(fea)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
         gate = weights * gate.exp()
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
 
-        x = self.message_nn(x)
-        out = scatter_add(gate * x, index, dim=0)
+        fea = self.message_nn(fea)
+        out = scatter_add(gate * fea, index, dim=0)
 
         return out
 
@@ -245,7 +242,6 @@ class SimpleNetwork(nn.Module):
 
         """
         super(SimpleNetwork, self).__init__()
-        # print("Initialising SimpleNetwork")
 
         dims = [input_dim]+hidden_layer_dims
 
@@ -279,12 +275,13 @@ class ResidualNetwork(nn.Module):
 
         """
         super(ResidualNetwork, self).__init__()
-        # print("Initialising ResidualNetwork")
 
         dims = [input_dim]+hidden_layer_dims
 
         self.fcs = nn.ModuleList([nn.Linear(dims[i], dims[i+1])
                                   for i in range(len(dims)-1)])
+        # self.bns = nn.ModuleList([nn.BatchNorm1d(dims[i+1])
+        #                           for i in range(len(dims)-1)])
         self.res_fcs = nn.ModuleList([nn.Linear(dims[i], dims[i+1], bias=False)
                                       if (dims[i] != dims[i+1])
                                       else nn.Identity()
@@ -294,6 +291,8 @@ class ResidualNetwork(nn.Module):
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, fea):
+        # for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
+        #     fea = act(bn(fc(fea)))+res_fc(fea)
         for fc, res_fc, act in zip(self.fcs, self.res_fcs, self.acts):
             fea = act(fc(fea))+res_fc(fea)
 

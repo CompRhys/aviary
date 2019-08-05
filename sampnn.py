@@ -26,7 +26,7 @@ from sampnn.utils import evaluate, save_checkpoint, \
 def init_model(orig_atom_fea_len):
 
     model = CompositionNet(orig_atom_fea_len,
-                           atom_fea_len=args.atom_fea_len,
+                           elem_fea_len=args.atom_fea_len,
                            n_graph=args.n_graph)
 
     model.to(args.device)
@@ -62,7 +62,7 @@ def init_optim(model):
 
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
                                                milestones=[250],
-                                               gamma=0.1)
+                                               gamma=0.3)
 
     return criterion, optimizer, scheduler
 
