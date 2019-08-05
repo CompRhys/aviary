@@ -174,7 +174,7 @@ def experiment(model_dir, fold_id, run_id, args,
             previous_state = load_previous_state(args.fine_tune, model)
             model, _, _, _, _, _ = previous_state
             model.to(args.device)
-            criterion, optimizer = init_optim(model)
+            criterion, optimizer, scheduler = init_optim(model)
         elif args.transfer:
             print("Use model as a feature extractor and retrain last layer")
             previous_state = load_previous_state(args.transfer, model)
@@ -184,7 +184,7 @@ def experiment(model_dir, fold_id, run_id, args,
             num_ftrs = model.output_nn.fc_out.in_features
             model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
             model.to(args.device)
-            criterion, optimizer = init_optim(model)
+            criterion, optimizer, scheduler  = init_optim(model)
 
         _, best_mae, _ = evaluate(generator=val_generator,
                                   model=model,
