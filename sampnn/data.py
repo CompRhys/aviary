@@ -91,7 +91,7 @@ def input_parser():
     parser.add_argument("--learning-rate", "--lr",
                         # 3e-4 is the best learning rate for
                         # Adam, hands down. - Andrej Karpathy 2016
-                        default=3e-4,
+                        default=8e-4,
                         type=float,
                         metavar="float",
                         help="initial learning rate (default: 3e-4)")

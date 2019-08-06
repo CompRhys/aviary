@@ -60,9 +60,13 @@ def init_optim(model):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
+
+
+    # scheduler = optim.lr_scheduler.LambdaLR(optimizer, [decay_fn])
+
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
-                                               milestones=[15, 100, 250],
-                                               gamma=0.3)
+                                               milestones=[50, 150, 250],
+                                               gamma=0.5)
 
     return criterion, optimizer, scheduler
 
