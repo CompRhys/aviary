@@ -61,7 +61,7 @@ def init_optim(model):
         raise NameError("Only SGD or Adam is allowed as --optim")
 
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
-                                               milestones=[250],
+                                               milestones=[15, 100, 250],
                                                gamma=0.3)
 
     return criterion, optimizer, scheduler
@@ -184,7 +184,7 @@ def experiment(model_dir, fold_id, run_id, args,
             num_ftrs = model.output_nn.fc_out.in_features
             model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
             model.to(args.device)
-            criterion, optimizer, scheduler  = init_optim(model)
+            criterion, optimizer, scheduler = init_optim(model)
 
         _, best_mae, _ = evaluate(generator=val_generator,
                                   model=model,

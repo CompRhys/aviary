@@ -1,33 +1,30 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch_scatter import scatter_max, scatter_add
+from torch_scatter import scatter_max, scatter_add, \
+                          scatter_mean
 
 
 class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
     """
-    def __init__(self, elem_fea_len, num_heads=1):
+    def __init__(self, fea_len, num_heads=1):
         """
         Inputs
         ----------
-        elem_fea_len: int
+        fea_len: int
             Number of elem hidden features.
-        nbr_fea_len: int
-            Number of bond features.
         """
         super(MessageLayer, self).__init__()
 
         # Pooling and Output
         hidden_ele = [256]
         hidden_msg = [256]
-        # hidden_ele = [x * elem_fea_len for x in [6, 4, 2]]
-        # hidden_msg = [x * elem_fea_len for x in [7, 5, 3]]
         self.pooling = nn.ModuleList([WeightedAttention(
-            gate_nn=SimpleNetwork(2*elem_fea_len, 1, hidden_ele),
-            message_nn=SimpleNetwork(2*elem_fea_len, elem_fea_len, hidden_msg),
-            # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
+            gate_nn=SimpleNetwork(2*fea_len, 1, hidden_ele),
+            message_nn=SimpleNetwork(2*fea_len, fea_len, hidden_msg),
+            # message_nn=nn.Linear(2*fea_len, fea_len),
             # message_nn=nn.Identity(),
             ) for _ in range(num_heads)])
 
@@ -70,6 +67,9 @@ class MessageLayer(nn.Module):
             head_fea.append(attnhead(fea=fea,
                                      index=self_fea_idx,
                                      weights=elem_nbr_weights))
+
+        # # Concatenate
+        # return torch.cat(head_fea, dim=1)
 
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
@@ -116,17 +116,21 @@ class CompositionNet(nn.Module):
 
         # create a list of Message passing layers
 
-        msg_heads = 3
+        msg_heads = 5
         self.graphs = nn.ModuleList(
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
+
+        # # Concatenate
+        # self.graphs = nn.ModuleList(
+        #                 [MessageLayer(elem_fea_len * (msg_heads ** i), msg_heads)
+        #                     for i in range(n_graph)])
+        # elem_fea_len = elem_fea_len * (msg_heads ** msg_heads)
 
         # define a global pooling function for materials
         mat_heads = 3
         mat_hidden = [256]
         msg_hidden = [256]
-        # mat_hidden = [x * elem_fea_len for x in [6, 4, 2]]
-        # msg_hidden = [x * elem_fea_len for x in [7, 5, 3]]
         self.cry_pool = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
             message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
@@ -195,6 +199,21 @@ class CompositionNet(nn.Module):
         return '{}'.format(self.__class__.__name__)
 
 
+class WeightedMeanPooling(torch.nn.Module):
+    """
+    mean pooling
+    """
+    def __init__(self):
+        super(WeightedMeanPooling, self).__init__()
+
+    def forward(self, fea, index, weights):
+        fea = weights * fea
+        return scatter_mean(fea, index, dim=0)
+
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
+
+
 class WeightedAttention(nn.Module):
     """
     Weighted softmax attention layer
@@ -215,7 +234,10 @@ class WeightedAttention(nn.Module):
         gate = self.gate_nn(fea)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
-        gate = weights * gate.exp()
+        # Network appears to perform better with weights as a
+        # feature rather than baked into the attention mechanism
+        # gate = weights * gate.exp()
+        gate = gate.exp()
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
 
         fea = self.message_nn(fea)
@@ -247,7 +269,7 @@ class SimpleNetwork(nn.Module):
 
         self.fcs = nn.ModuleList([nn.Linear(dims[i], dims[i+1])
                                   for i in range(len(dims)-1)])
-        self.acts = nn.ModuleList([nn.ReLU() for _ in range(len(dims)-1)])
+        self.acts = nn.ModuleList([nn.LeakyReLU() for _ in range(len(dims)-1)])
 
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
@@ -291,7 +313,8 @@ class ResidualNetwork(nn.Module):
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, fea):
-        # for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
+        # for fc, bn, res_fc, act in zip(self.fcs, self.bns,
+        #                                self.res_fcs, self.acts):
         #     fea = act(bn(fc(fea)))+res_fc(fea)
         for fc, res_fc, act in zip(self.fcs, self.res_fcs, self.acts):
             fea = act(fc(fea))+res_fc(fea)
