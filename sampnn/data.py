@@ -89,7 +89,7 @@ def input_parser():
                         metavar="str",
                         help="choose an optimizer; SGD, Adam or AdamW")
     parser.add_argument("--learning-rate", "--lr",
-                        default=8e-5,
+                        default=3e-4,
                         type=float,
                         metavar="float",
                         help="initial learning rate (default: 3e-4)")

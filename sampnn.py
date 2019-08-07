@@ -65,7 +65,7 @@ def init_optim(model):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    clr = cyclical_lr(period=100, max_mul=10, min_mul=1, end=200)
+    clr = cyclical_lr(period=100, max_mul=3, min_mul=0.3, end=200)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
 
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [50, 150, 250], 0.5)
