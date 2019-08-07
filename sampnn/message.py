@@ -116,7 +116,7 @@ class CompositionNet(nn.Module):
 
         # create a list of Message passing layers
 
-        msg_heads = 1
+        msg_heads = 3
         self.graphs = nn.ModuleList(
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
@@ -128,7 +128,7 @@ class CompositionNet(nn.Module):
         # elem_fea_len = elem_fea_len * (msg_heads ** msg_heads)
 
         # define a global pooling function for materials
-        mat_heads = 1
+        mat_heads = 3
         mat_hidden = [256]
         msg_hidden = [256]
         self.cry_pool = nn.ModuleList([WeightedAttention(
