@@ -20,7 +20,8 @@ from sampnn.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from sampnn.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
-                        RobustL2
+                        RobustL2, AdamW, cyclical_lr
+import math
 
 
 def init_model(orig_atom_fea_len):
@@ -57,16 +58,17 @@ def init_optim(model):
         optimizer = optim.Adam(model.parameters(),
                                lr=args.learning_rate,
                                weight_decay=args.weight_decay)
+    elif args.optim == "AdamW":
+        optimizer = AdamW(model.parameters(),
+                          lr=args.learning_rate,
+                          weight_decay=args.weight_decay)
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
+    clr = cyclical_lr(period=100, max_mul=10, min_mul=1, end=200)
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
 
-
-    # scheduler = optim.lr_scheduler.LambdaLR(optimizer, [decay_fn])
-
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
-                                               milestones=[50, 150, 250],
-                                               gamma=0.5)
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [50, 150, 250], 0.5)
 
     return criterion, optimizer, scheduler
 
@@ -75,7 +77,7 @@ def main():
 
     dataset = CompositionData(data_path=args.data_path,
                               fea_path=args.fea_path)
-    orig_atom_fea_len = dataset.atom_fea_dim + 1
+    orig_atom_fea_len = dataset.atom_fea_dim
 
     indices = list(range(len(dataset)))
     train_idx, test_idx = split(indices, random_state=args.seed,
@@ -237,6 +239,9 @@ def experiment(model_dir, fold_id, run_id, args,
             is_best = val_mae < best_mae
             if is_best:
                 best_mae = val_mae
+
+            for param_group in optimizer.param_groups:
+                print(param_group["lr"])
 
             checkpoint_dict = {"epoch": epoch + 1,
                                "state_dict": model.state_dict(),

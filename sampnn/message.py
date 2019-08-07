@@ -112,23 +112,23 @@ class CompositionNet(nn.Module):
         super(CompositionNet, self).__init__()
 
         # apply linear transform to the input to get a trainable embedding
-        self.embedding = nn.Linear(orig_elem_fea_len, elem_fea_len, bias=False)
+        self.embedding = nn.Linear(orig_elem_fea_len, elem_fea_len-1, bias=False)
 
         # create a list of Message passing layers
 
-        msg_heads = 5
+        msg_heads = 1
         self.graphs = nn.ModuleList(
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
 
         # # Concatenate
         # self.graphs = nn.ModuleList(
-        #                 [MessageLayer(elem_fea_len * (msg_heads ** i), msg_heads)
+        #       [MessageLayer(elem_fea_len * (msg_heads ** i), msg_heads)
         #                     for i in range(n_graph)])
         # elem_fea_len = elem_fea_len * (msg_heads ** msg_heads)
 
         # define a global pooling function for materials
-        mat_heads = 3
+        mat_heads = 1
         mat_hidden = [256]
         msg_hidden = [256]
         self.cry_pool = nn.ModuleList([WeightedAttention(
@@ -175,6 +175,10 @@ class CompositionNet(nn.Module):
 
         # embed the original features into the graph layer description
         elem_fea = self.embedding(orig_elem_fea)
+
+        # do this so that we can examine the embeddings without
+        # influence of the weights
+        elem_fea = torch.cat([elem_fea, elem_weights], dim=1)
 
         # apply the graph message passing functions
         for graph_func in self.graphs:
@@ -234,10 +238,8 @@ class WeightedAttention(nn.Module):
         gate = self.gate_nn(fea)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
-        # Network appears to perform better with weights as a
-        # feature rather than baked into the attention mechanism
-        # gate = weights * gate.exp()
-        gate = gate.exp()
+        gate = weights * gate.exp()
+        # gate = gate.exp()
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
 
         fea = self.message_nn(fea)

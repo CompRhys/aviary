@@ -63,7 +63,7 @@ def input_parser():
                         help="proportion of data for testing")
     parser.add_argument("--seed",
                         default=0,
-                        type=float,
+                        type=int,
                         metavar="N",
                         help="seed for random number generator")
     parser.add_argument("--sub-sample",
@@ -87,11 +87,9 @@ def input_parser():
                         default="Adam",
                         type=str,
                         metavar="str",
-                        help="choose an optimizer; SGD or Adam")
+                        help="choose an optimizer; SGD, Adam or AdamW")
     parser.add_argument("--learning-rate", "--lr",
-                        # 3e-4 is the best learning rate for
-                        # Adam, hands down. - Andrej Karpathy 2016
-                        default=8e-4,
+                        default=8e-5,
                         type=float,
                         metavar="float",
                         help="initial learning rate (default: 3e-4)")
@@ -101,7 +99,7 @@ def input_parser():
                         metavar="float [0,1]",
                         help="momentum (default: 0.9)")
     parser.add_argument("--weight-decay",
-                        default=5e-5,
+                        default=1e-5,
                         type=float,
                         metavar="float [0,1]",
                         help="weight decay (default: 0)")
@@ -208,7 +206,7 @@ class CompositionData(Dataset):
         except AssertionError:
             print(composition)
             sys.exit()
-        atom_fea = np.hstack((atom_fea, weights))
+        # atom_fea = np.hstack((atom_fea, weights))
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
