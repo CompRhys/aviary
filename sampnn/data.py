@@ -89,7 +89,7 @@ def input_parser():
                         metavar="str",
                         help="choose an optimizer; SGD, Adam or AdamW")
     parser.add_argument("--learning-rate", "--lr",
-                        default=3e-4,
+                        default=1e-3,
                         type=float,
                         metavar="float",
                         help="initial learning rate (default: 3e-4)")
@@ -99,7 +99,7 @@ def input_parser():
                         metavar="float [0,1]",
                         help="momentum (default: 0.9)")
     parser.add_argument("--weight-decay",
-                        default=1e-5,
+                        default=1e-6,
                         type=float,
                         metavar="float [0,1]",
                         help="weight decay (default: 0)")
@@ -134,6 +134,9 @@ def input_parser():
                         help="number ensemble repeats")
 
     # transfer learning
+    parser.add_argument("--lr-search",
+                        action="store_true",
+                        help="perform a learning rate search")
     parser.add_argument("--resume",
                         action="store_true",
                         help="resume from previous checkpoint")
@@ -147,6 +150,9 @@ def input_parser():
                         help="checkpoint path for fine tuning")
 
     args = parser.parse_args(sys.argv[1:])
+
+    if args.lr_search:
+        args.learning_rate = 1e-8
 
     args.device = torch.device("cuda") if (not args.disable_cuda) and  \
         torch.cuda.is_available() else torch.device("cpu")

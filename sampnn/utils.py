@@ -5,6 +5,12 @@ import shutil
 import math
 import numpy as np
 
+import copy
+
+from tqdm.autonotebook import tqdm
+from torch.optim.lr_scheduler import _LRScheduler
+import matplotlib.pyplot as plt
+
 from torch.optim.optimizer import Optimizer
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
@@ -22,7 +28,7 @@ def evaluate(generator, model, criterion, optimizer,
         test_targets = []
         test_pred = []
         test_std = []
-        test_cif_ids = []
+        test_ids = []
         test_comp = []
     else:
         loss_meter = AverageMeter()
@@ -36,7 +42,7 @@ def evaluate(generator, model, criterion, optimizer,
             raise NameError("Only train, val or test is allowed as task")
 
     with trange(len(generator), disable=(not verbose)) as t:
-        for input_, target, batch_comp, batch_cif_ids in generator:
+        for input_, target, batch_comp, batch_ids in generator:
 
             # normalize target
             target_norm = normalizer.norm(target)
@@ -56,7 +62,7 @@ def evaluate(generator, model, criterion, optimizer,
                 std = torch.exp(log_std).data.cpu()*normalizer.std
 
                 # collect the model outputs
-                test_cif_ids += batch_cif_ids
+                test_ids += batch_ids
                 test_comp += batch_comp
                 test_targets += target.view(-1).tolist()
                 test_pred += pred.view(-1).tolist()
@@ -81,7 +87,7 @@ def evaluate(generator, model, criterion, optimizer,
             t.update()
 
     if task == "test":
-        return test_cif_ids, test_comp, test_targets, test_pred, test_std
+        return test_ids, test_comp, test_targets, test_pred, test_std
     else:
         return loss_meter.avg, mae_meter.avg, rmse_meter.avg
 
@@ -139,115 +145,13 @@ def RobustL2(output, log_std, target):
     return torch.mean(loss)
 
 
-class AdamW(Optimizer):
-    """Implements Adam algorithm.
-    It has been proposed in `Adam: A Method for Stochastic Optimization`_.
-    Arguments:
-        params (iterable): iterable of parameters to optimize or dicts defining
-            parameter groups
-        lr (float, optional): learning rate (default: 1e-3)
-        betas (Tuple[float, float], optional): coefficients used for computing
-            running averages of gradient and its square (default: (0.9, 0.999))
-        eps (float, optional): term added to the denominator to improve
-            numerical stability (default: 1e-8)
-        weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
-        amsgrad (boolean, optional): whether to use the AMSGrad variant of this
-            algorithm from the paper `On the Convergence of Adam and Beyond`_
-    .. _Adam\: A Method for Stochastic Optimization:
-        https://arxiv.org/abs/1412.6980
-    .. _On the Convergence of Adam and Beyond:
-        https://openreview.net/forum?id=ryQu7f-RZ
-    """
-
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
-                 weight_decay=0, amsgrad=False):
-        if not 0.0 <= lr:
-            raise ValueError("Invalid learning rate: {}".format(lr))
-        if not 0.0 <= eps:
-            raise ValueError("Invalid epsilon value: {}".format(eps))
-        if not 0.0 <= betas[0] < 1.0:
-            raise ValueError("Invalid beta parameter at index 0: {}".format(betas[0]))
-        if not 0.0 <= betas[1] < 1.0:
-            raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
-        defaults = dict(lr=lr, betas=betas, eps=eps,
-                        weight_decay=weight_decay, amsgrad=amsgrad)
-        super(AdamW, self).__init__(params, defaults)
-
-    def __setstate__(self, state):
-        super(AdamW, self).__setstate__(state)
-        for group in self.param_groups:
-            group.setdefault('amsgrad', False)
-
-    def step(self, closure=None):
-        """Performs a single optimization step.
-        Arguments:
-            closure (callable, optional): A closure that reevaluates the model
-                and returns the loss.
-        """
-        loss = None
-        if closure is not None:
-            loss = closure()
-
-        for group in self.param_groups:
-            for p in group['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad.data
-                if grad.is_sparse:
-                    raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
-                amsgrad = group['amsgrad']
-
-                state = self.state[p]
-
-                # State initialization
-                if len(state) == 0:
-                    state['step'] = 0
-                    # Exponential moving average of gradient values
-                    state['exp_avg'] = torch.zeros_like(p.data)
-                    # Exponential moving average of squared gradient values
-                    state['exp_avg_sq'] = torch.zeros_like(p.data)
-                    if amsgrad:
-                        # Maintains max of all exp. moving avg. of sq. grad. values
-                        state['max_exp_avg_sq'] = torch.zeros_like(p.data)
-
-                exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
-                if amsgrad:
-                    max_exp_avg_sq = state['max_exp_avg_sq']
-                beta1, beta2 = group['betas']
-
-                state['step'] += 1
-
-                # if group['weight_decay'] != 0:
-                #     grad = grad.add(group['weight_decay'], p.data)
-
-                # Decay the first and second moment running average coefficient
-                exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
-                if amsgrad:
-                    # Maintains the maximum of all 2nd moment running avg. till now
-                    torch.max(max_exp_avg_sq, exp_avg_sq, out=max_exp_avg_sq)
-                    # Use the max. for normalizing running avg. of gradient
-                    denom = max_exp_avg_sq.sqrt().add_(group['eps'])
-                else:
-                    denom = exp_avg_sq.sqrt().add_(group['eps'])
-
-                bias_correction1 = 1 - beta1 ** state['step']
-                bias_correction2 = 1 - beta2 ** state['step']
-                step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
-
-                # p.data.addcdiv_(-step_size, exp_avg, denom)
-                p.data.add_(-step_size,  torch.mul(p.data, group['weight_decay']).addcdiv_(1, exp_avg, denom) )
-
-        return loss
-
-
-def cyclical_lr(period, max_mul=10, min_mul=0.1, end=-1):
+def cyclical_lr(period=100, cycle_mul=0.1, tune_mul=0.01, end=-1, decay=0.98):
     # Scaler: we can adapt this if we do not want the triangular CLR
     scaler = lambda x: 1.
 
     # Lambda function to calculate the LR
-    lr_lambda = lambda it: 1. + (max_mul - 1.) * relative(it, period) \
-                            if it < end else min_mul
+    lr_lambda = lambda it: cycle_mul + (1. - cycle_mul) * relative(it, period) \
+                            if it < end else cycle_mul * decay ** (it-end)
 
     # Additional function to see where on the cycle we are
     def relative(it, stepsize):
@@ -256,3 +160,326 @@ def cyclical_lr(period, max_mul=10, min_mul=0.1, end=-1):
         return max(0, (1 - x)) * scaler(cycle)
 
     return lr_lambda
+
+
+class LRFinder(object):
+    """Learning rate range test.
+
+    The learning rate range test increases the learning rate in a pre-training run
+    between two boundaries in a linear or exponential manner. It provides valuable
+    information on how well the network can be trained over a range of learning rates
+    and what is the optimal learning rate.
+
+    Arguments:
+        model (torch.nn.Module): wrapped model.
+        optimizer (torch.optim.Optimizer): wrapped optimizer where the defined learning
+            is assumed to be the lower boundary of the range test.
+        criterion (torch.nn.Module): wrapped loss function.
+        device (str or torch.device, optional): a string ("cpu" or "cuda") with an
+            optional ordinal for the device type (e.g. "cuda:X", where is the ordinal).
+            Alternatively, can be an object representing the device on which the
+            computation will take place. Default: None, uses the same device as `model`.
+        memory_cache (boolean): if this flag is set to True, `state_dict` of model and
+            optimizer will be cached in memory. Otherwise, they will be saved to files
+            under the `cache_dir`.
+        cache_dir (string): path for storing temporary files. If no path is specified,
+            system-wide temporary directory is used.
+            Notice that this parameter will be ignored if `memory_cache` is True.
+
+    Example:
+        >>> lr_finder = LRFinder(net, optimizer, criterion, device="cuda")
+        >>> lr_finder.range_test(dataloader, end_lr=100, num_iter=100)
+
+    Cyclical Learning Rates for Training Neural Networks: https://arxiv.org/abs/1506.01186
+    fastai/lr_find: https://github.com/fastai/fastai
+
+    EDITS:
+        This function has been edited to make use of the robust MSE model 
+        we are using and to unpack the inputs which are returned by the
+        dataloader as a tuple.
+
+    """
+
+    def __init__(self, model, optimizer, criterion, metric="mse", 
+                 device=None, memory_cache=True, cache_dir=None):
+        self.model = model
+        self.optimizer = optimizer
+        self.criterion = criterion
+        self.history = {"lr": [], "loss": []}
+        self.best_loss = None
+        self.memory_cache = memory_cache
+        self.cache_dir = cache_dir
+
+        # Save the original state of the model and optimizer so they can be restored if
+        # needed
+        self.model_device = next(self.model.parameters()).device
+        self.state_cacher = StateCacher(memory_cache, cache_dir=cache_dir)
+        self.state_cacher.store('model', self.model.state_dict())
+        self.state_cacher.store('optimizer', self.optimizer.state_dict())
+
+        # If device is None, use the same as the model
+        if device:
+            self.device = device
+        else:
+            self.device = self.model_device
+
+    def reset(self):
+        """Restores the model and optimizer to their initial states."""
+        self.model.load_state_dict(self.state_cacher.retrieve('model'))
+        self.optimizer.load_state_dict(self.state_cacher.retrieve('optimizer'))
+        self.model.to(self.model_device)
+
+    def range_test(
+        self,
+        train_loader,
+        val_loader=None,
+        end_lr=10,
+        num_iter=100,
+        step_mode="exp",
+        smooth_f=0.05,
+        diverge_th=5,
+    ):
+        """Performs the learning rate range test.
+
+        Arguments:
+            train_loader (torch.utils.data.DataLoader): the training set data laoder.
+            val_loader (torch.utils.data.DataLoader, optional): if `None` the range test
+                will only use the training loss. When given a data loader, the model is
+                evaluated after each iteration on that dataset and the evaluation loss
+                is used. Note that in this mode the test takes significantly longer but
+                generally produces more precise results. Default: None.
+            end_lr (float, optional): the maximum learning rate to test. Default: 10.
+            num_iter (int, optional): the number of iterations over which the test
+                occurs. Default: 100.
+            step_mode (str, optional): one of the available learning rate policies,
+                linear or exponential ("linear", "exp"). Default: "exp".
+            smooth_f (float, optional): the loss smoothing factor within the [0, 1[
+                interval. Disabled if set to 0, otherwise the loss is smoothed using
+                exponential smoothing. Default: 0.05.
+            diverge_th (int, optional): the test is stopped when the loss surpasses the
+                threshold:  diverge_th * best_loss. Default: 5.
+
+        """
+        # Reset test results
+        self.history = {"lr": [], "loss": []}
+        self.best_loss = None
+
+        # Move the model to the proper device
+        self.model.to(self.device)
+
+        # Initialize the proper learning rate policy
+        if step_mode.lower() == "exp":
+            lr_schedule = ExponentialLR(self.optimizer, end_lr, num_iter)
+        elif step_mode.lower() == "linear":
+            lr_schedule = LinearLR(self.optimizer, end_lr, num_iter)
+        else:
+            raise ValueError("expected one of (exp, linear), got {}".format(step_mode))
+
+        if smooth_f < 0 or smooth_f >= 1:
+            raise ValueError("smooth_f is outside the range [0, 1[")
+
+        # Create an iterator to get data batch by batch
+        iterator = iter(train_loader)
+        for iteration in tqdm(range(num_iter)):
+            # Get a new set of inputs and labels
+            try:
+                inputs, labels, _, _ = next(iterator)
+            except StopIteration:
+                iterator = iter(train_loader)
+                inputs, labels, _, _ = next(iterator)
+
+            # Train on batch and retrieve loss
+            loss = self._train_batch(inputs, labels)
+            if val_loader:
+                loss = self._validate(val_loader)
+
+            # Update the learning rate
+            lr_schedule.step()
+            self.history["lr"].append(lr_schedule.get_lr()[0])
+
+            # Track the best loss and smooth it if smooth_f is specified
+            if iteration == 0:
+                self.best_loss = loss
+            else:
+                if smooth_f > 0:
+                    loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
+                if loss < self.best_loss:
+                    self.best_loss = loss
+
+            # Check if the loss has diverged; if it has, stop the test
+            self.history["loss"].append(loss)
+            if loss > diverge_th * self.best_loss:
+                print("Stopping early, the loss has diverged")
+                break
+
+        # print("Learning rate search finished. See the graph with {finder_name}.plot()")
+
+    def _train_batch(self, inputs, labels):
+        # Set model to training mode
+        self.model.train()
+
+        # Move data to the correct device
+        inputs = (tensor.to(self.device) for tensor in inputs)
+        labels = labels.to(self.device)
+
+        # Forward pass
+        self.optimizer.zero_grad()
+        output, log_std = self.model(*inputs).chunk(2, dim=1)
+        # loss = self.metric(output, labels)
+        loss = self.criterion(output, log_std, labels)
+
+        # Backward pass
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()
+
+    def _validate(self, dataloader):
+        # Set model to evaluation mode and disable gradient computation
+        running_loss = 0
+        self.model.eval()
+        with torch.no_grad():
+            for inputs, labels, _, _ in dataloader:
+                # Move data to the correct device
+                inputs = (tensor.to(self.device) for tensor in inputs)
+                labels = labels.to(self.device)
+
+                # Forward pass and loss computation
+                output, log_std = self.model(*inputs).chunk(2, dim=1)
+                loss = self.criterion(output, log_std, labels)
+                running_loss += loss.item() * inputs.size(0)
+
+        return running_loss / len(dataloader.dataset)
+
+    def plot(self, skip_start=10, skip_end=5, log_lr=True):
+        """Plots the learning rate range test.
+
+        Arguments:
+            skip_start (int, optional): number of batches to trim from the start.
+                Default: 10.
+            skip_end (int, optional): number of batches to trim from the start.
+                Default: 5.
+            log_lr (bool, optional): True to plot the learning rate in a logarithmic
+                scale; otherwise, plotted in a linear scale. Default: True.
+
+        """
+
+        if skip_start < 0:
+            raise ValueError("skip_start cannot be negative")
+        if skip_end < 0:
+            raise ValueError("skip_end cannot be negative")
+
+        # Get the data to plot from the history dictionary. Also, handle skip_end=0
+        # properly so the behaviour is the expected
+        lrs = self.history["lr"]
+        losses = self.history["loss"]
+        if skip_end == 0:
+            lrs = lrs[skip_start:]
+            losses = losses[skip_start:]
+        else:
+            lrs = lrs[skip_start:-skip_end]
+            losses = losses[skip_start:-skip_end]
+
+        # Plot loss as a function of the learning rate
+        plt.plot(lrs, losses)
+        if log_lr:
+            plt.xscale("log")
+        plt.xlabel("Learning rate")
+        plt.ylabel("Loss")
+        plt.show()
+
+
+class LinearLR(_LRScheduler):
+    """Linearly increases the learning rate between two boundaries over a number of
+    iterations.
+
+    Arguments:
+        optimizer (torch.optim.Optimizer): wrapped optimizer.
+        end_lr (float, optional): the initial learning rate which is the lower
+            boundary of the test. Default: 10.
+        num_iter (int, optional): the number of iterations over which the test
+            occurs. Default: 100.
+        last_epoch (int): the index of last epoch. Default: -1.
+
+    """
+
+    def __init__(self, optimizer, end_lr, num_iter, last_epoch=-1):
+        self.end_lr = end_lr
+        self.num_iter = num_iter
+        super(LinearLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        curr_iter = self.last_epoch + 1
+        r = curr_iter / self.num_iter
+        return [base_lr + r * (self.end_lr - base_lr) for base_lr in self.base_lrs]
+
+
+class ExponentialLR(_LRScheduler):
+    """Exponentially increases the learning rate between two boundaries over a number of
+    iterations.
+
+    Arguments:
+        optimizer (torch.optim.Optimizer): wrapped optimizer.
+        end_lr (float, optional): the initial learning rate which is the lower
+            boundary of the test. Default: 10.
+        num_iter (int, optional): the number of iterations over which the test
+            occurs. Default: 100.
+        last_epoch (int): the index of last epoch. Default: -1.
+
+    """
+
+    def __init__(self, optimizer, end_lr, num_iter, last_epoch=-1):
+        self.end_lr = end_lr
+        self.num_iter = num_iter
+        super(ExponentialLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        curr_iter = self.last_epoch + 1
+        r = curr_iter / self.num_iter
+        return [base_lr * (self.end_lr / base_lr) ** r for base_lr in self.base_lrs]
+
+
+class StateCacher(object):
+    def __init__(self, in_memory, cache_dir=None):
+        self.in_memory = in_memory
+        self.cache_dir = cache_dir
+
+        if self.cache_dir is None:
+            import tempfile
+            self.cache_dir = tempfile.gettempdir()
+        else:
+            if not os.path.isdir(self.cache_dir):
+                raise ValueError('Given `cache_dir` is not a valid directory.')
+
+        self.cached = {}
+
+    def store(self, key, state_dict):
+        if self.in_memory:
+            self.cached.update({key: copy.deepcopy(state_dict)})
+        else:
+            fn = os.path.join(self.cache_dir, 'state_{}_{}.pt'.format(key, id(self)))
+            self.cached.update({key: fn})
+            torch.save(state_dict, fn)
+
+    def retrieve(self, key):
+        if key not in self.cached:
+            raise KeyError('Target {} was not cached.'.format(key))
+
+        if self.in_memory:
+            return self.cached.get(key)
+        else:
+            fn = self.cached.get(key)
+            if not os.path.exists(fn):
+                raise RuntimeError('Failed to load state in {}. File does not exist anymore.'.format(fn))
+            state_dict = torch.load(fn, map_location=lambda storage, location: storage)
+            return state_dict
+
+    def __del__(self):
+        """Check whether there are unused cached files existing in `cache_dir` before
+        this instance being destroyed."""
+        if self.in_memory:
+            return
+
+        for k in self.cached:
+            if os.path.exists(self.cached[k]):
+                os.remove(self.cached[k])

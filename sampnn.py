@@ -20,7 +20,8 @@ from sampnn.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from sampnn.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
-                        RobustL2, AdamW, cyclical_lr
+                        RobustL2, cyclical_lr, \
+                        LRFinder
 import math
 
 
@@ -59,16 +60,14 @@ def init_optim(model):
                                lr=args.learning_rate,
                                weight_decay=args.weight_decay)
     elif args.optim == "AdamW":
-        optimizer = AdamW(model.parameters(),
+        optimizer = optim.AdamW(model.parameters(),
                           lr=args.learning_rate,
                           weight_decay=args.weight_decay)
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    clr = cyclical_lr(period=100, max_mul=3, min_mul=0.3, end=200)
+    clr = cyclical_lr(period=100, cycle_mul=0.1, end=200)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
-
-    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [50, 150, 250], 0.5)
 
     return criterion, optimizer, scheduler
 
@@ -125,6 +124,16 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     val_generator = DataLoader(val_subset, **params)
 
     if not args.evaluate:
+
+        if args.lr_search:
+            model, normalizer = init_model(fea_len)
+            criterion, optimizer, scheduler = init_optim(model)
+            
+            lr_finder = LRFinder(model, optimizer, criterion, metric="mse", device=args.device)
+            lr_finder.range_test(train_generator, end_lr=1, num_iter=100, step_mode="exp")
+            lr_finder.plot()
+            return
+
         for run_id in range(ensemble_folds):
 
             # this allows us to run ensembles in parallel rather than in series
@@ -139,9 +148,6 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             normalizer.fit(sample_target)
 
             writer = SummaryWriter(flush_secs=30)
-         
-            # to be used once pypi index is updated
-            # writer.add_graph(model, next(iter(train_generator))[0])
 
             experiment(model_dir, fold_id, run_id, args,
                        train_generator, val_generator,
@@ -240,8 +246,8 @@ def experiment(model_dir, fold_id, run_id, args,
             if is_best:
                 best_mae = val_mae
 
-            for param_group in optimizer.param_groups:
-                print(param_group["lr"])
+            # for param_group in optimizer.param_groups:
+            #     print(param_group["lr"])
 
             checkpoint_dict = {"epoch": epoch + 1,
                                "state_dict": model.state_dict(),

@@ -121,12 +121,6 @@ class CompositionNet(nn.Module):
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
 
-        # # Concatenate
-        # self.graphs = nn.ModuleList(
-        #       [MessageLayer(elem_fea_len * (msg_heads ** i), msg_heads)
-        #                     for i in range(n_graph)])
-        # elem_fea_len = elem_fea_len * (msg_heads ** msg_heads)
-
         # define a global pooling function for materials
         mat_heads = 3
         mat_hidden = [256]
@@ -139,8 +133,7 @@ class CompositionNet(nn.Module):
             ) for _ in range(mat_heads)])
 
         # define an output neural network
-        out_hidden = [1024, 512, 256, 128, 64, 32]
-        # out_hidden = [x * elem_fea_len for x in [7, 5, 3, 1]]
+        out_hidden = [1024, 512, 256, 256, 128]
         self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
 
     def forward(self, elem_weights, orig_elem_fea, self_fea_idx,
