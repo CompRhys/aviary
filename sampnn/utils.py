@@ -145,13 +145,13 @@ def RobustL2(output, log_std, target):
     return torch.mean(loss)
 
 
-def cyclical_lr(period=100, cycle_mul=0.1, tune_mul=0.01, end=-1, decay=0.98):
+def cyclical_lr(period=100, cycle_mul=0.2, tune_mul=0.05, end=-1):
     # Scaler: we can adapt this if we do not want the triangular CLR
     scaler = lambda x: 1.
 
     # Lambda function to calculate the LR
     lr_lambda = lambda it: cycle_mul + (1. - cycle_mul) * relative(it, period) \
-                            if it < end else cycle_mul * decay ** (it-end)
+                            if it < end else tune_mul
 
     # Additional function to see where on the cycle we are
     def relative(it, stepsize):

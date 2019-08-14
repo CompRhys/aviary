@@ -1,0 +1,10 @@
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 0
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 1
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 2
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 3
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 4
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 5
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 6
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 7
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 8
+--data-path data/datasets/expt-non-metals.csv --fold-id 1 --run-id 9

@@ -108,10 +108,10 @@ venv.bak/
 .vscode/
 checkpoint.pth.tar
 model_best.pth.tar
-test_results.csv
+test_results*
+ensemble_results*
 
 runs/
-cds3/
 
 *.pth.tar
 

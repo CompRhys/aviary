@@ -66,8 +66,14 @@ def init_optim(model):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    clr = cyclical_lr(period=100, cycle_mul=0.1, end=200)
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
+    if args.clr_cycles > 0:
+        clr = cyclical_lr(period=args.clr_period,
+                          cycle_mul=0.2,
+                          tune_mul=0.1,
+                          end=args.clr_cycles*args.clr_period)
+        scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
+    else:
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [])
 
     return criterion, optimizer, scheduler
 
@@ -102,7 +108,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     params = {"batch_size": args.batch_size,
               "num_workers": args.workers,
               "pin_memory": False,
-              "shuffle": False,
+              "shuffle": True,
               "collate_fn": collate_batch}
 
     if args.val_size == 0.0:
@@ -353,7 +359,10 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
                        "epistemic": np.sqrt(y_epistemic),
                        "aleatoric": np.sqrt(y_aleatoric)})
 
-    df.to_csv("test_results.csv", index=False)
+    if ensemble_folds == 1:
+        df.to_csv("test_results_{}_{}.csv".format(fold_id, args.run_id), index=False)
+    else:
+        df.to_csv("ensemble_results_{}.csv".format(fold_id, args.run_id), index=False)
 
 
 if __name__ == "__main__":

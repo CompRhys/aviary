@@ -74,7 +74,7 @@ def input_parser():
 
     # optimiser inputs
     parser.add_argument("--epochs",
-                        default=100,
+                        default=120,
                         type=int,
                         metavar="N",
                         help="number of total epochs to run")
@@ -84,12 +84,12 @@ def input_parser():
                         metavar="str",
                         help="choose a (Robust) Loss Function; L2 or L1")
     parser.add_argument("--optim",
-                        default="Adam",
+                        default="AdamW",
                         type=str,
                         metavar="str",
                         help="choose an optimizer; SGD, Adam or AdamW")
     parser.add_argument("--learning-rate", "--lr",
-                        default=1e-3,
+                        default=5e-4,
                         type=float,
                         metavar="float",
                         help="initial learning rate (default: 3e-4)")
@@ -99,7 +99,7 @@ def input_parser():
                         metavar="float [0,1]",
                         help="momentum (default: 0.9)")
     parser.add_argument("--weight-decay",
-                        default=1e-6,
+                        default=1e-5,
                         type=float,
                         metavar="float [0,1]",
                         help="weight decay (default: 0)")
@@ -137,6 +137,14 @@ def input_parser():
     parser.add_argument("--lr-search",
                         action="store_true",
                         help="perform a learning rate search")
+    parser.add_argument("--clr-cycles",
+                        default=1,
+                        type=int,
+                        help="how many learning rate cycles to perform")
+    parser.add_argument("--clr-period",
+                        default=100,
+                        type=int,
+                        help="how many learning rate cycles to perform")
     parser.add_argument("--resume",
                         action="store_true",
                         help="resume from previous checkpoint")
@@ -153,6 +161,9 @@ def input_parser():
 
     if args.lr_search:
         args.learning_rate = 1e-8
+
+    if args.clr_cycles > 0:
+        assert args.clr_period*args.clr_cycles < args.epochs, "Not enough epochs to carry out clr cycles"
 
     args.device = torch.device("cuda") if (not args.disable_cuda) and  \
         torch.cuda.is_available() else torch.device("cpu")
