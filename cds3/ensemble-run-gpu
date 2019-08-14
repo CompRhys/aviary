@@ -12,7 +12,7 @@
 #! Name of the job:
 #SBATCH -J oqmd-job
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
-#SBATCH -A LEE-REAG2-SL2-CPU
+#SBATCH -A LEE-REAG2-SL2-GPU
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
 #! How many (MPI) tasks will there be in total?
