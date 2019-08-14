@@ -1,5 +1,6 @@
 import os
 import gc
+import datetime
 
 import numpy as np
 import pandas as pd
@@ -159,7 +160,9 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
-            writer = SummaryWriter(flush_secs=30, log_dir="runs/run_{}_{}/".format(fold_id, run_id))
+            writer = SummaryWriter(flush_secs=30, 
+            log_dir="runs/fold-{f}_run-{r}_{date:%Y-%m-%d_%H:%M:%S}.txt".format(date=datetime.datetime.now(),
+                                                                               f=fold_id, r=run_id))
 
             experiment(model_dir, fold_id, run_id, args,
                        train_generator, val_generator,
