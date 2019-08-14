@@ -153,7 +153,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
-            writer = SummaryWriter(flush_secs=30)
+            writer = SummaryWriter(flush_secs=30, log_dir="runs/run_{}_{}/".format(fold_id, run_id))
 
             experiment(model_dir, fold_id, run_id, args,
                        train_generator, val_generator,
@@ -252,10 +252,7 @@ def experiment(model_dir, fold_id, run_id, args,
             if is_best:
                 best_mae = val_mae
 
-            # for param_group in optimizer.param_groups:
-            #     print(param_group["lr"])
-
-            checkpoint_dict = {"epoch": epoch + 1,
+            checkpoint_dict = {"epoch": epoch,
                                "state_dict": model.state_dict(),
                                "best_error": best_mae,
                                "optimizer": optimizer.state_dict(),
