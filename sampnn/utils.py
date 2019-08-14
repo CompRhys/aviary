@@ -104,13 +104,13 @@ def save_checkpoint(state, is_best,
         shutil.copyfile(checkpoint, best)
 
 
-def load_previous_state(path, model, optimizer=None, 
+def load_previous_state(path, model, device, optimizer=None,
                         normalizer=None, scheduler=None):
     """
     """
     assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
 
-    checkpoint = torch.load(path, map_location=args.device)
+    checkpoint = torch.load(path, map_location=device)
     start_epoch = checkpoint["epoch"]
     best_error = checkpoint["best_error"]
     model.load_state_dict(checkpoint["state_dict"])

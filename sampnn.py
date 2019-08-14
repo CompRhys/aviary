@@ -100,7 +100,7 @@ def main():
 
 
 def ensemble(model_dir, fold_id, dataset, test_set,
-             ensemble_folds, fea_len, test=True):
+             ensemble_folds, fea_len):
     """
     Train multiple models
     """
@@ -130,7 +130,6 @@ def ensemble(model_dir, fold_id, dataset, test_set,
     val_generator = DataLoader(val_subset, **params)
 
     if not args.evaluate:
-
         if args.lr_search:
             model, normalizer = init_model(fea_len)
             criterion, optimizer, scheduler = init_optim(model)
@@ -139,7 +138,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             lr_finder.range_test(train_generator, end_lr=1, num_iter=100, step_mode="exp")
             lr_finder.plot()
             return
-
+        
         for run_id in range(ensemble_folds):
 
             # this allows us to run ensembles in parallel rather than in series
@@ -159,8 +158,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
                        train_generator, val_generator,
                        model, optimizer, criterion,
                        normalizer,  scheduler, writer)
-
-    if test:
+    else:
         test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
 
 
@@ -181,7 +179,7 @@ def experiment(model_dir, fold_id, run_id, args,
 
     if args.resume:
         print("Resume Training from previous model")
-        previous_state = load_previous_state(checkpoint_file, model,
+        previous_state = load_previous_state(checkpoint_file, model, args.device,
                                              optimizer, normalizer, scheduler)
         model, optimizer, normalizer, scheduler, \
             best_mae, start_epoch = previous_state
@@ -189,13 +187,13 @@ def experiment(model_dir, fold_id, run_id, args,
     else:
         if args.fine_tune:
             print("Fine tune from a network trained on a different dataset")
-            previous_state = load_previous_state(args.fine_tune, model)
+            previous_state = load_previous_state(args.fine_tune, model, args.device)
             model, _, _, _, _, _ = previous_state
             model.to(args.device)
             criterion, optimizer, scheduler = init_optim(model)
         elif args.transfer:
             print("Use model as a feature extractor and retrain last layer")
-            previous_state = load_previous_state(args.transfer, model)
+            previous_state = load_previous_state(args.transfer, model, args.device)
             model, _, _, _, _, _ = previous_state
             for p in model.parameters():
                 p.requires_grad = False
