@@ -133,6 +133,13 @@ def ensemble(model_dir, fold_id, dataset, test_set,
         if args.lr_search:
             model, normalizer = init_model(fea_len)
             criterion, optimizer, scheduler = init_optim(model)
+
+            if args.fine_tune:
+                print("Fine tune from a network trained on a different dataset")
+                previous_state = load_previous_state(args.fine_tune, model, args.device)
+                model, _, _, _, _, _ = previous_state
+                model.to(args.device)
+                criterion, optimizer, scheduler = init_optim(model) 
             
             lr_finder = LRFinder(model, optimizer, criterion, metric="mse", device=args.device)
             lr_finder.range_test(train_generator, end_lr=1, num_iter=100, step_mode="exp")
@@ -328,7 +335,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
     y_pred = np.mean(y_ensemble, axis=0)
     y_epistemic = np.var(y_ensemble, axis=0)
     y_aleatoric = np.mean(np.square(y_aleatoric), axis=0)
-    y_std = np.sqrt(y_epistemic + y_aleatoric)
+    y_std = np.sqrt(y_epistemic + y_aleatoric)/np.sqrt(ensemble_folds)
 
     # calculate metrics and errors with associated errors for ensembles
     res = np.abs(y_test - y_pred)
