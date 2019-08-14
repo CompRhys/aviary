@@ -313,7 +313,8 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         else:
             print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
 
-        checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, j))
+        checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, j),
+                                map_location=args.device)
         model.load_state_dict(checkpoint["state_dict"])
         normalizer.load_state_dict(checkpoint["normalizer"])
 

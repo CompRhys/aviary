@@ -110,7 +110,7 @@ def load_previous_state(path, model, optimizer=None,
     """
     assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
 
-    checkpoint = torch.load(path)
+    checkpoint = torch.load(path, map_location=args.device)
     start_epoch = checkpoint["epoch"]
     best_error = checkpoint["best_error"]
     model.load_state_dict(checkpoint["state_dict"])
