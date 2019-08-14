@@ -68,8 +68,8 @@ def init_optim(model):
 
     if args.clr_cycles > 0:
         clr = cyclical_lr(period=args.clr_period,
-                          cycle_mul=0.2,
-                          tune_mul=0.1,
+                          cycle_mul=0.1,
+                          tune_mul=0.05,
                           end=args.clr_cycles*args.clr_period)
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
     else:
@@ -138,7 +138,7 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             lr_finder.range_test(train_generator, end_lr=1, num_iter=100, step_mode="exp")
             lr_finder.plot()
             return
-        
+
         for run_id in range(ensemble_folds):
 
             # this allows us to run ensembles in parallel rather than in series
@@ -158,8 +158,8 @@ def ensemble(model_dir, fold_id, dataset, test_set,
                        train_generator, val_generator,
                        model, optimizer, criterion,
                        normalizer,  scheduler, writer)
-    else:
-        test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
+
+    test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
 
 
 def experiment(model_dir, fold_id, run_id, args,
@@ -311,7 +311,7 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, j),
                                 map_location=args.device)
         model.load_state_dict(checkpoint["state_dict"])
-        normalizer.load_state_dict(checkpoint["normalizer"])
+        normalizer.load_state_dict(checkpoint["normalizer"], args.device)
 
         model.eval()
         idx, comp, y_test, pred, std = evaluate(generator=test_generator,

@@ -74,7 +74,7 @@ def input_parser():
 
     # optimiser inputs
     parser.add_argument("--epochs",
-                        default=120,
+                        default=220,
                         type=int,
                         metavar="N",
                         help="number of total epochs to run")
@@ -99,7 +99,7 @@ def input_parser():
                         metavar="float [0,1]",
                         help="momentum (default: 0.9)")
     parser.add_argument("--weight-decay",
-                        default=1e-5,
+                        default=1e-6,
                         type=float,
                         metavar="float [0,1]",
                         help="weight decay (default: 0)")
@@ -138,7 +138,7 @@ def input_parser():
                         action="store_true",
                         help="perform a learning rate search")
     parser.add_argument("--clr-cycles",
-                        default=1,
+                        default=2,
                         type=int,
                         help="how many learning rate cycles to perform")
     parser.add_argument("--clr-period",
@@ -361,6 +361,6 @@ class Normalizer(object):
         return {"mean": self.mean,
                 "std": self.std}
 
-    def load_state_dict(self, state_dict):
-        self.mean = state_dict["mean"]
-        self.std = state_dict["std"]
+    def load_state_dict(self, state_dict, device):
+        self.mean = state_dict["mean"].to(device)
+        self.std = state_dict["std"].to(device)
