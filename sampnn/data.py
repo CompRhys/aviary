@@ -362,5 +362,5 @@ class Normalizer(object):
                 "std": self.std}
 
     def load_state_dict(self, state_dict):
-        self.mean = state_dict["mean"]
-        self.std = state_dict["std"]
+        self.mean = state_dict["mean"].cpu()
+        self.std = state_dict["std"].cpu()
