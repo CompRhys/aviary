@@ -74,7 +74,7 @@ def input_parser():
 
     # optimiser inputs
     parser.add_argument("--epochs",
-                        default=220,
+                        default=250,
                         type=int,
                         metavar="N",
                         help="number of total epochs to run")
@@ -361,6 +361,6 @@ class Normalizer(object):
         return {"mean": self.mean,
                 "std": self.std}
 
-    def load_state_dict(self, state_dict, device):
-        self.mean = state_dict["mean"].to(device)
-        self.std = state_dict["std"].to(device)
+    def load_state_dict(self, state_dict):
+        self.mean = state_dict["mean"]
+        self.std = state_dict["std"]
