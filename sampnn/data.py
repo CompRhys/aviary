@@ -28,7 +28,7 @@ def input_parser():
                         help="dataset path")
     parser.add_argument("--fea-path",
                         type=str,
-                        default="data/embeddings/matscholar-embedding.json",
+                        default="data/embeddings/onehot-embedding.json",
                         metavar="PATH",
                         help="atom feature path")
     parser.add_argument("--disable-cuda",
@@ -74,12 +74,12 @@ def input_parser():
 
     # optimiser inputs
     parser.add_argument("--epochs",
-                        default=250,
+                        default=300,
                         type=int,
                         metavar="N",
                         help="number of total epochs to run")
     parser.add_argument("--loss",
-                        default="L2",
+                        default="L1",
                         type=str,
                         metavar="str",
                         help="choose a (Robust) Loss Function; L2 or L1")
@@ -137,10 +137,10 @@ def input_parser():
     parser.add_argument("--lr-search",
                         action="store_true",
                         help="perform a learning rate search")
-    parser.add_argument("--clr-cycles",
-                        default=2,
-                        type=int,
-                        help="how many learning rate cycles to perform")
+    parser.add_argument("--clr",
+                        default=True
+                        type=bool
+                        help="perform a learning rate search")
     parser.add_argument("--clr-period",
                         default=100,
                         type=int,
@@ -161,9 +161,6 @@ def input_parser():
 
     if args.lr_search:
         args.learning_rate = 1e-8
-
-    if args.clr_cycles > 0:
-        assert args.clr_period*args.clr_cycles < args.epochs, "Not enough epochs to carry out clr cycles"
 
     args.device = torch.device("cuda") if (not args.disable_cuda) and  \
         torch.cuda.is_available() else torch.device("cpu")
