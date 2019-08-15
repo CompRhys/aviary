@@ -138,8 +138,8 @@ def input_parser():
                         action="store_true",
                         help="perform a learning rate search")
     parser.add_argument("--clr",
-                        default=True
-                        type=bool
+                        default=True,
+                        type=bool,
                         help="perform a learning rate search")
     parser.add_argument("--clr-period",
                         default=100,
