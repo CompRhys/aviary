@@ -84,7 +84,7 @@ def input_parser():
                         metavar="str",
                         help="choose a (Robust) Loss Function; L2 or L1")
     parser.add_argument("--optim",
-                        default="Adam",
+                        default="AdamW",
                         type=str,
                         metavar="str",
                         help="choose an optimizer; SGD, Adam or AdamW")

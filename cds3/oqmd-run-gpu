@@ -59,7 +59,7 @@ source activate pytorch-env
 application="python"
 
 #! Pull the inputfile from a text document
-inflags="`awk "NR==$SLURM_ARRAY_TASK_ID" $input`"
+inflags="`awk "NR==$SLURM_ARRAY_TASK_ID" "oqmd-inputs.txt"`"
 
 #! Run options for the application:
 options="sampnn.py $inflags"

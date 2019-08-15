@@ -62,8 +62,8 @@ def init_optim(model):
                                weight_decay=args.weight_decay)
     elif args.optim == "AdamW":
         optimizer = optim.AdamW(model.parameters(),
-                          lr=args.learning_rate,
-                          weight_decay=args.weight_decay)
+                                lr=args.learning_rate,
+                                weight_decay=args.weight_decay)
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
@@ -92,15 +92,20 @@ def main():
     train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sub_sample])
     test_set = torch.utils.data.Subset(dataset, test_idx)
 
-    model_dir = "models/"
-    if not os.path.isdir(model_dir):
-        os.makedirs(model_dir)
+    if not os.path.isdir("models/"):
+        os.makedirs("models/")
 
-    ensemble(model_dir, args.fold_id, train_set, test_set,
+    if not os.path.isdir("runs/"):
+        os.makedirs("runs/")
+
+    if not os.path.isdir("results/"):
+        os.makedirs("results/")
+
+    ensemble(args.fold_id, train_set, test_set,
              args.ensemble, orig_atom_fea_len)
 
 
-def ensemble(model_dir, fold_id, dataset, test_set,
+def ensemble(fold_id, dataset, test_set,
              ensemble_folds, fea_len):
     """
     Train multiple models
@@ -137,13 +142,17 @@ def ensemble(model_dir, fold_id, dataset, test_set,
 
             if args.fine_tune:
                 print("Fine tune from a network trained on a different dataset")
-                previous_state = load_previous_state(args.fine_tune, model, args.device)
+                previous_state = load_previous_state(args.fine_tune,
+                                                     model,
+                                                     args.device)
                 model, _, _, _, _, _ = previous_state
                 model.to(args.device)
-                criterion, optimizer, scheduler = init_optim(model) 
+                criterion, optimizer, scheduler = init_optim(model)
             
-            lr_finder = LRFinder(model, optimizer, criterion, metric="mse", device=args.device)
-            lr_finder.range_test(train_generator, end_lr=1, num_iter=100, step_mode="exp")
+            lr_finder = LRFinder(model, optimizer, criterion,
+                                 metric="mse", device=args.device)
+            lr_finder.range_test(train_generator, end_lr=1,
+                                 num_iter=100, step_mode="exp")
             lr_finder.plot()
             return
 
@@ -160,19 +169,23 @@ def ensemble(model_dir, fold_id, dataset, test_set,
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
-            writer = SummaryWriter(flush_secs=30, 
-            log_dir="runs/fold-{f}_run-{r}_{date:%Y-%m-%d_%H:%M:%S}.txt".format(date=datetime.datetime.now(),
-                                                                               f=fold_id, r=run_id))
+            writer = SummaryWriter(log_dir=("runs/f-{f}_r-{r}_s-{s}_t-{t}_"
+                                            "{date:%d-%m-%Y_%H:%M:%S}").format(
+                                                date=datetime.datetime.now(),
+                                                f=fold_id,
+                                                r=run_id,
+                                                s=args.seed,
+                                                t=args.sub_sample))
 
-            experiment(model_dir, fold_id, run_id, args,
+            experiment(fold_id, run_id, args,
                        train_generator, val_generator,
                        model, optimizer, criterion,
                        normalizer,  scheduler, writer)
 
-    test_ensemble(model_dir, fold_id, ensemble_folds, test_set, fea_len)
+    test_ensemble(fold_id, ensemble_folds, test_set, fea_len)
 
 
-def experiment(model_dir, fold_id, run_id, args,
+def experiment(fold_id, run_id, args,
                train_generator, val_generator,
                model, optimizer, criterion,
                normalizer,  scheduler, writer):
@@ -183,27 +196,42 @@ def experiment(model_dir, fold_id, run_id, args,
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total Number of Trainable Parameters: {}".format(num_param))
 
-    checkpoint_file = model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id,
-                                                                  run_id)
-    best_file = model_dir+"best_{}_{}.pth.tar".format(fold_id, run_id)
+    checkpoint_file = ("models/checkpoint_"
+                       "f-{}_r-{}_s-{}_t-{}.pth.tar").format(fold_id,
+                                                             run_id,
+                                                             args.seed,
+                                                             args.sub_sample)
+    best_file = ("models/best_"
+                 "f-{}_r-{}_s-{}_t-{}.pth.tar").format(fold_id,
+                                                       run_id,
+                                                       args.seed,
+                                                       args.sub_sample)
 
     if args.resume:
         print("Resume Training from previous model")
-        previous_state = load_previous_state(checkpoint_file, model, args.device,
-                                             optimizer, normalizer, scheduler)
+        previous_state = load_previous_state(checkpoint_file,
+                                             model,
+                                             args.device,
+                                             optimizer,
+                                             normalizer,
+                                             scheduler)
         model, optimizer, normalizer, scheduler, \
             best_mae, start_epoch = previous_state
         model.to(args.device)
     else:
         if args.fine_tune:
             print("Fine tune from a network trained on a different dataset")
-            previous_state = load_previous_state(args.fine_tune, model, args.device)
+            previous_state = load_previous_state(args.fine_tune,
+                                                 model,
+                                                 args.device)
             model, _, _, _, _, _ = previous_state
             model.to(args.device)
             criterion, optimizer, scheduler = init_optim(model)
         elif args.transfer:
             print("Use model as a feature extractor and retrain last layer")
-            previous_state = load_previous_state(args.transfer, model, args.device)
+            previous_state = load_previous_state(args.transfer,
+                                                 model,
+                                                 args.device)
             model, _, _, _, _, _ = previous_state
             for p in model.parameters():
                 p.requires_grad = False
@@ -226,14 +254,14 @@ def experiment(model_dir, fold_id, run_id, args,
     try:
         for epoch in range(start_epoch, start_epoch+args.epochs):
             # Training
-            train_loss, train_mae, train_rmse = evaluate(generator=train_generator,
-                                                         model=model,
-                                                         criterion=criterion,
-                                                         optimizer=optimizer,
-                                                         normalizer=normalizer,
-                                                         device=args.device,
-                                                         task="train",
-                                                         verbose=True)
+            t_loss, t_mae, t_rmse = evaluate(generator=train_generator,
+                                             model=model,
+                                             criterion=criterion,
+                                             optimizer=optimizer,
+                                             normalizer=normalizer,
+                                             device=args.device,
+                                             task="train",
+                                             verbose=True)
 
             # Validation
             with torch.no_grad():
@@ -253,7 +281,7 @@ def experiment(model_dir, fold_id, run_id, args,
                   "Validation : Loss {:.4f}\t"
                   "MAE {:.3f}\t RMSE {:.3f}\n".format(
                     epoch+1, start_epoch + args.epochs,
-                    train_loss, train_mae, train_rmse,
+                    t_loss, t_mae, t_rmse,
                     val_loss, val_mae, val_rmse))
 
             is_best = val_mae < best_mae
@@ -273,8 +301,12 @@ def experiment(model_dir, fold_id, run_id, args,
                             checkpoint_file,
                             best_file)
 
-            writer.add_scalar("data/train", train_rmse, epoch+1)
-            writer.add_scalar("data/validation", val_rmse, epoch+1)
+            writer.add_scalar("loss/train", t_loss, epoch+1)
+            writer.add_scalar("loss/validation", val_loss, epoch+1)
+            writer.add_scalar("rmse/train", t_rmse, epoch+1)
+            writer.add_scalar("rmse/validation", val_rmse, epoch+1)
+            writer.add_scalar("mae/train", t_mae, epoch+1)
+            writer.add_scalar("mae/validation", val_mae, epoch+1)
 
             scheduler.step()
 
@@ -287,7 +319,7 @@ def experiment(model_dir, fold_id, run_id, args,
     writer.close()
 
 
-def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
+def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
     """
     take an ensemble of models and evaluate their performance on the test set
     """
@@ -318,7 +350,12 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
         else:
             print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
 
-        checkpoint = torch.load(model_dir+"checkpoint_{}_{}.pth.tar".format(fold_id, j),
+        checkpoint = torch.load(f=("models/checkpoint_"
+                                   "f-{}_r-{}_s-{}_t-{}"
+                                   ".pth.tar").format(fold_id,
+                                                      j,
+                                                      args.seed,
+                                                      args.sub_sample),
                                 map_location=args.device)
         model.load_state_dict(checkpoint["state_dict"])
         normalizer.load_state_dict(checkpoint["normalizer"])
@@ -366,9 +403,20 @@ def test_ensemble(model_dir, fold_id, ensemble_folds, hold_out_set, fea_len):
                        "aleatoric": np.sqrt(y_aleatoric)})
 
     if ensemble_folds == 1:
-        df.to_csv("test_results_{}_{}.csv".format(fold_id, args.run_id), index=False)
+        df.to_csv(index=False,
+                  path_or_buf=("results/test_results_"
+                               "f-{}_r-{}_s-{}_t-{}"
+                               ".pth.tar").format(fold_id,
+                                                  args.run_id,
+                                                  args.seed,
+                                                  args.sub_sample))
     else:
-        df.to_csv("ensemble_results_{}.csv".format(fold_id, args.run_id), index=False)
+        df.to_csv(index=False,
+                  path_or_buf=("results/ensemble_results_"
+                               "f-{}_s-{}_t-{}"
+                               ".pth.tar").format(fold_id,
+                                                  args.seed,
+                                                  args.sub_sample))
 
 
 if __name__ == "__main__":
