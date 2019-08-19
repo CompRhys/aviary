@@ -66,7 +66,7 @@ def input_parser():
                         type=int,
                         metavar="N",
                         help="seed for random number generator")
-    parser.add_argument("--sub-sample",
+    parser.add_argument("--sample",
                         default=1,
                         type=int,
                         metavar="N",
@@ -140,7 +140,7 @@ def input_parser():
     parser.add_argument("--clr",
                         default=True,
                         type=bool,
-                        help="perform a learning rate search")
+                        help="use a cyclical learning rate schedule")
     parser.add_argument("--clr-period",
                         default=100,
                         type=int,

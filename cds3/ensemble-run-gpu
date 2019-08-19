@@ -22,7 +22,7 @@
 #! Note that the job submission script will enforce no more than 3 cpus per GPU.
 #SBATCH --gres=gpu:1
 #! How much wallclock time will be required?
-#SBATCH --time=10:00:00
+##SBATCH --time=10:00:00
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=FAIL
 #! Uncomment this to prevent the job from being requeued (e.g. if
@@ -62,7 +62,7 @@ application="python"
 inflags="`awk "NR==$SLURM_ARRAY_TASK_ID" $input`"
 
 #! Run options for the application:
-options="sampnn.py $inflags"
+options="sampnn.py $inflags $seed $sample"
 
 #! Work directory (i.e. where the job will run):
 workdir="$SLURM_SUBMIT_DIR"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory

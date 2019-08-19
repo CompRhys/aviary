@@ -88,7 +88,7 @@ def main():
     train_idx, test_idx = split(indices, random_state=args.seed,
                                 test_size=args.test_size)
 
-    train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sub_sample])
+    train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sample])
     test_set = torch.utils.data.Subset(dataset, test_idx)
 
     if not os.path.isdir("models/"):
@@ -174,7 +174,7 @@ def ensemble(fold_id, dataset, test_set,
                                                 f=fold_id,
                                                 r=run_id,
                                                 s=args.seed,
-                                                t=args.sub_sample))
+                                                t=args.sample))
 
             experiment(fold_id, run_id, args,
                        train_generator, val_generator,
@@ -199,12 +199,12 @@ def experiment(fold_id, run_id, args,
                        "f-{}_r-{}_s-{}_t-{}.pth.tar").format(fold_id,
                                                              run_id,
                                                              args.seed,
-                                                             args.sub_sample)
+                                                             args.sample)
     best_file = ("models/best_"
                  "f-{}_r-{}_s-{}_t-{}.pth.tar").format(fold_id,
                                                        run_id,
                                                        args.seed,
-                                                       args.sub_sample)
+                                                       args.sample)
 
     if args.resume:
         print("Resume Training from previous model")
@@ -354,7 +354,7 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
                                    ".pth.tar").format(fold_id,
                                                       j,
                                                       args.seed,
-                                                      args.sub_sample),
+                                                      args.sample),
                                 map_location=args.device)
         model.load_state_dict(checkpoint["state_dict"])
         normalizer.load_state_dict(checkpoint["normalizer"])
@@ -405,17 +405,17 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
         df.to_csv(index=False,
                   path_or_buf=("results/test_results_"
                                "f-{}_r-{}_s-{}_t-{}"
-                               ".pth.tar").format(fold_id,
+                               ".csv").format(fold_id,
                                                   args.run_id,
                                                   args.seed,
-                                                  args.sub_sample))
+                                                  args.sample))
     else:
         df.to_csv(index=False,
                   path_or_buf=("results/ensemble_results_"
                                "f-{}_s-{}_t-{}"
-                               ".pth.tar").format(fold_id,
+                               ".csv").format(fold_id,
                                                   args.seed,
-                                                  args.sub_sample))
+                                                  args.sample))
 
 
 if __name__ == "__main__":
