@@ -338,8 +338,8 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
 
     test_generator = DataLoader(hold_out_set, **params)
 
-    y_ensemble = []
-    y_aleatoric = []
+    y_ensemble = np.zeros((ensemble_folds, len(hold_out_set)))
+    y_aleatoric = np.zeros((ensemble_folds, len(hold_out_set)))
 
     for j in range(ensemble_folds):
 
@@ -368,18 +368,15 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
                                                 device=args.device,
                                                 task="test")
 
-        y_ensemble.append(pred)
-        y_aleatoric.append(std)
+        y_ensemble[j,:] = pred
+        y_aleatoric[j,:] = std
 
     y_pred = np.mean(y_ensemble, axis=0)
-    y_epistemic = np.var(y_ensemble, axis=0)
-    y_aleatoric = np.mean(np.square(y_aleatoric), axis=0)
-    y_std = np.sqrt(y_epistemic + y_aleatoric)/np.sqrt(ensemble_folds)
 
     # calculate metrics and errors with associated errors for ensembles
-    res = np.abs(y_test - y_pred)
-    mae_avg = np.mean(res)
-    mae_std = np.std(res)/np.sqrt(len(res))
+    ae = np.abs(y_test - y_pred)
+    mae_avg = np.mean(ae)
+    mae_std = np.std(ae)/np.sqrt(len(ae))
 
     se = np.square(y_test - y_pred)
     mse_avg = np.mean(se)
@@ -393,13 +390,32 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
     print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
     print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
 
-    df = pd.DataFrame({"id": idx,
-                       "composition": comp,
-                       "target": y_test,
-                       "mean": y_pred,
-                       "std": y_std,
-                       "epistemic": np.sqrt(y_epistemic),
-                       "aleatoric": np.sqrt(y_aleatoric)})
+    y_pred = np.average(y_ensemble, weights=1./y_aleatoric**2., axis=0)
+
+    # calculate metrics and errors with associated errors for ensembles
+    ae = np.abs(y_test - y_pred)
+    mae_avg = np.mean(ae)
+    mae_std = np.std(ae)/np.sqrt(len(ae))
+
+    se = np.square(y_test - y_pred)
+    mse_avg = np.mean(se)
+    mse_std = np.std(se)/np.sqrt(len(se))
+
+    rmse_avg = np.sqrt(mse_avg)
+    rmse_std = 0.5 * rmse_avg * mse_std / mse_avg
+
+    print("Ensemble Performance Metrics:")
+    print("R2 Score: {:.4f} ".format(r2_score(y_test, y_pred)))
+    print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
+    print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
+
+    core = {"id": idx, "composition": comp, "target": y_test,}
+    results = {"pred-{}".format(num): values for (num, values) 
+                in enumerate(y_ensemble)}
+    errors = {"aleatoric-{}".format(num): values for (num, values) 
+                in enumerate(y_aleatoric)}
+
+    df = pd.DataFrame({**core, **results, **errors})
 
     if ensemble_folds == 1:
         df.to_csv(index=False,
