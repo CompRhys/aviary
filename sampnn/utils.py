@@ -112,7 +112,7 @@ def load_previous_state(path, model, device, optimizer=None,
 
     checkpoint = torch.load(path, map_location=device)
     start_epoch = checkpoint["epoch"]
-    best_error = checkpoint["best_error"]
+    best_error = checkpoint["best_error"].cpu()
     model.load_state_dict(checkpoint["state_dict"])
     if optimizer:
         optimizer.load_state_dict(checkpoint["optimizer"])
