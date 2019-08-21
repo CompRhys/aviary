@@ -116,3 +116,7 @@ runs/
 *.pth.tar
 
 sampnn/crossval.py
+
+.ipynb_checkpoints/
+
+*.pdf

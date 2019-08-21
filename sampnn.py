@@ -392,23 +392,6 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
 
     y_pred = np.average(y_ensemble, weights=1./y_aleatoric**2., axis=0)
 
-    # calculate metrics and errors with associated errors for ensembles
-    ae = np.abs(y_test - y_pred)
-    mae_avg = np.mean(ae)
-    mae_std = np.std(ae)/np.sqrt(len(ae))
-
-    se = np.square(y_test - y_pred)
-    mse_avg = np.mean(se)
-    mse_std = np.std(se)/np.sqrt(len(se))
-
-    rmse_avg = np.sqrt(mse_avg)
-    rmse_std = 0.5 * rmse_avg * mse_std / mse_avg
-
-    print("Ensemble Performance Metrics:")
-    print("R2 Score: {:.4f} ".format(r2_score(y_test, y_pred)))
-    print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
-    print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
-
     core = {"id": idx, "composition": comp, "target": y_test,}
     results = {"pred-{}".format(num): values for (num, values) 
                 in enumerate(y_ensemble)}
