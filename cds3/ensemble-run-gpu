@@ -62,7 +62,7 @@ application="python"
 inflags="`awk "NR==$SLURM_ARRAY_TASK_ID" $input`"
 
 #! Run options for the application:
-options="sampnn.py $inflags $seed $sample"
+options="train.py $inflags $seed $sample"
 
 #! Work directory (i.e. where the job will run):
 workdir="$SLURM_SUBMIT_DIR"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
