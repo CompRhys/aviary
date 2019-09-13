@@ -15,11 +15,11 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
 
-from sampnn.message import CompositionNet, ResidualNetwork, \
+from roost.message import CompositionNet, ResidualNetwork, \
                             SimpleNetwork
-from sampnn.data import input_parser, CompositionData, \
+from roost.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
-from sampnn.utils import evaluate, save_checkpoint, \
+from roost.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
                         RobustL2, cyclical_lr, \
                         LRFinder

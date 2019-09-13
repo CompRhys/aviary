@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from torch.optim.optimizer import Optimizer
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
-from sampnn.data import AverageMeter, Normalizer
+from roost.data import AverageMeter, Normalizer
 
 
 def evaluate(generator, model, criterion, optimizer,

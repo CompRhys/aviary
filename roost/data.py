@@ -9,8 +9,8 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from sampnn.features import LoadFeaturiser
-from sampnn.parse import parse
+from roost.features import LoadFeaturiser
+from roost.parse import parse
 
 
 def input_parser():

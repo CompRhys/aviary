@@ -1,6 +1,6 @@
-# Sampnn
+# RooSt
 
-Structure Agnostic Message-Passing Neural Network
+**R**epresentati**o**n Learning fr**o**m **St**oichiometry
 
 ## Premise
 
