@@ -112,6 +112,9 @@ test_results*
 ensemble_results*
 
 runs/
+results/
+models/
+cds3/
 
 *.pth.tar
 
