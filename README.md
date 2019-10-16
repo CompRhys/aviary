@@ -6,14 +6,9 @@
 
 In materials discovery applications often we know the composition of trial materials but have little knowledge about the structure.
 
-Most current SOTA results within the field of machine learning for materials discovery are reliant on already knowing the structure of the material. Whilst this can help interpolate within given systems it means that our ML applications must be intrinsically dependant on costly structure prediction calculations to first find structures for trial composs to extended periodic crystals although notable issues exist in how to represent dopants in such graphs and how much of the structure we can take as prior knowledge.
+Most current SOTA results within the field of machine learning for materials discovery are reliant on already knowing the structure of the material this means that our ML applications are be intrinsically dependant on costly structure prediction calculations or experimental characterisation of structures before the models can be applied to new trial compositions.
 
-In this work, we show that we can leverage a message-passing neural network to tackle materials agnostic tasks with increase efficacy. This is done by reformulating the problem itions. Whilst this would not be prohibitive it adds an additional level of complexity.
-
-In a similar vein to other materials agnostic platforms (i.e. [MAGPIE](http://oqmd.org/static/analytics/magpie/doc)) this model aims to be able to determine properties (to reasonable accuracy) based solely on the composition, i.e. stoichiometric formula of a material.
-
-Recent progress in the study of small molecules has built upon the use of message-passing neural networks. Similar attempts are already progressing in the application of such networkas a dense graph and then learning perturbations to our atomic representations to allow for an end-to-end systematically improvable descriptor. 
-
+To avoid the structure bottle neck we want to develop models that learn from the stiochiometry alone. In this work, we show that we can leverage a message-passing neural network to tackle materials agnostic tasks with increase efficacy. This work draws inspiration from recent progress in the study of small molecules that has made use of very similiar neural network architectures. 
 
 ## Example Use
 To run the code install the necessary dependencies and then simply run `python train.py`. The default task is on the experimental bandgap data set referenced in the paper. The code has been set up to allow most things to be controlled using argparse flags, the flags are listed under `roost/data.py`. 
