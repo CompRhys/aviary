@@ -21,6 +21,10 @@ If you use this code please cite our work for which this model was built:
 
 [Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://arxiv.org/abs/1910.00617)
 
+## Work Using Roost
+
+[A critical examination of compound stability predictions from machine-learned formation energies](https://arxiv.org/abs/2001.10591)
+
 ## Disclaimer
 
 This is research code shared without support or any guarantee on its quality. However, if you do find an error please submit a pull request or raise an issue and I will try my best to solve it.
