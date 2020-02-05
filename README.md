@@ -23,6 +23,8 @@ If you use this code please cite our work for which this model was built:
 
 ## Work Using Roost
 
+If you have used Roost in your work please contact me and I will add your paper here.
+
 [A critical examination of compound stability predictions from machine-learned formation energies](https://arxiv.org/abs/2001.10591)
 
 ## Disclaimer
