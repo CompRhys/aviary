@@ -116,9 +116,11 @@ results/
 models/
 cds3/
 
+data/datasets/sebeck.csv
+
 *.pth.tar
 
-sampnn/crossval.py
+roost/crossval.py
 
 .ipynb_checkpoints/
 
