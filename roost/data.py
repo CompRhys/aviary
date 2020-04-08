@@ -20,25 +20,34 @@ def input_parser():
     parser = argparse.ArgumentParser(description="Structure Agnostic "
                                      "Message Passing Neural Network")
 
-    # misc inputs
+    # data inputs
     parser.add_argument("--data-path",
                         type=str,
                         default="data/datasets/expt-non-metals.csv",
                         metavar="PATH",
                         help="dataset path")
+    parser.add_argument("--test-path",
+                        type=str,
+                        metavar="PATH",
+                        help="testing set path")
+    parser.add_argument("--val-size",
+                        default=0.0,
+                        type=float,
+                        metavar="N",
+                        help="proportion of data used for validation")
+    parser.add_argument("--test-size",
+                        default=0.2,
+                        type=float,
+                        metavar="N",
+                        help="proportion of data for testing")
+
+    # data embeddings
     parser.add_argument("--fea-path",
                         type=str,
                         default="data/embeddings/matscholar-embedding.json",
                         metavar="PATH",
                         help="atom feature path")
-    parser.add_argument("--disable-cuda",
-                        action="store_true",
-                        help="Disable CUDA")
 
-    # restart inputs
-    parser.add_argument("--evaluate",
-                        action="store_true",
-                        help="skip network training stages checkpoint")
 
     # dataloader inputs
     parser.add_argument("--workers",
@@ -51,16 +60,6 @@ def input_parser():
                         type=int,
                         metavar="N",
                         help="mini-batch size (default: 128)")
-    parser.add_argument("--val-size",
-                        default=0.0,
-                        type=float,
-                        metavar="N",
-                        help="proportion of data used for validation")
-    parser.add_argument("--test-size",
-                        default=0.2,
-                        type=float,
-                        metavar="N",
-                        help="proportion of data for testing")
     parser.add_argument("--seed",
                         default=0,
                         type=int,
@@ -74,7 +73,7 @@ def input_parser():
 
     # optimiser inputs
     parser.add_argument("--epochs",
-                        default=300,
+                        default=100,
                         type=int,
                         metavar="N",
                         help="number of total epochs to run")
@@ -89,7 +88,7 @@ def input_parser():
                         metavar="str",
                         help="choose an optimizer; SGD, Adam or AdamW")
     parser.add_argument("--learning-rate", "--lr",
-                        default=5e-4,
+                        default=3e-4,
                         type=float,
                         metavar="float",
                         help="initial learning rate (default: 3e-4)")
@@ -117,11 +116,11 @@ def input_parser():
                         help="number of graph layers")
 
     # ensemble inputs
-    parser.add_argument("--fold-id",
-                        default=0,
-                        type=int,
+    parser.add_argument("--data-id",
+                        default="roost",
+                        type=str,
                         metavar="N",
-                        help="identify the fold of the data")
+                        help="identifier for the data/cross-val fold")
     parser.add_argument("--run-id",
                         default=0,
                         type=int,
@@ -133,18 +132,22 @@ def input_parser():
                         metavar="N",
                         help="number ensemble repeats")
 
-    # transfer learning
+    # scheduler
     parser.add_argument("--lr-search",
                         action="store_true",
                         help="perform a learning rate search")
     parser.add_argument("--clr",
-                        default=True,
-                        type=bool,
+                        action="store_true",
                         help="use a cyclical learning rate schedule")
     parser.add_argument("--clr-period",
                         default=100,
                         type=int,
                         help="how many learning rate cycles to perform")
+
+    # restart inputs
+    parser.add_argument("--evaluate",
+                        action="store_true",
+                        help="skip network training stages checkpoint") 
     parser.add_argument("--resume",
                         action="store_true",
                         help="resume from previous checkpoint")
@@ -156,6 +159,11 @@ def input_parser():
                         type=str,
                         metavar="PATH",
                         help="checkpoint path for fine tuning")
+
+    # misc
+    parser.add_argument("--disable-cuda",
+                        action="store_true",
+                        help="Disable CUDA")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -224,9 +232,9 @@ class CompositionData(Dataset):
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
+        nbrs = len(elements) - 1
         for i, _ in enumerate(elements):
-            nbrs = elements[:i]+elements[i+1:]
-            self_fea_idx += [i]*len(nbrs)
+            self_fea_idx += [i]*nbrs
             nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
 
         # convert all data to tensors

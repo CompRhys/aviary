@@ -15,8 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
 
-from roost.message import CompositionNet, ResidualNetwork, \
-                            SimpleNetwork
+from roost.message import Roost
 from roost.data import input_parser, CompositionData, \
                         Normalizer, collate_batch
 from roost.utils import evaluate, save_checkpoint, \
@@ -28,9 +27,14 @@ import math
 
 def init_model(orig_atom_fea_len):
 
-    model = CompositionNet(orig_atom_fea_len,
+    model = Roost(orig_atom_fea_len,
                            elem_fea_len=args.atom_fea_len,
                            n_graph=args.n_graph)
+
+    # TODO parallelise the code over multiple GPUs
+    # if (torch.cuda.device_count() > 1) and (args.device==torch.device("cuda")):
+    #     print("The model will use", torch.cuda.device_count(), "GPUs!")
+    #     model = nn.DataParallel(model)
 
     model.to(args.device)
 
@@ -73,6 +77,7 @@ def init_optim(model):
                           tune_mul=0.05,)
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
     else:
+        # Keep a fixed Learning Rate
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [])
 
     return criterion, optimizer, scheduler
@@ -84,12 +89,19 @@ def main():
                               fea_path=args.fea_path)
     orig_atom_fea_len = dataset.atom_fea_dim
 
-    indices = list(range(len(dataset)))
-    train_idx, test_idx = split(indices, random_state=args.seed,
-                                test_size=args.test_size)
+    if args.test_path:
+        print("using independent test set: {}".format(args.test_path))
+        train_set = dataset
+        test_set = CompositionData(data_path=args.test_path,
+                              fea_path=args.fea_path)
+    else:
+        print("using {} of training set as test set".format(args.test_size))
+        indices = list(range(len(dataset)))
+        train_idx, test_idx = split(indices, random_state=args.seed,
+                                    test_size=args.test_size)
 
-    train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sample])
-    test_set = torch.utils.data.Subset(dataset, test_idx)
+        train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sample])
+        test_set = torch.utils.data.Subset(dataset, test_idx)
 
     if not os.path.isdir("models/"):
         os.makedirs("models/")
@@ -100,11 +112,11 @@ def main():
     if not os.path.isdir("results/"):
         os.makedirs("results/")
 
-    ensemble(args.fold_id, train_set, test_set,
+    ensemble(args.data_id, train_set, test_set,
              args.ensemble, orig_atom_fea_len)
 
 
-def ensemble(fold_id, dataset, test_set,
+def ensemble(data_id, dataset, test_set,
              ensemble_folds, fea_len):
     """
     Train multiple models
@@ -156,7 +168,6 @@ def ensemble(fold_id, dataset, test_set,
             return
 
         for run_id in range(ensemble_folds):
-
             # this allows us to run ensembles in parallel rather than in series
             # by specifiying the run-id arg.
             if ensemble_folds == 1:
@@ -168,23 +179,23 @@ def ensemble(fold_id, dataset, test_set,
             _, sample_target, _, _ = collate_batch(train_subset)
             normalizer.fit(sample_target)
 
-            writer = SummaryWriter(log_dir=("runs/f-{f}_r-{r}_s-{s}_t-{t}_"
+            writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"
                                             "{date:%d-%m-%Y_%H:%M:%S}").format(
                                                 date=datetime.datetime.now(),
-                                                f=fold_id,
+                                                f=data_id,
                                                 r=run_id,
                                                 s=args.seed,
                                                 t=args.sample))
 
-            experiment(fold_id, run_id, args,
+            experiment(data_id, run_id, args,
                        train_generator, val_generator,
                        model, optimizer, criterion,
                        normalizer,  scheduler, writer)
 
-    test_ensemble(fold_id, ensemble_folds, test_set, fea_len)
+    test_ensemble(data_id, ensemble_folds, test_set, fea_len)
 
 
-def experiment(fold_id, run_id, args,
+def experiment(data_id, run_id, args,
                train_generator, val_generator,
                model, optimizer, criterion,
                normalizer,  scheduler, writer):
@@ -196,12 +207,12 @@ def experiment(fold_id, run_id, args,
     print("Total Number of Trainable Parameters: {}".format(num_param))
 
     checkpoint_file = ("models/checkpoint_"
-                       "f-{}_r-{}_s-{}_t-{}.pth.tar").format(fold_id,
+                       "{}_r-{}_s-{}_t-{}.pth.tar").format(data_id,
                                                              run_id,
                                                              args.seed,
                                                              args.sample)
     best_file = ("models/best_"
-                 "f-{}_r-{}_s-{}_t-{}.pth.tar").format(fold_id,
+                 "{}_r-{}_s-{}_t-{}.pth.tar").format(data_id,
                                                        run_id,
                                                        args.seed,
                                                        args.sample)
@@ -318,7 +329,7 @@ def experiment(fold_id, run_id, args,
     writer.close()
 
 
-def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
+def test_ensemble(data_id, ensemble_folds, hold_out_set, fea_len):
     """
     take an ensemble of models and evaluate their performance on the test set
     """
@@ -350,8 +361,8 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
             print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
 
         checkpoint = torch.load(f=("models/checkpoint_"
-                                   "f-{}_r-{}_s-{}_t-{}"
-                                   ".pth.tar").format(fold_id,
+                                   "{}_r-{}_s-{}_t-{}"
+                                   ".pth.tar").format(data_id,
                                                       j,
                                                       args.seed,
                                                       args.sample),
@@ -367,6 +378,9 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
                                                 normalizer=normalizer,
                                                 device=args.device,
                                                 task="test")
+
+        if ensemble_folds == 1:
+            j = 0
 
         y_ensemble[j,:] = pred
         y_aleatoric[j,:] = std
@@ -390,8 +404,6 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
     print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
     print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
 
-    y_pred = np.average(y_ensemble, weights=1./y_aleatoric**2., axis=0)
-
     core = {"id": idx, "composition": comp, "target": y_test,}
     results = {"pred-{}".format(num): values for (num, values) 
                 in enumerate(y_ensemble)}
@@ -403,16 +415,16 @@ def test_ensemble(fold_id, ensemble_folds, hold_out_set, fea_len):
     if ensemble_folds == 1:
         df.to_csv(index=False,
                   path_or_buf=("results/test_results_"
-                               "f-{}_r-{}_s-{}_t-{}"
-                               ".csv").format(fold_id,
+                               "{}_r-{}_s-{}_t-{}"
+                               ".csv").format(data_id,
                                                   args.run_id,
                                                   args.seed,
                                                   args.sample))
     else:
         df.to_csv(index=False,
                   path_or_buf=("results/ensemble_results_"
-                               "f-{}_s-{}_t-{}"
-                               ".csv").format(fold_id,
+                               "{}_s-{}_t-{}"
+                               ".csv").format(data_id,
                                                   args.seed,
                                                   args.sample))
 

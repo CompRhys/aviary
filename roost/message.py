@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
+import torch.functional as F
 import numpy as np
 from torch_scatter import scatter_max, scatter_add, \
                           scatter_mean
-
-
 class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
@@ -69,8 +68,7 @@ class MessageLayer(nn.Module):
                                      weights=elem_nbr_weights))
 
         # # Concatenate
-        # return torch.cat(head_fea, dim=1)
-
+        # fea = torch.cat(head_fea, dim=1)
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
         return fea + elem_in_fea
@@ -79,11 +77,11 @@ class MessageLayer(nn.Module):
         return '{}'.format(self.__class__.__name__)
 
 
-class CompositionNet(nn.Module):
+class Roost(nn.Module):
     """
     Create a neural network for predicting total material properties.
 
-    The CompositionNet model is comprised of a fully connected network
+    The Roost model is comprised of a fully connected network
     and message passing graph layers.
 
     The message passing layers are used to determine a descriptor set
@@ -109,31 +107,32 @@ class CompositionNet(nn.Module):
         n_graph: int
             Number of graph layers
         """
-        super(CompositionNet, self).__init__()
+        super(Roost, self).__init__()
 
         # apply linear transform to the input to get a trainable embedding
-        self.embedding = nn.Linear(orig_elem_fea_len, elem_fea_len-1, bias=False)
+        self.embedding = nn.Linear(orig_elem_fea_len, elem_fea_len-1)
 
         # create a list of Message passing layers
 
-        msg_heads = 3
+        msg_heads = 1
         self.graphs = nn.ModuleList(
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
 
         # define a global pooling function for materials
-        mat_heads = 3
+        mat_heads = 1
         mat_hidden = [256]
-        msg_hidden = [256]
+        # msg_hidden = [256]
         self.cry_pool = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
-            message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
+            # message_nn=SimpleNetwork(elem_fea_len, 20, msg_hidden),
             # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
-            # message_nn=nn.Identity(),
+            message_nn=nn.Identity(),
             ) for _ in range(mat_heads)])
 
         # define an output neural network
-        out_hidden = [1024, 512, 256, 256, 128]
+        # out_hidden = [512, 256, 128, 64]
+        out_hidden = [256] * 6
         self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
 
     def forward(self, elem_weights, orig_elem_fea, self_fea_idx,
@@ -186,6 +185,7 @@ class CompositionNet(nn.Module):
                                      weights=elem_weights))
 
         crys_fea = torch.mean(torch.stack(head_fea), dim=0)
+        # crys_fea = torch.cat(head_fea, dim=1)
 
         # apply neural network to map from learned features to target
         crys_fea = self.output_nn(crys_fea)
@@ -224,6 +224,7 @@ class WeightedAttention(nn.Module):
         super(WeightedAttention, self).__init__()
         self.gate_nn = gate_nn
         self.message_nn = message_nn
+        self.pow = torch.nn.Parameter(torch.randn((1)))
 
     def forward(self, fea, index, weights):
         """ forward pass """
@@ -231,7 +232,8 @@ class WeightedAttention(nn.Module):
         gate = self.gate_nn(fea)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
-        gate = weights * gate.exp()
+        gate = (weights ** self.pow) * gate.exp()
+        # gate = weights * gate.exp()
         # gate = gate.exp()
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
 

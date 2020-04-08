@@ -111,7 +111,7 @@ def load_previous_state(path, model, device, optimizer=None,
     assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
 
     checkpoint = torch.load(path, map_location=device)
-    start_epoch = checkpoint["epoch"]
+    start_epoch = checkpoint["epoch"]+1
     best_error = checkpoint["best_error"].cpu()
     model.load_state_dict(checkpoint["state_dict"])
     if optimizer:
@@ -120,7 +120,7 @@ def load_previous_state(path, model, device, optimizer=None,
         normalizer.load_state_dict(checkpoint["normalizer"])
     if scheduler:
         scheduler.load_state_dict(checkpoint["scheduler"])
-    print("Loaded '{}'".format(path, checkpoint["epoch"]))
+    print("Loaded '{}'".format(path))
 
     return model, optimizer, normalizer, scheduler, best_error, start_epoch
 
