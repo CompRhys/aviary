@@ -94,6 +94,7 @@ def main():
         train_set = torch.utils.data.Subset(dataset, indices[0::args.sample])
         test_set = CompositionData(data_path=args.test_path,
                                     fea_path=args.fea_path)
+        test_set = torch.utils.data.Subset(test_set, range(len(dataset)))
     else:
         print("using {} of training set as test set".format(args.test_size))
         train_idx, test_idx = split(indices, random_state=args.seed,
@@ -145,7 +146,7 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
 
     if not args.evaluate:
         if args.lr_search:
-            model, normalizer = init_model(train_generator.dataset)
+            model, normalizer = init_model(train_subset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             if args.fine_tune:
@@ -170,7 +171,7 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, normalizer = init_model(train_generator.dataset)
+            model, normalizer = init_model(train_subset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             _, sample_target, _, _ = collate_batch(train_subset)
@@ -342,7 +343,8 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
               "collate_fn": collate_batch}
 
     test_generator = DataLoader(hold_out_set, **params)
-    model, normalizer = init_model(test_generator.dataset)
+
+    model, normalizer = init_model(hold_out_set.dataset)
     criterion, _, _, = init_optim(model)
 
     y_ensemble = np.zeros((ensemble_folds, len(hold_out_set)))
