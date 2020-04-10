@@ -94,7 +94,7 @@ def main():
         train_set = torch.utils.data.Subset(dataset, indices[0::args.sample])
         test_set = CompositionData(data_path=args.test_path,
                                     fea_path=args.fea_path)
-        test_set = torch.utils.data.Subset(test_set, range(len(dataset)))
+        test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
     else:
         print("using {} of training set as test set".format(args.test_size))
         train_idx, test_idx = split(indices, random_state=args.seed,
