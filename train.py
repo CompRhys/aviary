@@ -145,7 +145,7 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
 
     if not args.evaluate:
         if args.lr_search:
-            model, normalizer = init_model(train_subset.dataset)
+            model, normalizer = init_model(train_generator.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             if args.fine_tune:
@@ -170,7 +170,7 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, normalizer = init_model(train_subset.dataset)
+            model, normalizer = init_model(train_generator.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             _, sample_target, _, _ = collate_batch(train_subset)
@@ -334,10 +334,7 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
           "------------Evaluate model on Test Set------------\n"
           "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-
-    model, normalizer = init_model(hold_out_set.dataset)
-    criterion, _, _, = init_optim(model)
-
+    
     params = {"batch_size": args.batch_size,
               "num_workers": args.workers,
               "pin_memory": False,
@@ -345,6 +342,8 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
               "collate_fn": collate_batch}
 
     test_generator = DataLoader(hold_out_set, **params)
+    model, normalizer = init_model(test_generator.dataset)
+    criterion, _, _, = init_optim(model)
 
     y_ensemble = np.zeros((ensemble_folds, len(hold_out_set)))
     y_aleatoric = np.zeros((ensemble_folds, len(hold_out_set)))
