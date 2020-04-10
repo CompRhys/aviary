@@ -14,7 +14,50 @@ import matplotlib.pyplot as plt
 from torch.optim.optimizer import Optimizer
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
-from roost.data import AverageMeter, Normalizer
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+class Normalizer(object):
+    """Normalize a Tensor and restore it later. """
+    def __init__(self, log=False):
+        """tensor is taken as a sample to calculate the mean and std"""
+        self.mean = torch.tensor((0))
+        self.std = torch.tensor((1))
+
+    def fit(self, tensor, dim=0, keepdim=False):
+        """tensor is taken as a sample to calculate the mean and std"""
+        self.mean = torch.mean(tensor, dim, keepdim)
+        self.std = torch.std(tensor, dim, keepdim)
+
+    def norm(self, tensor):
+        return (tensor - self.mean) / self.std
+
+    def denorm(self, normed_tensor):
+        return normed_tensor * self.std + self.mean
+
+    def state_dict(self):
+        return {"mean": self.mean,
+                "std": self.std}
+
+    def load_state_dict(self, state_dict):
+        self.mean = state_dict["mean"].cpu()
+        self.std = state_dict["std"].cpu()
 
 
 def evaluate(generator, model, criterion, optimizer,

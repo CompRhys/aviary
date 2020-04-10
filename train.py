@@ -17,19 +17,19 @@ from sklearn.metrics import r2_score
 
 from roost.message import Roost
 from roost.data import input_parser, CompositionData, \
-                        Normalizer, collate_batch
+                        collate_batch
 from roost.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
                         RobustL2, cyclical_lr, \
-                        LRFinder
+                        LRFinder, Normalizer
 import math
 
 
-def init_model(orig_atom_fea_len):
+def init_model(dataset):
 
-    model = Roost(orig_atom_fea_len,
-                           elem_fea_len=args.atom_fea_len,
-                           n_graph=args.n_graph)
+    model = Roost(dataset.atom_fea_dim,
+                    elem_fea_len=args.atom_fea_len,
+                    n_graph=args.n_graph)
 
     # TODO parallelise the code over multiple GPUs
     # if (torch.cuda.device_count() > 1) and (args.device==torch.device("cuda")):
@@ -87,16 +87,15 @@ def main():
 
     dataset = CompositionData(data_path=args.data_path,
                               fea_path=args.fea_path)
-    orig_atom_fea_len = dataset.atom_fea_dim
 
+    indices = list(range(len(dataset)))
     if args.test_path:
         print("using independent test set: {}".format(args.test_path))
-        train_set = dataset
+        train_set = torch.utils.data.Subset(dataset, indices[0::args.sample])
         test_set = CompositionData(data_path=args.test_path,
-                              fea_path=args.fea_path)
+                                    fea_path=args.fea_path)
     else:
         print("using {} of training set as test set".format(args.test_size))
-        indices = list(range(len(dataset)))
         train_idx, test_idx = split(indices, random_state=args.seed,
                                     test_size=args.test_size)
 
@@ -112,12 +111,10 @@ def main():
     if not os.path.isdir("results/"):
         os.makedirs("results/")
 
-    ensemble(args.data_id, train_set, test_set,
-             args.ensemble, orig_atom_fea_len)
+    ensemble(args.data_id, args.ensemble, train_set, test_set,)
 
 
-def ensemble(data_id, dataset, test_set,
-             ensemble_folds, fea_len):
+def ensemble(data_id, ensemble_folds, dataset, test_set):
     """
     Train multiple models
     """
@@ -148,7 +145,7 @@ def ensemble(data_id, dataset, test_set,
 
     if not args.evaluate:
         if args.lr_search:
-            model, normalizer = init_model(fea_len)
+            model, normalizer = init_model(train_subset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             if args.fine_tune:
@@ -173,7 +170,7 @@ def ensemble(data_id, dataset, test_set,
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, normalizer = init_model(fea_len)
+            model, normalizer = init_model(train_subset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             _, sample_target, _, _ = collate_batch(train_subset)
@@ -192,7 +189,7 @@ def ensemble(data_id, dataset, test_set,
                        model, optimizer, criterion,
                        normalizer,  scheduler, writer)
 
-    test_ensemble(data_id, ensemble_folds, test_set, fea_len)
+    test_ensemble(data_id, ensemble_folds, test_set)
 
 
 def experiment(data_id, run_id, args,
@@ -329,7 +326,7 @@ def experiment(data_id, run_id, args,
     writer.close()
 
 
-def test_ensemble(data_id, ensemble_folds, hold_out_set, fea_len):
+def test_ensemble(data_id, ensemble_folds, hold_out_set):
     """
     take an ensemble of models and evaluate their performance on the test set
     """
@@ -338,7 +335,7 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set, fea_len):
           "------------Evaluate model on Test Set------------\n"
           "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    model, normalizer = init_model(fea_len)
+    model, normalizer = init_model(hold_out_set.dataset)
     criterion, _, _, = init_optim(model)
 
     params = {"batch_size": args.batch_size,
