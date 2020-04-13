@@ -174,7 +174,7 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             model, normalizer = init_model(train_subset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
-            _, sample_target, _, _ = collate_batch(train_subset)
+            sample_target = torch.Tensor(train_subset.dataset.df.iloc[:,2].values)
             normalizer.fit(sample_target)
 
             writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"
