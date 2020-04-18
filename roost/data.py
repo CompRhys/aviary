@@ -44,7 +44,7 @@ def input_parser():
     # data embeddings
     parser.add_argument("--fea-path",
                         type=str,
-                        default="data/embeddings/matscholar-embedding.json",
+                        default="data/embeddings/onehot-embedding.json",
                         metavar="PATH",
                         help="atom feature path")
 
@@ -142,7 +142,7 @@ def input_parser():
     parser.add_argument("--clr-period",
                         default=100,
                         type=int,
-                        help="how many learning rate cycles to perform")
+                        help="how many epochs per learning rate cycle")
 
     # restart inputs
     parser.add_argument("--evaluate",

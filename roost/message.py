@@ -114,25 +114,25 @@ class Roost(nn.Module):
 
         # create a list of Message passing layers
 
-        msg_heads = 1
+        msg_heads = 3
         self.graphs = nn.ModuleList(
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
 
         # define a global pooling function for materials
-        mat_heads = 1
+        mat_heads = 3
         mat_hidden = [256]
         # msg_hidden = [256]
         self.cry_pool = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
-            # message_nn=SimpleNetwork(elem_fea_len, 20, msg_hidden),
+            message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
             # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
-            message_nn=nn.Identity(),
+            # message_nn=nn.Identity(),
             ) for _ in range(mat_heads)])
 
         # define an output neural network
-        # out_hidden = [512, 256, 128, 64]
-        out_hidden = [256] * 6
+        out_hidden = [1024, 512, 256, 128, 64]
+        # out_hidden = [256] * 6
         self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
 
     def forward(self, elem_weights, orig_elem_fea, self_fea_idx,
