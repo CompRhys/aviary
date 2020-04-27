@@ -220,15 +220,15 @@ class CompositionData(Dataset):
         cry_id, composition, target = self.df.iloc[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
-        assert len(elements) != 1, \
-            "crystal {}: {}, is a pure system".format(cry_id, composition)
+        assert len(elements) != 1, f"cry-id {cry_id} [{composition}] is a pure system"
         try:
             atom_fea = np.vstack([self.atom_features.get_fea(element)
                                   for element in elements])
         except AssertionError:
-            print(composition)
-            sys.exit()
-        # atom_fea = np.hstack((atom_fea, weights))
+            raise AssertionError(f"cry-id {cry_id} [{composition}] contains invalid atom types not in embedding")
+        except ValueError:
+            raise ValueError(f"cry-id {cry_id} [{composition}] composition cannot be parsed into elements")
+
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
