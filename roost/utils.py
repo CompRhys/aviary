@@ -168,23 +168,23 @@ def load_previous_state(path, model, device, optimizer=None,
     return model, optimizer, normalizer, scheduler, best_error, start_epoch
 
 
-def RobustL1(output, log_std, target):
+def RobustL1(output, log_std, target, alpha=1.0):
     """
     Robust L1 loss using a lorentzian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
     loss = np.sqrt(2.0) * torch.abs(output - target) * \
-        torch.exp(- log_std) + log_std
+        torch.exp(- log_std) + alpha*log_std
     return torch.mean(loss)
 
 
-def RobustL2(output, log_std, target):
+def RobustL2(output, log_std, target, alpha=1.0):
     """
     Robust L2 loss using a gaussian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
     loss = 0.5 * torch.pow(output - target, 2.0) * \
-        torch.exp(- 2.0 * log_std) + log_std
+        torch.exp(- 2.0 * log_std) + alpha*log_std
     return torch.mean(loss)
 
 

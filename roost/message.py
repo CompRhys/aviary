@@ -122,7 +122,7 @@ class Roost(nn.Module):
         # define a global pooling function for materials
         mat_heads = 3
         mat_hidden = [256]
-        # msg_hidden = [256]
+        msg_hidden = [256]
         self.cry_pool = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
             message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),

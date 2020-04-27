@@ -98,7 +98,7 @@ def input_parser():
                         metavar="float [0,1]",
                         help="momentum (default: 0.9)")
     parser.add_argument("--weight-decay",
-                        default=1e-6,
+                        default=0,
                         type=float,
                         metavar="float [0,1]",
                         help="weight decay (default: 0)")
