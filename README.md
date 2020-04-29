@@ -22,9 +22,9 @@ pip install torch-scatter==latest+${CUDA} \
 pip install scikit-learn matplotlib tqdm pandas tensorboard
 ```
 
-`${CUDA}` Should be replaced by either cpu, cu92, cu101 or cu102 depending on your system CUDA version.
+`${CUDA}` Should be replaced by either `cpu`, `cu92`, `cu101` or `cu102` depending on your system CUDA version.
 
-You may encounter issues getting the the correct installation of either Pytorch or Pytorch_Scatter for your system requirements if so please check the following pages [Pytorch](https://pytorch.org/get-started/locally/), [Pytorch-Scatter](https://github.com/rusty1s/pytorch_scatter)
+You may encounter issues getting the the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter)
 
 ## Example Use
 
