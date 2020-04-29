@@ -22,7 +22,6 @@ from roost.utils import evaluate, save_checkpoint, \
                         load_previous_state, RobustL1, \
                         RobustL2, cyclical_lr, \
                         LRFinder, Normalizer
-import math
 
 
 def init_model(dataset):
@@ -126,27 +125,35 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
               "shuffle": True,
               "collate_fn": collate_batch}
 
-    if args.val_size == 0.0:
-        print("No validation set used, using test set for evaluation purposes")
-        # Note that when using this option care must be taken not to
-        # peak at the test-set. The only valid model to use is the one obtained
-        # after the final epoch where the epoch count is decided in advance of
-        # the experiment.
-        train_subset = dataset
-        val_subset = test_set
+    if args.val_path:
+        print("using independent validation set: {}".format(args.val_path))
+        train_set = dataset
+        val_set = CompositionData(data_path=args.val_path,
+                                    fea_path=args.fea_path)
+        val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
     else:
-        indices = list(range(len(dataset)))
-        train_idx, val_idx = split(indices, random_state=args.seed,
-                                   test_size=args.val_size/(1-args.test_size))
-        train_subset = torch.utils.data.Subset(dataset, train_idx)
-        val_subset = torch.utils.data.Subset(dataset, val_idx)
+        if args.val_size == 0.0:
+            print("No validation set used, using test set for evaluation purposes")
+            # Note that when using this option care must be taken not to
+            # peak at the test-set. The only valid model to use is the one obtained
+            # after the final epoch where the epoch count is decided in advance of
+            # the experiment.
+            train_set = dataset
+            val_set = test_set
+        else:
+            print("using {} of training set as validation set".format(args.val_size))
+            indices = list(range(len(dataset)))
+            train_idx, val_idx = split(indices, random_state=args.seed,
+                                    test_size=args.val_size/(1-args.test_size))
+            train_set = torch.utils.data.Subset(dataset, train_idx)
+            val_set = torch.utils.data.Subset(dataset, val_idx)
 
-    train_generator = DataLoader(train_subset, **params)
-    val_generator = DataLoader(val_subset, **params)
+    train_generator = DataLoader(train_set, **params)
+    val_generator = DataLoader(val_set, **params)
 
     if not args.evaluate:
         if args.lr_search:
-            model, normalizer = init_model(train_subset.dataset)
+            model, normalizer = init_model(train_set.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             if args.fine_tune:
@@ -171,10 +178,10 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, normalizer = init_model(train_subset.dataset)
+            model, normalizer = init_model(train_set.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
-            sample_target = torch.Tensor(train_subset.dataset.df.iloc[:,2].values)
+            sample_target = torch.Tensor(train_set.dataset.df.iloc[:,2].values)
             normalizer.fit(sample_target)
 
             writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"

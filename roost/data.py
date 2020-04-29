@@ -26,20 +26,26 @@ def input_parser():
                         default="data/datasets/expt-non-metals.csv",
                         metavar="PATH",
                         help="dataset path")
-    parser.add_argument("--test-path",
-                        type=str,
-                        metavar="PATH",
-                        help="testing set path")
-    parser.add_argument("--val-size",
-                        default=0.0,
-                        type=float,
-                        metavar="N",
-                        help="proportion of data used for validation")
-    parser.add_argument("--test-size",
-                        default=0.2,
-                        type=float,
-                        metavar="N",
-                        help="proportion of data for testing")
+    valid_group = parser.add_mutually_exclusive_group()
+    valid_group.add_argument("--val-path",
+                            type=str,
+                            metavar="PATH",
+                            help="validation set path")
+    valid_group.add_argument("--val-size",
+                            default=0.0,
+                            type=float,
+                            metavar="N",
+                            help="proportion of data used for validation")
+    test_group = parser.add_mutually_exclusive_group()
+    test_group.add_argument("--test-path",
+                            type=str,
+                            metavar="PATH",
+                            help="testing set path")
+    test_group.add_argument("--test-size",
+                            default=0.2,
+                            type=float,
+                            metavar="N",
+                            help="proportion of data for testing")
 
     # data embeddings
     parser.add_argument("--fea-path",
@@ -76,17 +82,17 @@ def input_parser():
                         default=100,
                         type=int,
                         metavar="N",
-                        help="number of total epochs to run")
+                        help="number of total epochs to run (default: 100)")
     parser.add_argument("--loss",
                         default="L1",
                         type=str,
                         metavar="str",
-                        help="choose a (Robust) Loss Function; L2 or L1")
+                        help="choose a (Robust) Loss Function; L2 or L1 (default: 'L1')")
     parser.add_argument("--optim",
                         default="AdamW",
                         type=str,
                         metavar="str",
-                        help="choose an optimizer; SGD, Adam or AdamW")
+                        help="choose an optimizer; SGD, Adam or AdamW (default: 'AdamW')")
     parser.add_argument("--learning-rate", "--lr",
                         default=3e-4,
                         type=float,
@@ -108,12 +114,12 @@ def input_parser():
                         default=64,
                         type=int,
                         metavar="N",
-                        help="number of hidden atom features in conv layers")
+                        help="number of hidden atom features in conv layers (default: 64)")
     parser.add_argument("--n-graph",
                         default=3,
                         type=int,
                         metavar="N",
-                        help="number of graph layers")
+                        help="number of graph layers (default: 3)")
 
     # ensemble inputs
     parser.add_argument("--data-id",
@@ -142,6 +148,7 @@ def input_parser():
     parser.add_argument("--clr-period",
                         default=100,
                         type=int,
+                        metavar="N",
                         help="how many epochs per learning rate cycle")
 
     # restart inputs
