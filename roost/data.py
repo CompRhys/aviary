@@ -50,7 +50,7 @@ def input_parser():
     # data embeddings
     parser.add_argument("--fea-path",
                         type=str,
-                        default="data/embeddings/onehot-embedding.json",
+                        default="data/embeddings/matscholar-embedding.json",
                         metavar="PATH",
                         help="atom feature path")
 
