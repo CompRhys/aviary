@@ -390,24 +390,45 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
         y_ensemble[j,:] = pred
         y_aleatoric[j,:] = std
 
-    y_pred = np.mean(y_ensemble, axis=0)
+    res = y_ensemble - y_test
+    mae = np.mean(np.abs(res), axis=1)
+    mse = np.mean(np.square(res), axis=1)
+    rmse = np.sqrt(mse)
+    r2 = 1 - mse/np.var(y_ensemble)
 
-    # calculate metrics and errors with associated errors for ensembles
-    ae = np.abs(y_test - y_pred)
-    mae_avg = np.mean(ae)
-    mae_std = np.std(ae)/np.sqrt(len(ae))
+    if ensemble_folds == 1:
+        print("\nModel Performance Metrics:")
+        print("R2 Score: {:.4f} ".format(r2[0]))
+        print("MAE: {:.4f}".format(mae[0]))
+        print("RMSE: {:.4f}".format(rmse[0]))
+    else:
+        r2_avg = np.mean(r2)
+        r2_std = np.std(r2)
 
-    se = np.square(y_test - y_pred)
-    mse_avg = np.mean(se)
-    mse_std = np.std(se)/np.sqrt(len(se))
+        mae_avg = np.mean(mae)
+        mae_std = np.std(mae)
 
-    rmse_avg = np.sqrt(mse_avg)
-    rmse_std = 0.5 * rmse_avg * mse_std / mse_avg
+        rmse_avg = np.mean(rmse)
+        rmse_std = np.std(rmse)
 
-    print("Ensemble Performance Metrics:")
-    print("R2 Score: {:.4f} ".format(r2_score(y_test, y_pred)))
-    print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
-    print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
+        print("\nModel Performance Metrics:")
+        print("R2 Score: {:.4f} +/- {:.4f}".format(r2_avg, r2_std))
+        print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
+        print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
+
+        # calculate metrics and errors with associated errors for ensembles
+        y_ens = np.mean(y_ensemble, axis=0)
+
+        ae = np.abs(y_test - y_ens)
+        mae_ens = np.mean(ae)
+
+        se = np.square(y_test - y_ens)
+        rmse_ens = np.sqrt(np.mean(se))
+
+        print("\nEnsemble Performance Metrics:")
+        print("R2 Score: {:.4f} ".format(r2_score(y_test, y_ens)))
+        print("MAE: {:.4f}".format(mae_ens))
+        print("RMSE: {:.4f}".format(rmse_ens))
 
     core = {"id": idx, "composition": comp, "target": y_test,}
     results = {"pred-{}".format(num): values for (num, values) 
