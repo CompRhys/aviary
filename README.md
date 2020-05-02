@@ -51,6 +51,10 @@ The model takes input in the form csv files with materials-ids, composition stri
 
 Note that if no validation set is given the model will evaluate the test set performance after each epoch, **do not use this metric for early stopping**.
 
+## Using your trained model
+
+The `train.py` script can be used to test on new data without training by using the command line arguments `--evaluate  --test-path /path/to/testset.csv`. This will load the last checkpoint file corresponding to any identifiers passed ( i.e. `data-id`, `run-id`, `seed`, `sample`). 
+
 ## Cite This Work
 
 If you use this code please cite our work for which this model was built:
