@@ -177,6 +177,15 @@ def input_parser():
     if args.lr_search:
         args.learning_rate = 1e-8
 
+    if args.test_path:
+        args.test_size = 0
+    else:
+        assert 0.0 < args.test_size
+        assert args.test_size < 1.0
+
+    if not (args.test_path and args.val_path):
+        assert args.test_size + args.val_size < 1.0
+
     args.device = torch.device("cuda") if (not args.disable_cuda) and  \
         torch.cuda.is_available() else torch.device("cpu")
 
