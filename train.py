@@ -153,7 +153,7 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
 
     if not args.evaluate:
         if args.lr_search:
-            model, normalizer = init_model(train_set.dataset)
+            model, normalizer = init_model(dataset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             if args.fine_tune:
@@ -178,10 +178,10 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, normalizer = init_model(train_set.dataset)
+            model, normalizer = init_model(dataset.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
-            sample_target = torch.Tensor(train_set.dataset.df.iloc[:,2].values)
+            sample_target = torch.Tensor(dataset.dataset.df.iloc[train_set.indices,2].values)
             normalizer.fit(sample_target)
 
             writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"
@@ -339,7 +339,7 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
     take an ensemble of models and evaluate their performance on the test set
     """
 
-    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+    print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
           "------------Evaluate model on Test Set------------\n"
           "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     
