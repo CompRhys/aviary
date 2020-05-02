@@ -87,47 +87,21 @@ def main():
     dataset = CompositionData(data_path=args.data_path,
                               fea_path=args.fea_path)
 
-    indices = list(range(len(dataset)))
+    train_idx = list(range(len(dataset)))
+
     if args.test_path:
         print("using independent test set: {}".format(args.test_path))
-        train_set = torch.utils.data.Subset(dataset, indices[0::args.sample])
         test_set = CompositionData(data_path=args.test_path,
                                     fea_path=args.fea_path)
         test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
     else:
         print("using {} of training set as test set".format(args.test_size))
-        train_idx, test_idx = split(indices, random_state=args.seed,
+        train_idx, test_idx = split(train_idx, random_state=args.seed,
                                     test_size=args.test_size)
-
-        train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sample])
         test_set = torch.utils.data.Subset(dataset, test_idx)
-
-    if not os.path.isdir("models/"):
-        os.makedirs("models/")
-
-    if not os.path.isdir("runs/"):
-        os.makedirs("runs/")
-
-    if not os.path.isdir("results/"):
-        os.makedirs("results/")
-
-    ensemble(args.data_id, args.ensemble, train_set, test_set,)
-
-
-def ensemble(data_id, ensemble_folds, dataset, test_set):
-    """
-    Train multiple models
-    """
-
-    params = {"batch_size": args.batch_size,
-              "num_workers": args.workers,
-              "pin_memory": False,
-              "shuffle": True,
-              "collate_fn": collate_batch}
 
     if args.val_path:
         print("using independent validation set: {}".format(args.val_path))
-        train_set = dataset
         val_set = CompositionData(data_path=args.val_path,
                                     fea_path=args.fea_path)
         val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
@@ -138,22 +112,44 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             # peak at the test-set. The only valid model to use is the one obtained
             # after the final epoch where the epoch count is decided in advance of
             # the experiment.
-            train_set = dataset
             val_set = test_set
         else:
             print("using {} of training set as validation set".format(args.val_size))
-            indices = list(range(len(dataset)))
-            train_idx, val_idx = split(indices, random_state=args.seed,
+            train_idx, val_idx = split(train_idx, random_state=args.seed,
                                     test_size=args.val_size/(1-args.test_size))
-            train_set = torch.utils.data.Subset(dataset, train_idx)
             val_set = torch.utils.data.Subset(dataset, val_idx)
+
+    train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sample])
+
+    if not os.path.isdir("models/"):
+        os.makedirs("models/")
+
+    if not os.path.isdir("runs/"):
+        os.makedirs("runs/")
+
+    if not os.path.isdir("results/"):
+        os.makedirs("results/")
+
+    ensemble(args.data_id, args.ensemble, train_set, val_set, test_set,)
+
+
+def ensemble(data_id, ensemble_folds, train_set, val_set, test_set):
+    """
+    Train multiple models
+    """
+
+    params = {"batch_size": args.batch_size,
+              "num_workers": args.workers,
+              "pin_memory": False,
+              "shuffle": True,
+              "collate_fn": collate_batch}
 
     train_generator = DataLoader(train_set, **params)
     val_generator = DataLoader(val_set, **params)
 
     if not args.evaluate:
         if args.lr_search:
-            model, normalizer = init_model(dataset.dataset)
+            model, normalizer = init_model(train_set.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
             if args.fine_tune:
@@ -178,10 +174,10 @@ def ensemble(data_id, ensemble_folds, dataset, test_set):
             if ensemble_folds == 1:
                 run_id = args.run_id
 
-            model, normalizer = init_model(dataset.dataset)
+            model, normalizer = init_model(train_set.dataset)
             criterion, optimizer, scheduler = init_optim(model)
 
-            sample_target = torch.Tensor(dataset.dataset.df.iloc[train_set.indices,2].values)
+            sample_target = torch.Tensor(train_set.dataset.df.iloc[:,2].values)
             normalizer.fit(sample_target)
 
             writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"
