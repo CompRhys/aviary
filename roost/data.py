@@ -138,19 +138,6 @@ def input_parser():
                         metavar="N",
                         help="number ensemble repeats")
 
-    # scheduler
-    parser.add_argument("--lr-search",
-                        action="store_true",
-                        help="perform a learning rate search")
-    parser.add_argument("--clr",
-                        action="store_true",
-                        help="use a cyclical learning rate schedule")
-    parser.add_argument("--clr-period",
-                        default=100,
-                        type=int,
-                        metavar="N",
-                        help="how many epochs per learning rate cycle")
-
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument("--evaluate",
@@ -174,9 +161,6 @@ def input_parser():
                         help="Disable CUDA")
 
     args = parser.parse_args(sys.argv[1:])
-
-    if args.lr_search:
-        args.learning_rate = 1e-8
 
     if args.test_path:
         args.test_size = 0

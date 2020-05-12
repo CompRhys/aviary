@@ -16,9 +16,8 @@ from sklearn.metrics import r2_score
 from roost.model import Roost
 from roost.data import input_parser, CompositionData, \
                         collate_batch
-from roost.utils import load_previous_state, RobustL1, \
-                        RobustL2, cyclical_lr, \
-                        LRFinder, Normalizer
+from roost.utils import load_previous_state, Normalizer,\
+                        RobustL1, RobustL2
 
 
 def init_model(dataset):
@@ -71,14 +70,7 @@ def init_optim(model):
     else:
         raise NameError("Only SGD or Adam is allowed as --optim")
 
-    if args.clr:
-        clr = cyclical_lr(period=args.clr_period,
-                          cycle_mul=0.1,
-                          tune_mul=0.05,)
-        scheduler = optim.lr_scheduler.LambdaLR(optimizer, [clr])
-    else:
-        # Keep a fixed Learning Rate
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [])
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [])
 
     return criterion, optimizer, scheduler
 
@@ -151,26 +143,6 @@ def train_ensemble(data_id, ensemble_folds, train_set, val_set):
     train_generator = DataLoader(train_set, **params)
     val_generator = DataLoader(val_set, **params)
 
-    if args.lr_search:
-        model, normalizer = init_model(train_set.dataset)
-        criterion, optimizer, scheduler = init_optim(model)
-
-        if args.fine_tune:
-            print("Fine tune from a network trained on a different dataset")
-            previous_state = load_previous_state(args.fine_tune,
-                                                    model,
-                                                    args.device)
-            model, _, _, _, _, _ = previous_state
-            model.to(args.device)
-            criterion, optimizer, scheduler = init_optim(model)
-        
-        lr_finder = LRFinder(model, optimizer, criterion,
-                                metric="mse", device=args.device)
-        lr_finder.range_test(train_generator, end_lr=1,
-                                num_iter=100, step_mode="exp")
-        lr_finder.plot()
-        return
-
     for run_id in range(ensemble_folds):
         # this allows us to run ensembles in parallel rather than in series
         # by specifiying the run-id arg.
@@ -180,7 +152,7 @@ def train_ensemble(data_id, ensemble_folds, train_set, val_set):
         model, normalizer = init_model(train_set.dataset)
         criterion, optimizer, scheduler = init_optim(model)
 
-        sample_target = torch.Tensor(train_set.dataset.df.iloc[:,2].values)
+        sample_target = torch.Tensor(train_set.dataset.df.iloc[:, 2].values)
         normalizer.fit(sample_target)
 
         writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"
@@ -191,10 +163,8 @@ def train_ensemble(data_id, ensemble_folds, train_set, val_set):
                                             s=args.seed,
                                             t=args.sample))
 
-        experiment(data_id, run_id, 
-                    train_generator, val_generator,
-                    model, optimizer, criterion,
-                    normalizer,  scheduler, writer)
+        experiment(data_id, run_id, train_generator, val_generator,
+                    model, optimizer, criterion, normalizer,  scheduler, writer)
 
 
 def experiment(data_id, run_id,
@@ -265,7 +235,7 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
     print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
           "------------Evaluate model on Test Set------------\n"
           "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-    
+
     params = {"batch_size": args.batch_size,
               "num_workers": args.workers,
               "pin_memory": False,
