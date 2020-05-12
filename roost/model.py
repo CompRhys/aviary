@@ -1,9 +1,130 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
-import numpy as np
+from roost.utils import BaseModelClass
 from torch_scatter import scatter_max, scatter_add, \
                           scatter_mean
+
+
+class Roost(BaseModelClass):
+    """
+    Create a neural network for predicting total material properties.
+
+    The Roost model is comprised of a fully connected network
+    and message passing graph layers.
+
+    The message passing layers are used to determine a descriptor set
+    for the fully connected network. Critically the graphs are used to
+    represent (crystalline) materials in a structure agnostic manner
+    but contain trainable parameters unlike other structure agnostic
+    approaches.
+    """
+    def __init__(self, elem_emb_len, elem_fea_len, n_graph, 
+                    **kwargs):
+        """
+        Initialize CompositionNet.
+
+        Parameters
+        ----------
+        n_h: Number of hidden layers after pooling
+
+        Inputs
+        ----------
+        elem_emb_len: int
+            Number of elem features in the input.
+        elem_fea_len: int
+            Number of hidden elem features in the graph layers
+        n_graph: int
+            Number of graph layers
+        """
+        super(Roost, self).__init__(**kwargs)
+
+        # apply linear transform to the input to get a trainable embedding
+        self.embedding = nn.Linear(elem_emb_len, elem_fea_len-1)
+
+        # create a list of Message passing layers
+
+        msg_heads = 3
+        self.graphs = nn.ModuleList(
+                        [MessageLayer(elem_fea_len, msg_heads)
+                            for i in range(n_graph)])
+
+        # define a global pooling function for materials
+        mat_heads = 3
+        mat_hidden = [256]
+        msg_hidden = [256]
+        self.cry_pool = nn.ModuleList([WeightedAttention(
+            gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
+            message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
+            # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
+            # message_nn=nn.Identity(),
+            ) for _ in range(mat_heads)])
+
+        # define an output neural network
+        out_hidden = [1024, 512, 256, 128, 64]
+        # out_hidden = [256] * 6
+        self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
+
+    def forward(self, elem_weights, elem_fea, self_fea_idx,
+                nbr_fea_idx, crystal_elem_idx):
+        """
+        Forward pass
+
+        Parameters
+        ----------
+        N: Total number of elems (nodes) in the batch
+        M: Total number of bonds (edges) in the batch
+        C: Total number of crystals (graphs) in the batch
+
+        Inputs
+        ----------
+        elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
+            Atom features of each of the N elems in the batch
+        self_fea_idx: torch.Tensor shape (M,)
+            Indices of the elem each of the M bonds correspond to
+        nbr_fea_idx: torch.Tensor shape (M,)
+            Indices of of the neighbours of the M bonds connect to
+        elem_bond_idx: list of torch.LongTensor of length C
+            Mapping from the bond idx to elem idx
+        crystal_elem_idx: list of torch.LongTensor of length C
+            Mapping from the elem idx to crystal idx
+
+        Returns
+        -------
+        out: nn.Variable shape (C,)
+            Atom hidden features after message passing
+        """
+
+        # embed the original features into the graph layer description
+        elem_fea = self.embedding(elem_fea)
+
+        # do this so that we can examine the embeddings without
+        # influence of the weights
+        elem_fea = torch.cat([elem_fea, elem_weights], dim=1)
+
+        # apply the graph message passing functions
+        for graph_func in self.graphs:
+            elem_fea = graph_func(elem_weights, elem_fea,
+                                  self_fea_idx, nbr_fea_idx)
+
+        # generate crystal features by pooling the elemental features
+        head_fea = []
+        for attnhead in self.cry_pool:
+            head_fea.append(attnhead(fea=elem_fea,
+                                     index=crystal_elem_idx,
+                                     weights=elem_weights))
+
+        crys_fea = torch.mean(torch.stack(head_fea), dim=0)
+        # crys_fea = torch.cat(head_fea, dim=1)
+
+        # apply neural network to map from learned features to target
+        crys_fea = self.output_nn(crys_fea)
+
+        return crys_fea
+
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
+
+
 class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
@@ -72,125 +193,6 @@ class MessageLayer(nn.Module):
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
         return fea + elem_in_fea
-
-    def __repr__(self):
-        return '{}'.format(self.__class__.__name__)
-
-
-class Roost(nn.Module):
-    """
-    Create a neural network for predicting total material properties.
-
-    The Roost model is comprised of a fully connected network
-    and message passing graph layers.
-
-    The message passing layers are used to determine a descriptor set
-    for the fully connected network. Critically the graphs are used to
-    represent (crystalline) materials in a structure agnostic manner
-    but contain trainable parameters unlike other structure agnostic
-    approaches.
-    """
-    def __init__(self, orig_elem_fea_len, elem_fea_len, n_graph):
-        """
-        Initialize CompositionNet.
-
-        Parameters
-        ----------
-        n_h: Number of hidden layers after pooling
-
-        Inputs
-        ----------
-        orig_elem_fea_len: int
-            Number of elem features in the input.
-        elem_fea_len: int
-            Number of hidden elem features in the graph layers
-        n_graph: int
-            Number of graph layers
-        """
-        super(Roost, self).__init__()
-
-        # apply linear transform to the input to get a trainable embedding
-        self.embedding = nn.Linear(orig_elem_fea_len, elem_fea_len-1)
-
-        # create a list of Message passing layers
-
-        msg_heads = 3
-        self.graphs = nn.ModuleList(
-                        [MessageLayer(elem_fea_len, msg_heads)
-                            for i in range(n_graph)])
-
-        # define a global pooling function for materials
-        mat_heads = 3
-        mat_hidden = [256]
-        msg_hidden = [256]
-        self.cry_pool = nn.ModuleList([WeightedAttention(
-            gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
-            message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
-            # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
-            # message_nn=nn.Identity(),
-            ) for _ in range(mat_heads)])
-
-        # define an output neural network
-        out_hidden = [1024, 512, 256, 128, 64]
-        # out_hidden = [256] * 6
-        self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
-
-    def forward(self, elem_weights, orig_elem_fea, self_fea_idx,
-                nbr_fea_idx, crystal_elem_idx):
-        """
-        Forward pass
-
-        Parameters
-        ----------
-        N: Total number of elems (nodes) in the batch
-        M: Total number of bonds (edges) in the batch
-        C: Total number of crystals (graphs) in the batch
-
-        Inputs
-        ----------
-        orig_elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
-            Atom features of each of the N elems in the batch
-        self_fea_idx: torch.Tensor shape (M,)
-            Indices of the elem each of the M bonds correspond to
-        nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of of the neighbours of the M bonds connect to
-        elem_bond_idx: list of torch.LongTensor of length C
-            Mapping from the bond idx to elem idx
-        crystal_elem_idx: list of torch.LongTensor of length C
-            Mapping from the elem idx to crystal idx
-
-        Returns
-        -------
-        out: nn.Variable shape (C,)
-            Atom hidden features after message passing
-        """
-
-        # embed the original features into the graph layer description
-        elem_fea = self.embedding(orig_elem_fea)
-
-        # do this so that we can examine the embeddings without
-        # influence of the weights
-        elem_fea = torch.cat([elem_fea, elem_weights], dim=1)
-
-        # apply the graph message passing functions
-        for graph_func in self.graphs:
-            elem_fea = graph_func(elem_weights, elem_fea,
-                                  self_fea_idx, nbr_fea_idx)
-
-        # generate crystal features by pooling the elemental features
-        head_fea = []
-        for attnhead in self.cry_pool:
-            head_fea.append(attnhead(fea=elem_fea,
-                                     index=crystal_elem_idx,
-                                     weights=elem_weights))
-
-        crys_fea = torch.mean(torch.stack(head_fea), dim=0)
-        # crys_fea = torch.cat(head_fea, dim=1)
-
-        # apply neural network to map from learned features to target
-        crys_fea = self.output_nn(crys_fea)
-
-        return crys_fea
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)

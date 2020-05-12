@@ -152,17 +152,18 @@ def input_parser():
                         help="how many epochs per learning rate cycle")
 
     # restart inputs
-    parser.add_argument("--evaluate",
+    use_group = parser.add_mutually_exclusive_group()
+    use_group.add_argument("--evaluate",
                         action="store_true",
                         help="skip network training stages checkpoint") 
-    parser.add_argument("--resume",
+    use_group.add_argument("--resume",
                         action="store_true",
                         help="resume from previous checkpoint")
-    parser.add_argument("--transfer",
+    use_group.add_argument("--transfer",
                         type=str,
                         metavar="PATH",
                         help="checkpoint path for transfer learning")
-    parser.add_argument("--fine-tune",
+    use_group.add_argument("--fine-tune",
                         type=str,
                         metavar="PATH",
                         help="checkpoint path for fine tuning")
@@ -208,7 +209,7 @@ class CompositionData(Dataset):
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.atom_features = LoadFeaturiser(fea_path)
-        self.atom_fea_dim = self.atom_features.embedding_size()
+        self.atom_emb_len = self.atom_features.embedding_size()
 
     def __len__(self):
         return len(self.df)
