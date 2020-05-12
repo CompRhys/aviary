@@ -19,7 +19,7 @@ pip install torch==1.5.0+${CUDA} torchvision==0.6.0+${CUDA} \
     -f https://download.pytorch.org/whl/torch_stable.html
 pip install torch-scatter==latest+${CUDA} \
     -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-pip install scikit-learn matplotlib tqdm pandas tensorboard
+pip install scikit-learn tqdm pandas tensorboard
 ```
 
 `${CUDA}` Should be replaced by either `cpu`, `cu92`, `cu101` or `cu102` depending on your system CUDA version.
