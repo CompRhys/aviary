@@ -18,8 +18,9 @@ class Roost(BaseModelClass):
     but contain trainable parameters unlike other structure agnostic
     approaches.
     """
-    def __init__(self, elem_emb_len, elem_fea_len, n_graph, 
-                    **kwargs):
+    def __init__(self, elem_emb_len, elem_fea_len, n_graph,
+                    out_hidden=[1024, 512, 256, 128, 64],
+                    out_dim=2, **kwargs):
         """
         Initialize CompositionNet.
 
@@ -38,31 +39,77 @@ class Roost(BaseModelClass):
         """
         super(Roost, self).__init__(**kwargs)
 
+        self.material_nn = MaterialNetwork(elem_emb_len=elem_emb_len,
+                                            elem_fea_len=elem_fea_len,
+                                            n_graph=n_graph)
+
+        # define an output neural network
+        self.output_nn = ResidualNetwork(elem_fea_len, out_dim, out_hidden)
+
+    def forward(self, elem_weights, elem_fea, self_fea_idx,
+                nbr_fea_idx, crystal_elem_idx):
+        """
+        Forward pass
+
+        Parameters
+        ----------
+        N: Total number of elems (nodes) in the batch
+        M: Total number of bonds (edges) in the batch
+        C: Total number of crystals (graphs) in the batch
+
+        Inputs
+        ----------
+        elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
+            Atom features of each of the N elems in the batch
+        self_fea_idx: torch.Tensor shape (M,)
+            Indices of the elem each of the M bonds correspond to
+        nbr_fea_idx: torch.Tensor shape (M,)
+            Indices of of the neighbours of the M bonds connect to
+        elem_bond_idx: list of torch.LongTensor of length C
+            Mapping from the bond idx to elem idx
+        crystal_elem_idx: list of torch.LongTensor of length C
+            Mapping from the elem idx to crystal idx
+
+        Returns
+        -------
+        out: nn.Variable shape (C,)
+            Atom hidden features after message passing
+        """
+
+        crys_fea = self.material_nn(elem_weights, elem_fea, self_fea_idx,
+                                    nbr_fea_idx, crystal_elem_idx)
+
+        # apply neural network to map from learned features to target
+        return self.output_nn(crys_fea)
+
+    def __repr__(self):
+        return '{}'.format(self.__class__.__name__)
+
+
+class MaterialNetwork(nn.Module):
+    """
+    """
+    def __init__(self, elem_emb_len, elem_fea_len, n_graph=3, msg_heads=3,
+                    mat_heads=3, mat_hidden=[256], msg_hidden=[256]):
+        """
+        """
+        super(MaterialNetwork, self).__init__()
+
         # apply linear transform to the input to get a trainable embedding
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len-1)
 
         # create a list of Message passing layers
-
-        msg_heads = 3
         self.graphs = nn.ModuleList(
                         [MessageLayer(elem_fea_len, msg_heads)
                             for i in range(n_graph)])
 
         # define a global pooling function for materials
-        mat_heads = 3
-        mat_hidden = [256]
-        msg_hidden = [256]
         self.cry_pool = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(elem_fea_len, 1, mat_hidden),
             message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, msg_hidden),
             # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
             # message_nn=nn.Identity(),
             ) for _ in range(mat_heads)])
-
-        # define an output neural network
-        out_hidden = [1024, 512, 256, 128, 64]
-        # out_hidden = [256] * 6
-        self.output_nn = ResidualNetwork(elem_fea_len, 2, out_hidden)
 
     def forward(self, elem_weights, elem_fea, self_fea_idx,
                 nbr_fea_idx, crystal_elem_idx):
@@ -113,13 +160,8 @@ class Roost(BaseModelClass):
                                      index=crystal_elem_idx,
                                      weights=elem_weights))
 
-        crys_fea = torch.mean(torch.stack(head_fea), dim=0)
-        # crys_fea = torch.cat(head_fea, dim=1)
-
-        # apply neural network to map from learned features to target
-        crys_fea = self.output_nn(crys_fea)
-
-        return crys_fea
+        # return torch.cat(head_fea, dim=1)
+        return torch.mean(torch.stack(head_fea), dim=0)
 
     def __repr__(self):
         return '{}'.format(self.__class__.__name__)
@@ -129,7 +171,8 @@ class MessageLayer(nn.Module):
     """
     Class defining the message passing operation on the composition graph
     """
-    def __init__(self, fea_len, num_heads=1):
+    def __init__(self, fea_len, num_heads=1, hidden_ele=[256],
+                    hidden_msg=[256]):
         """
         Inputs
         ----------
@@ -139,8 +182,7 @@ class MessageLayer(nn.Module):
         super(MessageLayer, self).__init__()
 
         # Pooling and Output
-        hidden_ele = [256]
-        hidden_msg = [256]
+
         self.pooling = nn.ModuleList([WeightedAttention(
             gate_nn=SimpleNetwork(2*fea_len, 1, hidden_ele),
             message_nn=SimpleNetwork(2*fea_len, fea_len, hidden_msg),
