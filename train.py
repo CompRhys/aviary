@@ -5,284 +5,439 @@ import numpy as np
 import pandas as pd
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch.nn import L1Loss, MSELoss, BCEWithLogitsLoss, CrossEntropyLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split as split
 
-from roost.model import Roost
-from roost.data import input_parser, CompositionData, \
-                        collate_batch
-from roost.utils import load_previous_state, Normalizer,\
-                        RobustL1, RobustL2
-
-
-def init_model(dataset):
-
-    model = Roost(elem_emb_len=dataset.atom_emb_len,
-                    elem_fea_len=args.atom_fea_len,
-                    n_graph=args.n_graph,
-                    device=args.device)
-
-    num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("Total Number of Trainable Parameters: {}".format(num_param))
-
-    # TODO parallelise the code over multiple GPUs
-    # if (torch.cuda.device_count() > 1) and (args.device==torch.device("cuda")):
-    #     print("The model will use", torch.cuda.device_count(), "GPUs!")
-    #     model = nn.DataParallel(model)
-
-    model.to(args.device)
-
-    normalizer = Normalizer()
-
-    return model, normalizer
+from roost.model import Roost, ResidualNetwork
+from roost.data import input_parser, CompositionData, collate_batch
+from roost.utils import load_previous_state, Normalizer, RobustL1, RobustL2
 
 
-def init_optim(model):
+def main(
+    data_path,
+    fea_path,
+    task,
+    loss,
+    model_name="roost",
+    elem_fea_len=64,
+    n_graph=3,
+    ensemble=1,
+    run_id=1,
+    seed=42,
+    epochs=100,
+    log=True,
+    sample=1,
+    test_size=0.2,
+    test_path=None,
+    val_size=0.0,
+    val_path=None,
+    resume=None,
+    fine_tune=None,
+    transfer=None,
+    train=True,
+    evaluate=True,
+    optim="AdamW",
+    learning_rate=3e-4,
+    momentum=0.9,
+    weight_decay=1e-6,
+    batch_size=128,
+    workers=0,
+    device=torch.device("cuda") if torch.cuda.is_available() \
+            else torch.device("cpu"),
+    **kwargs,
+):
 
-    # Select Loss Function, Note we use Robust loss functions that
-    # are used to train an aleatoric error estimate
-    if args.loss == "L1":
-        criterion = RobustL1
-    elif args.loss == "L2":
-        criterion = RobustL2
-    else:
-        raise NameError("Only L1 or L2 are allowed as --loss")
-
-    # Select Optimiser
-    if args.optim == "SGD":
-        optimizer = optim.SGD(model.parameters(),
-                              lr=args.learning_rate,
-                              weight_decay=args.weight_decay,
-                              momentum=args.momentum)
-    elif args.optim == "Adam":
-        optimizer = optim.Adam(model.parameters(),
-                               lr=args.learning_rate,
-                               weight_decay=args.weight_decay)
-    elif args.optim == "AdamW":
-        optimizer = optim.AdamW(model.parameters(),
-                                lr=args.learning_rate,
-                                weight_decay=args.weight_decay)
-    else:
-        raise NameError("Only SGD or Adam is allowed as --optim")
-
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [])
-
-    return criterion, optimizer, scheduler
-
-
-def main():
-
-    dataset = CompositionData(data_path=args.data_path,
-                              fea_path=args.fea_path)
+    dataset = CompositionData(data_path=data_path, fea_path=fea_path)
+    n_targets = dataset.n_targets
+    elem_emb_len = dataset.elem_emb_len
 
     train_idx = list(range(len(dataset)))
 
-    if args.test_path:
-        print(f"using independent test set: {args.test_path}")
-        test_set = CompositionData(data_path=args.test_path,
-                                    fea_path=args.fea_path)
-        test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
-    else:
-        print(f"using {args.test_size} of training set as test set")
-        train_idx, test_idx = split(train_idx, random_state=args.seed,
-                                    test_size=args.test_size)
-        test_set = torch.utils.data.Subset(dataset, test_idx)
-
-    if args.val_path:
-        print(f"using independent validation set: {args.val_path}")
-        val_set = CompositionData(data_path=args.val_path,
-                                    fea_path=args.fea_path)
-        val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
-    else:
-        if args.val_size == 0.0:
-            print("No validation set used, using test set for evaluation purposes")
-            # Note that when using this option care must be taken not to
-            # peak at the test-set. The only valid model to use is the one obtained
-            # after the final epoch where the epoch count is decided in advance of
-            # the experiment.
-            val_set = test_set
+    if evaluate:
+        if test_path:
+            print(f"using independent test set: {test_path}")
+            test_set = CompositionData(data_path=test_path, fea_path=fea_path)
+            test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
+        elif test_size == 0.0:
+            raise ValueError("test-size must be non-zero to evaluate model")
         else:
-            print(f"using {args.val_size} of training set as validation set")
-            train_idx, val_idx = split(train_idx, random_state=args.seed,
-                                    test_size=args.val_size/(1-args.test_size))
-            val_set = torch.utils.data.Subset(dataset, val_idx)
+            print(f"using {test_size} of training set as test set")
+            train_idx, test_idx = split(
+                train_idx, random_state=seed, test_size=test_size
+            )
+            test_set = torch.utils.data.Subset(dataset, test_idx)
 
-    train_set = torch.utils.data.Subset(dataset, train_idx[0::args.sample])
+    if train:
+        if val_path:
+            print(f"using independent validation set: {val_path}")
+            val_set = CompositionData(data_path=val_path, fea_path=fea_path)
+            val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
+        else:
+            if val_size == 0.0 and evaluate:
+                print("No validation set used, using test set for evaluation purposes")
+                # NOTE: that when using this option care must be taken not to
+                # peak at the test-set. The only valid model to use is the one obtained
+                # after the final epoch where the epoch count is decided in advance of
+                # the experiment.
+                val_set = test_set
+            elif val_size == 0.0:
+                val_set = None
+            else:
+                print(f"using {val_size} of training set as validation set")
+                train_idx, val_idx = split(
+                    train_idx,
+                    random_state=seed,
+                    test_size=val_size / (1 - test_size),
+                )
+                val_set = torch.utils.data.Subset(dataset, val_idx)
+
+        train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
+
+    # print(len(train_set), len(val_set), len(test_set))
+    # exit()
+
+    data_params = {
+        "batch_size": batch_size,
+        "num_workers": workers,
+        "pin_memory": False,
+        "shuffle": True,
+        "collate_fn": collate_batch,
+    }
+
+    model_params = {
+        "task": task,
+        "elem_emb_len": elem_emb_len,
+        "elem_fea_len": elem_fea_len,
+        "n_graph": n_graph,
+        "n_targets": n_targets,
+        "loss": loss,
+        "optim": optim,
+        "learning_rate": learning_rate,
+        "weight_decay": weight_decay,
+        "momentum": momentum,
+        "device": device,
+        "resume": resume,
+        "fine_tune": fine_tune,
+        "transfer": transfer,
+    }
 
     if not os.path.isdir("models/"):
         os.makedirs("models/")
+    if not os.path.isdir(f"models/{model_name}/"):
+        os.makedirs(f"models/{model_name}/")
 
-    if not os.path.isdir("runs/"):
-        os.makedirs("runs/")
+    if log:
+        if not os.path.isdir("runs/"):
+            os.makedirs("runs/")
 
     if not os.path.isdir("results/"):
         os.makedirs("results/")
 
-    if not args.evaluate:
-        train_ensemble(args.data_id, args.ensemble, train_set, val_set)
+    if train:
+        train_ensemble(
+            model_name=model_name,
+            run_id=run_id,
+            ensemble_folds=ensemble,
+            epochs=epochs,
+            train_set=train_set,
+            val_set=val_set,
+            log=log,
+            data_params=data_params,
+            model_params=model_params
+        )
 
-    test_ensemble(args.data_id, args.ensemble, test_set)
+    if evaluate:
+
+        reset = {
+            "resume": None,
+            "fine_tune": None,
+            "transfer": None,
+        }
+        model_params.update(reset)
+
+        test_ensemble(
+            model_name=model_name,
+            run_id=run_id,
+            ensemble_folds=ensemble,
+            test_set=test_set,
+            data_params=data_params,
+            model_params=model_params,
+            eval_type="checkpoint"
+            )
 
 
-def train_ensemble(data_id, ensemble_folds, train_set, val_set):
+def init_model(
+    model_name,
+    run_id,
+    task,
+    elem_emb_len,
+    elem_fea_len,
+    n_graph,
+    n_targets,
+    loss,
+    optim,
+    learning_rate,
+    weight_decay,
+    momentum,
+    device,
+    resume=None,
+    fine_tune=None,
+    transfer=None,
+):
+
+    # Select Loss Function
+    if task == "classification":
+        if n_targets == 1:
+            criterion = BCEWithLogitsLoss
+        elif n_targets > 1:
+            criterion = CrossEntropyLoss
+
+    elif task == "regression":
+        if loss == "L1":
+            criterion = L1Loss
+        elif loss == "L2":
+            criterion = MSELoss
+        # NOTE: when using Robust loss functions we also get an
+        # aleatoric error estimate hence n_targets * 2
+        elif loss == "RL1":
+            criterion = RobustL1
+            n_targets = n_targets * 2
+        elif loss == "RL2":
+            criterion = RobustL2
+            n_targets = n_targets * 2
+        else:
+            raise NameError(
+                "Only L1, L2, RL1 or RL2 losses are allowed for regression tasks"
+            )
+
+    model = Roost(
+        elem_emb_len=elem_emb_len,
+        elem_fea_len=elem_fea_len,
+        n_graph=n_graph,
+        out_dim=n_targets,
+        device=device,
+        task=task
+    )
+
+    model.to(device)
+
+    if fine_tune is not None:
+        print(f"Using {fine_tune} as a starting point for fine-tuning")
+        previous_state = load_previous_state(fine_tune, model, device)
+        model, _, _, _, _, _ = previous_state
+        model.epoch = 1
+        model.best_val_loss = None
+
+    if transfer is not None:
+        # TODO: currently if you use a model as a feature extractor and then
+        # resume for a checkpoint of that model the material_nn unfreezes.
+        print(f"Using {transfer} as a feature extractor and retrain the output_nn")
+        previous_state = load_previous_state(transfer, model, device)
+        model, _, _, _, _, _ = previous_state
+        for p in model.material_nn.parameters():
+            p.requires_grad = False
+
+        model.output_nn = ResidualNetwork(
+            input_dim=elem_fea_len,
+            hidden_layer_dims=[1024, 512, 256, 128, 64],
+            output_dim=n_targets,
+        )
+
+        model.epoch = 1
+        model.best_val_loss = None
+
+    # Select Optimiser
+    if optim == "SGD":
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            momentum=momentum,
+        )
+    elif optim == "Adam":
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay
+        )
+    elif optim == "AdamW":
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay
+        )
+    else:
+        raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
+
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [])
+
+    if model.task == "regression":
+        normalizer = Normalizer()
+    else:
+        normalizer = None
+
+    if args.resume:
+        checkpoint_file = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+        print(f"Resuming training from {checkpoint_file}")
+        previous_state = load_previous_state(
+            checkpoint_file, model, device, optimizer, normalizer, scheduler
+        )
+        model, optimizer, normalizer = previous_state[:3]
+        scheduler, start_epoch, best_val_loss = previous_state[3:]
+        model.epoch = start_epoch
+        model.best_val_loss = best_val_loss
+
+    num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Total Number of Trainable Parameters: {}".format(num_param))
+
+    # TODO: parallelise the code over multiple GPUs. Currently DataParallel
+    # crashes as subsets of the batch have different sizes due to the use of
+    # lists of lists rather the zero-padding.
+    # if (torch.cuda.device_count() > 1) and (device==torch.device("cuda")):
+    #     print("The model will use", torch.cuda.device_count(), "GPUs!")
+    #     model = nn.DataParallel(model)
+
+    model.to(device)
+
+    return model, criterion, optimizer, scheduler, normalizer
+
+
+def train_ensemble(
+    model_name,
+    run_id,
+    ensemble_folds,
+    epochs,
+    train_set,
+    val_set,
+    log,
+    data_params,
+    model_params
+):
     """
     Train multiple models
     """
 
-    params = {"batch_size": args.batch_size,
-              "num_workers": args.workers,
-              "pin_memory": False,
-              "shuffle": True,
-              "collate_fn": collate_batch}
+    train_generator = DataLoader(train_set, **data_params)
 
-    train_generator = DataLoader(train_set, **params)
-    val_generator = DataLoader(val_set, **params)
-
-    for run_id in range(ensemble_folds):
-        # this allows us to run ensembles in parallel rather than in series
-        # by specifiying the run-id arg.
-        if ensemble_folds == 1:
-            run_id = args.run_id
-
-        model, normalizer = init_model(train_set.dataset)
-        criterion, optimizer, scheduler = init_optim(model)
-
-        sample_target = torch.Tensor(train_set.dataset.df.iloc[:, 2].values)
-        normalizer.fit(sample_target)
-
-        writer = SummaryWriter(log_dir=("runs/{f}_r-{r}_s-{s}_t-{t}_"
-                                        "{date:%d-%m-%Y_%H:%M:%S}").format(
-                                            date=datetime.datetime.now(),
-                                            f=data_id,
-                                            r=run_id,
-                                            s=args.seed,
-                                            t=args.sample))
-
-        experiment(data_id, run_id, train_generator, val_generator,
-                    model, optimizer, criterion, normalizer,  scheduler, writer)
-
-
-def experiment(data_id, run_id,
-               train_generator, val_generator,
-               model, optimizer, criterion,
-               normalizer, scheduler, writer):
-    """
-    for given training and validation sets run an experiment.
-    """
-    checkpoint_file = (f"models/checkpoint_{data_id}_r-{run_id}"
-                       f"_s-{args.seed}_t-{args.sample}.pth.tar")
-
-    best_file = (f"models/best_{data_id}_r-{run_id}"
-                 f"_s-{args.seed}_t-{args.sample}.pth.tar")
-
-    if args.resume:
-        print(f"Resume Training from {checkpoint_file}")
-        previous_state = load_previous_state(checkpoint_file,
-                                             model,
-                                             args.device,
-                                             optimizer,
-                                             normalizer,
-                                             scheduler)
-        model, optimizer, normalizer, scheduler, start_epoch, best_mae = previous_state
-        model.epoch = start_epoch
-        model.best_mae = best_mae
-        model.to(args.device)
+    if val_set is not None:
+        val_generator = DataLoader(val_set, **data_params)
     else:
-        if args.fine_tune:
-            print(f"Fine tune from {args.fine_tune}")
-            previous_state = load_previous_state(args.fine_tune,
-                                                 model,
-                                                 args.device)
-            model, _, _, _, _, _ = previous_state
-            model.to(args.device)
-            criterion, optimizer, scheduler = init_optim(model)
-        elif args.transfer:
-            print(f"Use {args.transfer} as a feature extractor and retrain last layer")
-            previous_state = load_previous_state(args.transfer,
-                                                 model,
-                                                 args.device)
-            model, _, _, _, _, _ = previous_state
-            for p in model.parameters():
-                p.requires_grad = False
-            num_ftrs = model.output_nn.fc_out.in_features
-            model.output_nn.fc_out = nn.Linear(num_ftrs, 2)
-            model.to(args.device)
-            criterion, optimizer, scheduler = init_optim(model)
+        val_generator = None
 
-        _, best_mae, _ = model.evaluate(generator=val_generator,
-                                  criterion=criterion,
-                                  optimizer=None,
-                                  normalizer=normalizer,
-                                  task="val")
-        model.epoch = 1
-        model.best_mae = best_mae
+    for run in range(ensemble_folds):
+        #  this allows us to run ensembles in parallel rather than in series
+        #  by specifiying the run-id arg.
+        if ensemble_folds == 1:
+            run = run_id
 
-    model.fit(train_generator, val_generator, optimizer,
-            scheduler, args.epochs, criterion, normalizer,
-            writer, checkpoint_file, best_file)
+        model, criterion, optimizer, scheduler, normalizer = init_model(
+            model_name=model_name, run_id=run, **model_params
+        )
+
+        if model.task == "regression":
+            sample_target = torch.Tensor(
+                train_set.dataset.df.iloc[train_set.indices, 2].values
+            )
+            normalizer.fit(sample_target)
+
+        if log:
+            writer = SummaryWriter(
+                log_dir=(
+                    f"runs/{model_name}-r{run}_""{date:%d-%m-%Y_%H-%M-%S}"
+                ).format(date=datetime.datetime.now())
+            )
+
+        if val_set is not None and model.best_val_loss is None:
+            model.best_val_loss = model.evaluate(
+                generator=val_generator,
+                criterion=criterion,
+                optimizer=None,
+                normalizer=normalizer,
+                action="val",
+            )[0]
+
+        model.fit(
+            train_generator=train_generator,
+            val_generator=val_generator,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            epochs=epochs,
+            criterion=criterion,
+            normalizer=normalizer,
+            model_name=model_name,
+            run_id=run_id,
+            writer=writer,
+        )
 
 
-def test_ensemble(data_id, ensemble_folds, hold_out_set):
+def test_ensemble(
+    model_name,
+    run_id,
+    ensemble_folds,
+    test_set,
+    data_params,
+    model_params,
+    eval_type="checkpoint",
+):
     """
     take an ensemble of models and evaluate their performance on the test set
     """
 
-    print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-          "------------Evaluate model on Test Set------------\n"
-          "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    print(
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        "------------Evaluate model on Test Set------------\n"
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+    )
 
-    params = {"batch_size": args.batch_size,
-              "num_workers": args.workers,
-              "pin_memory": False,
-              "shuffle": False,
-              "collate_fn": collate_batch}
+    test_generator = DataLoader(test_set, **data_params)
 
-    test_generator = DataLoader(hold_out_set, **params)
+    model, criterion, _, _, normalizer = init_model(
+        model_name=model_name, run_id=run_id, **model_params
+    )
 
-    model, normalizer = init_model(hold_out_set.dataset)
-    criterion, _, _, = init_optim(model)
-
-    y_ensemble = np.zeros((ensemble_folds, len(hold_out_set)))
-    y_aleatoric = np.zeros((ensemble_folds, len(hold_out_set)))
+    y_ensemble = np.zeros((ensemble_folds, len(test_set)))
+    y_aleatoric = np.zeros((ensemble_folds, len(test_set)))
 
     for j in range(ensemble_folds):
 
         if ensemble_folds == 1:
-            j = args.run_id
+            j = run_id
             print("Evaluating Model")
         else:
-            print("Evaluating Model {}/{}".format(j+1, ensemble_folds))
+            print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
 
-        checkpoint = torch.load(f=(f"models/checkpoint_{data_id}_r-{j}_"
-                                   f"s-{args.seed}_t-{args.sample}.pth.tar"),
-                                map_location=args.device)
+        checkpoint = torch.load(
+            f=(f"models/{model_name}/{eval_type}-r{j}.pth.tar"),
+            map_location=model_params["device"],
+        )
 
         model.load_state_dict(checkpoint["state_dict"])
         normalizer.load_state_dict(checkpoint["normalizer"])
 
         model.eval()
-        idx, comp, y_test, pred, std = model.evaluate(generator=test_generator,
-                                                    criterion=criterion,
-                                                    optimizer=None,
-                                                    normalizer=normalizer,
-                                                    task="test")
+        idx, comp, y_test, pred, std = model.evaluate(
+            generator=test_generator,
+            criterion=criterion,
+            optimizer=None,
+            normalizer=normalizer,
+            action="test",
+        )
 
         if ensemble_folds == 1:
             j = 0
 
-        y_ensemble[j,:] = pred
-        y_aleatoric[j,:] = std
+        y_ensemble[j, :] = pred
+        y_aleatoric[j, :] = std
 
     res = y_ensemble - y_test
     mae = np.mean(np.abs(res), axis=1)
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
-    r2 = 1 - mse/np.var(y_ensemble)
+    r2 = 1 - mse / np.var(y_ensemble)
 
     if ensemble_folds == 1:
         print("\nModel Performance Metrics:")
@@ -319,22 +474,20 @@ def test_ensemble(data_id, ensemble_folds, hold_out_set):
         print("RMSE: {:.4f}".format(rmse_ens))
 
     core = {"id": idx, "composition": comp, "target": y_test}
-    results = {"pred-{}".format(num): values for (num, values)
-                in enumerate(y_ensemble)}
-    errors = {"aleatoric-{}".format(num): values for (num, values)
-                in enumerate(y_aleatoric)}
+    results = {f"pred-{num}": val for (num, val) in enumerate(y_ensemble)}
+    errors = {f"aleatoric-{num}": val for (num, val) in enumerate(y_aleatoric)}
 
     df = pd.DataFrame({**core, **results, **errors})
 
     if ensemble_folds == 1:
-        df.to_csv(index=False,
-                  path_or_buf=(f"results/test_results_{data_id}_"
-                               f"r-{args.run_id}_s-{args.seed}_"
-                               f"t-{args.sample}.csv"))
+        df.to_csv(
+            index=False,
+            path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
+        )
     else:
-        df.to_csv(index=False,
-                  path_or_buf=(f"results/ensemble_results_{data_id}_"
-                               f"s-{args.seed}_t-{args.sample}.csv"))
+        df.to_csv(
+            index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
+        )
 
 
 if __name__ == "__main__":
@@ -342,4 +495,4 @@ if __name__ == "__main__":
 
     print(f"The model will run on the {args.device} device")
 
-    main()
+    main(**vars(args))

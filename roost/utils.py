@@ -8,61 +8,60 @@ import torch.nn as nn
 from tqdm.autonotebook import trange
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
+from torch.nn.functional import mse_loss as mse
 
 
 class BaseModelClass(nn.Module):
     """
     A base class for models.
     """
-
-    def __init__(self, device=torch.device("cpu"), epoch=1, best_mae=None):
+    def __init__(self, task, device=torch.device("cpu"), epoch=1, best_val_loss=None):
         super(BaseModelClass, self).__init__()
+        self.task = task
         self.device = device
-        self.best_mae = best_mae  # large number as placeholder
         self.epoch = epoch
-        pass
+        self.best_val_loss = best_val_loss
 
     def fit(self, train_generator, val_generator, optimizer,
-            scheduler, epochs, criterion, normalizer, writer,
-            checkpoint_file, best_file):
+            scheduler, epochs, criterion, normalizer,
+            model_name, run_id, writer=None):
         start_epoch = self.epoch
         try:
             for epoch in range(start_epoch, start_epoch+epochs):
                 self.epoch += 1
                 # Training
-                t_loss, t_mae, t_rmse = self.evaluate(generator=train_generator,
+                t_loss, t_metrics = self.evaluate(generator=train_generator,
                                                         criterion=criterion,
                                                         optimizer=optimizer,
                                                         normalizer=normalizer,
-                                                        task="train",
+                                                        action="train",
                                                         verbose=True)
 
+                print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
+                print(f"Train      : Loss {t_loss:.4f}\t"+
+                    "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()]))
+
                 # Validation
-                with torch.no_grad():
-                    # evaluate on validation set
-                    v_loss, v_mae, v_rmse = self.evaluate(generator=val_generator,
+                if val_generator is not None:
+                    with torch.no_grad():
+                        # evaluate on validation set
+                        v_loss, v_metrics = self.evaluate(generator=val_generator,
                                                           criterion=criterion,
                                                           optimizer=None,
                                                           normalizer=normalizer,
-                                                          task="val")
+                                                          action="val")
 
-                # if epoch % args.print_freq == 0:
-                print("Epoch: [{}/{}]\n"
-                        "Train      : Loss {:.4f}\t"
-                        "MAE {:.3f}\t RMSE {:.3f}\n"
-                        "Validation : Loss {:.4f}\t"
-                        "MAE {:.3f}\t RMSE {:.3f}\n".format(
-                        epoch, start_epoch + epochs - 1,
-                        t_loss, t_mae, t_rmse,
-                        v_loss, v_mae, v_rmse))
+                    print(f"Validation : Loss {v_loss:.4f}\t"+
+                        "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()]))
 
-                is_best = v_mae < self.best_mae
-                if is_best:
-                    self.best_mae = v_mae
+                    is_best = v_loss < self.best_val_loss
+                    if is_best: self.best_val_loss = v_loss
+                else:
+                    is_best = False
 
                 checkpoint_dict = {"state_dict": self.state_dict(),
                                     "epoch": self.epoch,
-                                    "best_error": self.best_mae,
+                                    "best_val_loss": self.best_val_loss,
                                     "optimizer": optimizer.state_dict(),
                                     "normalizer": normalizer.state_dict(),
                                     "scheduler": scheduler.state_dict(),
@@ -70,15 +69,18 @@ class BaseModelClass(nn.Module):
 
                 save_checkpoint(checkpoint_dict,
                                 is_best,
-                                checkpoint_file,
-                                best_file)
+                                model_name,
+                                run_id)
 
-                writer.add_scalar("loss/train", t_loss, epoch+1)
-                writer.add_scalar("loss/validation", v_loss, epoch+1)
-                writer.add_scalar("rmse/train", t_rmse, epoch+1)
-                writer.add_scalar("rmse/validation", v_rmse, epoch+1)
-                writer.add_scalar("mae/train", t_mae, epoch+1)
-                writer.add_scalar("mae/validation", v_mae, epoch+1)
+                if writer is not None:
+                    writer.add_scalar("train/loss", t_loss, epoch+1)
+                    for metric, val in t_metrics.items():
+                        writer.add_scalar(f"train/{metric}", val, epoch+1)
+
+                    if val_generator is not None:
+                        writer.add_scalar("validation/loss", v_loss, epoch+1)
+                        for metric, val in v_metrics.items():
+                            writer.add_scalar(f"validation/{metric}", val, epoch+1)
 
                 scheduler.step()
 
@@ -88,15 +90,16 @@ class BaseModelClass(nn.Module):
         except KeyboardInterrupt:
             pass
 
-        writer.close()
+        if writer is not None: 
+            writer.close()
 
-    def evaluate(self, generator, criterion, optimizer,
-                    normalizer, task="train", verbose=False):
+    def evaluate(self, generator, criterion, optimizer, normalizer, 
+                    action="train", verbose=False):
         """
         evaluate the model
         """
 
-        if task == "test":
+        if action == "test":
             self.eval()
             test_targets = []
             test_pred = []
@@ -107,12 +110,12 @@ class BaseModelClass(nn.Module):
             loss_meter = AverageMeter()
             rmse_meter = AverageMeter()
             mae_meter = AverageMeter()
-            if task == "val":
+            if action == "val":
                 self.eval()
-            elif task == "train":
+            elif action == "train":
                 self.train()
             else:
-                raise NameError("Only train, val or test is allowed as task")
+                raise NameError("Only train, val or test is allowed as action")
 
         with trange(len(generator), disable=(not verbose)) as t:
             for input_, target, batch_comp, batch_ids in generator:
@@ -130,7 +133,7 @@ class BaseModelClass(nn.Module):
                 # get predictions and error
                 pred = normalizer.denorm(output.data.cpu())
 
-                if task == "test":
+                if action == "test":
                     # get the aleatoric std
                     std = torch.exp(log_std).data.cpu()*normalizer.std
 
@@ -151,7 +154,7 @@ class BaseModelClass(nn.Module):
                     rmse_error = mse(pred, target).sqrt_()
                     rmse_meter.update(rmse_error, target.size(0))
 
-                    if task == "train":
+                    if action == "train":
                         # compute gradient and do SGD step
                         optimizer.zero_grad()
                         loss.backward()
@@ -159,18 +162,10 @@ class BaseModelClass(nn.Module):
 
                 t.update()
 
-        if task == "test":
+        if action == "test":
             return test_ids, test_comp, test_targets, test_pred, test_std
         else:
-            return loss_meter.avg, mae_meter.avg, rmse_meter.avg
-
-    def predict(self, generator, criterion, optimizer,
-                normalizer, verbose=False):
-        """
-        alias to evaluate on test set
-        """
-        return self.evaluate(generator, criterion, optimizer,
-                                normalizer, verbose, task="test")
+            return loss_meter.avg, {"MAE":mae_meter.avg, "RMSE":rmse_meter.avg}
 
 
 class AverageMeter(object):
@@ -218,12 +213,12 @@ class Normalizer(object):
         self.std = state_dict["std"].cpu()
 
 
-def save_checkpoint(state, is_best,
-                    checkpoint="checkpoint.pth.tar",
-                    best="best.pth.tar"):
+def save_checkpoint(state, is_best, model_name, run_id):
     """
     Saves a checkpoint and overwrites the best model when is_best = True
     """
+    checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+    best = f"models/{model_name}/best-r{run_id}.pth.tar"
 
     torch.save(state, checkpoint)
     if is_best:
@@ -238,17 +233,17 @@ def load_previous_state(path, model, device, optimizer=None,
 
     checkpoint = torch.load(path, map_location=device)
     start_epoch = checkpoint["epoch"]
-    best_error = checkpoint["best_error"].cpu()
+    best_val_loss = checkpoint["best_val_loss"].cpu()
     model.load_state_dict(checkpoint["state_dict"])
     if optimizer:
         optimizer.load_state_dict(checkpoint["optimizer"])
-    if normalizer:
+    if normalizer and model.task == "regression":
         normalizer.load_state_dict(checkpoint["normalizer"])
     if scheduler:
         scheduler.load_state_dict(checkpoint["scheduler"])
     print("Loaded '{}'".format(path))
 
-    return model, optimizer, normalizer, scheduler, start_epoch, best_error
+    return model, optimizer, normalizer, scheduler, start_epoch, best_val_loss
 
 
 def RobustL1(output, log_std, target):

@@ -49,31 +49,7 @@ class Roost(BaseModelClass):
     def forward(self, elem_weights, elem_fea, self_fea_idx,
                 nbr_fea_idx, crystal_elem_idx):
         """
-        Forward pass
-
-        Parameters
-        ----------
-        N: Total number of elems (nodes) in the batch
-        M: Total number of bonds (edges) in the batch
-        C: Total number of crystals (graphs) in the batch
-
-        Inputs
-        ----------
-        elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
-            Atom features of each of the N elems in the batch
-        self_fea_idx: torch.Tensor shape (M,)
-            Indices of the elem each of the M bonds correspond to
-        nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of of the neighbours of the M bonds connect to
-        elem_bond_idx: list of torch.LongTensor of length C
-            Mapping from the bond idx to elem idx
-        crystal_elem_idx: list of torch.LongTensor of length C
-            Mapping from the elem idx to crystal idx
-
-        Returns
-        -------
-        out: nn.Variable shape (C,)
-            Atom hidden features after message passing
+        Forward pass through the material_nn and output_nn
         """
 
         crys_fea = self.material_nn(elem_weights, elem_fea, self_fea_idx,
@@ -279,7 +255,7 @@ class WeightedAttention(nn.Module):
         gate = (weights ** self.pow) * gate.exp()
         # gate = weights * gate.exp()
         # gate = gate.exp()
-        gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-13)
+        gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-10)
 
         fea = self.message_nn(fea)
         out = scatter_add(gate * fea, index, dim=0)

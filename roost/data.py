@@ -77,17 +77,25 @@ def input_parser():
                         metavar="N",
                         help="sub-sample the training set for learning curves")
 
+    task_group = parser.add_mutually_exclusive_group()
+    task_group.add_argument("--classification",
+                            action="store_true",
+                            help="specifies a classification task")
+    task_group.add_argument("--regression",
+                            action="store_true",
+                            help="specifies a regression task") 
+
     # optimiser inputs
     parser.add_argument("--epochs",
                         default=100,
                         type=int,
                         metavar="N",
-                        help="number of total epochs to run (default: 100)")
+                        help="number of total epochs to run (default: 100)") 
     parser.add_argument("--loss",
-                        default="L1",
+                        default="RL1",
                         type=str,
                         metavar="str",
-                        help="choose a (Robust) Loss Function; L2 or L1 (default: 'L1')")
+                        help="Loss Function (default: 'RL1')")
     parser.add_argument("--optim",
                         default="AdamW",
                         type=str,
@@ -110,7 +118,7 @@ def input_parser():
                         help="weight decay (default: 1e-6)")
 
     # graph inputs
-    parser.add_argument("--atom-fea-len",
+    parser.add_argument("--elem-fea-len",
                         default=64,
                         type=int,
                         metavar="N",
@@ -122,6 +130,10 @@ def input_parser():
                         help="number of graph layers (default: 3)")
 
     # ensemble inputs
+    parser.add_argument("--model-name",
+                        type=str,
+                        default=None,
+                        help="name for model")
     parser.add_argument("--data-id",
                         default="roost",
                         type=str,
@@ -140,9 +152,6 @@ def input_parser():
 
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
-    use_group.add_argument("--evaluate",
-                        action="store_true",
-                        help="skip network training stages checkpoint") 
     use_group.add_argument("--resume",
                         action="store_true",
                         help="resume from previous checkpoint")
@@ -155,23 +164,44 @@ def input_parser():
                         metavar="PATH",
                         help="checkpoint path for fine tuning")
 
+    parser.add_argument("--evaluate",
+                    action="store_true",
+                    help="skip network training stages checkpoint")
+    parser.add_argument("--train",
+                    action="store_true",
+                    help="skip network training stages checkpoint") 
+
     # misc
     parser.add_argument("--disable-cuda",
                         action="store_true",
                         help="Disable CUDA")
+    parser.add_argument("--log",
+                        default=True,
+                        type=bool,
+                        help="Disable CUDA")
 
     args = parser.parse_args(sys.argv[1:])
 
-    if args.test_path:
-        args.test_size = 0
-    else:
-        assert 0.0 < args.test_size
-        assert args.test_size < 1.0
+    if args.model_name is None:
+        args.model_name = f"{args.data_id}_s-{args.seed}_t-{args.sample}"
 
+    if args.regression:
+        args.task = "regression"
+    elif args.classification:
+        args.task = "classification"
+    else:
+        args.task = "regression"
+
+    if args.evaluate:
+        if not args.test_path:
+            assert args.test_size < 1.0
+        else:
+            args.test_size = 0
+            
     if not (args.test_path and args.val_path):
         assert args.test_size + args.val_size < 1.0
 
-    args.device = torch.device("cuda") if (not args.disable_cuda) and  \
+    args.device = torch.device("cuda") if (not args.disable_cuda) and \
         torch.cuda.is_available() else torch.device("cpu")
 
     return args
@@ -182,18 +212,22 @@ class CompositionData(Dataset):
     The CompositionData dataset is a wrapper for a dataset data points are
     automatically constructed from composition strings.
     """
-    def __init__(self, data_path, fea_path):
+    def __init__(self, data_path, fea_path, df=None):
         """
         """
-        assert os.path.exists(data_path), \
-            "{} does not exist!".format(data_path)
-        # make sure to use dense datasets, here do not use the default na
-        # as they can clash with "NaN" which is a valid material
-        self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+        if df:
+            self.df = df
+        else:
+            assert os.path.exists(data_path), \
+                "{} does not exist!".format(data_path)
+            # make sure to use dense datasets, here do not use the default na
+            # as they can clash with "NaN" which is a valid material
+            self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
-        self.atom_features = LoadFeaturiser(fea_path)
-        self.atom_emb_len = self.atom_features.embedding_size()
+        self.elem_features = LoadFeaturiser(fea_path)
+        self.elem_emb_len = self.elem_features.embedding_size()
+        self.n_targets = self.df.shape[1]-2
 
     def __len__(self):
         return len(self.df)
@@ -218,12 +252,12 @@ class CompositionData(Dataset):
             input id for the material
         """
         # cry_id, composition, target = self.id_prop_data[idx]
-        cry_id, composition, target = self.df.iloc[idx]
+        cry_id, composition, *targets = self.df.iloc[idx]
         elements, weights = parse(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, f"cry-id {cry_id} [{composition}] is a pure system"
         try:
-            atom_fea = np.vstack([self.atom_features.get_fea(element)
+            atom_fea = np.vstack([self.elem_features.get_fea(element)
                                   for element in elements])
         except AssertionError:
             raise AssertionError(f"cry-id {cry_id} [{composition}] contains invalid atom types not in embedding")
@@ -243,10 +277,10 @@ class CompositionData(Dataset):
         atom_fea = torch.Tensor(atom_fea)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
-        target = torch.Tensor([float(target)])
+        targets = torch.Tensor([float(t) for t in targets])
 
         return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), \
-            target, composition, cry_id
+            targets, composition, cry_id
 
 
 def collate_batch(dataset_list):
