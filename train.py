@@ -5,11 +5,13 @@ import numpy as np
 import pandas as pd
 
 import torch
-from torch.nn import L1Loss, MSELoss, BCEWithLogitsLoss, CrossEntropyLoss
+from torch.nn import L1Loss, MSELoss, CrossEntropyLoss
+from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, \
+                            precision_recall_fscore_support
 from sklearn.model_selection import train_test_split as split
 
 from roost.model import Roost, ResidualNetwork
@@ -22,6 +24,7 @@ def main(
     fea_path,
     task,
     loss,
+    robust,
     model_name="roost",
     elem_fea_len=64,
     n_graph=3,
@@ -51,7 +54,8 @@ def main(
     **kwargs,
 ):
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path)
+    dataset = CompositionData(data_path=data_path, fea_path=fea_path,
+                                task=task)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -101,7 +105,8 @@ def main(
     # exit()
 
     data_params = {
-        "batch_size": batch_size,
+        "batch_size": batch_size, # NOTE could speed up inference by
+                                  # having larger batches for val/test
         "num_workers": workers,
         "pin_memory": False,
         "shuffle": True,
@@ -110,6 +115,7 @@ def main(
 
     model_params = {
         "task": task,
+        "robust": robust,
         "elem_emb_len": elem_emb_len,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
@@ -159,21 +165,33 @@ def main(
         }
         model_params.update(reset)
 
-        test_ensemble(
-            model_name=model_name,
-            run_id=run_id,
-            ensemble_folds=ensemble,
-            test_set=test_set,
-            data_params=data_params,
-            model_params=model_params,
-            eval_type="checkpoint"
-            )
+        if task == "regression":
+            results_regression(
+                model_name=model_name,
+                run_id=run_id,
+                ensemble_folds=ensemble,
+                test_set=test_set,
+                data_params=data_params,
+                model_params=model_params,
+                eval_type="checkpoint"
+                )
+        elif task == "classification":
+            results_classification(
+                model_name=model_name,
+                run_id=run_id,
+                ensemble_folds=ensemble,
+                test_set=test_set,
+                data_params=data_params,
+                model_params=model_params,
+                eval_type="checkpoint"
+                )
 
 
 def init_model(
     model_name,
     run_id,
     task,
+    robust,
     elem_emb_len,
     elem_fea_len,
     n_graph,
@@ -189,38 +207,14 @@ def init_model(
     transfer=None,
 ):
 
-    # Select Loss Function
-    if task == "classification":
-        if n_targets == 1:
-            criterion = BCEWithLogitsLoss
-        elif n_targets > 1:
-            criterion = CrossEntropyLoss
-
-    elif task == "regression":
-        if loss == "L1":
-            criterion = L1Loss
-        elif loss == "L2":
-            criterion = MSELoss
-        # NOTE: when using Robust loss functions we also get an
-        # aleatoric error estimate hence n_targets * 2
-        elif loss == "RL1":
-            criterion = RobustL1
-            n_targets = n_targets * 2
-        elif loss == "RL2":
-            criterion = RobustL2
-            n_targets = n_targets * 2
-        else:
-            raise NameError(
-                "Only L1, L2, RL1 or RL2 losses are allowed for regression tasks"
-            )
-
     model = Roost(
         elem_emb_len=elem_emb_len,
         elem_fea_len=elem_fea_len,
         n_graph=n_graph,
-        out_dim=n_targets,
+        n_targets=n_targets,
+        task=task,
+        robust=robust,
         device=device,
-        task=task
     )
 
     model.to(device)
@@ -230,7 +224,7 @@ def init_model(
         previous_state = load_previous_state(fine_tune, model, device)
         model, _, _, _, _, _ = previous_state
         model.epoch = 1
-        model.best_val_loss = None
+        model.best_val_score = None
 
     if transfer is not None:
         # TODO: currently if you use a model as a feature extractor and then
@@ -248,7 +242,7 @@ def init_model(
         )
 
         model.epoch = 1
-        model.best_val_loss = None
+        model.best_val_score = None
 
     # Select Optimiser
     if optim == "SGD":
@@ -275,10 +269,40 @@ def init_model(
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [])
 
-    if model.task == "regression":
-        normalizer = Normalizer()
-    else:
+        # Select Loss Function
+    if task == "classification":
         normalizer = None
+
+        if robust:
+            raise NotImplementedError(
+        "Robust/Hetroskedastic classifaction is not currently implemented"
+        )
+        else:
+            criterion = CrossEntropyLoss()
+
+    elif task == "regression":
+        normalizer = Normalizer()
+
+        # NOTE: when using Robust loss functions we also get an
+        # aleatoric error estimate hence n_targets * 2
+        if robust:
+            if loss == "L1":
+                criterion = RobustL1
+            elif loss == "L2":
+                criterion = RobustL2
+            else:
+                raise NameError(
+                "Only L1 or L2 losses are allowed for robust regression tasks"
+                )
+        else:
+            if loss == "L1":
+                criterion = L1Loss()
+            elif loss == "L2":
+                criterion = MSELoss()
+            else:
+                raise NameError(
+                "Only L1 or L2 losses are allowed for regression tasks"
+                )
 
     if args.resume:
         checkpoint_file = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
@@ -287,9 +311,9 @@ def init_model(
             checkpoint_file, model, device, optimizer, normalizer, scheduler
         )
         model, optimizer, normalizer = previous_state[:3]
-        scheduler, start_epoch, best_val_loss = previous_state[3:]
+        scheduler, start_epoch, best_val_score = previous_state[3:]
         model.epoch = start_epoch
-        model.best_val_loss = best_val_loss
+        model.best_val_score = best_val_score
 
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total Number of Trainable Parameters: {}".format(num_param))
@@ -350,15 +374,19 @@ def train_ensemble(
                     f"runs/{model_name}-r{run}_""{date:%d-%m-%Y_%H-%M-%S}"
                 ).format(date=datetime.datetime.now())
             )
+        else:
+            writer = None
 
-        if val_set is not None and model.best_val_loss is None:
-            model.best_val_loss = model.evaluate(
-                generator=val_generator,
-                criterion=criterion,
-                optimizer=None,
-                normalizer=normalizer,
-                action="val",
-            )[0]
+        if val_set is not None and model.best_val_score is None:
+            with torch.no_grad():
+                _, v_metrics = model.evaluate(
+                    generator=val_generator,
+                    criterion=criterion,
+                    optimizer=None,
+                    normalizer=normalizer,
+                    action="val",
+                )
+                model.best_val_score = v_metrics[model.scoring_rule]
 
         model.fit(
             train_generator=train_generator,
@@ -374,7 +402,7 @@ def train_ensemble(
         )
 
 
-def test_ensemble(
+def results_regression(
     model_name,
     run_id,
     ensemble_folds,
@@ -395,7 +423,7 @@ def test_ensemble(
 
     test_generator = DataLoader(test_set, **data_params)
 
-    model, criterion, _, _, normalizer = init_model(
+    model, _, _, _, normalizer = init_model(
         model_name=model_name, run_id=run_id, **model_params
     )
 
@@ -415,29 +443,32 @@ def test_ensemble(
             map_location=model_params["device"],
         )
 
-        model.load_state_dict(checkpoint["state_dict"])
-        normalizer.load_state_dict(checkpoint["normalizer"])
-
-        model.eval()
-        idx, comp, y_test, pred, std = model.evaluate(
-            generator=test_generator,
-            criterion=criterion,
-            optimizer=None,
-            normalizer=normalizer,
-            action="test",
-        )
-
         if ensemble_folds == 1:
             j = 0
 
-        y_ensemble[j, :] = pred
-        y_aleatoric[j, :] = std
+        model.load_state_dict(checkpoint["state_dict"])
+        normalizer.load_state_dict(checkpoint["normalizer"])
+
+        with torch.no_grad():
+            idx, comp, y_test, output = model.predict(
+                generator=test_generator,
+            )
+
+        if model.robust:
+            pred, log_std = output.chunk(2, dim=1)
+            pred = normalizer.denorm(pred.data.cpu())
+            std = torch.exp(log_std).data.cpu()*normalizer.std
+            y_aleatoric[j, :] = std.view(-1).numpy()
+        else:
+            pred = normalizer.denorm(output.data.cpu())
+
+        y_ensemble[j, :] = pred.view(-1).numpy()
 
     res = y_ensemble - y_test
     mae = np.mean(np.abs(res), axis=1)
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
-    r2 = 1 - mse / np.var(y_ensemble)
+    r2 = 1 - mse / np.var(y_ensemble, axis=1)
 
     if ensemble_folds == 1:
         print("\nModel Performance Metrics:")
@@ -455,29 +486,31 @@ def test_ensemble(
         rmse_std = np.std(rmse)
 
         print("\nModel Performance Metrics:")
-        print("R2 Score: {:.4f} +/- {:.4f}".format(r2_avg, r2_std))
-        print("MAE: {:.4f} +/- {:.4f}".format(mae_avg, mae_std))
-        print("RMSE: {:.4f} +/- {:.4f}".format(rmse_avg, rmse_std))
+        print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
+        print(f"MAE: {mae_avg:.4f} +/- {mae_std:.4f}")
+        print(f"RMSE: {rmse_avg:.4f} +/- {rmse_std:.4f}")
 
         # calculate metrics and errors with associated errors for ensembles
         y_ens = np.mean(y_ensemble, axis=0)
 
-        ae = np.abs(y_test - y_ens)
-        mae_ens = np.mean(ae)
+        mae_ens = np.abs(y_test - y_ens).mean()
+        mse_ens = np.square(y_test - y_ens).mean()
+        rmse_ens = np.sqrt(mse)
 
-        se = np.square(y_test - y_ens)
-        rmse_ens = np.sqrt(np.mean(se))
+        r2_ens = 1 - mse_ens / np.var(y_ens)
 
         print("\nEnsemble Performance Metrics:")
         print("R2 Score: {:.4f} ".format(r2_score(y_test, y_ens)))
-        print("MAE: {:.4f}".format(mae_ens))
-        print("RMSE: {:.4f}".format(rmse_ens))
+        print(f"R2 Score: {r2_ens:.4f} ")
+        print(f"MAE: {mae_ens:.4f}")
+        print(f"RMSE: {rmse_ens:.4f}")
 
     core = {"id": idx, "composition": comp, "target": y_test}
     results = {f"pred-{num}": val for (num, val) in enumerate(y_ensemble)}
-    errors = {f"aleatoric-{num}": val for (num, val) in enumerate(y_aleatoric)}
+    if model.robust:
+        results.update({f"aleatoric-{num}": val for (num, val) in enumerate(y_aleatoric)})
 
-    df = pd.DataFrame({**core, **results, **errors})
+    df = pd.DataFrame({**core, **results})
 
     if ensemble_folds == 1:
         df.to_csv(
@@ -488,6 +521,142 @@ def test_ensemble(
         df.to_csv(
             index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
         )
+
+
+def results_classification(
+    model_name,
+    run_id,
+    ensemble_folds,
+    test_set,
+    data_params,
+    model_params,
+    eval_type="checkpoint",
+):
+    """
+    take an ensemble of models and evaluate their performance on the test set
+    """
+
+    print(
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        "------------Evaluate model on Test Set------------\n"
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+    )
+
+    test_generator = DataLoader(test_set, **data_params)
+
+    model, _, _, _, _ = init_model(
+        model_name=model_name, run_id=run_id, **model_params
+    )
+
+    y_ensemble = np.zeros((ensemble_folds, len(test_set), model.n_targets))
+
+    metrics = np.zeros((ensemble_folds, 5))
+
+    for j in range(ensemble_folds):
+
+        if ensemble_folds == 1:
+            j = run_id
+            print("Evaluating Model")
+        else:
+            print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
+
+        checkpoint = torch.load(
+            f=(f"models/{model_name}/{eval_type}-r{j}.pth.tar"),
+            map_location=model_params["device"],
+        )
+
+        if ensemble_folds == 1:
+            j = 0
+
+        model.load_state_dict(checkpoint["state_dict"])
+
+        with torch.no_grad():
+            idx, comp, y_test, output = model.predict(
+                generator=test_generator,
+            )
+        
+        if model.robust:
+            raise NotImplementedError(
+        "Robust/Hetroskedastic classifaction is not currently implemented"
+        )
+        else:
+            pred = output.data.cpu()
+            logits = softmax(pred, dim=1)
+
+        y_ensemble[j, :, :] = logits.numpy()
+
+        y_test_ohe = np.zeros_like(pred)
+        y_test_ohe[np.arange(y_test.size), y_test] = 1
+
+        print(accuracy_score(y_test, np.argmax(logits, axis=1)))
+        print(roc_auc_score(y_test_ohe, logits))
+        print(precision_recall_fscore_support(y_test, np.argmax(pred, axis=1))[:3])
+
+        # metrics[j,0] = accuracy_score(y_test, np.argmax(logits, axis=1))
+        # metrics[j,1] = roc_auc_score(y_test_ohe, logits)
+        # metrics[j,2:] = precision_recall_fscore_support(y_test, np.argmax(pred, axis=1))[:3]
+        
+    print(metrics)
+
+    # res = y_ensemble - y_test
+    # mae = np.mean(np.abs(res), axis=1)
+    # mse = np.mean(np.square(res), axis=1)
+    # rmse = np.sqrt(mse)
+    # r2 = 1 - mse / np.var(y_ensemble, axis=1)
+
+    # if ensemble_folds == 1:
+    #     print("\nModel Performance Metrics:")
+    #     print("R2 Score: {:.4f} ".format(r2[0]))
+    #     print("MAE: {:.4f}".format(mae[0]))
+    #     print("RMSE: {:.4f}".format(rmse[0]))
+    # else:
+    #     r2_avg = np.mean(r2)
+    #     r2_std = np.std(r2)
+
+    #     mae_avg = np.mean(mae)
+    #     mae_std = np.std(mae)
+
+    #     rmse_avg = np.mean(rmse)
+    #     rmse_std = np.std(rmse)
+
+    #     print("\nModel Performance Metrics:")
+    #     print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
+    #     print(f"MAE: {mae_avg:.4f} +/- {mae_std:.4f}")
+    #     print(f"RMSE: {rmse_avg:.4f} +/- {rmse_std:.4f}")
+
+    #     # calculate metrics and errors with associated errors for ensembles
+    #     y_ens = np.mean(y_ensemble, axis=0)
+
+    #     mae_ens = np.abs(y_test - y_ens).mean()
+    #     mse_ens = np.square(y_test - y_ens).mean()
+    #     rmse_ens = np.sqrt(mse)
+
+    #     r2_ens = 1 - mse_ens / np.var(y_ens)
+
+    #     print("\nEnsemble Performance Metrics:")
+    #     print("R2 Score: {:.4f} ".format(r2_score(y_test, y_ens)))
+    #     print(f"R2 Score: {r2_ens:.4f} ")
+    #     print(f"MAE: {mae_ens:.4f}")
+    #     print(f"RMSE: {rmse_ens:.4f}")
+
+    # core = {"id": idx, "composition": comp, "target": y_test}
+    # results = {f"pred-{num}": val for (num, val) in enumerate(y_ensemble)}
+    # if model.robust:
+    #     raise NotImplementedError(
+    #     "Robust/Hetroskedastic classifaction is not currently implemented"
+    #     )
+
+    # df = pd.DataFrame({**core, **results})
+
+    # if ensemble_folds == 1:
+    #     df.to_csv(
+    #         index=False,
+    #         path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
+    #     )
+    # else:
+    #     df.to_csv(
+    #         index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
+    #     )
 
 
 if __name__ == "__main__":

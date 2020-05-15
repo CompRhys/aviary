@@ -8,79 +8,104 @@ import torch.nn as nn
 from tqdm.autonotebook import trange
 from torch.nn.functional import l1_loss as mae
 from torch.nn.functional import mse_loss as mse
-from torch.nn.functional import mse_loss as mse
+from torch.nn.functional import softmax
 
+from sklearn.metrics import accuracy_score, f1_score
 
 class BaseModelClass(nn.Module):
     """
     A base class for models.
     """
-    def __init__(self, task, device=torch.device("cpu"), epoch=1, best_val_loss=None):
+
+    def __init__(self, task, n_targets, robust, device, epoch=1, best_val_score=None):
         super(BaseModelClass, self).__init__()
         self.task = task
+        self.n_targets = n_targets
+        self.robust = robust
+        if self.task == "regression":
+            self.scoring_rule = "MAE"
+        elif self.task == "classification":
+            self.scoring_rule = "Acc"
         self.device = device
         self.epoch = epoch
-        self.best_val_loss = best_val_loss
+        self.best_val_score = best_val_score
 
-    def fit(self, train_generator, val_generator, optimizer,
-            scheduler, epochs, criterion, normalizer,
-            model_name, run_id, writer=None):
+    def fit(
+        self,
+        train_generator,
+        val_generator,
+        optimizer,
+        scheduler,
+        epochs,
+        criterion,
+        normalizer,
+        model_name,
+        run_id,
+        writer=None,
+    ):
         start_epoch = self.epoch
         try:
-            for epoch in range(start_epoch, start_epoch+epochs):
+            for epoch in range(start_epoch, start_epoch + epochs):
                 self.epoch += 1
                 # Training
-                t_loss, t_metrics = self.evaluate(generator=train_generator,
-                                                        criterion=criterion,
-                                                        optimizer=optimizer,
-                                                        normalizer=normalizer,
-                                                        action="train",
-                                                        verbose=True)
+                t_loss, t_metrics = self.evaluate(
+                    generator=train_generator,
+                    criterion=criterion,
+                    optimizer=optimizer,
+                    normalizer=normalizer,
+                    action="train",
+                    verbose=True,
+                )
 
                 print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
-                print(f"Train      : Loss {t_loss:.4f}\t"+
-                    "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()]))
+                print(f"Train      : Loss {t_loss:.4f}\t"
+                    + "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()])
+                )
 
                 # Validation
-                if val_generator is not None:
+                if val_generator is None:
+                    is_best = False
+                else:
                     with torch.no_grad():
                         # evaluate on validation set
-                        v_loss, v_metrics = self.evaluate(generator=val_generator,
-                                                          criterion=criterion,
-                                                          optimizer=None,
-                                                          normalizer=normalizer,
-                                                          action="val")
+                        v_loss, v_metrics = self.evaluate(
+                            generator=val_generator,
+                            criterion=criterion,
+                            optimizer=None,
+                            normalizer=normalizer,
+                            action="val",
+                        )
 
-                    print(f"Validation : Loss {v_loss:.4f}\t"+
-                        "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()]))
+                    print(f"Validation : Loss {v_loss:.4f}\t"
+                        + "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()])       
+                    )
 
-                    is_best = v_loss < self.best_val_loss
-                    if is_best: self.best_val_loss = v_loss
-                else:
-                    is_best = False
+                    is_best = v_metrics[self.scoring_rule] < self.best_val_score
 
-                checkpoint_dict = {"state_dict": self.state_dict(),
-                                    "epoch": self.epoch,
-                                    "best_val_loss": self.best_val_loss,
-                                    "optimizer": optimizer.state_dict(),
-                                    "normalizer": normalizer.state_dict(),
-                                    "scheduler": scheduler.state_dict(),
-                                    }
+                if is_best:
+                    self.best_val_score = v_metrics[self.scoring_rule]
 
-                save_checkpoint(checkpoint_dict,
-                                is_best,
-                                model_name,
-                                run_id)
+                checkpoint_dict = {
+                    "state_dict": self.state_dict(),
+                    "epoch": self.epoch,
+                    "best_val_score": self.best_val_score,
+                    "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(),
+                }
+                if self.task == "regression":
+                    checkpoint_dict.update({"normalizer": normalizer.state_dict()})
+
+                save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
 
                 if writer is not None:
-                    writer.add_scalar("train/loss", t_loss, epoch+1)
+                    writer.add_scalar("train/loss", t_loss, epoch + 1)
                     for metric, val in t_metrics.items():
-                        writer.add_scalar(f"train/{metric}", val, epoch+1)
+                        writer.add_scalar(f"train/{metric}", val, epoch + 1)
 
                     if val_generator is not None:
-                        writer.add_scalar("validation/loss", v_loss, epoch+1)
+                        writer.add_scalar("validation/loss", v_loss, epoch + 1)
                         for metric, val in v_metrics.items():
-                            writer.add_scalar(f"validation/{metric}", val, epoch+1)
+                            writer.add_scalar(f"validation/{metric}", val, epoch + 1)
 
                 scheduler.step()
 
@@ -90,86 +115,109 @@ class BaseModelClass(nn.Module):
         except KeyboardInterrupt:
             pass
 
-        if writer is not None: 
+        if writer is not None:
             writer.close()
 
-    def evaluate(self, generator, criterion, optimizer, normalizer, 
-                    action="train", verbose=False):
+    def evaluate(
+        self, generator, criterion, optimizer, normalizer, action="train", verbose=False
+    ):
         """
         evaluate the model
         """
 
-        if action == "test":
+        if action == "val":
             self.eval()
-            test_targets = []
-            test_pred = []
-            test_std = []
-            test_ids = []
-            test_comp = []
+        elif action == "train":
+            self.train()
         else:
-            loss_meter = AverageMeter()
-            rmse_meter = AverageMeter()
-            mae_meter = AverageMeter()
-            if action == "val":
-                self.eval()
-            elif action == "train":
-                self.train()
-            else:
-                raise NameError("Only train, val or test is allowed as action")
+            raise NameError("Only train or val allowed as action")
+
+        loss_meter = AverageMeter()
+
+        if self.task == "regression":
+            metric_meter = RegressionMetrics()
+        elif self.task == "classification":
+            metric_meter = ClassificationMetrics()
 
         with trange(len(generator), disable=(not verbose)) as t:
             for input_, target, batch_comp, batch_ids in generator:
 
-                # normalize target
-                target_norm = normalizer.norm(target)
-
                 # move tensors to GPU
                 input_ = (tensor.to(self.device) for tensor in input_)
-                target_norm = target_norm.to(self.device)
+
+                if self.task == "regression":
+                    # normalize target if needed
+                    target_norm = normalizer.norm(target)
+                    target_norm = target_norm.to(self.device)
+                elif self.task == "classification":
+                    target_norm = target.to(self.device)
 
                 # compute output
-                output, log_std = self(*input_).chunk(2, dim=1)
+                output = self(*input_)
 
-                # get predictions and error
-                pred = normalizer.denorm(output.data.cpu())
-
-                if action == "test":
-                    # get the aleatoric std
-                    std = torch.exp(log_std).data.cpu()*normalizer.std
-
-                    # collect the model outputs
-                    test_ids += batch_ids
-                    test_comp += batch_comp
-                    test_targets += target.view(-1).tolist()
-                    test_pred += pred.view(-1).tolist()
-                    test_std += std.view(-1).tolist()
-
-                else:
+                if self.robust:
+                    output, log_std = output.chunk(2, dim=1)
                     loss = criterion(output, log_std, target_norm)
-                    loss_meter.update(loss.data.cpu().item(), target.size(0))
+                else:
+                    loss = criterion(output, target_norm.squeeze(1))
 
-                    mae_error = mae(pred, target)
-                    mae_meter.update(mae_error, target.size(0))
+                loss_meter.update(loss.data.cpu().item())
 
-                    rmse_error = mse(pred, target).sqrt_()
-                    rmse_meter.update(rmse_error, target.size(0))
+                if self.task == "regression":
+                    # get predictions and error
+                    pred = normalizer.denorm(output.data.cpu())
+                    metric_meter.update(pred, target)
+                elif self.task == "classification":
+                    logits = softmax(output, dim=1)
+                    metric_meter.update(logits.data.cpu().numpy(), target.data.cpu().numpy())
 
-                    if action == "train":
-                        # compute gradient and do SGD step
-                        optimizer.zero_grad()
-                        loss.backward()
-                        optimizer.step()
+                if action == "train":
+                    # compute gradient and take an optimizer step
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
                 t.update()
 
-        if action == "test":
-            return test_ids, test_comp, test_targets, test_pred, test_std
-        else:
-            return loss_meter.avg, {"MAE":mae_meter.avg, "RMSE":rmse_meter.avg}
+        return loss_meter.avg, metric_meter.metric_dict()
+
+    def predict(self, generator, verbose=False):
+        """
+        evaluate the model
+        """
+
+        test_ids = []
+        test_comp = []
+        test_targets = []
+        test_output = []
+
+        # Ensure model is in evaluation mode
+        self.eval()
+
+        with trange(len(generator), disable=(not verbose)) as t:
+            for input_, target, batch_comp, batch_ids in generator:
+
+                # move tensors to GPU
+                input_ = (tensor.to(self.device) for tensor in input_)
+
+                # compute output
+                output = self(*input_)
+
+                # collect the model outputs
+                test_ids += batch_ids
+                test_comp += batch_comp
+                test_targets.append(target)
+                test_output.append(output)
+
+                t.update()
+
+        return test_ids, test_comp, torch.cat(test_targets, dim=0).view(-1).numpy(), \
+                torch.cat(test_output, dim=0)
 
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -185,9 +233,49 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+class RegressionMetrics(object):
+    """Computes and stores average metrics for regression tasks"""
+
+    def __init__(self):
+        self.rmse_meter = AverageMeter()
+        self.mae_meter = AverageMeter()
+
+    def update(self, pred, target):
+        mae_error = mae(pred, target)
+        self.mae_meter.update(mae_error)
+
+        rmse_error = mse(pred, target).sqrt_()
+        self.rmse_meter.update(rmse_error)
+
+    def metric_dict(self,):
+        return {"MAE": self.mae_meter.avg, "RMSE": self.rmse_meter.avg}
+
+
+class ClassificationMetrics(object):
+    """Computes and stores average metrics for classification tasks"""
+
+    def __init__(self):
+        self.acc_meter = AverageMeter()
+        self.fscore_meter = AverageMeter()
+
+    def update(self, pred, target):
+        acc = accuracy_score(target, np.argmax(pred, axis=1))
+        self.acc_meter.update(acc)
+
+        # target_ohe = np.zeros_like(pred)
+        # target_ohe[np.arange(target.size), target] = 1
+
+        fscore = f1_score(target, np.argmax(pred, axis=1))
+        self.fscore_meter.update(fscore)
+
+    def metric_dict(self,):
+        return {"Acc": self.acc_meter.avg,
+                "F1": self.fscore_meter.avg}
+
 
 class Normalizer(object):
     """Normalize a Tensor and restore it later. """
+
     def __init__(self, log=False):
         """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.tensor((0))
@@ -205,8 +293,7 @@ class Normalizer(object):
         return normed_tensor * self.std + self.mean
 
     def state_dict(self):
-        return {"mean": self.mean,
-                "std": self.std}
+        return {"mean": self.mean, "std": self.std}
 
     def load_state_dict(self, state_dict):
         self.mean = state_dict["mean"].cpu()
@@ -225,15 +312,17 @@ def save_checkpoint(state, is_best, model_name, run_id):
         shutil.copyfile(checkpoint, best)
 
 
-def load_previous_state(path, model, device, optimizer=None,
-                        normalizer=None, scheduler=None):
+def load_previous_state(
+    path, model, device, optimizer=None, normalizer=None, scheduler=None
+):
     """
     """
     assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
 
     checkpoint = torch.load(path, map_location=device)
     start_epoch = checkpoint["epoch"]
-    best_val_loss = checkpoint["best_val_loss"].cpu()
+    best_val_score = checkpoint["best_val_score"]
+    # best_val_score = checkpoint["best_val_score"].cpu()
     model.load_state_dict(checkpoint["state_dict"])
     if optimizer:
         optimizer.load_state_dict(checkpoint["optimizer"])
@@ -243,7 +332,7 @@ def load_previous_state(path, model, device, optimizer=None,
         scheduler.load_state_dict(checkpoint["scheduler"])
     print("Loaded '{}'".format(path))
 
-    return model, optimizer, normalizer, scheduler, start_epoch, best_val_loss
+    return model, optimizer, normalizer, scheduler, start_epoch, best_val_score
 
 
 def RobustL1(output, log_std, target):
@@ -251,8 +340,7 @@ def RobustL1(output, log_std, target):
     Robust L1 loss using a lorentzian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
-    loss = np.sqrt(2.0) * torch.abs(output - target) * \
-        torch.exp(- log_std) + log_std
+    loss = np.sqrt(2.0) * torch.abs(output - target) * torch.exp(-log_std) + log_std
     return torch.mean(loss)
 
 
@@ -261,6 +349,5 @@ def RobustL2(output, log_std, target):
     Robust L2 loss using a gaussian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
-    loss = 0.5 * torch.pow(output - target, 2.0) * \
-        torch.exp(- 2.0 * log_std) + log_std
+    loss = 0.5 * torch.pow(output - target, 2.0) * torch.exp(-2.0 * log_std) + log_std
     return torch.mean(loss)

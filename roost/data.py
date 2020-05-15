@@ -92,10 +92,13 @@ def input_parser():
                         metavar="N",
                         help="number of total epochs to run (default: 100)") 
     parser.add_argument("--loss",
-                        default="RL1",
+                        default="L1",
                         type=str,
                         metavar="str",
-                        help="Loss Function (default: 'RL1')")
+                        help="Loss Function (default: 'L1')")
+    parser.add_argument("--robust",
+                        action="store_true",
+                        help="Use hetroskedastic loss variant")
     parser.add_argument("--optim",
                         default="AdamW",
                         type=str,
@@ -176,9 +179,8 @@ def input_parser():
                         action="store_true",
                         help="Disable CUDA")
     parser.add_argument("--log",
-                        default=True,
-                        type=bool,
-                        help="Disable CUDA")
+                        action="store_true",
+                        help="log metrics to tensorboard")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -212,7 +214,7 @@ class CompositionData(Dataset):
     The CompositionData dataset is a wrapper for a dataset data points are
     automatically constructed from composition strings.
     """
-    def __init__(self, data_path, fea_path, df=None):
+    def __init__(self, data_path, fea_path, task, df=None):
         """
         """
         if df:
@@ -227,7 +229,20 @@ class CompositionData(Dataset):
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.elem_features = LoadFeaturiser(fea_path)
         self.elem_emb_len = self.elem_features.embedding_size()
-        self.n_targets = self.df.shape[1]-2
+        self.task = task
+        if self.task == "regression":
+            if self.df.shape[1]-2 != 1:
+                raise NotImplementedError(
+            "Multi-target regression currently not supported"
+                )
+            self.n_targets = self.df.shape[1]-2
+        elif self.task == "classification":
+            if self.df.shape[1]-2 != 1:
+                raise NotImplementedError(
+            "One-Hot input not supported please use categorical integer inputs"
+            "for classification i.e. Dog = 0, Cat = 1, Mouse = 2"
+                )
+            self.n_targets = np.max(self.df[self.df.columns[2]].values)+1
 
     def __len__(self):
         return len(self.df)
@@ -277,7 +292,10 @@ class CompositionData(Dataset):
         atom_fea = torch.Tensor(atom_fea)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
-        targets = torch.Tensor([float(t) for t in targets])
+        if self.task == "regression":
+            targets = torch.Tensor([float(t) for t in targets])
+        elif self.task == "classification":
+            targets = torch.LongTensor([targets[0]])
 
         return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), \
             targets, composition, cry_id
