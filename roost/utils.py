@@ -265,7 +265,7 @@ class ClassificationMetrics(object):
         # target_ohe = np.zeros_like(pred)
         # target_ohe[np.arange(target.size), target] = 1
 
-        fscore = f1_score(target, np.argmax(pred, axis=1))
+        fscore = f1_score(target, np.argmax(pred, axis=1), average="weighted")
         self.fscore_meter.update(fscore)
 
     def metric_dict(self,):
@@ -345,6 +345,15 @@ def RobustL1(output, log_std, target):
 
 
 def RobustL2(output, log_std, target):
+    """
+    Robust L2 loss using a gaussian prior. Allows for estimation
+    of an aleatoric uncertainty.
+    """
+    loss = 0.5 * torch.pow(output - target, 2.0) * torch.exp(-2.0 * log_std) + log_std
+    return torch.mean(loss)
+
+
+def sampled_logits(output, log_std, samples=10):
     """
     Robust L2 loss using a gaussian prior. Allows for estimation
     of an aleatoric uncertainty.

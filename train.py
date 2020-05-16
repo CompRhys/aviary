@@ -6,7 +6,6 @@ import pandas as pd
 
 import torch
 from torch.nn import L1Loss, MSELoss, CrossEntropyLoss
-from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -14,9 +13,12 @@ from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, \
                             precision_recall_fscore_support
 from sklearn.model_selection import train_test_split as split
 
+from scipy.special import softmax
+
 from roost.model import Roost, ResidualNetwork
 from roost.data import input_parser, CompositionData, collate_batch
-from roost.utils import load_previous_state, Normalizer, RobustL1, RobustL2
+from roost.utils import load_previous_state, Normalizer, sampled_logits, \
+                        RobustL1, RobustL2
 
 
 def main(
@@ -83,10 +85,10 @@ def main(
         else:
             if val_size == 0.0 and evaluate:
                 print("No validation set used, using test set for evaluation purposes")
-                # NOTE: that when using this option care must be taken not to
-                # peak at the test-set. The only valid model to use is the one obtained
-                # after the final epoch where the epoch count is decided in advance of
-                # the experiment.
+                # NOTE that when using this option care must be taken not to
+                # peak at the test-set. The only valid model to use is the one
+                # obtained after the final epoch where the epoch count is
+                # decided in advance of the experiment.
                 val_set = test_set
             elif val_size == 0.0:
                 val_set = None
@@ -101,12 +103,8 @@ def main(
 
         train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
 
-    # print(len(train_set), len(val_set), len(test_set))
-    # exit()
-
     data_params = {
-        "batch_size": batch_size, # NOTE could speed up inference by
-                                  # having larger batches for val/test
+        "batch_size": batch_size,
         "num_workers": workers,
         "pin_memory": False,
         "shuffle": True,
@@ -158,12 +156,18 @@ def main(
 
     if evaluate:
 
-        reset = {
+        model_reset = {
             "resume": None,
             "fine_tune": None,
             "transfer": None,
         }
-        model_params.update(reset)
+        model_params.update(model_reset)
+
+        data_reset = {
+            "batch_size": 16*batch_size,  # faster model inference
+            "shuffle": False,  # need fixed data order due to ensembling
+        }
+        data_params.update(data_reset)
 
         if task == "regression":
             results_regression(
@@ -227,7 +231,7 @@ def init_model(
         model.best_val_score = None
 
     if transfer is not None:
-        # TODO: currently if you use a model as a feature extractor and then
+        # TODO currently if you use a model as a feature extractor and then
         # resume for a checkpoint of that model the material_nn unfreezes.
         print(f"Using {transfer} as a feature extractor and retrain the output_nn")
         previous_state = load_previous_state(transfer, model, device)
@@ -269,22 +273,18 @@ def init_model(
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [])
 
-        # Select Loss Function
+    # Select Task and Loss Function
     if task == "classification":
         normalizer = None
-
         if robust:
             raise NotImplementedError(
-        "Robust/Hetroskedastic classifaction is not currently implemented"
-        )
+            "Robust/Hetroskedastic classifaction is not currently implemented"
+            )
         else:
             criterion = CrossEntropyLoss()
 
     elif task == "regression":
         normalizer = Normalizer()
-
-        # NOTE: when using Robust loss functions we also get an
-        # aleatoric error estimate hence n_targets * 2
         if robust:
             if loss == "L1":
                 criterion = RobustL1
@@ -318,7 +318,7 @@ def init_model(
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total Number of Trainable Parameters: {}".format(num_param))
 
-    # TODO: parallelise the code over multiple GPUs. Currently DataParallel
+    # TODO parallelise the code over multiple GPUs. Currently DataParallel
     # crashes as subsets of the batch have different sizes due to the use of
     # lists of lists rather the zero-padding.
     # if (torch.cuda.device_count() > 1) and (device==torch.device("cuda")):
@@ -352,14 +352,14 @@ def train_ensemble(
     else:
         val_generator = None
 
-    for run in range(ensemble_folds):
+    for j in range(ensemble_folds):
         #  this allows us to run ensembles in parallel rather than in series
         #  by specifiying the run-id arg.
         if ensemble_folds == 1:
-            run = run_id
+            j = run_id
 
         model, criterion, optimizer, scheduler, normalizer = init_model(
-            model_name=model_name, run_id=run, **model_params
+            model_name=model_name, run_id=j, **model_params
         )
 
         if model.task == "regression":
@@ -371,7 +371,7 @@ def train_ensemble(
         if log:
             writer = SummaryWriter(
                 log_dir=(
-                    f"runs/{model_name}-r{run}_""{date:%d-%m-%Y_%H-%M-%S}"
+                    f"runs/{model_name}-r{j}_""{date:%d-%m-%Y_%H-%M-%S}"
                 ).format(date=datetime.datetime.now())
             )
         else:
@@ -397,7 +397,7 @@ def train_ensemble(
             criterion=criterion,
             normalizer=normalizer,
             model_name=model_name,
-            run_id=run_id,
+            run_id=j,
             writer=writer,
         )
 
@@ -428,7 +428,8 @@ def results_regression(
     )
 
     y_ensemble = np.zeros((ensemble_folds, len(test_set)))
-    y_aleatoric = np.zeros((ensemble_folds, len(test_set)))
+    if model.robust:
+        y_ale = np.zeros((ensemble_folds, len(test_set)))
 
     for j in range(ensemble_folds):
 
@@ -458,7 +459,7 @@ def results_regression(
             pred, log_std = output.chunk(2, dim=1)
             pred = normalizer.denorm(pred.data.cpu())
             std = torch.exp(log_std).data.cpu()*normalizer.std
-            y_aleatoric[j, :] = std.view(-1).numpy()
+            y_ale[j, :] = std.view(-1).numpy()
         else:
             pred = normalizer.denorm(output.data.cpu())
 
@@ -495,20 +496,21 @@ def results_regression(
 
         mae_ens = np.abs(y_test - y_ens).mean()
         mse_ens = np.square(y_test - y_ens).mean()
-        rmse_ens = np.sqrt(mse)
+        rmse_ens = np.sqrt(mse_ens)
 
         r2_ens = 1 - mse_ens / np.var(y_ens)
 
         print("\nEnsemble Performance Metrics:")
-        print("R2 Score: {:.4f} ".format(r2_score(y_test, y_ens)))
-        print(f"R2 Score: {r2_ens:.4f} ")
-        print(f"MAE: {mae_ens:.4f}")
-        print(f"RMSE: {rmse_ens:.4f}")
+        print("R2 Score  : {:.4f} ".format(r2_score(y_test, y_ens)))
+        print(f"R2 Score : {r2_ens:.4f} ")
+        print(f"MAE  : {mae_ens:.4f}")
+        print(f"RMSE : {rmse_ens:.4f}")
 
     core = {"id": idx, "composition": comp, "target": y_test}
-    results = {f"pred-{num}": val for (num, val) in enumerate(y_ensemble)}
+    results = {f"pred_{n_ens}": val for (n_ens, val) in enumerate(y_ensemble)}
     if model.robust:
-        results.update({f"aleatoric-{num}": val for (num, val) in enumerate(y_aleatoric)})
+        ale = {f"aleatoric_{n_ens}": val for (n_ens, val) in enumerate(y_ale)}
+        results.update(ale)
 
     df = pd.DataFrame({**core, **results})
 
@@ -548,9 +550,16 @@ def results_classification(
         model_name=model_name, run_id=run_id, **model_params
     )
 
-    y_ensemble = np.zeros((ensemble_folds, len(test_set), model.n_targets))
+    y_pre_logits = np.zeros((ensemble_folds, len(test_set), model.n_targets))
+    y_logits = np.zeros((ensemble_folds, len(test_set), model.n_targets))
+    if model.robust:
+        y_pre_ale = np.zeros((ensemble_folds, len(test_set), model.n_targets))
 
-    metrics = np.zeros((ensemble_folds, 5))
+    acc = np.zeros((ensemble_folds))
+    roc_auc = np.zeros((ensemble_folds))
+    precision = np.zeros((ensemble_folds))
+    recall = np.zeros((ensemble_folds))
+    fscore = np.zeros((ensemble_folds))
 
     for j in range(ensemble_folds):
 
@@ -576,87 +585,104 @@ def results_classification(
             )
         
         if model.robust:
+            pre_logits, pre_std = output.chunk(2, dim=1)
+            pre_logits = pre_logits.data.cpu().numpy()
+            pre_std = pre_std.data.cpu().numpy()
+            y_pre_ale[j, :, :] = pre_std
+
+            logits = sampled_logits(pre_logits, pre_std, samples=10)
             raise NotImplementedError(
         "Robust/Hetroskedastic classifaction is not currently implemented"
         )
         else:
-            pred = output.data.cpu()
-            logits = softmax(pred, dim=1)
+            pre_logits = output.data.cpu().numpy()
 
-        y_ensemble[j, :, :] = logits.numpy()
+        logits = softmax(pre_logits, axis=1)
+        
+        y_pre_logits[j, :, :] = pre_logits
+        y_logits[j, :, :] = logits
 
-        y_test_ohe = np.zeros_like(pred)
+        y_test_ohe = np.zeros_like(pre_logits)
         y_test_ohe[np.arange(y_test.size), y_test] = 1
 
-        print(accuracy_score(y_test, np.argmax(logits, axis=1)))
-        print(roc_auc_score(y_test_ohe, logits))
-        print(precision_recall_fscore_support(y_test, np.argmax(pred, axis=1))[:3])
+        acc[j] = accuracy_score(y_test, np.argmax(logits, axis=1))
+        roc_auc[j] = roc_auc_score(y_test_ohe, logits)
+        precision[j], recall[j], fscore[j] = precision_recall_fscore_support(y_test,
+            np.argmax(logits, axis=1), average="weighted")[:3]
 
-        # metrics[j,0] = accuracy_score(y_test, np.argmax(logits, axis=1))
-        # metrics[j,1] = roc_auc_score(y_test_ohe, logits)
-        # metrics[j,2:] = precision_recall_fscore_support(y_test, np.argmax(pred, axis=1))[:3]
-        
-    print(metrics)
+    if ensemble_folds == 1:
+        print("\nModel Performance Metrics:")
+        print("Accuracy : {:.4f} ".format(acc[0]))
+        print("ROC-AUC  : {:.4f}".format(roc_auc[0]))
+        print("Weighted Precision : {:.4f}".format(precision[0]))
+        print("Weighted Recall    : {:.4f}".format(recall[0]))
+        print("Weighted F-score   : {:.4f}".format(fscore[0]))
+    else:
+        acc_avg = np.mean(acc)
+        acc_std = np.std(acc)
 
-    # res = y_ensemble - y_test
-    # mae = np.mean(np.abs(res), axis=1)
-    # mse = np.mean(np.square(res), axis=1)
-    # rmse = np.sqrt(mse)
-    # r2 = 1 - mse / np.var(y_ensemble, axis=1)
+        roc_auc_avg = np.mean(roc_auc)
+        roc_auc_std = np.std(roc_auc)
 
-    # if ensemble_folds == 1:
-    #     print("\nModel Performance Metrics:")
-    #     print("R2 Score: {:.4f} ".format(r2[0]))
-    #     print("MAE: {:.4f}".format(mae[0]))
-    #     print("RMSE: {:.4f}".format(rmse[0]))
-    # else:
-    #     r2_avg = np.mean(r2)
-    #     r2_std = np.std(r2)
+        precision_avg = np.mean(precision)
+        precision_std = np.std(precision)
 
-    #     mae_avg = np.mean(mae)
-    #     mae_std = np.std(mae)
+        recall_avg = np.mean(recall)
+        recall_std = np.std(recall)
 
-    #     rmse_avg = np.mean(rmse)
-    #     rmse_std = np.std(rmse)
+        fscore_avg = np.mean(fscore)
+        fscore_std = np.std(fscore)
 
-    #     print("\nModel Performance Metrics:")
-    #     print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
-    #     print(f"MAE: {mae_avg:.4f} +/- {mae_std:.4f}")
-    #     print(f"RMSE: {rmse_avg:.4f} +/- {rmse_std:.4f}")
+        print("\nModel Performance Metrics:")
+        print(f"Accuracy : {acc_avg:.4f} +/- {acc_std:.4f}")
+        print(f"ROC-AUC  : {roc_auc_avg:.4f} +/- {roc_auc_std:.4f}")
+        print(f"Weighted Precision : {precision_avg:.4f} +/- {precision_std:.4f}")
+        print(f"Weighted Recall    : {recall_avg:.4f} +/- {recall_std:.4f}")
+        print(f"Weighted F-score   : {fscore_avg:.4f} +/- {fscore_std:.4f}")
 
-    #     # calculate metrics and errors with associated errors for ensembles
-    #     y_ens = np.mean(y_ensemble, axis=0)
+        # calculate metrics and errors with associated errors for ensembles
+        ens_logits = np.mean(y_logits, axis=0)
 
-    #     mae_ens = np.abs(y_test - y_ens).mean()
-    #     mse_ens = np.square(y_test - y_ens).mean()
-    #     rmse_ens = np.sqrt(mse)
+        y_test_ohe = np.zeros_like(ens_logits)
+        y_test_ohe[np.arange(y_test.size), y_test] = 1
 
-    #     r2_ens = 1 - mse_ens / np.var(y_ens)
+        ens_acc = accuracy_score(y_test, np.argmax(ens_logits, axis=1))
+        ens_roc_auc = roc_auc_score(y_test_ohe, ens_logits)
+        ens_precision, ens_recall, ens_fscore = precision_recall_fscore_support(y_test,
+            np.argmax(ens_logits, axis=1), average="weighted")[:3]
 
-    #     print("\nEnsemble Performance Metrics:")
-    #     print("R2 Score: {:.4f} ".format(r2_score(y_test, y_ens)))
-    #     print(f"R2 Score: {r2_ens:.4f} ")
-    #     print(f"MAE: {mae_ens:.4f}")
-    #     print(f"RMSE: {rmse_ens:.4f}")
+        print("\nEnsemble Performance Metrics:")
+        print(f"Accuracy : {ens_acc:.4f} ")
+        print(f"ROC-AUC  : {ens_roc_auc:.4f}")
+        print(f"Weighted Precision : {ens_precision:.4f}")
+        print(f"Weighted Recall    : {ens_recall:.4f}")
+        print(f"Weighted F-score   : {ens_fscore:.4f}")
 
-    # core = {"id": idx, "composition": comp, "target": y_test}
-    # results = {f"pred-{num}": val for (num, val) in enumerate(y_ensemble)}
-    # if model.robust:
-    #     raise NotImplementedError(
-    #     "Robust/Hetroskedastic classifaction is not currently implemented"
-    #     )
+    # NOTE we save pre_logits rather than logits due to fact that with the
+    # hetroskedastic setup we want to be able to sample from the gaussian
+    # distributed pre_logits.
+    core = {"id": idx, "composition": comp, "target": y_test}
 
-    # df = pd.DataFrame({**core, **results})
+    results = {}
+    for n_ens, y_pre_logit in enumerate(y_pre_logits):
+        pre_log_dict = {f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)}
+        results.update(pre_log_dict)
+        if model.robust:
+            raise NotImplementedError(
+            "Robust/Hetroskedastic classifaction is not currently implemented"
+            )
 
-    # if ensemble_folds == 1:
-    #     df.to_csv(
-    #         index=False,
-    #         path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
-    #     )
-    # else:
-    #     df.to_csv(
-    #         index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
-    #     )
+    df = pd.DataFrame({**core, **results})
+
+    if ensemble_folds == 1:
+        df.to_csv(
+            index=False,
+            path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
+        )
+    else:
+        df.to_csv(
+            index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
+        )
 
 
 if __name__ == "__main__":
