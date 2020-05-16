@@ -112,22 +112,35 @@ def main(
         "collate_fn": collate_batch,
     }
 
-    model_params = {
-        "task": task,
-        "robust": robust,
-        "elem_emb_len": elem_emb_len,
-        "elem_fea_len": elem_fea_len,
-        "n_graph": n_graph,
-        "n_targets": n_targets,
+    setup_params = {
         "loss": loss,
         "optim": optim,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
         "momentum": momentum,
         "device": device,
+    }
+
+    restart_params = {
         "resume": resume,
         "fine_tune": fine_tune,
         "transfer": transfer,
+    }
+
+    model_params = {
+        "task": task,
+        "robust": robust,
+        "n_targets": n_targets,
+        "elem_emb_len": elem_emb_len,
+        "elem_fea_len": elem_fea_len,
+        "n_graph": n_graph,
+        "elem_heads": 3,
+        "elem_gate": [256],
+        "elem_msg": [256],
+        "cry_heads": 3,
+        "cry_gate": [256],
+        "cry_msg": [256],
+        "out_hidden": [1024, 512, 256, 128, 64]
     }
 
     if not os.path.isdir("models/"):
@@ -152,17 +165,19 @@ def main(
             val_set=val_set,
             log=log,
             data_params=data_params,
-            model_params=model_params
+            setup_params=setup_params,
+            restart_params=restart_params,
+            model_params=model_params,
         )
 
     if evaluate:
 
-        model_reset = {
+        restart_reset = {
             "resume": None,
             "fine_tune": None,
             "transfer": None,
         }
-        model_params.update(model_reset)
+        restart_params.update(restart_reset)
 
         data_reset = {
             "batch_size": 16*batch_size,  # faster model inference
@@ -177,6 +192,8 @@ def main(
                 ensemble_folds=ensemble,
                 test_set=test_set,
                 data_params=data_params,
+                setup_params=setup_params,
+                restart_params=restart_params,
                 model_params=model_params,
                 eval_type="checkpoint"
                 )
@@ -187,6 +204,8 @@ def main(
                 ensemble_folds=ensemble,
                 test_set=test_set,
                 data_params=data_params,
+                setup_params=setup_params,
+                restart_params=restart_params,
                 model_params=model_params,
                 eval_type="checkpoint"
                 )
@@ -197,26 +216,40 @@ def init_model(
     run_id,
     task,
     robust,
-    elem_emb_len,
-    elem_fea_len,
-    n_graph,
-    n_targets,
     loss,
     optim,
     learning_rate,
     weight_decay,
     momentum,
     device,
+    n_targets,
+    elem_emb_len,
+    elem_fea_len,
+    n_graph,
+    elem_heads,
+    elem_gate,
+    elem_msg,
+    cry_heads,
+    cry_gate,
+    cry_msg,
+    out_hidden,
     resume=None,
     fine_tune=None,
     transfer=None,
 ):
 
     model = Roost(
+        n_targets=n_targets,
         elem_emb_len=elem_emb_len,
         elem_fea_len=elem_fea_len,
         n_graph=n_graph,
-        n_targets=n_targets,
+        elem_heads=elem_heads,
+        elem_gate=elem_gate,
+        elem_msg=elem_msg,
+        cry_heads=cry_heads,
+        cry_gate=cry_gate,
+        cry_msg=cry_msg,
+        out_hidden=out_hidden,
         task=task,
         robust=robust,
         device=device,
@@ -234,6 +267,8 @@ def init_model(
     if transfer is not None:
         # TODO currently if you use a model as a feature extractor and then
         # resume for a checkpoint of that model the material_nn unfreezes.
+        # NOTE this is a pretty useless option it performs worse than fine-
+        # tuning in all tests so far. Perhaps best to deprecate and remove?
         print(f"Using {transfer} as a feature extractor and retrain the output_nn")
         previous_state = load_previous_state(transfer, model, device)
         model, _, _, _, _, _ = previous_state
@@ -338,7 +373,9 @@ def train_ensemble(
     val_set,
     log,
     data_params,
-    model_params
+    setup_params,
+    restart_params,
+    model_params,
 ):
     """
     Train multiple models
@@ -358,7 +395,11 @@ def train_ensemble(
             j = run_id
 
         model, criterion, optimizer, scheduler, normalizer = init_model(
-            model_name=model_name, run_id=j, **model_params
+            model_name=model_name,
+            run_id=j,
+            **setup_params,
+            **restart_params,
+            **model_params,
         )
 
         if model.task == "regression":
@@ -407,6 +448,8 @@ def results_regression(
     ensemble_folds,
     test_set,
     data_params,
+    setup_params,
+    restart_params,
     model_params,
     eval_type="checkpoint",
 ):
@@ -423,9 +466,12 @@ def results_regression(
     test_generator = DataLoader(test_set, **data_params)
 
     model, _, _, _, normalizer = init_model(
-        model_name=model_name, run_id=run_id, **model_params
+        model_name=model_name,
+        run_id=run_id,
+        **setup_params,
+        **restart_params,
+        **model_params,
     )
-
     y_ensemble = np.zeros((ensemble_folds, len(test_set)))
     if model.robust:
         y_ale = np.zeros((ensemble_folds, len(test_set)))
@@ -440,7 +486,7 @@ def results_regression(
 
         checkpoint = torch.load(
             f=(f"models/{model_name}/{eval_type}-r{j}.pth.tar"),
-            map_location=model_params["device"],
+            map_location=setup_params["device"],
         )
 
         if ensemble_folds == 1:
@@ -530,6 +576,8 @@ def results_classification(
     ensemble_folds,
     test_set,
     data_params,
+    setup_params,
+    restart_params,
     model_params,
     eval_type="checkpoint",
 ):
@@ -546,7 +594,11 @@ def results_classification(
     test_generator = DataLoader(test_set, **data_params)
 
     model, _, _, _, _ = init_model(
-        model_name=model_name, run_id=run_id, **model_params
+        model_name=model_name,
+        run_id=run_id,
+        **setup_params,
+        **restart_params,
+        **model_params,
     )
 
     y_pre_logits = np.zeros((ensemble_folds, len(test_set), model.n_targets))
@@ -570,7 +622,7 @@ def results_classification(
 
         checkpoint = torch.load(
             f=(f"models/{model_name}/{eval_type}-r{j}.pth.tar"),
-            map_location=model_params["device"],
+            map_location=setup_params["device"],
         )
 
         if ensemble_folds == 1:

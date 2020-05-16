@@ -6,9 +6,9 @@
 
 In materials discovery applications often we know the composition of trial materials but have little knowledge about the structure.
 
-Most current SOTA results within the field of machine learning for materials discovery are reliant on already knowing the structure of the material this means that such ML applications are intrinsically dependant on costly structure prediction calculations or can only be applied to systems that have undergone experimental characterisation. The use of structures is a prohibative bottleneck to many materials screening applications we would like to pursue.
+Many current SOTA results within the field of machine learning for materials discovery are reliant on knowledge of the structure of the material. This means that such models can only be applied to systems that have undergone structural characterisation. As structural characterisation is a time-consuming process whether done experimentally or via the use of ab-initio methods the use of structures as our model inputs is a prohibitive bottleneck to many materials screening applications we would like to pursue.
 
-To avoid the structure bottle neck we want to develop models that learn from the stiochiometry alone. In this work, we show that we can leverage a message-passing neural network to tackle materials agnostic tasks with increase efficacy compared to more widely used descriptor based approaches. This work draws inspiration from recent progress in the study of small molecules that has made use of very similiar neural network architectures. 
+One approach for avoiding the structure bottleneck is to develop models that learn from the stoichiometry alone. In this work, we show that via a novel recasting of how we view the stoichiometry of a material we can leverage a message-passing neural network to learn materials properties whilst remaining agnostic to the structure. The proposed model exhibits increase sample efficiency compared to more widely used descriptor-based approaches. This work draws inspiration from recent progress in using graph-based methods for the study of small molecules and crystalline materials.
 
 ## Environment Setup
 
@@ -24,23 +24,21 @@ pip install scikit-learn tqdm pandas tensorboard
 
 `${CUDA}` Should be replaced by either `cpu`, `cu92`, `cu101` or `cu102` depending on your system CUDA version.
 
-You may encounter issues getting the the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter)
+You may encounter issues getting the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter)
 
 ## Example Use
 
-```python train.py```
+```python train.py --train --evaluate```
 
-Runs the default task is on the experimental bandgap data set referenced in the pre-print. This default task has been setup to work out of the box without any changes. 
+Runs the default task, this is on the experimental bandgap data of Zhou et al. (See folder for reference). This default task has been set up to work out of the box without any changes and to give a flavour of how the model can be used. 
 
-If you want to tune the model the best way to get an understanding of how to run the code with other settings is to run the command:
+If you want to use your own data set on a regression task this can be done with:
 
-```python train.py --help```
+```python train.py --data-path /path/to/your/data/data.csv --train```
 
-This will output the various commandline flags that can be used to control the code.
+You can then test your model with:
 
-If you want to use your own data set this can be done with:
-
-```python train.py --data-path /path/to/your/data/data.csv```
+```python train.py --test-path /path/to/testset.csv --evaluate```
 
 The model takes input in the form csv files with materials-ids, composition strings and target values as the columns.
 
@@ -49,11 +47,13 @@ The model takes input in the form csv files with materials-ids, composition stri
 | foo-1       | Fe2O3        | 2.3     | 
 | foo-2       | La2CuO4      | 4.3     | 
 
-Note that if no validation set is given the model will evaluate the test set performance after each epoch, **do not use this metric for early stopping**.
+Basic hints about more advanced use of the model (i.e. classification, robust losses, ensembles, tensorboard logging etc..)
+are available via the command:
 
-## Using your trained model
+```python train.py --help```
 
-The `train.py` script can be used to test on new data without training by using the command line arguments `--evaluate  --test-path /path/to/testset.csv`. This will load the last checkpoint file corresponding to any identifiers passed ( i.e. `data-id`, `run-id`, `seed`, `sample`). 
+This will output the various command-line flags that can be used to control the code. 
+
 
 ## Cite This Work
 
@@ -63,11 +63,14 @@ If you use this code please cite our work for which this model was built:
 
 ## Work Using Roost
 
+[A critical examination of compound stability predictions from machine-learned formation energies](https://arxiv.org/abs/2001.10591)
+
 If you have used Roost in your work please contact me and I will add your paper here.
 
-[A critical examination of compound stability predictions from machine-learned formation energies](https://arxiv.org/abs/2001.10591)
+## Acknowledgements
+
+The open-source implementation of `cgcnn` provided [here](https://github.com/txie-93/cgcnn) provided significant initial inspiration for how to structure this code-base.
 
 ## Disclaimer
 
-This is research code shared without support or any guarantee on its quality. However, if you do find an error please submit a pull request or raise an issue and I will try my best to solve it.
-
+This is research code shared without support or any guarantee on its quality. However, please do submit issues and pull requests or raise an issue and I will try my best to solve it.

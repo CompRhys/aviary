@@ -6,51 +6,42 @@ from torch_scatter import scatter_max, scatter_add, scatter_mean
 
 class Roost(BaseModelClass):
     """
-    Create a neural network for predicting total material properties.
-
     The Roost model is comprised of a fully connected network
     and message passing graph layers.
 
     The message passing layers are used to determine a descriptor set
-    for the fully connected network. Critically the graphs are used to
-    represent (crystalline) materials in a structure agnostic manner
-    but contain trainable parameters unlike other structure agnostic
-    approaches.
+    for the fully connected network. The graphs are used to represent
+    the stiochiometry of inorganic materials in a trainable manner.
+    This makes them systematically improvable with more data.
     """
 
     def __init__(
         self,
-        elem_emb_len,
-        elem_fea_len,
-        n_graph,
         n_targets,
+        elem_emb_len,
+        elem_fea_len=64,
+        n_graph=3,
+        elem_heads=3,
+        elem_gate=[256],
+        elem_msg=[256],
+        cry_heads=3,
+        cry_gate=[256],
+        cry_msg=[256],
         out_hidden=[1024, 512, 256, 128, 64],
-        msg_heads=3,
-        mat_heads=3,
-        mat_hidden=[256],
-        msg_hidden=[256],
         **kwargs
     ):
-        """
-        Initialize CompositionNet.
-
-        Parameters
-        ----------
-        n_h: Number of hidden layers after pooling
-
-        Inputs
-        ----------
-        elem_emb_len: int
-            Number of elem features in the input.
-        elem_fea_len: int
-            Number of hidden elem features in the graph layers
-        n_graph: int
-            Number of graph layers
-        """
         super(Roost, self).__init__(n_targets=n_targets, **kwargs)
 
-        self.material_nn = MaterialNetwork(
-            elem_emb_len=elem_emb_len, elem_fea_len=elem_fea_len, n_graph=n_graph
+        self.material_nn = DescriptorNetwork(
+            elem_emb_len=elem_emb_len,
+            elem_fea_len=elem_fea_len,
+            n_graph=n_graph,
+            elem_heads=elem_heads,
+            elem_gate=elem_gate,
+            elem_msg=elem_msg,
+            cry_heads=cry_heads,
+            cry_gate=cry_gate,
+            cry_msg=cry_msg,
         )
 
         # define an output neural network
@@ -67,7 +58,6 @@ class Roost(BaseModelClass):
         """
         Forward pass through the material_nn and output_nn
         """
-
         crys_fea = self.material_nn(
             elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, crystal_elem_idx
         )
@@ -79,32 +69,43 @@ class Roost(BaseModelClass):
         return "{}".format(self.__class__.__name__)
 
 
-class MaterialNetwork(nn.Module):
+class DescriptorNetwork(nn.Module):
     """
+    The Descriptor Network is the message passing section of the
+    Roost Model.
     """
 
     def __init__(
         self,
         elem_emb_len,
-        elem_fea_len,
+        elem_fea_len=64,
         n_graph=3,
-        msg_heads=3,
-        msg_gate=[256],
-        msg_msg=[256],
+        elem_heads=3,
+        elem_gate=[256],
+        elem_msg=[256],
         cry_heads=3,
         cry_gate=[256],
         cry_msg=[256],
     ):
         """
         """
-        super(MaterialNetwork, self).__init__()
+        super(DescriptorNetwork, self).__init__()
 
         # apply linear transform to the input to get a trainable embedding
+        # NOTE -1 here so we can add the weights as a node feature
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len - 1)
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList(
-            [MessageLayer(elem_fea_len, msg_heads) for i in range(n_graph)]
+            [
+                MessageLayer(
+                    elem_fea_len=elem_fea_len,
+                    elem_heads=elem_heads,
+                    elem_gate=elem_gate,
+                    elem_msg=elem_msg,
+                )
+                for i in range(n_graph)
+            ]
         )
 
         # define a global pooling function for materials
@@ -134,14 +135,14 @@ class MaterialNetwork(nn.Module):
 
         Inputs
         ----------
+        elem_fea: Variable(torch.Tensor) shape (N)
+            Fractional weight of each Element in its stiochiometry
         elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
-            Atom features of each of the N elems in the batch
+            Element features of each of the N elems in the batch
         self_fea_idx: torch.Tensor shape (M,)
             Indices of the elem each of the M bonds correspond to
         nbr_fea_idx: torch.Tensor shape (M,)
             Indices of of the neighbours of the M bonds connect to
-        elem_bond_idx: list of torch.LongTensor of length C
-            Mapping from the bond idx to elem idx
         crystal_elem_idx: list of torch.LongTensor of length C
             Mapping from the elem idx to crystal idx
 
@@ -151,14 +152,13 @@ class MaterialNetwork(nn.Module):
             Atom hidden features after message passing
         """
 
-        # embed the original features into the graph layer description
+        # embed the original features into a trainable embedding space
         elem_fea = self.embedding(elem_fea)
 
-        # do this so that we can examine the embeddings without
-        # influence of the weights
+        # add weights as a node feature
         elem_fea = torch.cat([elem_fea, elem_weights], dim=1)
 
-        # apply the graph message passing functions
+        # apply the message passing functions
         for graph_func in self.graphs:
             elem_fea = graph_func(elem_weights, elem_fea, self_fea_idx, nbr_fea_idx)
 
@@ -169,7 +169,6 @@ class MaterialNetwork(nn.Module):
                 attnhead(fea=elem_fea, index=crystal_elem_idx, weights=elem_weights)
             )
 
-        # return torch.cat(head_fea, dim=1)
         return torch.mean(torch.stack(head_fea), dim=0)
 
     def __repr__(self):
@@ -178,29 +177,25 @@ class MaterialNetwork(nn.Module):
 
 class MessageLayer(nn.Module):
     """
-    Class defining the message passing operation on the composition graph
+    Massage Layers are used to propagate information between nodes in
+    in the stiochiometry graph.
     """
 
-    def __init__(self, fea_len, num_heads=1, hidden_gate=[256], hidden_msg=[256]):
+    def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
         """
-        Inputs
-        ----------
-        fea_len: int
-            Number of elem hidden features.
         """
         super(MessageLayer, self).__init__()
 
         # Pooling and Output
-
         self.pooling = nn.ModuleList(
             [
                 WeightedAttention(
-                    gate_nn=SimpleNetwork(2 * fea_len, 1, hidden_gate),
-                    message_nn=SimpleNetwork(2 * fea_len, fea_len, hidden_msg),
-                    # message_nn=nn.Linear(2*fea_len, fea_len),
+                    gate_nn=SimpleNetwork(2 * elem_fea_len, 1, elem_gate),
+                    message_nn=SimpleNetwork(2 * elem_fea_len, elem_fea_len, elem_msg),
+                    # message_nn=nn.Linear(2*elem_fea_len, elem_fea_len),
                     # message_nn=nn.Identity(),
                 )
-                for _ in range(num_heads)
+                for _ in range(elem_heads)
             ]
         )
 
@@ -243,8 +238,7 @@ class MessageLayer(nn.Module):
                 attnhead(fea=fea, index=self_fea_idx, weights=elem_nbr_weights)
             )
 
-        # # Concatenate
-        # fea = torch.cat(head_fea, dim=1)
+        # average the attention heads
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
         return fea + elem_in_fea
@@ -255,7 +249,7 @@ class MessageLayer(nn.Module):
 
 class WeightedMeanPooling(torch.nn.Module):
     """
-    mean pooling
+    Weighted mean pooling
     """
 
     def __init__(self):
@@ -386,4 +380,3 @@ class ResidualNetwork(nn.Module):
 
     def __repr__(self):
         return "{}".format(self.__class__.__name__)
-

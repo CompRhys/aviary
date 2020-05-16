@@ -80,6 +80,8 @@ class BaseModelClass(nn.Module):
                         + "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()])       
                     )
 
+                    # NOTE we need to find a proper scoring rule for classification 
+                    # which is minimised for good models.
                     is_best = v_metrics[self.scoring_rule] < self.best_val_score
 
                 if is_best:
@@ -174,6 +176,7 @@ class BaseModelClass(nn.Module):
                         loss = criterion(output, target.squeeze(1))
                         logits = softmax(output, dim=1)
 
+                    # classification metrics from sklearn need numpy arrays
                     metric_meter.update(logits.data.cpu().numpy(), target.data.cpu().numpy())
 
                 loss_meter.update(loss.data.cpu().item())
@@ -269,9 +272,6 @@ class ClassificationMetrics(object):
         acc = accuracy_score(target, np.argmax(pred, axis=1))
         self.acc_meter.update(acc)
 
-        # target_ohe = np.zeros_like(pred)
-        # target_ohe[np.arange(target.size), target] = 1
-
         fscore = f1_score(target, np.argmax(pred, axis=1), average="weighted")
         self.fscore_meter.update(fscore)
 
@@ -329,7 +329,6 @@ def load_previous_state(
     checkpoint = torch.load(path, map_location=device)
     start_epoch = checkpoint["epoch"]
     best_val_score = checkpoint["best_val_score"]
-    # best_val_score = checkpoint["best_val_score"].cpu()
     model.load_state_dict(checkpoint["state_dict"])
     if optimizer:
         optimizer.load_state_dict(checkpoint["optimizer"])
@@ -365,6 +364,9 @@ def sampled_softmax(pre_logits, log_std, samples=10):
     Draw samples from gaussian distributed pre-logits and use these to estimate
     a mean and aleatoric uncertainty.
     """
+    # NOTE here as we do not risk dividing by zero should we really be
+    # predicting log_std or is there another way to deal with negative numbers?
+    # This choice may have an unknown effect on the calibration of the uncertainties
     sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
     epsilon = torch.randn_like(sam_std)
     pre_logits = pre_logits.repeat_interleave(samples, dim=0) + \

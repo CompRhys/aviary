@@ -1,16 +1,17 @@
 import re
 
-def format_composition(composition):
+
+def format_composition(comp):
     """ format str to ensure weights are explicate
     example: BaCu3 -> Ba1Cu3
     """
     subst = r"\g<1>1.0"
-    composition = re.sub(r'[\d.]+', lambda x: str(float(x.group())), composition.rstrip())    
-    composition = re.sub(r"([A-Z][a-z](?![0-9]))", subst, composition)
-    composition = re.sub(r"([A-Z](?![0-9]|[a-z]))", subst, composition)
-    composition = re.sub(r"([\)](?=[A-Z]))", subst, composition)
-    composition = re.sub(r"([\)](?=\())", subst, composition)
-    return composition
+    comp = re.sub(r"[\d.]+", lambda x: str(float(x.group())), comp.rstrip())
+    comp = re.sub(r"([A-Z][a-z](?![0-9]))", subst, comp)
+    comp = re.sub(r"([A-Z](?![0-9]|[a-z]))", subst, comp)
+    comp = re.sub(r"([\)](?=[A-Z]))", subst, comp)
+    comp = re.sub(r"([\)](?=\())", subst, comp)
+    return comp
 
 
 def parenthetic_contents(string):
@@ -21,17 +22,20 @@ def parenthetic_contents(string):
 
     stack = []
     for i, c in enumerate(string):
-        if c == '(':
+        if c == "(":
             stack.append(i)
-        elif c == ')' and stack:
+        elif c == ")" and stack:
             start = stack.pop()
-            num = re.split(num_after_bracket, string[i+1:])[0] or 1
-            yield {'value': [string[start + 1: i], float(num), False], 'level':len(stack)+1}
+            num = re.split(num_after_bracket, string[i + 1 :])[0] or 1
+            yield {
+                "value": [string[start + 1 : i], float(num), False],
+                "level": len(stack) + 1,
+            }
 
-    yield {'value': [string,1, False], 'level':0}
+    yield {"value": [string, 1, False], "level": 0}
 
 
-def splitout_weights(composition):
+def splitout_weights(comp):
     """ split composition string into elements (keys) and weights
     example: Ba1Cu3 -> [Ba,Cu] [1,3]
     """
@@ -39,53 +43,54 @@ def splitout_weights(composition):
     weights = []
     regex3 = r"(\d+\.\d+)|(\d+)"
     try:
-        parsed = [j for j in re.split(regex3, composition) if j]
+        parsed = [j for j in re.split(regex3, comp) if j]
     except:
-        print('parsed:', composition)
+        print("parsed:", comp)
     elements += parsed[0::2]
     weights += parsed[1::2]
     weights = [float(w) for w in weights]
     return elements, weights
 
 
-def update_weights(composition, weight):
+def update_weights(comp, weight):
     """ split composition string into elements (keys) and weights
     example: Ba1Cu3 -> [Ba,Cu] [1,3]
     """
     regex3 = r"(\d+\.\d+)|(\d+)"
-    parsed = [j for j in re.split(regex3, composition) if j]
+    parsed = [j for j in re.split(regex3, comp) if j]
     elements = parsed[0::2]
-    weights = [float(p)*weight for p in parsed[1::2]]
-    new_comp = ''
-    for m,n in zip(elements,weights):
-        new_comp += m+f'{n:.2f}'
-    return new_comp    
+    weights = [float(p) * weight for p in parsed[1::2]]
+    new_comp = ""
+    for m, n in zip(elements, weights):
+        new_comp += m + f"{n:.2f}"
+    return new_comp
 
 
 class Node(object):
     """ Node class for tree data structure """
+
     def __init__(self, parent, val=None):
         self.value = val
         self.parent = parent
         self.children = []
 
     def __repr__(self):
-        return '<Node %s >' % (self.value,)
+        return f"<Node {self.value} >"
 
 
 def build_tree(root, data):
     """ build a tree from ordered levelled data """
     for record in data:
         last = root
-        for _ in range(record['level']):
+        for _ in range(record["level"]):
             last = last.children[-1]
-        last.children.append(Node(last, record['value']))
+        last.children.append(Node(last, record["value"]))
 
 
 def print_tree(current, depth=0):
     """ print out the tree structure """
     for child in current.children:
-        print('  ' * depth + '%r' % child)
+        print("  " * depth + "%r" % child)
         print_tree(child, depth + 1)
 
 
@@ -103,7 +108,7 @@ def update_parent(child):
     """ update the str for parent """
     input_str = child.value[2] or child.value[0]
     new_str = update_weights(input_str, child.value[1])
-    pattern = re.escape("("+child.value[0]+")"+str(child.value[1]))
+    pattern = re.escape("(" + child.value[0] + ")" + str(child.value[1]))
     old_str = child.parent.value[2] or child.parent.value[0]
     child.parent.value[2] = re.sub(pattern, new_str, old_str, 0)
 
@@ -117,7 +122,7 @@ def parse(string):
         # reverse nested list
         nested_levels = nested_levels[::-1]
         # plant and grow the tree
-        root = Node('root', ['None']*3)
+        root = Node("root", ["None"] * 3)
         build_tree(root, nested_levels)
         # reduce the tree to get compositions
         reduce_tree(root)
@@ -125,4 +130,3 @@ def parse(string):
 
     else:
         return splitout_weights(string)
-
