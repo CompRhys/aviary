@@ -82,4 +82,4 @@ The open-source implementation of `cgcnn` available [here](https://github.com/tx
 
 ## Disclaimer
 
-This is research code shared without support or any guarantee on its quality. However, please do submit issues and pull requests or raise an issue and I will try my best to solve it.
+This is research code shared without support or any guarantee on its quality. However, please do raise an issue or submit a pull request if you spot something wrong or that could be improved and I will try my best to solve it.
