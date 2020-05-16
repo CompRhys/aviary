@@ -61,12 +61,14 @@ If you use this code please cite our work for which this model was built:
 
 [Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://arxiv.org/abs/1910.00617)
 
-> @article{goodall2019predicting,
+``` 
+@article{goodall2019predicting,
   title={Predicting materials properties without crystal structure: Deep representation learning from stoichiometry},
   author={Goodall, Rhys EA and Lee, Alpha A},
   journal={arXiv preprint arXiv:1910.00617},
   year={2019}
 }
+```
 
 ## Work Using Roost
 
