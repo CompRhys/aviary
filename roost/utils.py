@@ -150,26 +150,33 @@ class BaseModelClass(nn.Module):
                     target_norm = normalizer.norm(target)
                     target_norm = target_norm.to(self.device)
                 elif self.task == "classification":
-                    target_norm = target.to(self.device)
+                    target = target.to(self.device)
 
                 # compute output
                 output = self(*input_)
 
-                if self.robust:
-                    output, log_std = output.chunk(2, dim=1)
-                    loss = criterion(output, log_std, target_norm)
-                else:
-                    loss = criterion(output, target_norm.squeeze(1))
-
-                loss_meter.update(loss.data.cpu().item())
-
                 if self.task == "regression":
-                    # get predictions and error
+                    if self.robust:
+                        output, log_std = output.chunk(2, dim=1)
+                        loss = criterion(output, log_std, target_norm)
+                    else:
+                        loss = criterion(output, target_norm)
+
                     pred = normalizer.denorm(output.data.cpu())
                     metric_meter.update(pred, target)
+
                 elif self.task == "classification":
-                    logits = softmax(output, dim=1)
+                    if self.robust:
+                        output, log_std = output.chunk(2, dim=1)  
+                        logits = sampled_softmax(output, log_std)
+                        loss = criterion(torch.log(logits), target.squeeze(1))
+                    else:
+                        loss = criterion(output, target.squeeze(1))
+                        logits = softmax(output, dim=1)
+
                     metric_meter.update(logits.data.cpu().numpy(), target.data.cpu().numpy())
+
+                loss_meter.update(loss.data.cpu().item())
 
                 if action == "train":
                     # compute gradient and take an optimizer step
@@ -353,10 +360,14 @@ def RobustL2(output, log_std, target):
     return torch.mean(loss)
 
 
-def sampled_logits(output, log_std, samples=10):
+def sampled_softmax(pre_logits, log_std, samples=10):
     """
-    Robust L2 loss using a gaussian prior. Allows for estimation
-    of an aleatoric uncertainty.
+    Draw samples from gaussian distributed pre-logits and use these to estimate
+    a mean and aleatoric uncertainty.
     """
-    loss = 0.5 * torch.pow(output - target, 2.0) * torch.exp(-2.0 * log_std) + log_std
-    return torch.mean(loss)
+    sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
+    epsilon = torch.randn_like(sam_std)
+    pre_logits = pre_logits.repeat_interleave(samples, dim=0) + \
+                    torch.mul(epsilon, sam_std) 
+    logits = softmax(pre_logits, dim=1).view(len(log_std), samples, -1)
+    return torch.mean(logits, dim=1)

@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 
 import torch
-from torch.nn import L1Loss, MSELoss, CrossEntropyLoss
+from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, \
+                     NLLLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -17,7 +18,7 @@ from scipy.special import softmax
 
 from roost.model import Roost, ResidualNetwork
 from roost.data import input_parser, CompositionData, collate_batch
-from roost.utils import load_previous_state, Normalizer, sampled_logits, \
+from roost.utils import load_previous_state, Normalizer, sampled_softmax, \
                         RobustL1, RobustL2
 
 
@@ -277,9 +278,7 @@ def init_model(
     if task == "classification":
         normalizer = None
         if robust:
-            raise NotImplementedError(
-            "Robust/Hetroskedastic classifaction is not currently implemented"
-            )
+            criterion = NLLLoss()
         else:
             criterion = CrossEntropyLoss()
 
@@ -469,7 +468,8 @@ def results_regression(
     mae = np.mean(np.abs(res), axis=1)
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
-    r2 = 1 - mse / np.var(y_ensemble, axis=1)
+    r2 = r2_score(np.repeat(y_test[:, np.newaxis], ensemble_folds, axis=1),
+                    y_ensemble.T, multioutput="raw_values")
 
     if ensemble_folds == 1:
         print("\nModel Performance Metrics:")
@@ -498,10 +498,9 @@ def results_regression(
         mse_ens = np.square(y_test - y_ens).mean()
         rmse_ens = np.sqrt(mse_ens)
 
-        r2_ens = 1 - mse_ens / np.var(y_ens)
+        r2_ens = r2_score(y_test, y_ens)
 
         print("\nEnsemble Performance Metrics:")
-        print("R2 Score  : {:.4f} ".format(r2_score(y_test, y_ens)))
         print(f"R2 Score : {r2_ens:.4f} ")
         print(f"MAE  : {mae_ens:.4f}")
         print(f"RMSE : {rmse_ens:.4f}")
@@ -509,7 +508,7 @@ def results_regression(
     core = {"id": idx, "composition": comp, "target": y_test}
     results = {f"pred_{n_ens}": val for (n_ens, val) in enumerate(y_ensemble)}
     if model.robust:
-        ale = {f"aleatoric_{n_ens}": val for (n_ens, val) in enumerate(y_ale)}
+        ale = {f"ale_{n_ens}": val for (n_ens, val) in enumerate(y_ale)}
         results.update(ale)
 
     df = pd.DataFrame({**core, **results})
@@ -585,15 +584,11 @@ def results_classification(
             )
         
         if model.robust:
-            pre_logits, pre_std = output.chunk(2, dim=1)
+            pre_logits, log_std = output.chunk(2, dim=1)
+            logits = sampled_softmax(pre_logits, log_std, samples=10).data.cpu().numpy()
             pre_logits = pre_logits.data.cpu().numpy()
-            pre_std = pre_std.data.cpu().numpy()
-            y_pre_ale[j, :, :] = pre_std
-
-            logits = sampled_logits(pre_logits, pre_std, samples=10)
-            raise NotImplementedError(
-        "Robust/Hetroskedastic classifaction is not currently implemented"
-        )
+            log_std = torch.exp(log_std).data.cpu().numpy()
+            y_pre_ale[j, :, :] = log_std
         else:
             pre_logits = output.data.cpu().numpy()
 
@@ -665,13 +660,12 @@ def results_classification(
 
     results = {}
     for n_ens, y_pre_logit in enumerate(y_pre_logits):
-        pre_log_dict = {f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)}
-        results.update(pre_log_dict)
+        pred_dict = {f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)}
+        results.update(pred_dict)
         if model.robust:
-            raise NotImplementedError(
-            "Robust/Hetroskedastic classifaction is not currently implemented"
-            )
-
+            ale_dict = {f"class-{lab}-ale_{n_ens}": val for lab, val in enumerate(y_pre_ale[n_ens, :, :].T)}
+            results.update(ale_dict)
+            
     df = pd.DataFrame({**core, **results})
 
     if ensemble_folds == 1:
