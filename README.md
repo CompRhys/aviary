@@ -69,7 +69,7 @@ If you have used Roost in your work please contact me and I will add your paper 
 
 ## Acknowledgements
 
-The open-source implementation of `cgcnn` provided [here](https://github.com/txie-93/cgcnn) provided significant initial inspiration for how to structure this code-base.
+The open-source implementation of `cgcnn` available [here](https://github.com/txie-93/cgcnn) provided significant initial inspiration for how to structure this code-base.
 
 ## Disclaimer
 
