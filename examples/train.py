@@ -62,7 +62,7 @@ def main(
     assert task in ["regression", "classification"], ("Only "
         "'regression' or 'classification' allowed for 'task'")
 
-    if test_path or (not evaluate):
+    if test_path:
         test_size = 0.0
 
     if not (test_path and val_path):

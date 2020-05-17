@@ -28,35 +28,35 @@ def input_parser():
         type=str,
         default="data/datasets/expt-non-metals.csv",
         metavar="PATH",
-        help="dataset path",
+        help="Path to main data set/training set",
     )
     valid_group = parser.add_mutually_exclusive_group()
     valid_group.add_argument(
         "--val-path",
         type=str,
         metavar="PATH",
-        help="validation set path"
+        help="Path to independent validation set"
     )
     valid_group.add_argument(
         "--val-size",
         default=0.0,
         type=float,
-        metavar="N",
-        help="proportion of data used for validation",
+        metavar="FLOAT",
+        help="Proportion of data used for validation",
     )
     test_group = parser.add_mutually_exclusive_group()
     test_group.add_argument(
         "--test-path",
         type=str,
         metavar="PATH",
-        help="testing set path"
+        help="Path to independent test set"
     )
     test_group.add_argument(
         "--test-size",
         default=0.2,
         type=float,
-        metavar="N",
-        help="proportion of data for testing",
+        metavar="FLOAT",
+        help="Proportion of data set for testing",
     )
 
     # data embeddings
@@ -65,7 +65,7 @@ def input_parser():
         type=str,
         default="data/embeddings/matscholar-embedding.json",
         metavar="PATH",
-        help="atom feature path",
+        help="Element embedding feature path",
     )
 
     # dataloader inputs
@@ -73,42 +73,30 @@ def input_parser():
         "--workers",
         default=0,
         type=int,
-        metavar="N",
-        help="number of data loading workers (default: 0)",
+        metavar="INT",
+        help="Number of data loading workers (default: 0)",
     )
     parser.add_argument(
         "--batch-size",
         "--bsize",
         default=128,
         type=int,
-        metavar="N",
-        help="mini-batch size (default: 128)",
+        metavar="INT",
+        help="Mini-batch size (default: 128)",
     )
     parser.add_argument(
         "--seed",
         default=0,
         type=int,
-        metavar="N",
-        help="seed for random number generator",
+        metavar="INT",
+        help="Seed used when splitting data sets (default: 0)",
     )
     parser.add_argument(
         "--sample",
         default=1,
         type=int,
-        metavar="N",
-        help="sub-sample the training set for learning curves",
-    )
-
-    task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="specifies a classification task"
-    )
-    task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="specifies a regression task"
+        metavar="INT",
+        help="Sub-sample the training set for learning curves",
     )
 
     # optimiser inputs
@@ -116,49 +104,49 @@ def input_parser():
         "--epochs",
         default=100,
         type=int,
-        metavar="N",
-        help="number of total epochs to run (default: 100)",
+        metavar="INT",
+        help="Number of training epochs to run (default: 100)",
     )
     parser.add_argument(
         "--loss",
         default="L1",
         type=str,
-        metavar="str",
-        help="Loss Function (default: 'L1')",
+        metavar="STR",
+        help="Loss function if regression (default: 'L1')",
     )
     parser.add_argument(
         "--robust",
         action="store_true",
-        help="Use hetroskedastic loss variant"
+        help="Specifies whether to use hetroskedastic loss variants"
     )
     parser.add_argument(
         "--optim",
         default="AdamW",
         type=str,
-        metavar="str",
-        help="choose an optimizer; SGD, Adam or AdamW (default: 'AdamW')",
+        metavar="STR",
+        help="Optimizer used for training (default: 'AdamW')",
     )
     parser.add_argument(
         "--learning-rate",
         "--lr",
         default=3e-4,
         type=float,
-        metavar="float",
-        help="initial learning rate (default: 3e-4)",
+        metavar="FLOAT",
+        help="Initial learning rate (default: 3e-4)",
     )
     parser.add_argument(
         "--momentum",
         default=0.9,
         type=float,
-        metavar="float [0,1]",
-        help="momentum (default: 0.9)",
+        metavar="FLOAT [0,1]",
+        help="Optimizer momentum (default: 0.9)",
     )
     parser.add_argument(
         "--weight-decay",
         default=1e-6,
         type=float,
-        metavar="float [0,1]",
-        help="weight decay (default: 1e-6)",
+        metavar="FLOAT [0,1]",
+        help="Optimizer weight decay (default: 1e-6)",
     )
 
     # graph inputs
@@ -166,75 +154,89 @@ def input_parser():
         "--elem-fea-len",
         default=64,
         type=int,
-        metavar="N",
-        help="number of hidden atom features in conv layers (default: 64)",
+        metavar="INT",
+        help="Number of hidden features for elements (default: 64)",
     )
     parser.add_argument(
         "--n-graph",
         default=3,
         type=int,
-        metavar="N",
-        help="number of graph layers (default: 3)",
+        metavar="INT",
+        help="Number of message passing layers (default: 3)",
     )
 
     # ensemble inputs
     parser.add_argument(
+        "--ensemble",
+        default=1,
+        type=int,
+        metavar="INT",
+        help="Number models to ensemble"
+    )
+    name_group = parser.add_mutually_exclusive_group()
+    name_group.add_argument(
         "--model-name",
         type=str,
         default=None,
-        help="name for model"
+        metavar="STR",
+        help="Name for sub-directory where models will be stored"
     )
-    parser.add_argument(
+    name_group.add_argument(
         "--data-id",
         default="roost",
         type=str,
-        metavar="N",
-        help="identifier for the data/cross-val fold",
+        metavar="STR",
+        help="Partial identifier for sub-directory where models will be stored"
     )
     parser.add_argument(
         "--run-id",
         default=0,
         type=int,
-        metavar="N",
-        help="ensemble model id"
-    )
-    parser.add_argument(
-        "--ensemble",
-        default=1,
-        type=int,
-        metavar="N",
-        help="number ensemble repeats"
+        metavar="INT",
+        help="Index for model in an ensemble of models"
     )
 
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="resume from previous checkpoint"
+        "--fine-tune",
+        type=str,
+        metavar="PATH",
+        help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
         "--transfer",
         type=str,
         metavar="PATH",
-        help="checkpoint path for transfer learning",
+        help="Checkpoint path for transfer learning",
     )
     use_group.add_argument(
-        "--fine-tune",
-        type=str,
-        metavar="PATH",
-        help="checkpoint path for fine tuning"
+        "--resume",
+        action="store_true",
+        help="Resume from previous checkpoint"
     )
 
+    # task type
+    task_group = parser.add_mutually_exclusive_group()
+    task_group.add_argument(
+        "--classification",
+        action="store_true",
+        help="Specifies a classification task"
+    )
+    task_group.add_argument(
+        "--regression",
+        action="store_true",
+        help="Specifies a regression task"
+    )
     parser.add_argument(
         "--evaluate",
         action="store_true",
-        help="skip network training stages checkpoint",
+        help="Evaluate the model/ensemble",
     )
     parser.add_argument(
         "--train",
         action="store_true",
-        help="skip network training stages checkpoint"
+        help="Train the model/ensemble"
     )
 
     # misc
@@ -246,7 +248,7 @@ def input_parser():
     parser.add_argument(
         "--log",
         action="store_true",
-        help="log metrics to tensorboard"
+        help="Log training metrics to tensorboard"
     )
 
     args = parser.parse_args(sys.argv[1:])
