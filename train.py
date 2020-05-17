@@ -5,21 +5,23 @@ import numpy as np
 import pandas as pd
 
 import torch
-from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, \
-                     NLLLoss
+from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, NLLLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, \
-                            precision_recall_fscore_support
+from sklearn.metrics import (
+    r2_score,
+    roc_auc_score,
+    accuracy_score,
+    precision_recall_fscore_support,
+)
 from sklearn.model_selection import train_test_split as split
 
 from scipy.special import softmax
 
 from roost.model import Roost, ResidualNetwork
 from roost.data import input_parser, CompositionData, collate_batch
-from roost.utils import load_previous_state, Normalizer, sampled_softmax, \
-                        RobustL1, RobustL2
+from roost.utils import Normalizer, sampled_softmax, RobustL1, RobustL2
 
 
 def main(
@@ -52,13 +54,32 @@ def main(
     weight_decay=1e-6,
     batch_size=128,
     workers=0,
-    device=torch.device("cuda") if torch.cuda.is_available() \
-            else torch.device("cpu"),
+    device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
+    assert evaluate or train, ("No task given - Set at least one of "
+        "'train' or 'evaluate' kwargs as True")
+    assert task in ["regression", "classification"], ("Only "
+        "'regression' or 'classification' allowed for 'task'")
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path,
-                                task=task)
+    if test_path or (not evaluate):
+        test_size = 0.0
+
+    if not (test_path and val_path):
+        assert test_size + val_size < 1.0, (f"'test_size'({test_size}) "
+            f"plus 'val_size'({val_size}) must be less than 1")
+
+    if ensemble > 1 and (fine_tune or transfer):
+        raise NotImplementedError(
+            "If training an ensemble with fine tuning or transfering"
+            " options the models must be trained one by one using the"
+            " run-id flag."
+        )
+
+    assert not (fine_tune and transfer), ("Cannot fine-tune and"
+        " transfer checkpoint(s) at the same time.")
+
+    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task=task)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -96,9 +117,7 @@ def main(
             else:
                 print(f"using {val_size} of training set as validation set")
                 train_idx, val_idx = split(
-                    train_idx,
-                    random_state=seed,
-                    test_size=val_size / (1 - test_size),
+                    train_idx, random_state=seed, test_size=val_size / (1 - test_size),
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -140,7 +159,7 @@ def main(
         "cry_heads": 3,
         "cry_gate": [256],
         "cry_msg": [256],
-        "out_hidden": [1024, 512, 256, 128, 64]
+        "out_hidden": [1024, 512, 256, 128, 64],
     }
 
     if not os.path.isdir("models/"):
@@ -172,15 +191,8 @@ def main(
 
     if evaluate:
 
-        restart_reset = {
-            "resume": None,
-            "fine_tune": None,
-            "transfer": None,
-        }
-        restart_params.update(restart_reset)
-
         data_reset = {
-            "batch_size": 16*batch_size,  # faster model inference
+            "batch_size": 16 * batch_size,  # faster model inference
             "shuffle": False,  # need fixed data order due to ensembling
         }
         data_params.update(data_reset)
@@ -192,11 +204,10 @@ def main(
                 ensemble_folds=ensemble,
                 test_set=test_set,
                 data_params=data_params,
-                setup_params=setup_params,
-                restart_params=restart_params,
-                model_params=model_params,
-                eval_type="checkpoint"
-                )
+                robust=robust,
+                device=device,
+                eval_type="checkpoint",
+            )
         elif task == "classification":
             results_classification(
                 model_name=model_name,
@@ -204,11 +215,10 @@ def main(
                 ensemble_folds=ensemble,
                 test_set=test_set,
                 data_params=data_params,
-                setup_params=setup_params,
-                restart_params=restart_params,
-                model_params=model_params,
-                eval_type="checkpoint"
-                )
+                robust=robust,
+                device=device,
+                eval_type="checkpoint",
+            )
 
 
 def init_model(
@@ -238,51 +248,68 @@ def init_model(
     transfer=None,
 ):
 
-    model = Roost(
-        n_targets=n_targets,
-        elem_emb_len=elem_emb_len,
-        elem_fea_len=elem_fea_len,
-        n_graph=n_graph,
-        elem_heads=elem_heads,
-        elem_gate=elem_gate,
-        elem_msg=elem_msg,
-        cry_heads=cry_heads,
-        cry_gate=cry_gate,
-        cry_msg=cry_msg,
-        out_hidden=out_hidden,
-        task=task,
-        robust=robust,
-        device=device,
-    )
-
-    model.to(device)
-
     if fine_tune is not None:
-        print(f"Using {fine_tune} as a starting point for fine-tuning")
-        previous_state = load_previous_state(fine_tune, model, device)
-        model, _, _, _, _, _ = previous_state
-        model.epoch = 1
-        model.best_val_score = None
+        print(f"Use material_nn and output_nn from '{fine_tune}' as a starting point")
+        checkpoint = torch.load(fine_tune, map_location=device)
+        model = Roost(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
 
-    if transfer is not None:
-        # TODO currently if you use a model as a feature extractor and then
-        # resume for a checkpoint of that model the material_nn unfreezes.
-        # NOTE this is a pretty useless option it performs worse than fine-
-        # tuning in all tests so far. Perhaps best to deprecate and remove?
-        print(f"Using {transfer} as a feature extractor and retrain the output_nn")
-        previous_state = load_previous_state(transfer, model, device)
-        model, _, _, _, _, _ = previous_state
-        for p in model.material_nn.parameters():
-            p.requires_grad = False
+        assert model.model_params["robust"] == robust, ("cannot fine-tune "
+            "between tasks with different numebers of outputs - use transfer "
+            "option instead")
+        assert model.model_params["n_targets"] == n_targets, ("cannot fine-tune "
+            "between tasks with different numebers of outputs - use transfer "
+            "option instead")
+
+    elif transfer is not None:
+        print(f"Use material_nn from '{transfer}' as a starting point and "
+            "train the output_nn from scratch")
+        checkpoint = torch.load(transfer, map_location=device)
+        model = Roost(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+
+        model.task = task
+        model.model_params["task"] = task
+        model.robust = robust
+        model.model_params["robust"] = robust
+        model.model_params["n_targets"] = n_targets
+
+        # # NOTE currently if you use a model as a feature extractor and then
+        # # resume for a checkpoint of that model the material_nn unfreezes.
+        # # This is potentially not the behaviour a user might expect.
+        # for p in model.material_nn.parameters():
+        #     p.requires_grad = False
+
+        if robust:
+            output_dim = 2 * n_targets
+        else:
+            output_dim = n_targets
 
         model.output_nn = ResidualNetwork(
-            input_dim=elem_fea_len,
-            hidden_layer_dims=[1024, 512, 256, 128, 64],
-            output_dim=n_targets,
+            input_dim=elem_fea_len, hidden_layer_dims=out_hidden, output_dim=output_dim,
         )
 
-        model.epoch = 1
-        model.best_val_score = None
+    else:
+        model = Roost(
+            n_targets=n_targets,
+            elem_emb_len=elem_emb_len,
+            elem_fea_len=elem_fea_len,
+            n_graph=n_graph,
+            elem_heads=elem_heads,
+            elem_gate=elem_gate,
+            elem_msg=elem_msg,
+            cry_heads=cry_heads,
+            cry_gate=cry_gate,
+            cry_msg=cry_msg,
+            out_hidden=out_hidden,
+            task=task,
+            robust=robust,
+            device=device,
+        )
+
+        model.to(device)
 
     # Select Optimiser
     if optim == "SGD":
@@ -294,15 +321,11 @@ def init_model(
         )
     elif optim == "Adam":
         optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
         )
     elif optim == "AdamW":
         optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
         )
     else:
         raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
@@ -326,7 +349,7 @@ def init_model(
                 criterion = RobustL2
             else:
                 raise NameError(
-                "Only L1 or L2 losses are allowed for robust regression tasks"
+                    "Only L1 or L2 losses are allowed for robust regression tasks"
                 )
         else:
             if loss == "L1":
@@ -334,20 +357,24 @@ def init_model(
             elif loss == "L2":
                 criterion = MSELoss()
             else:
-                raise NameError(
-                "Only L1 or L2 losses are allowed for regression tasks"
-                )
+                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
 
     if args.resume:
-        checkpoint_file = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
-        print(f"Resuming training from {checkpoint_file}")
-        previous_state = load_previous_state(
-            checkpoint_file, model, device, optimizer, normalizer, scheduler
-        )
-        model, optimizer, normalizer = previous_state[:3]
-        scheduler, start_epoch, best_val_score = previous_state[3:]
-        model.epoch = start_epoch
-        model.best_val_score = best_val_score
+        # TODO work out how to ensure that we are using the same optimizer
+        # when resuming such that the state dictionaries do not clash.
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+        print(f"Resuming training from '{resume}'")
+        checkpoint = torch.load(resume, map_location=device)
+
+        model = Roost(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+        model.epoch = checkpoint["epoch"]
+        model.best_val_score = checkpoint["best_val_score"]
+
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        normalizer.load_state_dict(checkpoint["normalizer"])
+        scheduler.load_state_dict(checkpoint["scheduler"])
 
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total Number of Trainable Parameters: {}".format(num_param))
@@ -384,6 +411,7 @@ def train_ensemble(
     train_generator = DataLoader(train_set, **data_params)
 
     if val_set is not None:
+        data_params.update({"batch_size": 16 * data_params["batch_size"]})
         val_generator = DataLoader(val_set, **data_params)
     else:
         val_generator = None
@@ -410,14 +438,14 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                log_dir=(
-                    f"runs/{model_name}-r{j}_""{date:%d-%m-%Y_%H-%M-%S}"
-                ).format(date=datetime.datetime.now())
+                log_dir=(f"runs/{model_name}-r{j}_" "{date:%d-%m-%Y_%H-%M-%S}").format(
+                    date=datetime.datetime.now()
+                )
             )
         else:
             writer = None
 
-        if val_set is not None and model.best_val_score is None:
+        if (val_set is not None) and (model.best_val_score is None):
             with torch.no_grad():
                 _, v_metrics = model.evaluate(
                     generator=val_generator,
@@ -426,7 +454,11 @@ def train_ensemble(
                     normalizer=normalizer,
                     action="val",
                 )
-                model.best_val_score = v_metrics[model.scoring_rule]
+                if model.task == "regression":
+                    val_score = v_metrics["MAE"]
+                elif model.task == "classification":
+                    val_score = v_metrics["Acc"]
+                model.best_val_score = val_score
 
         model.fit(
             train_generator=train_generator,
@@ -448,9 +480,8 @@ def results_regression(
     ensemble_folds,
     test_set,
     data_params,
-    setup_params,
-    restart_params,
-    model_params,
+    robust,
+    device,
     eval_type="checkpoint",
 ):
     """
@@ -465,46 +496,41 @@ def results_regression(
 
     test_generator = DataLoader(test_set, **data_params)
 
-    model, _, _, _, normalizer = init_model(
-        model_name=model_name,
-        run_id=run_id,
-        **setup_params,
-        **restart_params,
-        **model_params,
-    )
     y_ensemble = np.zeros((ensemble_folds, len(test_set)))
-    if model.robust:
+    if robust:
         y_ale = np.zeros((ensemble_folds, len(test_set)))
 
     for j in range(ensemble_folds):
 
         if ensemble_folds == 1:
-            j = run_id
+            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
         else:
+            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
             print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
 
-        checkpoint = torch.load(
-            f=(f"models/{model_name}/{eval_type}-r{j}.pth.tar"),
-            map_location=setup_params["device"],
-        )
+        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
+        checkpoint = torch.load(resume, map_location=device)
+        checkpoint["model_params"]["robust"]
+        assert (
+            checkpoint["model_params"]["robust"] == robust
+        ), f"robustness of checkpoint '{resume}' is not {robust}"
 
-        if ensemble_folds == 1:
-            j = 0
-
+        model = Roost(**checkpoint["model_params"], device=device,)
+        model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
+
+        normalizer = Normalizer()
         normalizer.load_state_dict(checkpoint["normalizer"])
 
         with torch.no_grad():
-            idx, comp, y_test, output = model.predict(
-                generator=test_generator,
-            )
+            idx, comp, y_test, output = model.predict(generator=test_generator,)
 
-        if model.robust:
-            pred, log_std = output.chunk(2, dim=1)
-            pred = normalizer.denorm(pred.data.cpu())
-            std = torch.exp(log_std).data.cpu()*normalizer.std
-            y_ale[j, :] = std.view(-1).numpy()
+        if robust:
+            mean, log_std = output.chunk(2, dim=1)
+            pred = normalizer.denorm(mean.data.cpu())
+            ale_std = torch.exp(log_std).data.cpu() * normalizer.std
+            y_ale[j, :] = ale_std.view(-1).numpy()
         else:
             pred = normalizer.denorm(output.data.cpu())
 
@@ -514,8 +540,11 @@ def results_regression(
     mae = np.mean(np.abs(res), axis=1)
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
-    r2 = r2_score(np.repeat(y_test[:, np.newaxis], ensemble_folds, axis=1),
-                    y_ensemble.T, multioutput="raw_values")
+    r2 = r2_score(
+        np.repeat(y_test[:, np.newaxis], ensemble_folds, axis=1),
+        y_ensemble.T,
+        multioutput="raw_values",
+    )
 
     if ensemble_folds == 1:
         print("\nModel Performance Metrics:")
@@ -576,9 +605,8 @@ def results_classification(
     ensemble_folds,
     test_set,
     data_params,
-    setup_params,
-    restart_params,
-    model_params,
+    robust,
+    device,
     eval_type="checkpoint",
 ):
     """
@@ -593,18 +621,10 @@ def results_classification(
 
     test_generator = DataLoader(test_set, **data_params)
 
-    model, _, _, _, _ = init_model(
-        model_name=model_name,
-        run_id=run_id,
-        **setup_params,
-        **restart_params,
-        **model_params,
-    )
-
-    y_pre_logits = np.zeros((ensemble_folds, len(test_set), model.n_targets))
-    y_logits = np.zeros((ensemble_folds, len(test_set), model.n_targets))
-    if model.robust:
-        y_pre_ale = np.zeros((ensemble_folds, len(test_set), model.n_targets))
+    y_pre_logits = []
+    y_logits = []
+    if robust:
+        y_pre_ale = []
 
     acc = np.zeros((ensemble_folds))
     roc_auc = np.zeros((ensemble_folds))
@@ -615,47 +635,47 @@ def results_classification(
     for j in range(ensemble_folds):
 
         if ensemble_folds == 1:
-            j = run_id
+            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
         else:
+            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
             print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
 
-        checkpoint = torch.load(
-            f=(f"models/{model_name}/{eval_type}-r{j}.pth.tar"),
-            map_location=setup_params["device"],
-        )
+        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
+        checkpoint = torch.load(resume, map_location=device)
+        assert (
+            checkpoint["model_params"]["robust"] == robust
+        ), f"robustness of checkpoint '{resume}' is not {robust}"
 
-        if ensemble_folds == 1:
-            j = 0
-
+        model = Roost(**checkpoint["model_params"], device=device,)
+        model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
         with torch.no_grad():
-            idx, comp, y_test, output = model.predict(
-                generator=test_generator,
-            )
-        
+            idx, comp, y_test, output = model.predict(generator=test_generator)
+
         if model.robust:
-            pre_logits, log_std = output.chunk(2, dim=1)
-            logits = sampled_softmax(pre_logits, log_std, samples=10).data.cpu().numpy()
-            pre_logits = pre_logits.data.cpu().numpy()
-            log_std = torch.exp(log_std).data.cpu().numpy()
-            y_pre_ale[j, :, :] = log_std
+            mean, log_std = output.chunk(2, dim=1)
+            logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
+            pre_logits = mean.data.cpu().numpy()
+            pre_logits_std = torch.exp(log_std).data.cpu().numpy()
+            y_pre_ale.append(pre_logits_std)
         else:
             pre_logits = output.data.cpu().numpy()
 
         logits = softmax(pre_logits, axis=1)
-        
-        y_pre_logits[j, :, :] = pre_logits
-        y_logits[j, :, :] = logits
+
+        y_pre_logits.append(pre_logits)
+        y_logits.append(logits)
 
         y_test_ohe = np.zeros_like(pre_logits)
         y_test_ohe[np.arange(y_test.size), y_test] = 1
 
         acc[j] = accuracy_score(y_test, np.argmax(logits, axis=1))
         roc_auc[j] = roc_auc_score(y_test_ohe, logits)
-        precision[j], recall[j], fscore[j] = precision_recall_fscore_support(y_test,
-            np.argmax(logits, axis=1), average="weighted")[:3]
+        precision[j], recall[j], fscore[j] = precision_recall_fscore_support(
+            y_test, np.argmax(logits, axis=1), average="weighted"
+        )[:3]
 
     if ensemble_folds == 1:
         print("\nModel Performance Metrics:")
@@ -695,8 +715,9 @@ def results_classification(
 
         ens_acc = accuracy_score(y_test, np.argmax(ens_logits, axis=1))
         ens_roc_auc = roc_auc_score(y_test_ohe, ens_logits)
-        ens_precision, ens_recall, ens_fscore = precision_recall_fscore_support(y_test,
-            np.argmax(ens_logits, axis=1), average="weighted")[:3]
+        ens_precision, ens_recall, ens_fscore = precision_recall_fscore_support(
+            y_test, np.argmax(ens_logits, axis=1), average="weighted"
+        )[:3]
 
         print("\nEnsemble Performance Metrics:")
         print(f"Accuracy : {ens_acc:.4f} ")
@@ -707,17 +728,22 @@ def results_classification(
 
     # NOTE we save pre_logits rather than logits due to fact that with the
     # hetroskedastic setup we want to be able to sample from the gaussian
-    # distributed pre_logits.
+    # distributed pre_logits we parameterise.
     core = {"id": idx, "composition": comp, "target": y_test}
 
     results = {}
     for n_ens, y_pre_logit in enumerate(y_pre_logits):
-        pred_dict = {f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)}
+        pred_dict = {
+            f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)
+        }
         results.update(pred_dict)
         if model.robust:
-            ale_dict = {f"class-{lab}-ale_{n_ens}": val for lab, val in enumerate(y_pre_ale[n_ens, :, :].T)}
+            ale_dict = {
+                f"class-{lab}-ale_{n_ens}": val
+                for lab, val in enumerate(y_pre_ale[n_ens].T)
+            }
             results.update(ale_dict)
-            
+
     df = pd.DataFrame({**core, **results})
 
     if ensemble_folds == 1:

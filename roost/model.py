@@ -17,6 +17,8 @@ class Roost(BaseModelClass):
 
     def __init__(
         self,
+        task,
+        robust,
         n_targets,
         elem_emb_len,
         elem_fea_len=64,
@@ -30,19 +32,36 @@ class Roost(BaseModelClass):
         out_hidden=[1024, 512, 256, 128, 64],
         **kwargs
     ):
-        super(Roost, self).__init__(n_targets=n_targets, **kwargs)
-
-        self.material_nn = DescriptorNetwork(
-            elem_emb_len=elem_emb_len,
-            elem_fea_len=elem_fea_len,
-            n_graph=n_graph,
-            elem_heads=elem_heads,
-            elem_gate=elem_gate,
-            elem_msg=elem_msg,
-            cry_heads=cry_heads,
-            cry_gate=cry_gate,
-            cry_msg=cry_msg,
+        super(Roost, self).__init__(
+            task=task, robust=robust, n_targets=n_targets, **kwargs
         )
+
+        # TODO find a more elegant way to structure this unpacking then
+        # a dictionary seems like a non-optimal solution.
+        self.model_params.update()
+
+        desc_dict = {
+            "elem_emb_len": elem_emb_len,
+            "elem_fea_len": elem_fea_len,
+            "n_graph": n_graph,
+            "elem_heads": elem_heads,
+            "elem_gate": elem_gate,
+            "elem_msg": elem_msg,
+            "cry_heads": cry_heads,
+            "cry_gate": cry_gate,
+            "cry_msg": cry_msg,
+        }
+
+        self.material_nn = DescriptorNetwork(**desc_dict)
+
+        self.model_params.update({
+            "task": task,
+            "robust": robust,
+            "n_targets": n_targets,
+            "out_hidden": out_hidden,
+        })
+
+        self.model_params.update(desc_dict)
 
         # define an output neural network
         if self.robust:
@@ -53,13 +72,13 @@ class Roost(BaseModelClass):
         self.output_nn = ResidualNetwork(elem_fea_len, output_dim, out_hidden)
 
     def forward(
-        self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, crystal_elem_idx
+        self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
     ):
         """
         Forward pass through the material_nn and output_nn
         """
         crys_fea = self.material_nn(
-            elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, crystal_elem_idx
+            elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
         )
 
         # apply neural network to map from learned features to target
@@ -122,34 +141,34 @@ class DescriptorNetwork(nn.Module):
         )
 
     def forward(
-        self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, crystal_elem_idx
+        self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
     ):
         """
         Forward pass
 
         Parameters
         ----------
-        N: Total number of elems (nodes) in the batch
-        M: Total number of bonds (edges) in the batch
+        N: Total number of elements (nodes) in the batch
+        M: Total number of pairs (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
         Inputs
         ----------
-        elem_fea: Variable(torch.Tensor) shape (N)
+        elem_weights: Variable(torch.Tensor) shape (N)
             Fractional weight of each Element in its stiochiometry
         elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
             Element features of each of the N elems in the batch
         self_fea_idx: torch.Tensor shape (M,)
-            Indices of the elem each of the M bonds correspond to
+            Indices of the first element in each of the M pairs
         nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of of the neighbours of the M bonds connect to
-        crystal_elem_idx: list of torch.LongTensor of length C
+            Indices of the second element in each of the M pairs
+        cry_elem_idx: list of torch.LongTensor of length C
             Mapping from the elem idx to crystal idx
 
         Returns
         -------
-        out: nn.Variable shape (C,)
-            Atom hidden features after message passing
+        cry_fea: nn.Variable shape (C,)
+            Material representation after message passing
         """
 
         # embed the original features into a trainable embedding space
@@ -166,7 +185,7 @@ class DescriptorNetwork(nn.Module):
         head_fea = []
         for attnhead in self.cry_pool:
             head_fea.append(
-                attnhead(fea=elem_fea, index=crystal_elem_idx, weights=elem_weights)
+                attnhead(fea=elem_fea, index=cry_elem_idx, weights=elem_weights)
             )
 
         return torch.mean(torch.stack(head_fea), dim=0)
@@ -205,8 +224,8 @@ class MessageLayer(nn.Module):
 
         Parameters
         ----------
-        N: Total number of elems (nodes) in the batch
-        M: Total number of bonds (edges) in the batch
+        N: Total number of elements (nodes) in the batch
+        M: Total number of pairs (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
         Inputs
@@ -214,16 +233,16 @@ class MessageLayer(nn.Module):
         elem_weights: Variable(torch.Tensor) shape (N,)
             The fractional weights of elems in their materials
         elem_in_fea: Variable(torch.Tensor) shape (N, elem_fea_len)
-            Atom hidden features before message passing
+            Element hidden features before message passing
         self_fea_idx: torch.Tensor shape (M,)
-            Indices of M neighbours of each elem
+            Indices of the first element in each of the M pairs
         nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of M neighbours of each elem
+            Indices of the second element in each of the M pairs
 
         Returns
         -------
         elem_out_fea: nn.Variable shape (N, elem_fea_len)
-            Atom hidden features after message passing
+            Element hidden features after message passing
         """
         # construct the total features for passing
         elem_nbr_weights = elem_weights[nbr_fea_idx, :]

@@ -20,15 +20,11 @@ class BaseModelClass(nn.Module):
     def __init__(self, task, n_targets, robust, device, epoch=1, best_val_score=None):
         super(BaseModelClass, self).__init__()
         self.task = task
-        self.n_targets = n_targets
         self.robust = robust
-        if self.task == "regression":
-            self.scoring_rule = "MAE"
-        elif self.task == "classification":
-            self.scoring_rule = "Acc"
         self.device = device
         self.epoch = epoch
         self.best_val_score = best_val_score
+        self.model_params = {}
 
     def fit(
         self,
@@ -77,17 +73,21 @@ class BaseModelClass(nn.Module):
                         )
 
                     print(f"Validation : Loss {v_loss:.4f}\t"
-                        + "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()])       
+                        + "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()])
                     )
 
-                    # NOTE we need to find a proper scoring rule for classification 
-                    # which is minimised for good models.
-                    is_best = v_metrics[self.scoring_rule] < self.best_val_score
+                    if self.task == "regression":
+                        val_score = v_metrics["MAE"]
+                        is_best = val_score < self.best_val_score
+                    elif self.task == "classification":
+                        val_score = v_metrics["Acc"]
+                        is_best = val_score > self.best_val_score
 
                 if is_best:
-                    self.best_val_score = v_metrics[self.scoring_rule]
+                    self.best_val_score = val_score
 
                 checkpoint_dict = {
+                    "model_params": self.model_params,
                     "state_dict": self.state_dict(),
                     "epoch": self.epoch,
                     "best_val_score": self.best_val_score,
@@ -142,7 +142,8 @@ class BaseModelClass(nn.Module):
             metric_meter = ClassificationMetrics()
 
         with trange(len(generator), disable=(not verbose)) as t:
-            for input_, target, batch_comp, batch_ids in generator:
+            # we do not need batch_comp or batch_ids when training
+            for input_, target, _, _ in generator:
 
                 # move tensors to GPU
                 input_ = (tensor.to(self.device) for tensor in input_)
@@ -169,7 +170,7 @@ class BaseModelClass(nn.Module):
 
                 elif self.task == "classification":
                     if self.robust:
-                        output, log_std = output.chunk(2, dim=1)  
+                        output, log_std = output.chunk(2, dim=1)
                         logits = sampled_softmax(output, log_std)
                         loss = criterion(torch.log(logits), target.squeeze(1))
                     else:
@@ -319,28 +320,6 @@ def save_checkpoint(state, is_best, model_name, run_id):
         shutil.copyfile(checkpoint, best)
 
 
-def load_previous_state(
-    path, model, device, optimizer=None, normalizer=None, scheduler=None
-):
-    """
-    """
-    assert os.path.isfile(path), "no checkpoint found at '{}'".format(path)
-
-    checkpoint = torch.load(path, map_location=device)
-    start_epoch = checkpoint["epoch"]
-    best_val_score = checkpoint["best_val_score"]
-    model.load_state_dict(checkpoint["state_dict"])
-    if optimizer:
-        optimizer.load_state_dict(checkpoint["optimizer"])
-    if normalizer and model.task == "regression":
-        normalizer.load_state_dict(checkpoint["normalizer"])
-    if scheduler:
-        scheduler.load_state_dict(checkpoint["scheduler"])
-    print("Loaded '{}'".format(path))
-
-    return model, optimizer, normalizer, scheduler, start_epoch, best_val_score
-
-
 def RobustL1(output, log_std, target):
     """
     Robust L1 loss using a lorentzian prior. Allows for estimation
@@ -370,6 +349,6 @@ def sampled_softmax(pre_logits, log_std, samples=10):
     sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
     epsilon = torch.randn_like(sam_std)
     pre_logits = pre_logits.repeat_interleave(samples, dim=0) + \
-                    torch.mul(epsilon, sam_std) 
+                    torch.mul(epsilon, sam_std)
     logits = softmax(pre_logits, dim=1).view(len(log_std), samples, -1)
     return torch.mean(logits, dim=1)

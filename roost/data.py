@@ -17,170 +17,237 @@ def input_parser():
     """
     parse input
     """
-    parser = argparse.ArgumentParser(description="Structure Agnostic "
-                                     "Message Passing Neural Network")
+    parser = argparse.ArgumentParser(
+        description=("Roost - a Structure Agnostic Message Passing "
+            "Neural Network for Inorganic Materials")
+    )
 
     # data inputs
-    parser.add_argument("--data-path",
-                        type=str,
-                        default="data/datasets/expt-non-metals.csv",
-                        metavar="PATH",
-                        help="dataset path")
+    parser.add_argument(
+        "--data-path",
+        type=str,
+        default="data/datasets/expt-non-metals.csv",
+        metavar="PATH",
+        help="dataset path",
+    )
     valid_group = parser.add_mutually_exclusive_group()
-    valid_group.add_argument("--val-path",
-                            type=str,
-                            metavar="PATH",
-                            help="validation set path")
-    valid_group.add_argument("--val-size",
-                            default=0.0,
-                            type=float,
-                            metavar="N",
-                            help="proportion of data used for validation")
+    valid_group.add_argument(
+        "--val-path",
+        type=str,
+        metavar="PATH",
+        help="validation set path"
+    )
+    valid_group.add_argument(
+        "--val-size",
+        default=0.0,
+        type=float,
+        metavar="N",
+        help="proportion of data used for validation",
+    )
     test_group = parser.add_mutually_exclusive_group()
-    test_group.add_argument("--test-path",
-                            type=str,
-                            metavar="PATH",
-                            help="testing set path")
-    test_group.add_argument("--test-size",
-                            default=0.2,
-                            type=float,
-                            metavar="N",
-                            help="proportion of data for testing")
+    test_group.add_argument(
+        "--test-path",
+        type=str,
+        metavar="PATH",
+        help="testing set path"
+    )
+    test_group.add_argument(
+        "--test-size",
+        default=0.2,
+        type=float,
+        metavar="N",
+        help="proportion of data for testing",
+    )
 
     # data embeddings
-    parser.add_argument("--fea-path",
-                        type=str,
-                        default="data/embeddings/matscholar-embedding.json",
-                        metavar="PATH",
-                        help="atom feature path")
-
+    parser.add_argument(
+        "--fea-path",
+        type=str,
+        default="data/embeddings/matscholar-embedding.json",
+        metavar="PATH",
+        help="atom feature path",
+    )
 
     # dataloader inputs
-    parser.add_argument("--workers",
-                        default=0,
-                        type=int,
-                        metavar="N",
-                        help="number of data loading workers (default: 0)")
-    parser.add_argument("--batch-size", "--bsize",
-                        default=128,
-                        type=int,
-                        metavar="N",
-                        help="mini-batch size (default: 128)")
-    parser.add_argument("--seed",
-                        default=0,
-                        type=int,
-                        metavar="N",
-                        help="seed for random number generator")
-    parser.add_argument("--sample",
-                        default=1,
-                        type=int,
-                        metavar="N",
-                        help="sub-sample the training set for learning curves")
+    parser.add_argument(
+        "--workers",
+        default=0,
+        type=int,
+        metavar="N",
+        help="number of data loading workers (default: 0)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        "--bsize",
+        default=128,
+        type=int,
+        metavar="N",
+        help="mini-batch size (default: 128)",
+    )
+    parser.add_argument(
+        "--seed",
+        default=0,
+        type=int,
+        metavar="N",
+        help="seed for random number generator",
+    )
+    parser.add_argument(
+        "--sample",
+        default=1,
+        type=int,
+        metavar="N",
+        help="sub-sample the training set for learning curves",
+    )
 
     task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument("--classification",
-                            action="store_true",
-                            help="specifies a classification task")
-    task_group.add_argument("--regression",
-                            action="store_true",
-                            help="specifies a regression task") 
+    task_group.add_argument(
+        "--classification",
+        action="store_true",
+        help="specifies a classification task"
+    )
+    task_group.add_argument(
+        "--regression",
+        action="store_true",
+        help="specifies a regression task"
+    )
 
     # optimiser inputs
-    parser.add_argument("--epochs",
-                        default=100,
-                        type=int,
-                        metavar="N",
-                        help="number of total epochs to run (default: 100)") 
-    parser.add_argument("--loss",
-                        default="L1",
-                        type=str,
-                        metavar="str",
-                        help="Loss Function (default: 'L1')")
-    parser.add_argument("--robust",
-                        action="store_true",
-                        help="Use hetroskedastic loss variant")
-    parser.add_argument("--optim",
-                        default="AdamW",
-                        type=str,
-                        metavar="str",
-                        help="choose an optimizer; SGD, Adam or AdamW (default: 'AdamW')")
-    parser.add_argument("--learning-rate", "--lr",
-                        default=3e-4,
-                        type=float,
-                        metavar="float",
-                        help="initial learning rate (default: 3e-4)")
-    parser.add_argument("--momentum",
-                        default=0.9,
-                        type=float,
-                        metavar="float [0,1]",
-                        help="momentum (default: 0.9)")
-    parser.add_argument("--weight-decay",
-                        default=1e-6,
-                        type=float,
-                        metavar="float [0,1]",
-                        help="weight decay (default: 1e-6)")
+    parser.add_argument(
+        "--epochs",
+        default=100,
+        type=int,
+        metavar="N",
+        help="number of total epochs to run (default: 100)",
+    )
+    parser.add_argument(
+        "--loss",
+        default="L1",
+        type=str,
+        metavar="str",
+        help="Loss Function (default: 'L1')",
+    )
+    parser.add_argument(
+        "--robust",
+        action="store_true",
+        help="Use hetroskedastic loss variant"
+    )
+    parser.add_argument(
+        "--optim",
+        default="AdamW",
+        type=str,
+        metavar="str",
+        help="choose an optimizer; SGD, Adam or AdamW (default: 'AdamW')",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        "--lr",
+        default=3e-4,
+        type=float,
+        metavar="float",
+        help="initial learning rate (default: 3e-4)",
+    )
+    parser.add_argument(
+        "--momentum",
+        default=0.9,
+        type=float,
+        metavar="float [0,1]",
+        help="momentum (default: 0.9)",
+    )
+    parser.add_argument(
+        "--weight-decay",
+        default=1e-6,
+        type=float,
+        metavar="float [0,1]",
+        help="weight decay (default: 1e-6)",
+    )
 
     # graph inputs
-    parser.add_argument("--elem-fea-len",
-                        default=64,
-                        type=int,
-                        metavar="N",
-                        help="number of hidden atom features in conv layers (default: 64)")
-    parser.add_argument("--n-graph",
-                        default=3,
-                        type=int,
-                        metavar="N",
-                        help="number of graph layers (default: 3)")
+    parser.add_argument(
+        "--elem-fea-len",
+        default=64,
+        type=int,
+        metavar="N",
+        help="number of hidden atom features in conv layers (default: 64)",
+    )
+    parser.add_argument(
+        "--n-graph",
+        default=3,
+        type=int,
+        metavar="N",
+        help="number of graph layers (default: 3)",
+    )
 
     # ensemble inputs
-    parser.add_argument("--model-name",
-                        type=str,
-                        default=None,
-                        help="name for model")
-    parser.add_argument("--data-id",
-                        default="roost",
-                        type=str,
-                        metavar="N",
-                        help="identifier for the data/cross-val fold")
-    parser.add_argument("--run-id",
-                        default=0,
-                        type=int,
-                        metavar="N",
-                        help="ensemble model id")
-    parser.add_argument("--ensemble",
-                        default=1,
-                        type=int,
-                        metavar="N",
-                        help="number ensemble repeats")
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default=None,
+        help="name for model"
+    )
+    parser.add_argument(
+        "--data-id",
+        default="roost",
+        type=str,
+        metavar="N",
+        help="identifier for the data/cross-val fold",
+    )
+    parser.add_argument(
+        "--run-id",
+        default=0,
+        type=int,
+        metavar="N",
+        help="ensemble model id"
+    )
+    parser.add_argument(
+        "--ensemble",
+        default=1,
+        type=int,
+        metavar="N",
+        help="number ensemble repeats"
+    )
 
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
-    use_group.add_argument("--resume",
-                        action="store_true",
-                        help="resume from previous checkpoint")
-    use_group.add_argument("--transfer",
-                        type=str,
-                        metavar="PATH",
-                        help="checkpoint path for transfer learning")
-    use_group.add_argument("--fine-tune",
-                        type=str,
-                        metavar="PATH",
-                        help="checkpoint path for fine tuning")
+    use_group.add_argument(
+        "--resume",
+        action="store_true",
+        help="resume from previous checkpoint"
+    )
+    use_group.add_argument(
+        "--transfer",
+        type=str,
+        metavar="PATH",
+        help="checkpoint path for transfer learning",
+    )
+    use_group.add_argument(
+        "--fine-tune",
+        type=str,
+        metavar="PATH",
+        help="checkpoint path for fine tuning"
+    )
 
-    parser.add_argument("--evaluate",
-                    action="store_true",
-                    help="skip network training stages checkpoint")
-    parser.add_argument("--train",
-                    action="store_true",
-                    help="skip network training stages checkpoint") 
+    parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="skip network training stages checkpoint",
+    )
+    parser.add_argument(
+        "--train",
+        action="store_true",
+        help="skip network training stages checkpoint"
+    )
 
     # misc
-    parser.add_argument("--disable-cuda",
-                        action="store_true",
-                        help="Disable CUDA")
-    parser.add_argument("--log",
-                        action="store_true",
-                        help="log metrics to tensorboard")
+    parser.add_argument(
+        "--disable-cuda",
+        action="store_true",
+        help="Disable CUDA"
+    )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="log metrics to tensorboard"
+    )
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -194,17 +261,11 @@ def input_parser():
     else:
         args.task = "regression"
 
-    if args.evaluate:
-        if not args.test_path:
-            assert args.test_size < 1.0
-        else:
-            args.test_size = 0
-            
-    if not (args.test_path and args.val_path):
-        assert args.test_size + args.val_size < 1.0
-
-    args.device = torch.device("cuda") if (not args.disable_cuda) and \
-        torch.cuda.is_available() else torch.device("cpu")
+    args.device = (
+        torch.device("cuda")
+        if (not args.disable_cuda) and torch.cuda.is_available()
+        else torch.device("cpu")
+    )
 
     return args
 
@@ -214,14 +275,14 @@ class CompositionData(Dataset):
     The CompositionData dataset is a wrapper for a dataset data points are
     automatically constructed from composition strings.
     """
+
     def __init__(self, data_path, fea_path, task, df=None):
         """
         """
         if df:
             self.df = df
         else:
-            assert os.path.exists(data_path), \
-                "{} does not exist!".format(data_path)
+            assert os.path.exists(data_path), "{} does not exist!".format(data_path)
             # make sure to use dense datasets, here do not use the default na
             # as they can clash with "NaN" which is a valid material
             self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
@@ -231,18 +292,18 @@ class CompositionData(Dataset):
         self.elem_emb_len = self.elem_features.embedding_size()
         self.task = task
         if self.task == "regression":
-            if self.df.shape[1]-2 != 1:
+            if self.df.shape[1] - 2 != 1:
                 raise NotImplementedError(
-            "Multi-target regression currently not supported"
+                    "Multi-target regression currently not supported"
                 )
-            self.n_targets = self.df.shape[1]-2
+            self.n_targets = self.df.shape[1] - 2
         elif self.task == "classification":
-            if self.df.shape[1]-2 != 1:
+            if self.df.shape[1] - 2 != 1:
                 raise NotImplementedError(
-            "One-Hot input not supported please use categorical integer inputs"
-            "for classification i.e. Dog = 0, Cat = 1, Mouse = 2"
+                    "One-Hot input not supported please use categorical integer"
+                    " inputs for classification i.e. Dog = 0, Cat = 1, Mouse = 2"
                 )
-            self.n_targets = np.max(self.df[self.df.columns[2]].values)+1
+            self.n_targets = np.max(self.df[self.df.columns[2]].values) + 1
 
     def __len__(self):
         return len(self.df)
@@ -272,20 +333,25 @@ class CompositionData(Dataset):
         weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, f"cry-id {cry_id} [{composition}] is a pure system"
         try:
-            atom_fea = np.vstack([self.elem_features.get_fea(element)
-                                  for element in elements])
+            atom_fea = np.vstack(
+                [self.elem_features.get_fea(element) for element in elements]
+            )
         except AssertionError:
-            raise AssertionError(f"cry-id {cry_id} [{composition}] contains invalid atom types not in embedding")
+            raise AssertionError(
+                f"cry-id {cry_id} [{composition}] contains element types not in embedding"
+            )
         except ValueError:
-            raise ValueError(f"cry-id {cry_id} [{composition}] composition cannot be parsed into elements")
+            raise ValueError(
+                f"cry-id {cry_id} [{composition}] composition cannot be parsed into elements"
+            )
 
         env_idx = list(range(len(elements)))
         self_fea_idx = []
         nbr_fea_idx = []
         nbrs = len(elements) - 1
         for i, _ in enumerate(elements):
-            self_fea_idx += [i]*nbrs
-            nbr_fea_idx += env_idx[:i]+env_idx[i+1:]
+            self_fea_idx += [i] * nbrs
+            nbr_fea_idx += env_idx[:i] + env_idx[i + 1 :]
 
         # convert all data to tensors
         atom_weights = torch.Tensor(weights)
@@ -297,8 +363,12 @@ class CompositionData(Dataset):
         elif self.task == "classification":
             targets = torch.LongTensor([targets[0]])
 
-        return (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), \
-            targets, composition, cry_id
+        return (
+            (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
+            targets,
+            composition,
+            cry_id,
+        )
 
 
 def collate_batch(dataset_list):
@@ -314,6 +384,7 @@ def collate_batch(dataset_list):
 
       atom_fea: torch.Tensor shape (n_i, atom_fea_len)
       nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
+      self_fea_idx: torch.LongTensor shape (n_i, M)
       nbr_fea_idx: torch.LongTensor shape (n_i, M)
       target: torch.Tensor shape (1, )
       cif_id: str or int
@@ -322,17 +393,19 @@ def collate_batch(dataset_list):
     -------
     N = sum(n_i); N0 = sum(i)
 
+    batch_atom_weights: torch.Tensor shape (N, 1)
     batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
         Atom features from atom type
-    batch_nbr_fea: torch.Tensor shape (N, M, nbr_fea_len)
-        Bond features of each atom"s M neighbors
+    batch_self_fea_idx: torch.LongTensor shape (N, M)
+        Indices of mapping atom to copies of itself
     batch_nbr_fea_idx: torch.LongTensor shape (N, M)
         Indices of M neighbors of each atom
     crystal_atom_idx: list of torch.LongTensor of length N0
         Mapping from the crystal idx to atom idx
     target: torch.Tensor shape (N, 1)
         Target value for prediction
-    batch_cif_ids: list
+    batch_comps: list
+    batch_ids: list
     """
     # define the lists
     batch_atom_weights = []
@@ -345,8 +418,8 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
-            target, comp, cry_id) in enumerate(dataset_list):
+    for (i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
+            target, comp, cry_id)) in enumerate(dataset_list):
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]
 
@@ -355,11 +428,11 @@ def collate_batch(dataset_list):
         batch_atom_fea.append(atom_fea)
 
         # mappings from bonds to atoms
-        batch_self_fea_idx.append(self_fea_idx+cry_base_idx)
-        batch_nbr_fea_idx.append(nbr_fea_idx+cry_base_idx)
+        batch_self_fea_idx.append(self_fea_idx + cry_base_idx)
+        batch_nbr_fea_idx.append(nbr_fea_idx + cry_base_idx)
 
         # mapping from atoms to crystals
-        crystal_atom_idx.append(torch.tensor([i]*n_i))
+        crystal_atom_idx.append(torch.tensor([i] * n_i))
 
         # batch the targets and ids
         batch_target.append(target)
@@ -369,12 +442,15 @@ def collate_batch(dataset_list):
         # increment the id counter
         cry_base_idx += n_i
 
-    return (torch.cat(batch_atom_weights, dim=0),
+    return (
+        (
+            torch.cat(batch_atom_weights, dim=0),
             torch.cat(batch_atom_fea, dim=0),
             torch.cat(batch_self_fea_idx, dim=0),
             torch.cat(batch_nbr_fea_idx, dim=0),
-            torch.cat(crystal_atom_idx)), \
-        torch.stack(batch_target, dim=0), \
-        batch_comp, \
-        batch_cry_ids
-
+            torch.cat(crystal_atom_idx),
+        ),
+        torch.stack(batch_target, dim=0),
+        batch_comp,
+        batch_cry_ids,
+    )
