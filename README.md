@@ -61,6 +61,15 @@ If you use this code please cite our work for which this model was built:
 
 [Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://arxiv.org/abs/1910.00617)
 
+``` 
+@article{goodall2019predicting,
+  title={Predicting materials properties without crystal structure: Deep representation learning from stoichiometry},
+  author={Goodall, Rhys EA and Lee, Alpha A},
+  journal={arXiv preprint arXiv:1910.00617},
+  year={2019}
+}
+```
+
 ## Work Using Roost
 
 [A critical examination of compound stability predictions from machine-learned formation energies](https://arxiv.org/abs/2001.10591)
@@ -69,8 +78,8 @@ If you have used Roost in your work please contact me and I will add your paper 
 
 ## Acknowledgements
 
-The open-source implementation of `cgcnn` provided [here](https://github.com/txie-93/cgcnn) provided significant initial inspiration for how to structure this code-base.
+The open-source implementation of `cgcnn` available [here](https://github.com/txie-93/cgcnn) provided significant initial inspiration for how to structure this code-base.
 
 ## Disclaimer
 
-This is research code shared without support or any guarantee on its quality. However, please do submit issues and pull requests or raise an issue and I will try my best to solve it.
+This is research code shared without support or any guarantee on its quality. However, please do raise an issue or submit a pull request if you spot something wrong or that could be improved and I will try my best to solve it.
