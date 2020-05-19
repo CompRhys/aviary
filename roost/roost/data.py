@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import argparse
 import functools
@@ -9,8 +10,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from roost.features import LoadFeaturiser
-from roost.parse import parse
+from roost.utils import LoadFeaturiser
 
 
 def input_parser():
@@ -18,8 +18,10 @@ def input_parser():
     parse input
     """
     parser = argparse.ArgumentParser(
-        description=("Roost - a Structure Agnostic Message Passing "
-            "Neural Network for Inorganic Materials")
+        description=(
+            "Roost - a Structure Agnostic Message Passing "
+            "Neural Network for Inorganic Materials"
+        )
     )
 
     # data inputs
@@ -35,7 +37,7 @@ def input_parser():
         "--val-path",
         type=str,
         metavar="PATH",
-        help="Path to independent validation set"
+        help="Path to independent validation set",
     )
     valid_group.add_argument(
         "--val-size",
@@ -46,10 +48,7 @@ def input_parser():
     )
     test_group = parser.add_mutually_exclusive_group()
     test_group.add_argument(
-        "--test-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent test set"
+        "--test-path", type=str, metavar="PATH", help="Path to independent test set"
     )
     test_group.add_argument(
         "--test-size",
@@ -117,7 +116,7 @@ def input_parser():
     parser.add_argument(
         "--robust",
         action="store_true",
-        help="Specifies whether to use hetroskedastic loss variants"
+        help="Specifies whether to use hetroskedastic loss variants",
     )
     parser.add_argument(
         "--optim",
@@ -171,7 +170,7 @@ def input_parser():
         default=1,
         type=int,
         metavar="INT",
-        help="Number models to ensemble"
+        help="Number models to ensemble",
     )
     name_group = parser.add_mutually_exclusive_group()
     name_group.add_argument(
@@ -179,30 +178,27 @@ def input_parser():
         type=str,
         default=None,
         metavar="STR",
-        help="Name for sub-directory where models will be stored"
+        help="Name for sub-directory where models will be stored",
     )
     name_group.add_argument(
         "--data-id",
         default="roost",
         type=str,
         metavar="STR",
-        help="Partial identifier for sub-directory where models will be stored"
+        help="Partial identifier for sub-directory where models will be stored",
     )
     parser.add_argument(
         "--run-id",
         default=0,
         type=int,
         metavar="INT",
-        help="Index for model in an ensemble of models"
+        help="Index for model in an ensemble of models",
     )
 
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--fine-tune",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for fine tuning"
+        "--fine-tune", type=str, metavar="PATH", help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
         "--transfer",
@@ -211,44 +207,26 @@ def input_parser():
         help="Checkpoint path for transfer learning",
     )
     use_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from previous checkpoint"
+        "--resume", action="store_true", help="Resume from previous checkpoint"
     )
 
     # task type
     task_group = parser.add_mutually_exclusive_group()
     task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="Specifies a classification task"
+        "--classification", action="store_true", help="Specifies a classification task"
     )
     task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="Specifies a regression task"
+        "--regression", action="store_true", help="Specifies a regression task"
     )
     parser.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Evaluate the model/ensemble",
+        "--evaluate", action="store_true", help="Evaluate the model/ensemble",
     )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train the model/ensemble"
-    )
+    parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
 
     # misc
+    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--disable-cuda",
-        action="store_true",
-        help="Disable CUDA"
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="Log training metrics to tensorboard"
+        "--log", action="store_true", help="Log training metrics to tensorboard"
     )
 
     args = parser.parse_args(sys.argv[1:])
@@ -278,16 +256,13 @@ class CompositionData(Dataset):
     automatically constructed from composition strings.
     """
 
-    def __init__(self, data_path, fea_path, task, df=None):
+    def __init__(self, data_path, fea_path, task):
         """
         """
-        if df:
-            self.df = df
-        else:
-            assert os.path.exists(data_path), "{} does not exist!".format(data_path)
-            # make sure to use dense datasets, here do not use the default na
-            # as they can clash with "NaN" which is a valid material
-            self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
+        # make sure to use dense datasets, here do not use the default na
+        # as they can clash with "NaN" which is a valid material
+        self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.elem_features = LoadFeaturiser(fea_path)
@@ -331,7 +306,7 @@ class CompositionData(Dataset):
         """
         # cry_id, composition, target = self.id_prop_data[idx]
         cry_id, composition, *targets = self.df.iloc[idx]
-        elements, weights = parse(composition)
+        elements, weights = parse_roost(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, f"cry-id {cry_id} [{composition}] is a pure system"
         try:
@@ -420,8 +395,10 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for (i, ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
-            target, comp, cry_id)) in enumerate(dataset_list):
+    for (
+        i,
+        ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, comp, cry_id),
+    ) in enumerate(dataset_list):
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]
 
@@ -456,3 +433,134 @@ def collate_batch(dataset_list):
         batch_comp,
         batch_cry_ids,
     )
+
+
+def format_composition(comp):
+    """ format str to ensure weights are explicate
+    example: BaCu3 -> Ba1Cu3
+    """
+    subst = r"\g<1>1.0"
+    comp = re.sub(r"[\d.]+", lambda x: str(float(x.group())), comp.rstrip())
+    comp = re.sub(r"([A-Z][a-z](?![0-9]))", subst, comp)
+    comp = re.sub(r"([A-Z](?![0-9]|[a-z]))", subst, comp)
+    comp = re.sub(r"([\)](?=[A-Z]))", subst, comp)
+    comp = re.sub(r"([\)](?=\())", subst, comp)
+    return comp
+
+
+def parenthetic_contents(string):
+    """
+    Generate parenthesized contents in string as (level, contents, weight).
+    """
+    num_after_bracket = r"[^0-9.]"
+
+    stack = []
+    for i, c in enumerate(string):
+        if c == "(":
+            stack.append(i)
+        elif c == ")" and stack:
+            start = stack.pop()
+            num = re.split(num_after_bracket, string[i + 1 :])[0] or 1
+            yield {
+                "value": [string[start + 1 : i], float(num), False],
+                "level": len(stack) + 1,
+            }
+
+    yield {"value": [string, 1, False], "level": 0}
+
+
+def splitout_weights(comp):
+    """ split composition string into elements (keys) and weights
+    example: Ba1Cu3 -> [Ba,Cu] [1,3]
+    """
+    elements = []
+    weights = []
+    regex3 = r"(\d+\.\d+)|(\d+)"
+    try:
+        parsed = [j for j in re.split(regex3, comp) if j]
+    except:
+        print("parsed:", comp)
+    elements += parsed[0::2]
+    weights += parsed[1::2]
+    weights = [float(w) for w in weights]
+    return elements, weights
+
+
+def update_weights(comp, weight):
+    """ split composition string into elements (keys) and weights
+    example: Ba1Cu3 -> [Ba,Cu] [1,3]
+    """
+    regex3 = r"(\d+\.\d+)|(\d+)"
+    parsed = [j for j in re.split(regex3, comp) if j]
+    elements = parsed[0::2]
+    weights = [float(p) * weight for p in parsed[1::2]]
+    new_comp = ""
+    for m, n in zip(elements, weights):
+        new_comp += m + f"{n:.2f}"
+    return new_comp
+
+
+class Node(object):
+    """ Node class for tree data structure """
+
+    def __init__(self, parent, val=None):
+        self.value = val
+        self.parent = parent
+        self.children = []
+
+    def __repr__(self):
+        return f"<Node {self.value} >"
+
+
+def build_tree(root, data):
+    """ build a tree from ordered levelled data """
+    for record in data:
+        last = root
+        for _ in range(record["level"]):
+            last = last.children[-1]
+        last.children.append(Node(last, record["value"]))
+
+
+def print_tree(current, depth=0):
+    """ print out the tree structure """
+    for child in current.children:
+        print("  " * depth + "%r" % child)
+        print_tree(child, depth + 1)
+
+
+def reduce_tree(current):
+    """ perform a post-order reduction on the tree """
+    if not current:
+        pass
+
+    for child in current.children:
+        reduce_tree(child)
+        update_parent(child)
+
+
+def update_parent(child):
+    """ update the str for parent """
+    input_str = child.value[2] or child.value[0]
+    new_str = update_weights(input_str, child.value[1])
+    pattern = re.escape("(" + child.value[0] + ")" + str(child.value[1]))
+    old_str = child.parent.value[2] or child.parent.value[0]
+    child.parent.value[2] = re.sub(pattern, new_str, old_str, 0)
+
+
+def parse_roost(string):
+    # format the string to remove edge cases
+    string = format_composition(string)
+    # get nested bracket structure
+    nested_levels = list(parenthetic_contents(string))
+    if len(nested_levels) > 1:
+        # reverse nested list
+        nested_levels = nested_levels[::-1]
+        # plant and grow the tree
+        root = Node("root", ["None"] * 3)
+        build_tree(root, nested_levels)
+        # reduce the tree to get compositions
+        reduce_tree(root)
+        return splitout_weights(root.children[0].value[2])
+
+    else:
+        return splitout_weights(string)

@@ -1,5 +1,5 @@
-import os
 import gc
+import json
 import torch
 import shutil
 import numpy as np
@@ -11,6 +11,7 @@ from torch.nn.functional import mse_loss as mse
 from torch.nn.functional import softmax
 
 from sklearn.metrics import accuracy_score, f1_score
+
 
 class BaseModelClass(nn.Module):
     """
@@ -54,7 +55,8 @@ class BaseModelClass(nn.Module):
                 )
 
                 print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
-                print(f"Train      : Loss {t_loss:.4f}\t"
+                print(
+                    f"Train      : Loss {t_loss:.4f}\t"
                     + "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()])
                 )
 
@@ -72,8 +74,11 @@ class BaseModelClass(nn.Module):
                             action="val",
                         )
 
-                    print(f"Validation : Loss {v_loss:.4f}\t"
-                        + "".join([f"{key} {val:.3f}\t" for key, val in v_metrics.items()])
+                    print(
+                        f"Validation : Loss {v_loss:.4f}\t"
+                        + "".join(
+                            [f"{key} {val:.3f}\t" for key, val in v_metrics.items()]
+                        )
                     )
 
                     if self.task == "regression":
@@ -178,7 +183,9 @@ class BaseModelClass(nn.Module):
                         logits = softmax(output, dim=1)
 
                     # classification metrics from sklearn need numpy arrays
-                    metric_meter.update(logits.data.cpu().numpy(), target.data.cpu().numpy())
+                    metric_meter.update(
+                        logits.data.cpu().numpy(), target.data.cpu().numpy()
+                    )
 
                 loss_meter.update(loss.data.cpu().item())
 
@@ -222,8 +229,12 @@ class BaseModelClass(nn.Module):
 
                 t.update()
 
-        return test_ids, test_comp, torch.cat(test_targets, dim=0).view(-1).numpy(), \
-                torch.cat(test_output, dim=0)
+        return (
+            test_ids,
+            test_comp,
+            torch.cat(test_targets, dim=0).view(-1).numpy(),
+            torch.cat(test_output, dim=0),
+        )
 
 
 class AverageMeter(object):
@@ -243,6 +254,7 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
 
 class RegressionMetrics(object):
     """Computes and stores average metrics for regression tasks"""
@@ -277,8 +289,7 @@ class ClassificationMetrics(object):
         self.fscore_meter.update(fscore)
 
     def metric_dict(self,):
-        return {"Acc": self.acc_meter.avg,
-                "F1": self.fscore_meter.avg}
+        return {"Acc": self.acc_meter.avg, "F1": self.fscore_meter.avg}
 
 
 class Normalizer(object):
@@ -306,6 +317,49 @@ class Normalizer(object):
     def load_state_dict(self, state_dict):
         self.mean = state_dict["mean"].cpu()
         self.std = state_dict["std"].cpu()
+
+
+class Featuriser(object):
+    """
+    Base class for featurising nodes and edges.
+    """
+
+    def __init__(self, allowed_types):
+        self.allowed_types = set(allowed_types)
+        self._embedding = {}
+
+    def get_fea(self, key):
+        assert key in self.allowed_types, f"{key} is not an allowed atom type"
+        return self._embedding[key]
+
+    def load_state_dict(self, state_dict):
+        self._embedding = state_dict
+        self.allowed_types = set(self._embedding.keys())
+
+    def get_state_dict(self):
+        return self._embedding
+
+    def embedding_size(self):
+        return len(self._embedding[list(self._embedding.keys())[0]])
+
+
+class LoadFeaturiser(Featuriser):
+    """
+    Initialize a featuriser from a JSON file.
+
+    Parameters
+    ----------
+    embedding_file: str
+        The path to the .json file
+    """
+
+    def __init__(self, embedding_file):
+        with open(embedding_file) as f:
+            embedding = json.load(f)
+        allowed_types = set(embedding.keys())
+        super(LoadFeaturiser, self).__init__(allowed_types)
+        for key, value in embedding.items():
+            self._embedding[key] = np.array(value, dtype=float)
 
 
 def save_checkpoint(state, is_best, model_name, run_id):
@@ -348,7 +402,8 @@ def sampled_softmax(pre_logits, log_std, samples=10):
     # This choice may have an unknown effect on the calibration of the uncertainties
     sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
     epsilon = torch.randn_like(sam_std)
-    pre_logits = pre_logits.repeat_interleave(samples, dim=0) + \
-                    torch.mul(epsilon, sam_std)
+    pre_logits = pre_logits.repeat_interleave(samples, dim=0) + torch.mul(
+        epsilon, sam_std
+    )
     logits = softmax(pre_logits, dim=1).view(len(log_std), samples, -1)
     return torch.mean(logits, dim=1)

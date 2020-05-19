@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from roost.utils import BaseModelClass
-from torch_scatter import scatter_max, scatter_add, scatter_mean
+from roost.segments import SimpleNetwork, ResidualNetwork, WeightedAttention
 
 
 class Roost(BaseModelClass):
@@ -54,12 +54,14 @@ class Roost(BaseModelClass):
 
         self.material_nn = DescriptorNetwork(**desc_dict)
 
-        self.model_params.update({
-            "task": task,
-            "robust": robust,
-            "n_targets": n_targets,
-            "out_hidden": out_hidden,
-        })
+        self.model_params.update(
+            {
+                "task": task,
+                "robust": robust,
+                "n_targets": n_targets,
+                "out_hidden": out_hidden,
+            }
+        )
 
         self.model_params.update(desc_dict)
 
@@ -71,9 +73,7 @@ class Roost(BaseModelClass):
 
         self.output_nn = ResidualNetwork(elem_fea_len, output_dim, out_hidden)
 
-    def forward(
-        self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
-    ):
+    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
         Forward pass through the material_nn and output_nn
         """
@@ -140,9 +140,7 @@ class DescriptorNetwork(nn.Module):
             ]
         )
 
-    def forward(
-        self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
-    ):
+    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
         Forward pass
 
@@ -261,141 +259,6 @@ class MessageLayer(nn.Module):
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
         return fea + elem_in_fea
-
-    def __repr__(self):
-        return "{}".format(self.__class__.__name__)
-
-
-class WeightedMeanPooling(torch.nn.Module):
-    """
-    Weighted mean pooling
-    """
-
-    def __init__(self):
-        super(WeightedMeanPooling, self).__init__()
-
-    def forward(self, fea, index, weights):
-        fea = weights * fea
-        return scatter_mean(fea, index, dim=0)
-
-    def __repr__(self):
-        return "{}".format(self.__class__.__name__)
-
-
-class WeightedAttention(nn.Module):
-    """
-    Weighted softmax attention layer
-    """
-
-    def __init__(self, gate_nn, message_nn):
-        """
-        Inputs
-        ----------
-        gate_nn: Variable(nn.Module)
-        """
-        super(WeightedAttention, self).__init__()
-        self.gate_nn = gate_nn
-        self.message_nn = message_nn
-        self.pow = torch.nn.Parameter(torch.randn((1)))
-
-    def forward(self, fea, index, weights):
-        """ forward pass """
-
-        gate = self.gate_nn(fea)
-
-        gate = gate - scatter_max(gate, index, dim=0)[0][index]
-        gate = (weights ** self.pow) * gate.exp()
-        # gate = weights * gate.exp()
-        # gate = gate.exp()
-        gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-10)
-
-        fea = self.message_nn(fea)
-        out = scatter_add(gate * fea, index, dim=0)
-
-        return out
-
-    def __repr__(self):
-        return "{}(gate_nn={})".format(self.__class__.__name__, self.gate_nn)
-
-
-class SimpleNetwork(nn.Module):
-    """
-    Simple Feed Forward Neural Network
-    """
-
-    def __init__(self, input_dim, output_dim, hidden_layer_dims):
-        """
-        Inputs
-        ----------
-        input_dim: int
-        output_dim: int
-        hidden_layer_dims: list(int)
-
-        """
-        super(SimpleNetwork, self).__init__()
-
-        dims = [input_dim] + hidden_layer_dims
-
-        self.fcs = nn.ModuleList(
-            [nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
-        )
-        self.acts = nn.ModuleList([nn.LeakyReLU() for _ in range(len(dims) - 1)])
-
-        self.fc_out = nn.Linear(dims[-1], output_dim)
-
-    def forward(self, fea):
-        for fc, act in zip(self.fcs, self.acts):
-            fea = act(fc(fea))
-
-        return self.fc_out(fea)
-
-    def __repr__(self):
-        return "{}".format(self.__class__.__name__)
-
-
-class ResidualNetwork(nn.Module):
-    """
-    Feed forward Residual Neural Network
-    """
-
-    def __init__(self, input_dim, output_dim, hidden_layer_dims):
-        """
-        Inputs
-        ----------
-        input_dim: int
-        output_dim: int
-        hidden_layer_dims: list(int)
-
-        """
-        super(ResidualNetwork, self).__init__()
-
-        dims = [input_dim] + hidden_layer_dims
-
-        self.fcs = nn.ModuleList(
-            [nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
-        )
-        # self.bns = nn.ModuleList([nn.BatchNorm1d(dims[i+1])
-        #                           for i in range(len(dims)-1)])
-        self.res_fcs = nn.ModuleList(
-            [
-                nn.Linear(dims[i], dims[i + 1], bias=False)
-                if (dims[i] != dims[i + 1])
-                else nn.Identity()
-                for i in range(len(dims) - 1)
-            ]
-        )
-        self.acts = nn.ModuleList([nn.ReLU() for _ in range(len(dims) - 1)])
-
-        self.fc_out = nn.Linear(dims[-1], output_dim)
-
-    def forward(self, fea):
-        # for fc, bn, res_fc, act in zip(self.fcs, self.bns,
-        #                                self.res_fcs, self.acts):
-        #     fea = act(bn(fc(fea)))+res_fc(fea)
-        for fc, res_fc, act in zip(self.fcs, self.res_fcs, self.acts):
-            fea = act(fc(fea)) + res_fc(fea)
-
-        return self.fc_out(fea)
 
     def __repr__(self):
         return "{}".format(self.__class__.__name__)

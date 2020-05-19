@@ -19,9 +19,10 @@ from sklearn.model_selection import train_test_split as split
 
 from scipy.special import softmax
 
-from roost.model import Roost, ResidualNetwork
-from roost.data import input_parser, CompositionData, collate_batch
+from roost.roost.model import Roost
+from roost.roost.data import input_parser, CompositionData, collate_batch
 from roost.utils import Normalizer, sampled_softmax, RobustL1, RobustL2
+from roost.segments import ResidualNetwork
 
 
 def main(
@@ -57,17 +58,21 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
-    assert evaluate or train, ("No task given - Set at least one of "
-        "'train' or 'evaluate' kwargs as True")
-    assert task in ["regression", "classification"], ("Only "
-        "'regression' or 'classification' allowed for 'task'")
+    assert evaluate or train, (
+        "No task given - Set at least one of " "'train' or 'evaluate' kwargs as True"
+    )
+    assert task in ["regression", "classification"], (
+        "Only " "'regression' or 'classification' allowed for 'task'"
+    )
 
     if test_path:
         test_size = 0.0
 
     if not (test_path and val_path):
-        assert test_size + val_size < 1.0, (f"'test_size'({test_size}) "
-            f"plus 'val_size'({val_size}) must be less than 1")
+        assert test_size + val_size < 1.0, (
+            f"'test_size'({test_size}) "
+            f"plus 'val_size'({val_size}) must be less than 1"
+        )
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
@@ -76,8 +81,9 @@ def main(
             " run-id flag."
         )
 
-    assert not (fine_tune and transfer), ("Cannot fine-tune and"
-        " transfer checkpoint(s) at the same time.")
+    assert not (fine_tune and transfer), (
+        "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
+    )
 
     dataset = CompositionData(data_path=data_path, fea_path=fea_path, task=task)
     n_targets = dataset.n_targets
@@ -88,7 +94,9 @@ def main(
     if evaluate:
         if test_path:
             print(f"using independent test set: {test_path}")
-            test_set = CompositionData(data_path=test_path, fea_path=fea_path)
+            test_set = CompositionData(
+                data_path=test_path, fea_path=fea_path, task=task
+            )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
             raise ValueError("test-size must be non-zero to evaluate model")
@@ -102,7 +110,7 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(data_path=val_path, fea_path=fea_path)
+            val_set = CompositionData(data_path=val_path, fea_path=fea_path, task=task)
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
             if val_size == 0.0 and evaluate:
@@ -255,16 +263,22 @@ def init_model(
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        assert model.model_params["robust"] == robust, ("cannot fine-tune "
+        assert model.model_params["robust"] == robust, (
+            "cannot fine-tune "
             "between tasks with different numebers of outputs - use transfer "
-            "option instead")
-        assert model.model_params["n_targets"] == n_targets, ("cannot fine-tune "
+            "option instead"
+        )
+        assert model.model_params["n_targets"] == n_targets, (
+            "cannot fine-tune "
             "between tasks with different numebers of outputs - use transfer "
-            "option instead")
+            "option instead"
+        )
 
     elif transfer is not None:
-        print(f"Use material_nn from '{transfer}' as a starting point and "
-            "train the output_nn from scratch")
+        print(
+            f"Use material_nn from '{transfer}' as a starting point and "
+            "train the output_nn from scratch"
+        )
         checkpoint = torch.load(transfer, map_location=device)
         model = Roost(**checkpoint["model_params"], device=device,)
         model.to(device)
