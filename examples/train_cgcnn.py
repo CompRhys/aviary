@@ -19,8 +19,8 @@ from sklearn.model_selection import train_test_split as split
 
 from scipy.special import softmax
 
-from roost.roost.model import Roost
-from roost.roost.data import input_parser, CompositionData, collate_batch
+from roost.cgcnn.model import CGCNN
+from roost.cgcnn.data import input_parser, GraphData, collate_batch
 from roost.utils import Normalizer, sampled_softmax, RobustL1, RobustL2
 from roost.segments import ResidualNetwork
 
@@ -31,9 +31,11 @@ def main(
     task,
     loss,
     robust,
-    model_name="roost",
+    model_name="cgcnn",
     elem_fea_len=64,
-    n_graph=3,
+    n_graph=4,
+    n_hidden=1,
+    h_fea_len=128,
     ensemble=1,
     run_id=1,
     seed=42,
@@ -85,17 +87,40 @@ def main(
         "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
     )
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task=task)
+    if transfer:
+        raise NotImplementedError(
+            "Transfer option not availiable for CGCNN in order to stay "
+            "faithful to the original implmentation."
+        )
+
+    dataset = GraphData(
+        data_path=data_path,
+        fea_path=fea_path,
+        task=task,
+        max_num_nbr=12,
+        radius=8,
+        dmin=0,
+        step=0.2,
+        use_cache=True,
+    )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
+    elem_emb_len = dataset.elem_fea_dim
+    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
 
     if evaluate:
         if test_path:
             print(f"using independent test set: {test_path}")
-            test_set = CompositionData(
-                data_path=test_path, fea_path=fea_path, task=task
+            test_set = GraphData(
+                data_path=test_path,
+                fea_path=fea_path,
+                task=task,
+                max_num_nbr=12,
+                radius=8,
+                dmin=0,
+                step=0.2,
+                use_cache=True,
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -110,7 +135,16 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(data_path=val_path, fea_path=fea_path, task=task)
+            val_set = GraphData(
+                data_path=val_path,
+                fea_path=fea_path,
+                task=task,
+                max_num_nbr=12,
+                radius=8,
+                dmin=0,
+                step=0.2,
+                use_cache=True,
+            )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
             if val_size == 0.0 and evaluate:
@@ -159,15 +193,11 @@ def main(
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
+        "nbr_fea_len": nbr_fea_len,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
-        "elem_heads": 3,
-        "elem_gate": [256],
-        "elem_msg": [256],
-        "cry_heads": 3,
-        "cry_gate": [256],
-        "cry_msg": [256],
-        "out_hidden": [1024, 512, 256, 128, 64],
+        "h_fea_len": h_fea_len,
+        "n_hidden": n_hidden,
     }
 
     if not os.path.isdir("models/"):
@@ -242,15 +272,11 @@ def init_model(
     device,
     n_targets,
     elem_emb_len,
+    nbr_fea_len,
     elem_fea_len,
     n_graph,
-    elem_heads,
-    elem_gate,
-    elem_msg,
-    cry_heads,
-    cry_gate,
-    cry_msg,
-    out_hidden,
+    n_hidden,
+    h_fea_len,
     resume=None,
     fine_tune=None,
     transfer=None,
@@ -259,7 +285,7 @@ def init_model(
     if fine_tune is not None:
         print(f"Use material_nn and output_nn from '{fine_tune}' as a starting point")
         checkpoint = torch.load(fine_tune, map_location=device)
-        model = Roost(**checkpoint["model_params"], device=device,)
+        model = CGCNN(**checkpoint["model_params"], device=device,)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -280,7 +306,7 @@ def init_model(
             "train the output_nn from scratch"
         )
         checkpoint = torch.load(transfer, map_location=device)
-        model = Roost(**checkpoint["model_params"], device=device,)
+        model = CGCNN(**checkpoint["model_params"], device=device,)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -306,18 +332,14 @@ def init_model(
         )
 
     else:
-        model = Roost(
+        model = CGCNN(
             n_targets=n_targets,
             elem_emb_len=elem_emb_len,
+            nbr_fea_len=nbr_fea_len,
             elem_fea_len=elem_fea_len,
             n_graph=n_graph,
-            elem_heads=elem_heads,
-            elem_gate=elem_gate,
-            elem_msg=elem_msg,
-            cry_heads=cry_heads,
-            cry_gate=cry_gate,
-            cry_msg=cry_msg,
-            out_hidden=out_hidden,
+            n_hidden=n_hidden,
+            h_fea_len=h_fea_len,
             task=task,
             robust=robust,
             device=device,
@@ -380,7 +402,7 @@ def init_model(
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        model = Roost(**checkpoint["model_params"], device=device,)
+        model = CGCNN(**checkpoint["model_params"], device=device,)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
         model.epoch = checkpoint["epoch"]
@@ -534,7 +556,7 @@ def results_regression(
             checkpoint["model_params"]["robust"] == robust
         ), f"robustness of checkpoint '{resume}' is not {robust}"
 
-        model = Roost(**checkpoint["model_params"], device=device,)
+        model = CGCNN(**checkpoint["model_params"], device=device,)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -665,7 +687,7 @@ def results_classification(
             checkpoint["model_params"]["robust"] == robust
         ), f"robustness of checkpoint '{resume}' is not {robust}"
 
-        model = Roost(**checkpoint["model_params"], device=device,)
+        model = CGCNN(**checkpoint["model_params"], device=device,)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
