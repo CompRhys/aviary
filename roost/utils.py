@@ -6,11 +6,11 @@ import numpy as np
 import torch.nn as nn
 
 from tqdm.autonotebook import trange
-from torch.nn.functional import l1_loss as mae
-from torch.nn.functional import mse_loss as mse
 from torch.nn.functional import softmax
 
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import mean_absolute_error as mae, \
+                            mean_squared_error as mse
 
 
 class BaseModelClass(nn.Module):
@@ -171,7 +171,9 @@ class BaseModelClass(nn.Module):
                         loss = criterion(output, target_norm)
 
                     pred = normalizer.denorm(output.data.cpu())
-                    metric_meter.update(pred, target)
+                    metric_meter.update(
+                        pred.data.cpu().numpy(), target.data.cpu().numpy()
+                    )
 
                 elif self.task == "classification":
                     if self.robust:
@@ -267,7 +269,7 @@ class RegressionMetrics(object):
         mae_error = mae(pred, target)
         self.mae_meter.update(mae_error)
 
-        rmse_error = mse(pred, target).sqrt_()
+        rmse_error = np.sqrt(mse(pred, target))
         self.rmse_meter.update(rmse_error)
 
     def metric_dict(self,):
