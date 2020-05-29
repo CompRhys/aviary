@@ -24,7 +24,6 @@ from roost.roost.data import input_parser, CompositionData, collate_batch
 from roost.utils import Normalizer, sampled_softmax, RobustL1, RobustL2
 from roost.segments import ResidualNetwork
 
-
 def main(
     data_path,
     fea_path,
@@ -59,10 +58,10 @@ def main(
     **kwargs,
 ):
     assert evaluate or train, (
-        "No task given - Set at least one of " "'train' or 'evaluate' kwargs as True"
+        "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
     )
     assert task in ["regression", "classification"], (
-        "Only " "'regression' or 'classification' allowed for 'task'"
+        "Only 'regression' or 'classification' allowed for 'task'"
     )
 
     if test_path:

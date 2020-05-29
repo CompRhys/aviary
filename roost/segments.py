@@ -39,6 +39,36 @@ class SumPooling(nn.Module):
         return "{}".format(self.__class__.__name__)
 
 
+class AttentionPooling(nn.Module):
+    """
+    Weighted softmax attention layer
+    """
+
+    def __init__(self, gate_nn, message_nn):
+        """
+        Inputs
+        ----------
+        gate_nn: Variable(nn.Module)
+        """
+        super(AttentionPooling, self).__init__()
+        self.gate_nn = gate_nn
+        self.message_nn = message_nn
+
+    def forward(self, fea, index):
+        """ forward pass """
+
+        gate = self.gate_nn(fea)
+
+        gate = gate - scatter_max(gate, index, dim=0)[0][index]
+        gate = gate.exp()
+        gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-10)
+
+        fea = self.message_nn(fea)
+        out = scatter_add(gate * fea, index, dim=0)
+
+        return out
+
+
 class WeightedMeanPooling(torch.nn.Module):
     """
     Weighted mean pooling
