@@ -35,6 +35,7 @@ Once you have setup an environment with the correct dependencies you can install
 ```bash
 conda activate roost
 git clone https://github.com/CompRhys/roost.git
+cd roost
 python setup.py sdist
 pip install -e .
 ```
@@ -47,18 +48,18 @@ In order to test your installation you can do so by running the following exampl
 
 ```
 cd /path/to/roost/
-python examples/train.py --train --evaluate --epochs 10
+python examples/roost-example.py --train --evaluate --epochs 10
 ```
 
 This command runs a default task for 10 epochs -- experimental band gap regression using the data from Zhou et al. (See `data/` folder for reference). This default task has been set up to work out of the box without any changes and to give a flavour of how the model can be used. 
 
 If you want to use your own data set on a regression task this can be done with:
 
-```python examples/train.py --data-path /path/to/your/data/data.csv --train```
+```python examples/roost-example.py --data-path /path/to/your/data/data.csv --train```
 
 You can then test your model with:
 
-```python examples/train.py --test-path /path/to/testset.csv --evaluate```
+```python examples/roost-example.py --test-path /path/to/testset.csv --evaluate```
 
 The model takes input in the form csv files with materials-ids, composition strings and target values as the columns.
 
@@ -70,7 +71,7 @@ The model takes input in the form csv files with materials-ids, composition stri
 Basic hints about more advanced use of the model (i.e. classification, robust losses, ensembles, tensorboard logging etc..)
 are available via the command:
 
-```python examples/train.py --help```
+```python examples/roost-example.py --help```
 
 This will output the various command-line flags that can be used to control the code. 
 

@@ -1,411 +1,555 @@
-import gc
-import json
-import torch
-import shutil
+import os
+import datetime
+
 import numpy as np
-import torch.nn as nn
+import pandas as pd
 
-from tqdm.autonotebook import trange
-from torch.nn.functional import softmax
+import torch
+from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, NLLLoss
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
-from sklearn.metrics import accuracy_score, f1_score
-from sklearn.metrics import mean_absolute_error as mae, \
-                            mean_squared_error as mse
+from sklearn.metrics import (
+    r2_score,
+    roc_auc_score,
+    accuracy_score,
+    precision_recall_fscore_support,
+)
+
+from scipy.special import softmax
+
+from roost.core import Normalizer, sampled_softmax, RobustL1, RobustL2
+from roost.segments import ResidualNetwork
 
 
-class BaseModelClass(nn.Module):
+def init_model(
+    model_class,
+    model_name,
+    model_params,
+    run_id,
+    loss,
+    optim,
+    learning_rate,
+    weight_decay,
+    momentum,
+    device,
+    resume=None,
+    fine_tune=None,
+    transfer=None,
+):
+
+    task = model_params["task"]
+    robust = model_params["robust"]
+    n_targets = model_params["n_targets"]
+
+    if fine_tune is not None:
+        print(f"Use material_nn and output_nn from '{fine_tune}' as a starting point")
+        checkpoint = torch.load(fine_tune, map_location=device)
+        model = model_class(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+
+        assert model.model_params["robust"] == robust, (
+            "cannot fine-tune "
+            "between tasks with different numebers of outputs - use transfer "
+            "option instead"
+        )
+        assert model.model_params["n_targets"] == n_targets, (
+            "cannot fine-tune "
+            "between tasks with different numebers of outputs - use transfer "
+            "option instead"
+        )
+
+    elif transfer is not None:
+        print(
+            f"Use material_nn from '{transfer}' as a starting point and "
+            "train the output_nn from scratch"
+        )
+        checkpoint = torch.load(transfer, map_location=device)
+        model = model_class(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+
+        model.task = task
+        model.model_params["task"] = task
+        model.robust = robust
+        model.model_params["robust"] = robust
+        model.model_params["n_targets"] = n_targets
+
+        # # NOTE currently if you use a model as a feature extractor and then
+        # # resume for a checkpoint of that model the material_nn unfreezes.
+        # # This is potentially not the behaviour a user might expect.
+        # for p in model.material_nn.parameters():
+        #     p.requires_grad = False
+
+        if robust:
+            output_dim = 2 * n_targets
+        else:
+            output_dim = n_targets
+
+        model.output_nn = ResidualNetwork(
+            input_dim=model_params["elem_fea_len"],
+            hidden_layer_dims=model_params["out_hidden"],
+            output_dim=output_dim,
+        )
+
+    elif resume:
+        # TODO work out how to ensure that we are using the same optimizer
+        # when resuming such that the state dictionaries do not clash.
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+        print(f"Resuming training from '{resume}'")
+        checkpoint = torch.load(resume, map_location=device)
+
+        model = model_class(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+        model.epoch = checkpoint["epoch"]
+        model.best_val_score = checkpoint["best_val_score"]
+
+    else:
+        model = model_class(device=device, **model_params)
+
+        model.to(device)
+
+    # Select Optimiser
+    if optim == "SGD":
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            momentum=momentum,
+        )
+    elif optim == "Adam":
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+    elif optim == "AdamW":
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+    else:
+        raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
+
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [])
+
+    # Select Task and Loss Function
+    if task == "classification":
+        normalizer = None
+        if robust:
+            criterion = NLLLoss()
+        else:
+            criterion = CrossEntropyLoss()
+
+    elif task == "regression":
+        normalizer = Normalizer()
+        if robust:
+            if loss == "L1":
+                criterion = RobustL1
+            elif loss == "L2":
+                criterion = RobustL2
+            else:
+                raise NameError(
+                    "Only L1 or L2 losses are allowed for robust regression tasks"
+                )
+        else:
+            if loss == "L1":
+                criterion = L1Loss()
+            elif loss == "L2":
+                criterion = MSELoss()
+            else:
+                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
+
+    if resume:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        normalizer.load_state_dict(checkpoint["normalizer"])
+        scheduler.load_state_dict(checkpoint["scheduler"])
+
+    num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Total Number of Trainable Parameters: {}".format(num_param))
+
+    # TODO parallelise the code over multiple GPUs. Currently DataParallel
+    # crashes as subsets of the batch have different sizes due to the use of
+    # lists of lists rather the zero-padding.
+    # if (torch.cuda.device_count() > 1) and (device==torch.device("cuda")):
+    #     print("The model will use", torch.cuda.device_count(), "GPUs!")
+    #     model = nn.DataParallel(model)
+
+    model.to(device)
+
+    return model, criterion, optimizer, scheduler, normalizer
+
+
+def train_ensemble(
+    model_class,
+    model_name,
+    run_id,
+    ensemble_folds,
+    epochs,
+    train_set,
+    val_set,
+    log,
+    data_params,
+    setup_params,
+    restart_params,
+    model_params,
+):
     """
-    A base class for models.
+    Train multiple models
     """
 
-    def __init__(self, task, n_targets, robust, device, epoch=1, best_val_score=None):
-        super(BaseModelClass, self).__init__()
-        self.task = task
-        self.robust = robust
-        self.device = device
-        self.epoch = epoch
-        self.best_val_score = best_val_score
-        self.model_params = {}
+    train_generator = DataLoader(train_set, **data_params)
 
-    def fit(
-        self,
-        train_generator,
-        val_generator,
-        optimizer,
-        scheduler,
-        epochs,
-        criterion,
-        normalizer,
-        model_name,
-        run_id,
-        writer=None,
-    ):
-        start_epoch = self.epoch
-        try:
-            for epoch in range(start_epoch, start_epoch + epochs):
-                self.epoch += 1
-                # Training
-                t_loss, t_metrics = self.evaluate(
-                    generator=train_generator,
+    if val_set is not None:
+        data_params.update({"batch_size": 16 * data_params["batch_size"]})
+        val_generator = DataLoader(val_set, **data_params)
+    else:
+        val_generator = None
+
+    for j in range(ensemble_folds):
+        #  this allows us to run ensembles in parallel rather than in series
+        #  by specifiying the run-id arg.
+        if ensemble_folds == 1:
+            j = run_id
+
+        model, criterion, optimizer, scheduler, normalizer = init_model(
+            model_class=model_class,
+            model_name=model_name,
+            model_params=model_params,
+            run_id=j,
+            **setup_params,
+            **restart_params,
+        )
+
+        if model.task == "regression":
+            sample_target = torch.Tensor(
+                train_set.dataset.df.iloc[train_set.indices, 2].values
+            )
+            if not restart_params["resume"]:
+                normalizer.fit(sample_target)
+            print(f"Dummy MAE: {torch.mean(torch.abs(sample_target-normalizer.mean)):.4f}")
+
+        if log:
+            writer = SummaryWriter(
+                log_dir=(f"runs/{model_name}-r{j}_" "{date:%d-%m-%Y_%H-%M-%S}").format(
+                    date=datetime.datetime.now()
+                )
+            )
+        else:
+            writer = None
+
+        if (val_set is not None) and (model.best_val_score is None):
+            print("Getting Validation Baseline")
+            with torch.no_grad():
+                _, v_metrics = model.evaluate(
+                    generator=val_generator,
                     criterion=criterion,
-                    optimizer=optimizer,
+                    optimizer=None,
                     normalizer=normalizer,
-                    action="train",
+                    action="val",
                     verbose=True,
                 )
+                if model.task == "regression":
+                    val_score = v_metrics["MAE"]
+                    print(f"Validation Baseline: MAE {val_score:.3f}\n")
+                elif model.task == "classification":
+                    val_score = v_metrics["Acc"]
+                    print(f"Validation Baseline: Acc {val_score:.3f}\n")
+                model.best_val_score = val_score
 
-                print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
-                print(
-                    f"Train      : Loss {t_loss:.4f}\t"
-                    + "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()])
-                )
-
-                # Validation
-                if val_generator is None:
-                    is_best = False
-                else:
-                    with torch.no_grad():
-                        # evaluate on validation set
-                        v_loss, v_metrics = self.evaluate(
-                            generator=val_generator,
-                            criterion=criterion,
-                            optimizer=None,
-                            normalizer=normalizer,
-                            action="val",
-                        )
-
-                    print(
-                        f"Validation : Loss {v_loss:.4f}\t"
-                        + "".join(
-                            [f"{key} {val:.3f}\t" for key, val in v_metrics.items()]
-                        )
-                    )
-
-                    if self.task == "regression":
-                        val_score = v_metrics["MAE"]
-                        is_best = val_score < self.best_val_score
-                    elif self.task == "classification":
-                        val_score = v_metrics["Acc"]
-                        is_best = val_score > self.best_val_score
-
-                if is_best:
-                    self.best_val_score = val_score
-
-                checkpoint_dict = {
-                    "model_params": self.model_params,
-                    "state_dict": self.state_dict(),
-                    "epoch": self.epoch,
-                    "best_val_score": self.best_val_score,
-                    "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                }
-                if self.task == "regression":
-                    checkpoint_dict.update({"normalizer": normalizer.state_dict()})
-
-                save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
-
-                if writer is not None:
-                    writer.add_scalar("train/loss", t_loss, epoch + 1)
-                    for metric, val in t_metrics.items():
-                        writer.add_scalar(f"train/{metric}", val, epoch + 1)
-
-                    if val_generator is not None:
-                        writer.add_scalar("validation/loss", v_loss, epoch + 1)
-                        for metric, val in v_metrics.items():
-                            writer.add_scalar(f"validation/{metric}", val, epoch + 1)
-
-                scheduler.step()
-
-                # catch memory leak
-                gc.collect()
-
-        except KeyboardInterrupt:
-            pass
-
-        if writer is not None:
-            writer.close()
-
-    def evaluate(
-        self, generator, criterion, optimizer, normalizer, action="train", verbose=False
-    ):
-        """
-        evaluate the model
-        """
-
-        if action == "val":
-            self.eval()
-        elif action == "train":
-            self.train()
-        else:
-            raise NameError("Only train or val allowed as action")
-
-        loss_meter = AverageMeter()
-
-        if self.task == "regression":
-            metric_meter = RegressionMetrics()
-        elif self.task == "classification":
-            metric_meter = ClassificationMetrics()
-
-        with trange(len(generator), disable=(not verbose)) as t:
-            # we do not need batch_comp or batch_ids when training
-            for input_, target, _, _ in generator:
-
-                # move tensors to GPU
-                input_ = (tensor.to(self.device) for tensor in input_)
-
-                if self.task == "regression":
-                    # normalize target if needed
-                    target_norm = normalizer.norm(target)
-                    target_norm = target_norm.to(self.device)
-                elif self.task == "classification":
-                    target = target.to(self.device)
-
-                # compute output
-                output = self(*input_)
-
-                if self.task == "regression":
-                    if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        loss = criterion(output, log_std, target_norm)
-                    else:
-                        loss = criterion(output, target_norm)
-
-                    pred = normalizer.denorm(output.data.cpu())
-                    metric_meter.update(
-                        pred.data.cpu().numpy(), target.data.cpu().numpy()
-                    )
-
-                elif self.task == "classification":
-                    if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        logits = sampled_softmax(output, log_std)
-                        loss = criterion(torch.log(logits), target.squeeze(1))
-                    else:
-                        loss = criterion(output, target.squeeze(1))
-                        logits = softmax(output, dim=1)
-
-                    # classification metrics from sklearn need numpy arrays
-                    metric_meter.update(
-                        logits.data.cpu().numpy(), target.data.cpu().numpy()
-                    )
-
-                loss_meter.update(loss.data.cpu().item())
-
-                if action == "train":
-                    # compute gradient and take an optimizer step
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-
-                t.update()
-
-        return loss_meter.avg, metric_meter.metric_dict()
-
-    def predict(self, generator, verbose=False):
-        """
-        evaluate the model
-        """
-
-        test_ids = []
-        test_comp = []
-        test_targets = []
-        test_output = []
-
-        # Ensure model is in evaluation mode
-        self.eval()
-
-        with trange(len(generator), disable=(not verbose)) as t:
-            for input_, target, batch_comp, batch_ids in generator:
-
-                # move tensors to GPU
-                input_ = (tensor.to(self.device) for tensor in input_)
-
-                # compute output
-                output = self(*input_)
-
-                # collect the model outputs
-                test_ids += batch_ids
-                test_comp += batch_comp
-                test_targets.append(target)
-                test_output.append(output)
-
-                t.update()
-
-        return (
-            test_ids,
-            test_comp,
-            torch.cat(test_targets, dim=0).view(-1).numpy(),
-            torch.cat(test_output, dim=0),
+        model.fit(
+            train_generator=train_generator,
+            val_generator=val_generator,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            epochs=epochs,
+            criterion=criterion,
+            normalizer=normalizer,
+            model_name=model_name,
+            run_id=j,
+            writer=writer,
         )
 
 
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-
-class RegressionMetrics(object):
-    """Computes and stores average metrics for regression tasks"""
-
-    def __init__(self):
-        self.rmse_meter = AverageMeter()
-        self.mae_meter = AverageMeter()
-
-    def update(self, pred, target):
-        mae_error = mae(pred, target)
-        self.mae_meter.update(mae_error)
-
-        rmse_error = np.sqrt(mse(pred, target))
-        self.rmse_meter.update(rmse_error)
-
-    def metric_dict(self,):
-        return {"MAE": self.mae_meter.avg, "RMSE": self.rmse_meter.avg}
-
-
-class ClassificationMetrics(object):
-    """Computes and stores average metrics for classification tasks"""
-
-    def __init__(self):
-        self.acc_meter = AverageMeter()
-        self.fscore_meter = AverageMeter()
-
-    def update(self, pred, target):
-        acc = accuracy_score(target, np.argmax(pred, axis=1))
-        self.acc_meter.update(acc)
-
-        fscore = f1_score(target, np.argmax(pred, axis=1), average="weighted")
-        self.fscore_meter.update(fscore)
-
-    def metric_dict(self,):
-        return {"Acc": self.acc_meter.avg, "F1": self.fscore_meter.avg}
-
-
-class Normalizer(object):
-    """Normalize a Tensor and restore it later. """
-
-    def __init__(self, log=False):
-        """tensor is taken as a sample to calculate the mean and std"""
-        self.mean = torch.tensor((0))
-        self.std = torch.tensor((1))
-
-    def fit(self, tensor, dim=0, keepdim=False):
-        """tensor is taken as a sample to calculate the mean and std"""
-        self.mean = torch.mean(tensor, dim, keepdim)
-        self.std = torch.std(tensor, dim, keepdim)
-
-    def norm(self, tensor):
-        return (tensor - self.mean) / self.std
-
-    def denorm(self, normed_tensor):
-        return normed_tensor * self.std + self.mean
-
-    def state_dict(self):
-        return {"mean": self.mean, "std": self.std}
-
-    def load_state_dict(self, state_dict):
-        self.mean = state_dict["mean"].cpu()
-        self.std = state_dict["std"].cpu()
-
-
-class Featuriser(object):
+def results_regression(
+    model_class,
+    model_name,
+    run_id,
+    ensemble_folds,
+    test_set,
+    data_params,
+    robust,
+    device,
+    eval_type="checkpoint",
+):
     """
-    Base class for featurising nodes and edges.
+    take an ensemble of models and evaluate their performance on the test set
     """
 
-    def __init__(self, allowed_types):
-        self.allowed_types = set(allowed_types)
-        self._embedding = {}
-
-    def get_fea(self, key):
-        assert key in self.allowed_types, f"{key} is not an allowed atom type"
-        return self._embedding[key]
-
-    def load_state_dict(self, state_dict):
-        self._embedding = state_dict
-        self.allowed_types = set(self._embedding.keys())
-
-    def get_state_dict(self):
-        return self._embedding
-
-    def embedding_size(self):
-        return len(self._embedding[list(self._embedding.keys())[0]])
-
-
-class LoadFeaturiser(Featuriser):
-    """
-    Initialize a featuriser from a JSON file.
-
-    Parameters
-    ----------
-    embedding_file: str
-        The path to the .json file
-    """
-
-    def __init__(self, embedding_file):
-        with open(embedding_file) as f:
-            embedding = json.load(f)
-        allowed_types = set(embedding.keys())
-        super(LoadFeaturiser, self).__init__(allowed_types)
-        for key, value in embedding.items():
-            self._embedding[key] = np.array(value, dtype=float)
-
-
-def save_checkpoint(state, is_best, model_name, run_id):
-    """
-    Saves a checkpoint and overwrites the best model when is_best = True
-    """
-    checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
-    best = f"models/{model_name}/best-r{run_id}.pth.tar"
-
-    torch.save(state, checkpoint)
-    if is_best:
-        shutil.copyfile(checkpoint, best)
-
-
-def RobustL1(output, log_std, target):
-    """
-    Robust L1 loss using a lorentzian prior. Allows for estimation
-    of an aleatoric uncertainty.
-    """
-    loss = np.sqrt(2.0) * torch.abs(output - target) * torch.exp(-log_std) + log_std
-    return torch.mean(loss)
-
-
-def RobustL2(output, log_std, target):
-    """
-    Robust L2 loss using a gaussian prior. Allows for estimation
-    of an aleatoric uncertainty.
-    """
-    loss = 0.5 * torch.pow(output - target, 2.0) * torch.exp(-2.0 * log_std) + log_std
-    return torch.mean(loss)
-
-
-def sampled_softmax(pre_logits, log_std, samples=10):
-    """
-    Draw samples from gaussian distributed pre-logits and use these to estimate
-    a mean and aleatoric uncertainty.
-    """
-    # NOTE here as we do not risk dividing by zero should we really be
-    # predicting log_std or is there another way to deal with negative numbers?
-    # This choice may have an unknown effect on the calibration of the uncertainties
-    sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
-    epsilon = torch.randn_like(sam_std)
-    pre_logits = pre_logits.repeat_interleave(samples, dim=0) + torch.mul(
-        epsilon, sam_std
+    print(
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        "------------Evaluate model on Test Set------------\n"
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
     )
-    logits = softmax(pre_logits, dim=1).view(len(log_std), samples, -1)
-    return torch.mean(logits, dim=1)
+
+    test_generator = DataLoader(test_set, **data_params)
+
+    y_ensemble = np.zeros((ensemble_folds, len(test_set)))
+    if robust:
+        y_ale = np.zeros((ensemble_folds, len(test_set)))
+
+    for j in range(ensemble_folds):
+
+        if ensemble_folds == 1:
+            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
+            print("Evaluating Model")
+        else:
+            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
+            print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
+
+        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
+        checkpoint = torch.load(resume, map_location=device)
+        checkpoint["model_params"]["robust"]
+        assert (
+            checkpoint["model_params"]["robust"] == robust
+        ), f"robustness of checkpoint '{resume}' is not {robust}"
+
+        model = model_class(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+
+        normalizer = Normalizer()
+        normalizer.load_state_dict(checkpoint["normalizer"])
+
+        with torch.no_grad():
+            idx, comp, y_test, output = model.predict(generator=test_generator,)
+
+        if robust:
+            mean, log_std = output.chunk(2, dim=1)
+            pred = normalizer.denorm(mean.data.cpu())
+            ale_std = torch.exp(log_std).data.cpu() * normalizer.std
+            y_ale[j, :] = ale_std.view(-1).numpy()
+        else:
+            pred = normalizer.denorm(output.data.cpu())
+
+        y_ensemble[j, :] = pred.view(-1).numpy()
+
+    res = y_ensemble - y_test
+    mae = np.mean(np.abs(res), axis=1)
+    mse = np.mean(np.square(res), axis=1)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(
+        np.repeat(y_test[:, np.newaxis], ensemble_folds, axis=1),
+        y_ensemble.T,
+        multioutput="raw_values",
+    )
+
+    if ensemble_folds == 1:
+        print("\nModel Performance Metrics:")
+        print("R2 Score: {:.4f} ".format(r2[0]))
+        print("MAE: {:.4f}".format(mae[0]))
+        print("RMSE: {:.4f}".format(rmse[0]))
+    else:
+        r2_avg = np.mean(r2)
+        r2_std = np.std(r2)
+
+        mae_avg = np.mean(mae)
+        mae_std = np.std(mae)
+
+        rmse_avg = np.mean(rmse)
+        rmse_std = np.std(rmse)
+
+        print("\nModel Performance Metrics:")
+        print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
+        print(f"MAE: {mae_avg:.4f} +/- {mae_std:.4f}")
+        print(f"RMSE: {rmse_avg:.4f} +/- {rmse_std:.4f}")
+
+        # calculate metrics and errors with associated errors for ensembles
+        y_ens = np.mean(y_ensemble, axis=0)
+
+        mae_ens = np.abs(y_test - y_ens).mean()
+        mse_ens = np.square(y_test - y_ens).mean()
+        rmse_ens = np.sqrt(mse_ens)
+
+        r2_ens = r2_score(y_test, y_ens)
+
+        print("\nEnsemble Performance Metrics:")
+        print(f"R2 Score : {r2_ens:.4f} ")
+        print(f"MAE  : {mae_ens:.4f}")
+        print(f"RMSE : {rmse_ens:.4f}")
+
+    core = {"id": idx, "composition": comp, "target": y_test}
+    results = {f"pred_{n_ens}": val for (n_ens, val) in enumerate(y_ensemble)}
+    if model.robust:
+        ale = {f"ale_{n_ens}": val for (n_ens, val) in enumerate(y_ale)}
+        results.update(ale)
+
+    df = pd.DataFrame({**core, **results})
+
+    if ensemble_folds == 1:
+        df.to_csv(
+            index=False,
+            path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
+        )
+    else:
+        df.to_csv(
+            index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
+        )
+
+
+def results_classification(
+    model_class,
+    model_name,
+    run_id,
+    ensemble_folds,
+    test_set,
+    data_params,
+    robust,
+    device,
+    eval_type="checkpoint",
+):
+    """
+    take an ensemble of models and evaluate their performance on the test set
+    """
+
+    print(
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        "------------Evaluate model on Test Set------------\n"
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+    )
+
+    test_generator = DataLoader(test_set, **data_params)
+
+    y_pre_logits = []
+    y_logits = []
+    if robust:
+        y_pre_ale = []
+
+    acc = np.zeros((ensemble_folds))
+    roc_auc = np.zeros((ensemble_folds))
+    precision = np.zeros((ensemble_folds))
+    recall = np.zeros((ensemble_folds))
+    fscore = np.zeros((ensemble_folds))
+
+    for j in range(ensemble_folds):
+
+        if ensemble_folds == 1:
+            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
+            print("Evaluating Model")
+        else:
+            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
+            print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
+
+        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
+        checkpoint = torch.load(resume, map_location=device)
+        assert (
+            checkpoint["model_params"]["robust"] == robust
+        ), f"robustness of checkpoint '{resume}' is not {robust}"
+
+        model = model_class(**checkpoint["model_params"], device=device,)
+        model.to(device)
+        model.load_state_dict(checkpoint["state_dict"])
+
+        with torch.no_grad():
+            idx, comp, y_test, output = model.predict(generator=test_generator)
+
+        if model.robust:
+            mean, log_std = output.chunk(2, dim=1)
+            logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
+            pre_logits = mean.data.cpu().numpy()
+            pre_logits_std = torch.exp(log_std).data.cpu().numpy()
+            y_pre_ale.append(pre_logits_std)
+        else:
+            pre_logits = output.data.cpu().numpy()
+
+        logits = softmax(pre_logits, axis=1)
+
+        y_pre_logits.append(pre_logits)
+        y_logits.append(logits)
+
+        y_test_ohe = np.zeros_like(pre_logits)
+        y_test_ohe[np.arange(y_test.size), y_test] = 1
+
+        acc[j] = accuracy_score(y_test, np.argmax(logits, axis=1))
+        roc_auc[j] = roc_auc_score(y_test_ohe, logits)
+        precision[j], recall[j], fscore[j] = precision_recall_fscore_support(
+            y_test, np.argmax(logits, axis=1), average="weighted"
+        )[:3]
+
+    if ensemble_folds == 1:
+        print("\nModel Performance Metrics:")
+        print("Accuracy : {:.4f} ".format(acc[0]))
+        print("ROC-AUC  : {:.4f}".format(roc_auc[0]))
+        print("Weighted Precision : {:.4f}".format(precision[0]))
+        print("Weighted Recall    : {:.4f}".format(recall[0]))
+        print("Weighted F-score   : {:.4f}".format(fscore[0]))
+    else:
+        acc_avg = np.mean(acc)
+        acc_std = np.std(acc)
+
+        roc_auc_avg = np.mean(roc_auc)
+        roc_auc_std = np.std(roc_auc)
+
+        precision_avg = np.mean(precision)
+        precision_std = np.std(precision)
+
+        recall_avg = np.mean(recall)
+        recall_std = np.std(recall)
+
+        fscore_avg = np.mean(fscore)
+        fscore_std = np.std(fscore)
+
+        print("\nModel Performance Metrics:")
+        print(f"Accuracy : {acc_avg:.4f} +/- {acc_std:.4f}")
+        print(f"ROC-AUC  : {roc_auc_avg:.4f} +/- {roc_auc_std:.4f}")
+        print(f"Weighted Precision : {precision_avg:.4f} +/- {precision_std:.4f}")
+        print(f"Weighted Recall    : {recall_avg:.4f} +/- {recall_std:.4f}")
+        print(f"Weighted F-score   : {fscore_avg:.4f} +/- {fscore_std:.4f}")
+
+        # calculate metrics and errors with associated errors for ensembles
+        ens_logits = np.mean(y_logits, axis=0)
+
+        y_test_ohe = np.zeros_like(ens_logits)
+        y_test_ohe[np.arange(y_test.size), y_test] = 1
+
+        ens_acc = accuracy_score(y_test, np.argmax(ens_logits, axis=1))
+        ens_roc_auc = roc_auc_score(y_test_ohe, ens_logits)
+        ens_precision, ens_recall, ens_fscore = precision_recall_fscore_support(
+            y_test, np.argmax(ens_logits, axis=1), average="weighted"
+        )[:3]
+
+        print("\nEnsemble Performance Metrics:")
+        print(f"Accuracy : {ens_acc:.4f} ")
+        print(f"ROC-AUC  : {ens_roc_auc:.4f}")
+        print(f"Weighted Precision : {ens_precision:.4f}")
+        print(f"Weighted Recall    : {ens_recall:.4f}")
+        print(f"Weighted F-score   : {ens_fscore:.4f}")
+
+    # NOTE we save pre_logits rather than logits due to fact that with the
+    # hetroskedastic setup we want to be able to sample from the gaussian
+    # distributed pre_logits we parameterise.
+    core = {"id": idx, "composition": comp, "target": y_test}
+
+    results = {}
+    for n_ens, y_pre_logit in enumerate(y_pre_logits):
+        pred_dict = {
+            f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)
+        }
+        results.update(pred_dict)
+        if model.robust:
+            ale_dict = {
+                f"class-{lab}-ale_{n_ens}": val
+                for lab, val in enumerate(y_pre_ale[n_ens].T)
+            }
+            results.update(ale_dict)
+
+    df = pd.DataFrame({**core, **results})
+
+    if ensemble_folds == 1:
+        df.to_csv(
+            index=False,
+            path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
+        )
+    else:
+        df.to_csv(
+            index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
+        )

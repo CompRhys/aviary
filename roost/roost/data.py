@@ -1,7 +1,5 @@
 import os
 import re
-import sys
-import argparse
 import functools
 
 import numpy as np
@@ -10,244 +8,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from roost.utils import LoadFeaturiser
-
-
-def input_parser():
-    """
-    parse input
-    """
-    parser = argparse.ArgumentParser(
-        description=(
-            "Roost - a Structure Agnostic Message Passing "
-            "Neural Network for Inorganic Materials"
-        )
-    )
-
-    # data inputs
-    parser.add_argument(
-        "--data-path",
-        type=str,
-        default="data/datasets/expt-non-metals.csv",
-        metavar="PATH",
-        help="Path to main data set/training set",
-    )
-    valid_group = parser.add_mutually_exclusive_group()
-    valid_group.add_argument(
-        "--val-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent validation set",
-    )
-    valid_group.add_argument(
-        "--val-size",
-        default=0.0,
-        type=float,
-        metavar="FLOAT",
-        help="Proportion of data used for validation",
-    )
-    test_group = parser.add_mutually_exclusive_group()
-    test_group.add_argument(
-        "--test-path", type=str, metavar="PATH", help="Path to independent test set"
-    )
-    test_group.add_argument(
-        "--test-size",
-        default=0.2,
-        type=float,
-        metavar="FLOAT",
-        help="Proportion of data set for testing",
-    )
-
-    # data embeddings
-    parser.add_argument(
-        "--fea-path",
-        type=str,
-        default="data/embeddings/matscholar-embedding.json",
-        metavar="PATH",
-        help="Element embedding feature path",
-    )
-
-    # dataloader inputs
-    parser.add_argument(
-        "--workers",
-        default=0,
-        type=int,
-        metavar="INT",
-        help="Number of data loading workers (default: 0)",
-    )
-    parser.add_argument(
-        "--batch-size",
-        "--bsize",
-        default=128,
-        type=int,
-        metavar="INT",
-        help="Mini-batch size (default: 128)",
-    )
-    parser.add_argument(
-        "--seed",
-        default=0,
-        type=int,
-        metavar="INT",
-        help="Seed used when splitting data sets (default: 0)",
-    )
-    parser.add_argument(
-        "--sample",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Sub-sample the training set for learning curves",
-    )
-
-    # optimiser inputs
-    parser.add_argument(
-        "--epochs",
-        default=100,
-        type=int,
-        metavar="INT",
-        help="Number of training epochs to run (default: 100)",
-    )
-    parser.add_argument(
-        "--loss",
-        default="L1",
-        type=str,
-        metavar="STR",
-        help="Loss function if regression (default: 'L1')",
-    )
-    parser.add_argument(
-        "--robust",
-        action="store_true",
-        help="Specifies whether to use hetroskedastic loss variants",
-    )
-    parser.add_argument(
-        "--optim",
-        default="AdamW",
-        type=str,
-        metavar="STR",
-        help="Optimizer used for training (default: 'AdamW')",
-    )
-    parser.add_argument(
-        "--learning-rate",
-        "--lr",
-        default=3e-4,
-        type=float,
-        metavar="FLOAT",
-        help="Initial learning rate (default: 3e-4)",
-    )
-    parser.add_argument(
-        "--momentum",
-        default=0.9,
-        type=float,
-        metavar="FLOAT [0,1]",
-        help="Optimizer momentum (default: 0.9)",
-    )
-    parser.add_argument(
-        "--weight-decay",
-        default=1e-6,
-        type=float,
-        metavar="FLOAT [0,1]",
-        help="Optimizer weight decay (default: 1e-6)",
-    )
-
-    # graph inputs
-    parser.add_argument(
-        "--elem-fea-len",
-        default=64,
-        type=int,
-        metavar="INT",
-        help="Number of hidden features for elements (default: 64)",
-    )
-    parser.add_argument(
-        "--n-graph",
-        default=3,
-        type=int,
-        metavar="INT",
-        help="Number of message passing layers (default: 3)",
-    )
-
-    # ensemble inputs
-    parser.add_argument(
-        "--ensemble",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Number models to ensemble",
-    )
-    name_group = parser.add_mutually_exclusive_group()
-    name_group.add_argument(
-        "--model-name",
-        type=str,
-        default=None,
-        metavar="STR",
-        help="Name for sub-directory where models will be stored",
-    )
-    name_group.add_argument(
-        "--data-id",
-        default="roost",
-        type=str,
-        metavar="STR",
-        help="Partial identifier for sub-directory where models will be stored",
-    )
-    parser.add_argument(
-        "--run-id",
-        default=0,
-        type=int,
-        metavar="INT",
-        help="Index for model in an ensemble of models",
-    )
-
-    # restart inputs
-    use_group = parser.add_mutually_exclusive_group()
-    use_group.add_argument(
-        "--fine-tune", type=str, metavar="PATH", help="Checkpoint path for fine tuning"
-    )
-    use_group.add_argument(
-        "--transfer",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for transfer learning",
-    )
-    use_group.add_argument(
-        "--resume", action="store_true", help="Resume from previous checkpoint"
-    )
-
-    # task type
-    task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument(
-        "--classification", action="store_true", help="Specifies a classification task"
-    )
-    task_group.add_argument(
-        "--regression", action="store_true", help="Specifies a regression task"
-    )
-    parser.add_argument(
-        "--evaluate", action="store_true", help="Evaluate the model/ensemble",
-    )
-    parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
-
-    # misc
-    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
-    parser.add_argument(
-        "--log", action="store_true", help="Log training metrics to tensorboard"
-    )
-
-    args = parser.parse_args(sys.argv[1:])
-
-    if args.model_name is None:
-        args.model_name = f"{args.data_id}_s-{args.seed}_t-{args.sample}"
-
-    if args.regression:
-        args.task = "regression"
-    elif args.classification:
-        args.task = "classification"
-    else:
-        args.task = "regression"
-
-    args.device = (
-        torch.device("cuda")
-        if (not args.disable_cuda) and torch.cuda.is_available()
-        else torch.device("cpu")
-    )
-
-    return args
+from roost.core import LoadFeaturiser
 
 
 class CompositionData(Dataset):
@@ -273,7 +34,7 @@ class CompositionData(Dataset):
                 raise NotImplementedError(
                     "Multi-target regression currently not supported"
                 )
-            self.n_targets = self.df.shape[1] - 2
+            self.n_targets = 1
         elif self.task == "classification":
             if self.df.shape[1] - 2 != 1:
                 raise NotImplementedError(
@@ -304,8 +65,7 @@ class CompositionData(Dataset):
         cry_id: torch.Tensor shape (1,)
             input id for the material
         """
-        # cry_id, composition, target = self.id_prop_data[idx]
-        cry_id, composition, *targets = self.df.iloc[idx]
+        cry_id, composition, target = self.df.iloc[idx]
         elements, weights = parse_roost(composition)
         weights = np.atleast_2d(weights).T / np.sum(weights)
         assert len(elements) != 1, f"cry-id {cry_id} [{composition}] is a pure system"
@@ -336,9 +96,9 @@ class CompositionData(Dataset):
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         if self.task == "regression":
-            targets = torch.Tensor([float(t) for t in targets])
+            targets = torch.Tensor([float(target)])
         elif self.task == "classification":
-            targets = torch.LongTensor([targets[0]])
+            targets = torch.LongTensor([target])
 
         return (
             (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
@@ -395,10 +155,8 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for (
-        i,
-        ((atom_weights, atom_fea, self_fea_idx, nbr_fea_idx), target, comp, cry_id),
-    ) in enumerate(dataset_list):
+    for i, (inputs, target, comp, cry_id) in enumerate(dataset_list):
+        atom_weights, atom_fea, self_fea_idx, nbr_fea_idx = inputs
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]
 

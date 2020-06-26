@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from roost.utils import BaseModelClass
+from roost.core import BaseModelClass
 from roost.segments import SimpleNetwork, ResidualNetwork, WeightedAttention
 
 

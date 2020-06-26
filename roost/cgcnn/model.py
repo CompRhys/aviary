@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from roost.utils import BaseModelClass
+from roost.core import BaseModelClass
 from roost.segments import MeanPooling, SumPooling
 
 
@@ -9,7 +9,7 @@ class CGCNN(BaseModelClass):
     Create a crystal graph convolutional neural network for predicting total
     material properties.
 
-    This model is based on: https://github.com/txie-93/cgcnn [MIT Licesnse].
+    This model is based on: https://github.com/txie-93/cgcnn [MIT License].
     Changes to the code were made to allow for the removal of zero-padding
     and to benefit from the BaseModelClass functionality. The architectural
     choices of the model remain unchanged.
@@ -66,10 +66,10 @@ class CGCNN(BaseModelClass):
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
         self.convs = nn.ModuleList(
-            [
-                ConvLayer(elem_fea_len=elem_fea_len, nbr_fea_len=nbr_fea_len)
-                for _ in range(n_graph)
-            ]
+            [ConvLayer(
+                elem_fea_len=elem_fea_len,
+                nbr_fea_len=nbr_fea_len
+            ) for _ in range(n_graph)]
         )
 
         self.pooling = MeanPooling()

@@ -11,279 +11,9 @@ import functools
 import torch
 from torch.utils.data import Dataset
 
-from roost.utils import LoadFeaturiser
+from roost.core import LoadFeaturiser
 
 from pymatgen.core.structure import Structure
-
-
-def input_parser():
-    """
-    parse input
-    """
-    parser = argparse.ArgumentParser(description=("cgcnn"))
-
-    # data inputs
-    parser.add_argument(
-        "--data-path",
-        type=str,
-        default="data/datasets/taata-cgcnn.csv",
-        metavar="PATH",
-        help="Path to main data set/training set",
-    )
-    valid_group = parser.add_mutually_exclusive_group()
-    valid_group.add_argument(
-        "--val-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent validation set",
-    )
-    valid_group.add_argument(
-        "--val-size",
-        default=0.0,
-        type=float,
-        metavar="FLOAT",
-        help="Proportion of data used for validation",
-    )
-    test_group = parser.add_mutually_exclusive_group()
-    test_group.add_argument(
-        "--test-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent test set"
-    )
-    test_group.add_argument(
-        "--test-size",
-        default=0.2,
-        type=float,
-        metavar="FLOAT",
-        help="Proportion of data set for testing",
-    )
-
-    # data embeddings
-    parser.add_argument(
-        "--fea-path",
-        type=str,
-        default="data/embeddings/cgcnn-embedding.json",
-        metavar="PATH",
-        help="Element embedding feature path",
-    )
-
-    # dataloader inputs
-    parser.add_argument(
-        "--workers",
-        default=0,
-        type=int,
-        metavar="INT",
-        help="Number of data loading workers (default: 0)",
-    )
-    parser.add_argument(
-        "--batch-size",
-        "--bsize",
-        default=128,
-        type=int,
-        metavar="INT",
-        help="Mini-batch size (default: 128)",
-    )
-    parser.add_argument(
-        "--seed",
-        default=0,
-        type=int,
-        metavar="INT",
-        help="Seed used when splitting data sets (default: 0)",
-    )
-    parser.add_argument(
-        "--sample",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Sub-sample the training set for learning curves",
-    )
-
-    # optimiser inputs
-    parser.add_argument(
-        "--epochs",
-        default=100,
-        type=int,
-        metavar="INT",
-        help="Number of training epochs to run (default: 100)",
-    )
-    parser.add_argument(
-        "--loss",
-        default="L1",
-        type=str,
-        metavar="STR",
-        help="Loss function if regression (default: 'L1')",
-    )
-    parser.add_argument(
-        "--robust",
-        action="store_true",
-        help="Specifies whether to use hetroskedastic loss variants",
-    )
-    parser.add_argument(
-        "--optim",
-        default="AdamW",
-        type=str,
-        metavar="STR",
-        help="Optimizer used for training (default: 'AdamW')",
-    )
-    parser.add_argument(
-        "--learning-rate",
-        "--lr",
-        default=3e-4,
-        type=float,
-        metavar="FLOAT",
-        help="Initial learning rate (default: 3e-4)",
-    )
-    parser.add_argument(
-        "--momentum",
-        default=0.9,
-        type=float,
-        metavar="FLOAT [0,1]",
-        help="Optimizer momentum (default: 0.9)",
-    )
-    parser.add_argument(
-        "--weight-decay",
-        default=1e-6,
-        type=float,
-        metavar="FLOAT [0,1]",
-        help="Optimizer weight decay (default: 1e-6)",
-    )
-
-    # graph inputs
-    parser.add_argument(
-        "--elem-fea-len",
-        default=64,
-        type=int,
-        metavar="INT",
-        help="Number of hidden features for elements (default: 64)",
-    )
-    parser.add_argument(
-        "--h-fea-len",
-        default=128,
-        type=int,
-        metavar="INT",
-        help="Number of hidden features for output network (default: 128)",
-    )
-    parser.add_argument(
-        "--n-graph",
-        default=4,
-        type=int,
-        metavar="INT",
-        help="Number of message passing layers (default: 3)",
-    )
-    parser.add_argument(
-        "--n-hidden",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Number of layers in output network (default: 1)",
-    )
-
-    # ensemble inputs
-    parser.add_argument(
-        "--ensemble",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Number models to ensemble",
-    )
-    name_group = parser.add_mutually_exclusive_group()
-    name_group.add_argument(
-        "--model-name",
-        type=str,
-        default=None,
-        metavar="STR",
-        help="Name for sub-directory where models will be stored",
-    )
-    name_group.add_argument(
-        "--data-id",
-        default="cgcnn",
-        type=str,
-        metavar="STR",
-        help="Partial identifier for sub-directory where models will be stored",
-    )
-    parser.add_argument(
-        "--run-id",
-        default=0,
-        type=int,
-        metavar="INT",
-        help="Index for model in an ensemble of models",
-    )
-
-    # restart inputs
-    use_group = parser.add_mutually_exclusive_group()
-    use_group.add_argument(
-        "--fine-tune",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for fine tuning"
-    )
-    use_group.add_argument(
-        "--transfer",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for transfer learning",
-    )
-    use_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from previous checkpoint"
-    )
-
-    # task type
-    task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="Specifies a classification task"
-    )
-    task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="Specifies a regression task"
-    )
-    parser.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Evaluate the model/ensemble",
-    )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train the model/ensemble"
-    )
-
-    # misc
-    parser.add_argument(
-        "--disable-cuda",
-        action="store_true",
-        help="Disable CUDA"
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="Log training metrics to tensorboard"
-    )
-
-    args = parser.parse_args(sys.argv[1:])
-
-    if args.model_name is None:
-        args.model_name = f"{args.data_id}_s-{args.seed}_t-{args.sample}"
-
-    if args.regression:
-        args.task = "regression"
-    elif args.classification:
-        args.task = "classification"
-    else:
-        args.task = "regression"
-
-    args.device = (
-        torch.device("cuda")
-        if (not args.disable_cuda) and torch.cuda.is_available()
-        else torch.device("cpu")
-    )
-
-    return args
 
 
 class GraphData(Dataset):
@@ -361,12 +91,16 @@ class GraphData(Dataset):
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
+        # NOTE sites must be given in fractional co-ordinates
         cif_id, comp, target, cell, sites = self.df.iloc[idx]
         cif_id = str(cif_id)
 
         if os.path.exists(os.path.join(self.cachedir, cif_id + ".pkl")):
             with open(os.path.join(self.cachedir, cif_id + ".pkl"), "rb") as f:
-                pkl_data = pickle.load(f)
+                try:
+                    pkl_data = pickle.load(f)
+                except EOFError:
+                    raise EOFError(f"Check {f} for issue")
             atom_fea = pkl_data[0]
             nbr_fea = pkl_data[1]
             self_fea_idx = pkl_data[2]
@@ -374,6 +108,9 @@ class GraphData(Dataset):
 
         else:
             cell, elems, coords = parse_cgcnn(cell, sites)
+            assert np.all(coords >= 0) and np.all(coords <= 1.0), (
+                "Use fractional co-ordinates to specify structures"
+            )
             # NOTE getting primative structure before constructing graph
             # significantly harms the performnace of this model.
             crystal = Structure(
@@ -389,18 +126,14 @@ class GraphData(Dataset):
             self_fea_idx, nbr_fea_idx, nbr_fea = [], [], []
 
             for i, nbr in enumerate(all_nbrs):
+                # NOTE due to using a geometric learning library we do not need to
+                # set a maximum number of neighbours but do so in order to replicate
+                # the original code.
                 if len(nbr) < self.max_num_nbr:
-                    # warnings.warn('{} not find enough neighbors to build graph. '
-                    #             'If it happens frequently, consider increase '
-                    #             'radius.'.format(cif_id))
-
                     nbr_fea_idx.extend(list(map(lambda x: x[2], nbr)))
                     nbr_fea.extend(list(map(lambda x: x[1], nbr)))
-
                 else:
-                    nbr_fea_idx.extend(
-                        list(map(lambda x: x[2], nbr[: self.max_num_nbr]))
-                    )
+                    nbr_fea_idx.extend(list(map(lambda x: x[2], nbr[: self.max_num_nbr])))
                     nbr_fea.extend(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))
 
                 self_fea_idx.extend([i] * min(len(nbr), self.max_num_nbr))

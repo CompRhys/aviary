@@ -104,24 +104,26 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-#vscode
+# vscode
 .vscode/
-checkpoint.pth.tar
-model_best.pth.tar
-test_results*
-ensemble_results*
 
+# notebooks
+.ipynb_checkpoints/
+
+# local files
 runs/
 results/
 models/
 cds3/
+*.csv
+cache/
+data/datasets/process/
 
-data/datasets/sebeck.csv
-
-*.pth.tar
-
-roost/crossval.py
-
-.ipynb_checkpoints/
-
-*.pdf
+# new work
+data/wren/
+roost/wren/
+roost/swren/
+roost/hwren/
+examples/wren-example.py
+examples/swren.py
+examples/hwren.py
