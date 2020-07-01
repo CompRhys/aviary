@@ -1,7 +1,5 @@
 import os
-import sys
 import ast
-import argparse
 import numpy as np
 import pandas as pd
 
@@ -68,7 +66,7 @@ class GraphData(Dataset):
         if not os.path.isdir(self.cachedir):
             os.makedirs(self.cachedir)
 
-        # make sure to use dense datasets, here do not use the default na
+        # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 

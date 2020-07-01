@@ -21,7 +21,7 @@ class CompositionData(Dataset):
         """
         """
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
-        # make sure to use dense datasets, here do not use the default na
+        # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
