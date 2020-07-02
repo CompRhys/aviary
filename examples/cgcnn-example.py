@@ -4,8 +4,8 @@ import torch
 import argparse
 
 from sklearn.model_selection import train_test_split as split
-from roost.cgcnn.model import CGCNN
-from roost.cgcnn.data import GraphData, collate_batch
+from roost.cgcnn.model import CrystalGraphConvNet
+from roost.cgcnn.data import CrystalGraphData, collate_batch
 from roost.utils import (
     train_ensemble,
     results_regression,
@@ -81,7 +81,7 @@ def main(
             "faithful to the original implmentation."
         )
 
-    dataset = GraphData(
+    dataset = CrystalGraphData(
         data_path=data_path,
         fea_path=fea_path,
         task=task,
@@ -100,7 +100,7 @@ def main(
     if evaluate:
         if test_path:
             print(f"using independent test set: {test_path}")
-            test_set = GraphData(
+            test_set = CrystalGraphData(
                 data_path=test_path,
                 fea_path=fea_path,
                 task=task,
@@ -123,7 +123,7 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = GraphData(
+            val_set = CrystalGraphData(
                 data_path=val_path,
                 fea_path=fea_path,
                 task=task,
@@ -202,7 +202,7 @@ def main(
 
     if train:
         train_ensemble(
-            model_class=CGCNN,
+            model_class=CrystalGraphConvNet,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
@@ -226,7 +226,7 @@ def main(
 
         if task == "regression":
             results_regression(
-                model_class=CGCNN,
+                model_class=CrystalGraphConvNet,
                 model_name=model_name,
                 run_id=run_id,
                 ensemble_folds=ensemble,
@@ -238,7 +238,7 @@ def main(
             )
         elif task == "classification":
             results_classification(
-                model_class=CGCNN,
+                model_class=CrystalGraphConvNet,
                 model_name=model_name,
                 run_id=run_id,
                 ensemble_folds=ensemble,

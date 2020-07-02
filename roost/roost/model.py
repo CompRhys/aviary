@@ -36,10 +36,6 @@ class Roost(BaseModelClass):
             task=task, robust=robust, n_targets=n_targets, **kwargs
         )
 
-        # TODO find a more elegant way to structure this unpacking then
-        # a dictionary seems like a non-optimal solution.
-        self.model_params.update()
-
         desc_dict = {
             "elem_emb_len": elem_emb_len,
             "elem_fea_len": elem_fea_len,
@@ -73,7 +69,14 @@ class Roost(BaseModelClass):
 
         self.output_nn = ResidualNetwork(elem_fea_len, output_dim, out_hidden)
 
-    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
+    def forward(
+        self,
+        elem_weights,
+        elem_fea,
+        self_fea_idx,
+        nbr_fea_idx,
+        cry_elem_idx
+    ):
         """
         Forward pass through the material_nn and output_nn
         """
@@ -140,7 +143,14 @@ class DescriptorNetwork(nn.Module):
             ]
         )
 
-    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
+    def forward(
+        self,
+        elem_weights,
+        elem_fea,
+        self_fea_idx,
+        nbr_fea_idx,
+        cry_elem_idx
+    ):
         """
         Forward pass
 

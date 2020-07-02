@@ -14,7 +14,7 @@ from roost.core import LoadFeaturiser
 from pymatgen.core.structure import Structure
 
 
-class GraphData(Dataset):
+class CrystalGraphData(Dataset):
     """
     The CIFData dataset is a wrapper for a dataset where the crystal structures
     are stored in the form of CIF files. The dataset should have the following

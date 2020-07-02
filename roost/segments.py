@@ -126,7 +126,13 @@ class SimpleNetwork(nn.Module):
     Simple Feed Forward Neural Network
     """
 
-    def __init__(self, input_dim, output_dim, hidden_layer_dims):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        hidden_layer_dims,
+        activation=nn.LeakyReLU
+    ):
         """
         Inputs
         ----------
@@ -142,7 +148,7 @@ class SimpleNetwork(nn.Module):
         self.fcs = nn.ModuleList(
             [nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
         )
-        self.acts = nn.ModuleList([nn.LeakyReLU() for _ in range(len(dims) - 1)])
+        self.acts = nn.ModuleList([activation() for _ in range(len(dims) - 1)])
 
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
@@ -161,7 +167,13 @@ class ResidualNetwork(nn.Module):
     Feed forward Residual Neural Network
     """
 
-    def __init__(self, input_dim, output_dim, hidden_layer_dims):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        hidden_layer_dims,
+        activation=nn.ReLU
+    ):
         """
         Inputs
         ----------
@@ -187,7 +199,7 @@ class ResidualNetwork(nn.Module):
                 for i in range(len(dims) - 1)
             ]
         )
-        self.acts = nn.ModuleList([nn.ReLU() for _ in range(len(dims) - 1)])
+        self.acts = nn.ModuleList([activation() for _ in range(len(dims) - 1)])
 
         self.fc_out = nn.Linear(dims[-1], output_dim)
 

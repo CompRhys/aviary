@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 from roost.core import BaseModelClass
-from roost.segments import MeanPooling, SumPooling
+from roost.segments import MeanPooling, SumPooling, SimpleNetwork
 
 
-class CGCNN(BaseModelClass):
+class CrystalGraphConvNet(BaseModelClass):
     """
     Create a crystal graph convolutional neural network for predicting total
     material properties.
@@ -47,21 +47,104 @@ class CGCNN(BaseModelClass):
         n_hidden: int
             Number of hidden layers after pooling
         """
-        super(CGCNN, self).__init__(
+        super(CrystalGraphConvNet, self).__init__(
             task=task, robust=robust, n_targets=n_targets, **kwargs
         )
 
-        self.model_params = {
-            "task": task,
-            "robust": robust,
-            "n_targets": n_targets,
+        desc_dict = {
             "elem_emb_len": elem_emb_len,
             "nbr_fea_len": nbr_fea_len,
             "elem_fea_len": elem_fea_len,
             "n_graph": n_graph,
-            "h_fea_len": h_fea_len,
-            "n_hidden": n_hidden,
+
         }
+
+        self.material_nn = DescriptorNetwork(**desc_dict)
+
+        self.model_params.update(
+            {
+                "task": task,
+                "robust": robust,
+                "n_targets": n_targets,
+                "h_fea_len": h_fea_len,
+                "n_hidden": n_hidden,
+            }
+        )
+
+        self.model_params.update(desc_dict)
+
+        if self.robust:
+            output_dim = 2 * n_targets
+        else:
+            output_dim = n_targets
+
+        out_hidden = [h_fea_len] * n_hidden
+
+        # NOTE the original model used softpluses as activation functions
+        self.output_nn = SimpleNetwork(
+            elem_fea_len,
+            output_dim,
+            out_hidden,
+            nn.Softplus
+        )
+
+    def forward(
+        self,
+        atom_fea,
+        nbr_fea,
+        self_fea_idx,
+        nbr_fea_idx,
+        crystal_atom_idx
+    ):
+        """
+        Forward pass
+
+        N: Total number of atoms in the batch
+        M: Max number of neighbors
+        N0: Total number of crystals in the batch
+
+        Parameters
+        ----------
+
+        atom_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
+            Atom features from atom type
+        nbr_fea: Variable(torch.Tensor) shape (N, M, nbr_fea_len)
+            Bond features of each atom's M neighbors
+        nbr_fea_idx: torch.LongTensor shape (N, M)
+            Indices of M neighbors of each atom
+        crystal_atom_idx: list of torch.LongTensor of length N0
+            Mapping from the crystal idx to atom idx
+
+        Returns
+        -------
+
+        prediction: nn.Variable shape (N, )
+            Atom hidden features after convolution
+
+        """
+        crys_fea = self.material_nn(
+            atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx
+        )
+
+        # apply neural network to map from learned features to target
+        return self.output_nn(crys_fea)
+
+
+class DescriptorNetwork(nn.Module):
+    """
+    The Descriptor Network is the message passing section of the
+    CrystalGraphConvNet Model.
+    """
+    def __init__(
+        self,
+        elem_emb_len,
+        nbr_fea_len,
+        elem_fea_len=64,
+        n_graph=4,
+    ):
+        """
+        """
+        super(DescriptorNetwork, self).__init__()
 
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
@@ -73,25 +156,15 @@ class CGCNN(BaseModelClass):
         )
 
         self.pooling = MeanPooling()
-        self.conv_to_fc = nn.Linear(elem_fea_len, h_fea_len)
-        self.conv_to_fc_softplus = nn.Softplus()
 
-        if n_hidden > 1:
-            self.fcs = nn.ModuleList(
-                [nn.Linear(h_fea_len, h_fea_len) for _ in range(n_hidden - 1)]
-            )
-            self.softpluses = nn.ModuleList(
-                [nn.Softplus() for _ in range(n_hidden - 1)]
-            )
-
-        if self.robust:
-            output_dim = 2 * n_targets
-        else:
-            output_dim = n_targets
-
-        self.fc_out = nn.Linear(h_fea_len, output_dim)
-
-    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
+    def forward(
+        self,
+        atom_fea,
+        nbr_fea,
+        self_fea_idx,
+        nbr_fea_idx,
+        crystal_atom_idx
+    ):
         """
         Forward pass
 
@@ -125,16 +198,10 @@ class CGCNN(BaseModelClass):
 
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
 
-        crys_fea = self.conv_to_fc(self.conv_to_fc_softplus(crys_fea))
-        crys_fea = self.conv_to_fc_softplus(crys_fea)
+        # NOTE required to match the reference implementation
+        crys_fea = nn.functional.softplus(crys_fea)
 
-        if hasattr(self, "fcs") and hasattr(self, "softpluses"):
-            for fc, softplus in zip(self.fcs, self.softpluses):
-                crys_fea = softplus(fc(crys_fea))
-
-        out = self.fc_out(crys_fea)
-
-        return out
+        return crys_fea
 
 
 class ConvLayer(nn.Module):
