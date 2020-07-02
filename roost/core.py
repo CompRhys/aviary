@@ -38,7 +38,9 @@ class BaseModelClass(nn.Module):
         normalizer,
         model_name,
         run_id,
+        checkpoint=True,
         writer=None,
+        verbose=True
     ):
         start_epoch = self.epoch
         try:
@@ -51,14 +53,15 @@ class BaseModelClass(nn.Module):
                     optimizer=optimizer,
                     normalizer=normalizer,
                     action="train",
-                    verbose=True,
+                    verbose=verbose,
                 )
 
-                print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
-                print(
-                    f"Train      : Loss {t_loss:.4f}\t"
-                    + "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()])
-                )
+                if verbose:
+                    print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
+                    print(
+                        f"Train      : Loss {t_loss:.4f}\t"
+                        + "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()])
+                    )
 
                 # Validation
                 if val_generator is None:
@@ -74,12 +77,13 @@ class BaseModelClass(nn.Module):
                             action="val",
                         )
 
-                    print(
-                        f"Validation : Loss {v_loss:.4f}\t"
-                        + "".join(
-                            [f"{key} {val:.3f}\t" for key, val in v_metrics.items()]
+                    if verbose:
+                        print(
+                            f"Validation : Loss {v_loss:.4f}\t"
+                            + "".join(
+                                [f"{key} {val:.3f}\t" for key, val in v_metrics.items()]
+                            )
                         )
-                    )
 
                     if self.task == "regression":
                         val_score = v_metrics["MAE"]
@@ -91,18 +95,19 @@ class BaseModelClass(nn.Module):
                 if is_best:
                     self.best_val_score = val_score
 
-                checkpoint_dict = {
-                    "model_params": self.model_params,
-                    "state_dict": self.state_dict(),
-                    "epoch": self.epoch,
-                    "best_val_score": self.best_val_score,
-                    "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                }
-                if self.task == "regression":
-                    checkpoint_dict.update({"normalizer": normalizer.state_dict()})
+                if checkpoint:
+                    checkpoint_dict = {
+                        "model_params": self.model_params,
+                        "state_dict": self.state_dict(),
+                        "epoch": self.epoch,
+                        "best_val_score": self.best_val_score,
+                        "optimizer": optimizer.state_dict(),
+                        "scheduler": scheduler.state_dict(),
+                    }
+                    if self.task == "regression":
+                        checkpoint_dict.update({"normalizer": normalizer.state_dict()})
 
-                save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
+                    save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
 
                 if writer is not None:
                     writer.add_scalar("train/loss", t_loss, epoch + 1)
