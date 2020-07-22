@@ -184,17 +184,12 @@ def main(
         "n_hidden": n_hidden,
     }
 
-    if not os.path.isdir("models/"):
-        os.makedirs("models/")
-    if not os.path.isdir(f"models/{model_name}/"):
-        os.makedirs(f"models/{model_name}/")
+    os.makedirs(f"models/{model_name}/", exist_ok=True)
 
     if log:
-        if not os.path.isdir("runs/"):
-            os.makedirs("runs/")
+        os.makedirs("runs/", exist_ok=True)
 
-    if not os.path.isdir("results/"):
-        os.makedirs("results/")
+    os.makedirs("results/", exist_ok=True)
 
     if train:
         train_ensemble(
