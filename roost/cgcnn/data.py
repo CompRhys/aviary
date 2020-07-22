@@ -62,9 +62,11 @@ class CrystalGraphData(Dataset):
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
         # NOTE this naming structure might lead to clashes where the model
         # loads the wrong graph from the cache.
-        self.cachedir = os.path.join(os.path.dirname(data_path), "cache/")
-        if not os.path.isdir(self.cachedir):
-            os.makedirs(self.cachedir)
+        self.use_cache = use_cache
+        if self.use_cache:
+            self.cachedir = os.path.join(os.path.dirname(data_path), "cache/")
+            if not os.path.isdir(self.cachedir):
+                os.makedirs(self.cachedir)
 
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
@@ -93,8 +95,11 @@ class CrystalGraphData(Dataset):
         cif_id, comp, target, cell, sites = self.df.iloc[idx]
         cif_id = str(cif_id)
 
-        if os.path.exists(os.path.join(self.cachedir, cif_id + ".pkl")):
-            with open(os.path.join(self.cachedir, cif_id + ".pkl"), "rb") as f:
+        if self.use_cache:
+            cache_path = os.path.join(self.cachedir, cif_id + ".pkl")
+        
+        if self.use_cache and os.path.exists(cache_path):
+            with open(cache_path, "rb") as f:
                 try:
                     pkl_data = pickle.load(f)
                 except EOFError:
@@ -106,9 +111,6 @@ class CrystalGraphData(Dataset):
 
         else:
             cell, elems, coords = parse_cgcnn(cell, sites)
-            assert np.all(coords >= 0) and np.all(coords <= 1.0), (
-                "Use fractional co-ordinates to specify structures"
-            )
             # NOTE getting primative structure before constructing graph
             # significantly harms the performnace of this model.
             crystal = Structure(
@@ -124,22 +126,32 @@ class CrystalGraphData(Dataset):
             self_fea_idx, nbr_fea_idx, nbr_fea = [], [], []
 
             for i, nbr in enumerate(all_nbrs):
-                # NOTE due to using a geometric learning library we do not need to
-                # set a maximum number of neighbours but do so in order to replicate
-                # the original code.
+                # NOTE due to using a geometric learning library we do not
+                # need to set a maximum number of neighbours but do so in
+                # order to replicate the original code.
                 if len(nbr) < self.max_num_nbr:
                     nbr_fea_idx.extend(list(map(lambda x: x[2], nbr)))
                     nbr_fea.extend(list(map(lambda x: x[1], nbr)))
                 else:
-                    nbr_fea_idx.extend(list(map(lambda x: x[2], nbr[: self.max_num_nbr])))
-                    nbr_fea.extend(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))
+                    nbr_fea_idx.extend(
+                        list(map(lambda x: x[2], nbr[: self.max_num_nbr]))
+                    )
+                    nbr_fea.extend(
+                        list(map(lambda x: x[1], nbr[: self.max_num_nbr]))
+                    )
 
+                if len(nbr) == 0:
+                    raise ValueError(
+                        f"Isolated atom found in {cif_id} ({comp}) - "
+                        "increase maximum radius or remove structure"
+                    )
                 self_fea_idx.extend([i] * min(len(nbr), self.max_num_nbr))
 
             nbr_fea = np.array(nbr_fea)
 
-            with open(os.path.join(self.cachedir, cif_id + ".pkl"), "wb") as f:
-                pickle.dump((atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx), f)
+            if self.use_cache:
+                with open(cache_path, "wb") as f:
+                    pickle.dump((atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx), f)
 
         nbr_fea = self.gdf.expand(nbr_fea)
         atom_fea = np.vstack([self.ari.get_fea(atom) for atom in atom_fea])

@@ -33,6 +33,8 @@ def init_model(
     weight_decay,
     momentum,
     device,
+    milestones=[],
+    gamma=0.3,
     resume=None,
     fine_tune=None,
     transfer=None,
@@ -130,7 +132,11 @@ def init_model(
     else:
         raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [])
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer,
+        milestones=milestones,
+        gamma=gamma
+    )
 
     # Select Task and Loss Function
     if task == "classification":

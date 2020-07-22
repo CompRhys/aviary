@@ -81,15 +81,19 @@ def main(
             "faithful to the original implmentation."
         )
 
+    dist_dict = {
+        "max_num_nbr": 12,
+        "radius": 8,
+        "dmin": 0,
+        "step": 0.2,
+        "use_cache": True,
+    }
+
     dataset = CrystalGraphData(
         data_path=data_path,
         fea_path=fea_path,
         task=task,
-        max_num_nbr=12,
-        radius=8,
-        dmin=0,
-        step=0.2,
-        use_cache=True,
+        **dist_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_fea_dim
@@ -104,11 +108,7 @@ def main(
                 data_path=test_path,
                 fea_path=fea_path,
                 task=task,
-                max_num_nbr=12,
-                radius=8,
-                dmin=0,
-                step=0.2,
-                use_cache=True,
+                **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -127,11 +127,7 @@ def main(
                 data_path=val_path,
                 fea_path=fea_path,
                 task=task,
-                max_num_nbr=12,
-                radius=8,
-                dmin=0,
-                step=0.2,
-                use_cache=True,
+                **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
