@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch_scatter import scatter_max, scatter_add, scatter_mean
+from torch_scatter import scatter_add, scatter_max, scatter_mean
 
 
 class MeanPooling(nn.Module):
@@ -9,7 +9,7 @@ class MeanPooling(nn.Module):
     """
 
     def __init__(self):
-        super(MeanPooling, self).__init__()
+        super().__init__()
 
     def forward(self, x, index):
 
@@ -18,7 +18,7 @@ class MeanPooling(nn.Module):
         return mean
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
 
 
 class SumPooling(nn.Module):
@@ -27,7 +27,7 @@ class SumPooling(nn.Module):
     """
 
     def __init__(self):
-        super(SumPooling, self).__init__()
+        super().__init__()
 
     def forward(self, x, index):
 
@@ -36,7 +36,7 @@ class SumPooling(nn.Module):
         return mean
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
 
 
 class AttentionPooling(nn.Module):
@@ -50,7 +50,7 @@ class AttentionPooling(nn.Module):
         ----------
         gate_nn: Variable(nn.Module)
         """
-        super(AttentionPooling, self).__init__()
+        super().__init__()
         self.gate_nn = gate_nn
         self.message_nn = message_nn
 
@@ -75,14 +75,14 @@ class WeightedMeanPooling(torch.nn.Module):
     """
 
     def __init__(self):
-        super(WeightedMeanPooling, self).__init__()
+        super().__init__()
 
     def forward(self, fea, index, weights):
         fea = weights * fea
         return scatter_mean(fea, index, dim=0)
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
 
 
 class WeightedAttention(nn.Module):
@@ -96,7 +96,7 @@ class WeightedAttention(nn.Module):
         ----------
         gate_nn: Variable(nn.Module)
         """
-        super(WeightedAttention, self).__init__()
+        super().__init__()
         self.gate_nn = gate_nn
         self.message_nn = message_nn
         self.pow = torch.nn.Parameter(torch.randn((1)))
@@ -127,11 +127,7 @@ class SimpleNetwork(nn.Module):
     """
 
     def __init__(
-        self,
-        input_dim,
-        output_dim,
-        hidden_layer_dims,
-        activation=nn.LeakyReLU
+        self, input_dim, output_dim, hidden_layer_dims, activation=nn.LeakyReLU
     ):
         """
         Inputs
@@ -141,7 +137,7 @@ class SimpleNetwork(nn.Module):
         hidden_layer_dims: list(int)
 
         """
-        super(SimpleNetwork, self).__init__()
+        super().__init__()
 
         dims = [input_dim] + hidden_layer_dims
 
@@ -159,7 +155,7 @@ class SimpleNetwork(nn.Module):
         return self.fc_out(fea)
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
 
 
 class ResidualNetwork(nn.Module):
@@ -167,13 +163,7 @@ class ResidualNetwork(nn.Module):
     Feed forward Residual Neural Network
     """
 
-    def __init__(
-        self,
-        input_dim,
-        output_dim,
-        hidden_layer_dims,
-        activation=nn.ReLU
-    ):
+    def __init__(self, input_dim, output_dim, hidden_layer_dims, activation=nn.ReLU):
         """
         Inputs
         ----------
@@ -182,7 +172,7 @@ class ResidualNetwork(nn.Module):
         hidden_layer_dims: list(int)
 
         """
-        super(ResidualNetwork, self).__init__()
+        super().__init__()
 
         dims = [input_dim] + hidden_layer_dims
 
@@ -213,4 +203,4 @@ class ResidualNetwork(nn.Module):
         return self.fc_out(fea)
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__

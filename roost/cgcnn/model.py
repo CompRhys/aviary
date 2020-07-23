@@ -47,9 +47,7 @@ class CrystalGraphConvNet(BaseModelClass):
         n_hidden: int
             Number of hidden layers after pooling
         """
-        super(CrystalGraphConvNet, self).__init__(
-            task=task, robust=robust, n_targets=n_targets, **kwargs
-        )
+        super().__init__(task=task, robust=robust, n_targets=n_targets, **kwargs)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -82,20 +80,10 @@ class CrystalGraphConvNet(BaseModelClass):
 
         # NOTE the original model used softpluses as activation functions
         self.output_nn = SimpleNetwork(
-            elem_fea_len,
-            output_dim,
-            out_hidden,
-            nn.Softplus
+            elem_fea_len, output_dim, out_hidden, nn.Softplus
         )
 
-    def forward(
-        self,
-        atom_fea,
-        nbr_fea,
-        self_fea_idx,
-        nbr_fea_idx,
-        crystal_atom_idx
-    ):
+    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
         """
         Forward pass
 
@@ -135,16 +123,13 @@ class DescriptorNetwork(nn.Module):
     The Descriptor Network is the message passing section of the
     CrystalGraphConvNet Model.
     """
+
     def __init__(
-        self,
-        elem_emb_len,
-        nbr_fea_len,
-        elem_fea_len=64,
-        n_graph=4,
+        self, elem_emb_len, nbr_fea_len, elem_fea_len=64, n_graph=4,
     ):
         """
         """
-        super(DescriptorNetwork, self).__init__()
+        super().__init__()
 
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
@@ -157,14 +142,7 @@ class DescriptorNetwork(nn.Module):
 
         self.pooling = MeanPooling()
 
-    def forward(
-        self,
-        atom_fea,
-        nbr_fea,
-        self_fea_idx,
-        nbr_fea_idx,
-        crystal_atom_idx
-    ):
+    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
         """
         Forward pass
 
@@ -221,7 +199,7 @@ class ConvLayer(nn.Module):
         nbr_fea_len: int
                 Number of bond features.
         """
-        super(ConvLayer, self).__init__()
+        super().__init__()
         self.elem_fea_len = elem_fea_len
         self.nbr_fea_len = nbr_fea_len
         self.fc_full = nn.Linear(

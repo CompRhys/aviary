@@ -1,24 +1,21 @@
 import os
-import datetime
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-
 import torch
-from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, NLLLoss
+from scipy.special import softmax
+from sklearn.metrics import (
+    accuracy_score,
+    precision_recall_fscore_support,
+    r2_score,
+    roc_auc_score,
+)
+from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from sklearn.metrics import (
-    r2_score,
-    roc_auc_score,
-    accuracy_score,
-    precision_recall_fscore_support,
-)
-
-from scipy.special import softmax
-
-from roost.core import Normalizer, sampled_softmax, RobustL1, RobustL2
+from roost.core import Normalizer, RobustL1, RobustL2, sampled_softmax
 from roost.segments import ResidualNetwork
 
 
@@ -53,12 +50,12 @@ def init_model(
 
         assert model.model_params["robust"] == robust, (
             "cannot fine-tune "
-            "between tasks with different numebers of outputs - use transfer "
+            "between tasks with different numbers of outputs - use transfer "
             "option instead"
         )
         assert model.model_params["n_targets"] == n_targets, (
             "cannot fine-tune "
-            "between tasks with different numebers of outputs - use transfer "
+            "between tasks with different numbers of outputs - use transfer "
             "option instead"
         )
 
@@ -213,7 +210,7 @@ def train_ensemble(
 
     for j in range(ensemble_folds):
         #  this allows us to run ensembles in parallel rather than in series
-        #  by specifiying the run-id arg.
+        #  by specifying the run-id arg.
         if ensemble_folds == 1:
             j = run_id
 
@@ -232,13 +229,13 @@ def train_ensemble(
             )
             if not restart_params["resume"]:
                 normalizer.fit(sample_target)
-            print(f"Dummy MAE: {torch.mean(torch.abs(sample_target-normalizer.mean)):.4f}")
+            print(
+                f"Dummy MAE: {torch.mean(torch.abs(sample_target-normalizer.mean)):.4f}"
+            )
 
         if log:
             writer = SummaryWriter(
-                log_dir=(f"runs/{model_name}-r{j}_" "{date:%d-%m-%Y_%H-%M-%S}").format(
-                    date=datetime.datetime.now()
-                )
+                log_dir=(f"runs/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}")
             )
         else:
             writer = None

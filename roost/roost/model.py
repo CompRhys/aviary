@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
+
 from roost.core import BaseModelClass
-from roost.segments import SimpleNetwork, ResidualNetwork, WeightedAttention
+from roost.segments import ResidualNetwork, SimpleNetwork, WeightedAttention
 
 
 class Roost(BaseModelClass):
@@ -11,7 +12,7 @@ class Roost(BaseModelClass):
 
     The message passing layers are used to determine a descriptor set
     for the fully connected network. The graphs are used to represent
-    the stiochiometry of inorganic materials in a trainable manner.
+    the stoichiometry of inorganic materials in a trainable manner.
     This makes them systematically improvable with more data.
     """
 
@@ -32,9 +33,7 @@ class Roost(BaseModelClass):
         out_hidden=[1024, 512, 256, 128, 64],
         **kwargs
     ):
-        super(Roost, self).__init__(
-            task=task, robust=robust, n_targets=n_targets, **kwargs
-        )
+        super().__init__(task=task, robust=robust, n_targets=n_targets, **kwargs)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -88,7 +87,7 @@ class Roost(BaseModelClass):
         return self.output_nn(crys_fea)
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
 
 
 class DescriptorNetwork(nn.Module):
@@ -111,7 +110,7 @@ class DescriptorNetwork(nn.Module):
     ):
         """
         """
-        super(DescriptorNetwork, self).__init__()
+        super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
         # NOTE -1 here so we can add the weights as a node feature
@@ -143,14 +142,7 @@ class DescriptorNetwork(nn.Module):
             ]
         )
 
-    def forward(
-        self,
-        elem_weights,
-        elem_fea,
-        self_fea_idx,
-        nbr_fea_idx,
-        cry_elem_idx
-    ):
+    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
         Forward pass
 
@@ -199,7 +191,7 @@ class DescriptorNetwork(nn.Module):
         return torch.mean(torch.stack(head_fea), dim=0)
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
 
 
 class MessageLayer(nn.Module):
@@ -211,7 +203,7 @@ class MessageLayer(nn.Module):
     def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
         """
         """
-        super(MessageLayer, self).__init__()
+        super().__init__()
 
         # Pooling and Output
         self.pooling = nn.ModuleList(
@@ -271,4 +263,4 @@ class MessageLayer(nn.Module):
         return fea + elem_in_fea
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return self.__class__.__name__
