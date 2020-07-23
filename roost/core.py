@@ -244,6 +244,33 @@ class BaseModelClass(nn.Module):
         )
 
 
+def featurise(self, generator):
+    """Generate features for a list of composition strings. When using Roost,
+    this runs only the message-passing part of the model without the ResNet.
+
+    Args:
+        generator (DataLoader): PyTorch loader with the same data format used in fit()
+
+    Returns:
+        np.array: 2d array of features
+    """
+    err_msg = f"{self} needs to be fitted before it can be used for featurisation"
+    assert self.epoch > 0, err_msg
+
+    self.eval()  # ensure model is in evaluation mode
+    features = []
+
+    with torch.no_grad():
+        for input_, *_ in generator:
+
+            input_ = (tensor.to(self.device) for tensor in input_)
+
+            output = self.material_nn(*input_).numpy()
+            features.append(output)
+
+    return np.vstack(features)
+
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 

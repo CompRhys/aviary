@@ -54,7 +54,6 @@ class CrystalGraphConvNet(BaseModelClass):
             "nbr_fea_len": nbr_fea_len,
             "elem_fea_len": elem_fea_len,
             "n_graph": n_graph,
-
         }
 
         self.material_nn = DescriptorNetwork(**desc_dict)
