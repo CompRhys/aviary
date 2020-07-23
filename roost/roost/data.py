@@ -1,10 +1,9 @@
+import functools
 import os
 import re
-import functools
 
 import numpy as np
 import pandas as pd
-
 import torch
 from torch.utils.data import Dataset
 
@@ -57,9 +56,9 @@ class CompositionData(Dataset):
         atom_fea: torch.Tensor shape (M, n_fea)
             features of atoms in the material
         self_fea_idx: torch.Tensor shape (M*M, 1)
-            list of self indicies
+            list of self indices
         nbr_fea_idx: torch.Tensor shape (M*M, 1)
-            list of neighbour indicies
+            list of neighbor indices
         target: torch.Tensor shape (1,)
             target value for material
         cry_id: torch.Tensor shape (1,)

@@ -1,16 +1,15 @@
 import gc
 import json
-import torch
 import shutil
+
 import numpy as np
+import torch
 import torch.nn as nn
-
-from tqdm.autonotebook import trange
-from torch.nn.functional import softmax
-
 from sklearn.metrics import accuracy_score, f1_score
-from sklearn.metrics import mean_absolute_error as mae, \
-                            mean_squared_error as mse
+from sklearn.metrics import mean_absolute_error as mae
+from sklearn.metrics import mean_squared_error as mse
+from torch.nn.functional import softmax
+from tqdm.autonotebook import trange
 
 
 class BaseModelClass(nn.Module):
@@ -19,7 +18,7 @@ class BaseModelClass(nn.Module):
     """
 
     def __init__(self, task, n_targets, robust, device, epoch=1, best_val_score=None):
-        super(BaseModelClass, self).__init__()
+        super().__init__()
         self.task = task
         self.robust = robust
         self.device = device
@@ -40,7 +39,7 @@ class BaseModelClass(nn.Module):
         run_id,
         checkpoint=True,
         writer=None,
-        verbose=True
+        verbose=True,
     ):
         start_epoch = self.epoch
         try:
@@ -223,7 +222,7 @@ class BaseModelClass(nn.Module):
             with trange(len(generator), disable=(not verbose)) as t:
                 for input_, target, batch_comp, batch_ids in generator:
 
-                    # move tensors to GPU
+                    # move tensors to device (GPU or CPU)
                     input_ = (tensor.to(self.device) for tensor in input_)
 
                     # compute output
@@ -241,7 +240,7 @@ class BaseModelClass(nn.Module):
             test_ids,
             test_comp,
             torch.cat(test_targets, dim=0).view(-1).numpy(),
-            torch.cat(test_output, dim=0),
+            torch.cat(test_output, dim=0).view(-1).numpy(),
         )
 
 
@@ -365,7 +364,7 @@ class LoadFeaturiser(Featuriser):
         with open(embedding_file) as f:
             embedding = json.load(f)
         allowed_types = set(embedding.keys())
-        super(LoadFeaturiser, self).__init__(allowed_types)
+        super().__init__(allowed_types)
         for key, value in embedding.items():
             self._embedding[key] = np.array(value, dtype=float)
 

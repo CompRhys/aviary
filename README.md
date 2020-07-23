@@ -8,11 +8,11 @@ In materials discovery applications often we know the composition of trial mater
 
 Many current SOTA results within the field of machine learning for materials discovery are reliant on knowledge of the structure of the material. This means that such models can only be applied to systems that have undergone structural characterisation. As structural characterisation is a time-consuming process whether done experimentally or via the use of ab-initio methods the use of structures as our model inputs is a prohibitive bottleneck to many materials screening applications we would like to pursue.
 
-One approach for avoiding the structure bottleneck is to develop models that learn from the stoichiometry alone. In this work, we show that via a novel recasting of how we view the stoichiometry of a material we can leverage a message-passing neural network to learn materials properties whilst remaining agnostic to the structure. The proposed model exhibits increase sample efficiency compared to more widely used descriptor-based approaches. This work draws inspiration from recent progress in using graph-based methods for the study of small molecules and crystalline materials.
+One approach for avoiding the structure bottleneck is to develop models that learn from the stoichiometry alone. In this work, we show that via a novel recasting of how we view the stoichiometry of a material we can leverage a message-passing neural network to learn materials properties whilst remaining agnostic to the structure. The proposed model exhibits increased sample efficiency compared to more widely used descriptor-based approaches. This work draws inspiration from recent progress in using graph-based methods for the study of small molecules and crystalline materials.
 
 ## Environment Setup
 
-To use `roost` you need to create an environment with the correct dependancies. Using `Anaconda` this can be accomplished with the follow commands:
+To use `roost` you need to create an environment with the correct dependencies. Using `Anaconda` this can be accomplished with the follow commands:
 
 ```bash
 conda create --name roost python=3.6
@@ -30,11 +30,11 @@ You may encounter issues getting the correct installation of either `PyTorch` or
 
 ## Roost Setup
 
-Once you have setup an environment with the correct dependencies you can install `roost` using the following commands: 
+Once you have setup an environment with the correct dependencies you can install `roost` using the following commands:
 
 ```bash
 conda activate roost
-git clone https://github.com/CompRhys/roost.git
+git clone https://github.com/CompRhys/roost
 cd roost
 python setup.py sdist
 pip install -e .
@@ -46,35 +46,40 @@ This will install the library in an editable state allowing for advanced users t
 
 In order to test your installation you can do so by running the following example from the top of your `roost` directory:
 
-```
+```sh
 cd /path/to/roost/
 python examples/roost-example.py --train --evaluate --epochs 10
 ```
 
-This command runs a default task for 10 epochs -- experimental band gap regression using the data from Zhou et al. (See `data/` folder for reference). This default task has been set up to work out of the box without any changes and to give a flavour of how the model can be used. 
+This command runs a default task for 10 epochs -- experimental band gap regression using the data from Zhou et al. (See `data/` folder for reference). This default task has been set up to work out of the box without any changes and to give a flavour of how the model can be used.
 
 If you want to use your own data set on a regression task this can be done with:
 
-```python examples/roost-example.py --data-path /path/to/your/data/data.csv --train```
+```sh
+python examples/roost-example.py --data-path /path/to/your/data/data.csv --train
+```
 
 You can then test your model with:
 
-```python examples/roost-example.py --test-path /path/to/testset.csv --evaluate```
+```sh
+python examples/roost-example.py --test-path /path/to/testset.csv --evaluate
+```
 
 The model takes input in the form csv files with materials-ids, composition strings and target values as the columns.
 
-| material-id |  composition |  target | 
-|-------------|--------------|---------| 
-| foo-1       | Fe2O3        | 2.3     | 
-| foo-2       | La2CuO4      | 4.3     | 
+| material-id | composition | target |
+| ----------- | ----------- | ------ |
+| foo-1       | Fe2O3       | 2.3    |
+| foo-2       | La2CuO4     | 4.3    |
 
 Basic hints about more advanced use of the model (i.e. classification, robust losses, ensembles, tensorboard logging etc..)
 are available via the command:
 
-```python examples/roost-example.py --help```
+```sh
+python examples/roost-example.py --help
+```
 
-This will output the various command-line flags that can be used to control the code. 
-
+This will output the various command-line flags that can be used to control the code.
 
 ## Cite This Work
 
@@ -82,7 +87,7 @@ If you use this code please cite our work for which this model was built:
 
 [Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://arxiv.org/abs/1910.00617)
 
-``` 
+```tex
 @article{goodall2019predicting,
   title={Predicting materials properties without crystal structure: Deep representation learning from stoichiometry},
   author={Goodall, Rhys EA and Lee, Alpha A},

@@ -1,16 +1,16 @@
+import argparse
 import os
 import sys
-import argparse
 
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.roost.model import Roost
 from roost.roost.data import CompositionData, collate_batch
+from roost.roost.model import Roost
 from roost.utils import (
-    train_ensemble,
-    results_regression,
     results_classification,
+    results_regression,
+    train_ensemble,
 )
 
 

@@ -1,17 +1,15 @@
-import os
 import ast
+import functools
+import os
+import pickle
+
 import numpy as np
 import pandas as pd
-
-import pickle
-import functools
-
 import torch
+from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset
 
 from roost.core import LoadFeaturiser
-
-from pymatgen.core.structure import Structure
 
 
 class CrystalGraphData(Dataset):
@@ -97,7 +95,7 @@ class CrystalGraphData(Dataset):
 
         if self.use_cache:
             cache_path = os.path.join(self.cachedir, cif_id + ".pkl")
-        
+
         if self.use_cache and os.path.exists(cache_path):
             with open(cache_path, "rb") as f:
                 try:
@@ -136,9 +134,7 @@ class CrystalGraphData(Dataset):
                     nbr_fea_idx.extend(
                         list(map(lambda x: x[2], nbr[: self.max_num_nbr]))
                     )
-                    nbr_fea.extend(
-                        list(map(lambda x: x[1], nbr[: self.max_num_nbr]))
-                    )
+                    nbr_fea.extend(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))
 
                 if len(nbr) == 0:
                     raise ValueError(
