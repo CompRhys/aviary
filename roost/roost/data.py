@@ -26,7 +26,7 @@ class CompositionData(Dataset):
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.elem_features = LoadFeaturiser(fea_path)
-        self.elem_emb_len = self.elem_features.embedding_size()
+        self.elem_emb_len = self.elem_features.embedding_size
         self.task = task
         if self.task == "regression":
             if self.df.shape[1] - 2 != 1:

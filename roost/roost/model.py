@@ -68,14 +68,7 @@ class Roost(BaseModelClass):
 
         self.output_nn = ResidualNetwork(elem_fea_len, output_dim, out_hidden)
 
-    def forward(
-        self,
-        elem_weights,
-        elem_fea,
-        self_fea_idx,
-        nbr_fea_idx,
-        cry_elem_idx
-    ):
+    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
         Forward pass through the material_nn and output_nn
         """
@@ -155,7 +148,7 @@ class DescriptorNetwork(nn.Module):
         Inputs
         ----------
         elem_weights: Variable(torch.Tensor) shape (N)
-            Fractional weight of each Element in its stiochiometry
+            Fractional weight of each Element in its stoichiometry
         elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
             Element features of each of the N elems in the batch
         self_fea_idx: torch.Tensor shape (M,)
@@ -197,7 +190,7 @@ class DescriptorNetwork(nn.Module):
 class MessageLayer(nn.Module):
     """
     Massage Layers are used to propagate information between nodes in
-    in the stiochiometry graph.
+    the stoichiometry graph.
     """
 
     def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):

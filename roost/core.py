@@ -1,6 +1,7 @@
 import gc
 import json
 import shutil
+from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
@@ -12,7 +13,7 @@ from torch.nn.functional import softmax
 from tqdm.autonotebook import trange
 
 
-class BaseModelClass(nn.Module):
+class BaseModelClass(nn.Module, ABC):
     """
     A base class for models.
     """
@@ -59,7 +60,9 @@ class BaseModelClass(nn.Module):
                     print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
                     print(
                         f"Train      : Loss {t_loss:.4f}\t"
-                        + "".join([f"{key} {val:.3f}\t" for key, val in t_metrics.items()])
+                        + "".join(
+                            [f"{key} {val:.3f}\t" for key, val in t_metrics.items()]
+                        )
                     )
 
                 # Validation
@@ -203,7 +206,7 @@ class BaseModelClass(nn.Module):
 
                 t.update()
 
-        return loss_meter.avg, metric_meter.metric_dict()
+        return loss_meter.avg, metric_meter.metric_dict
 
     def predict(self, generator, verbose=False):
         """
@@ -270,6 +273,14 @@ def featurise(self, generator):
 
     return np.vstack(features)
 
+    @abstractmethod
+    def forward(self, *x):
+        """
+        Forward pass through the model. Needs to be implemented in any derived
+        model class.
+        """
+        raise NotImplementedError("forward() is not defined!")
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -304,7 +315,8 @@ class RegressionMetrics(object):
         rmse_error = np.sqrt(mse(pred, target))
         self.rmse_meter.update(rmse_error)
 
-    def metric_dict(self,):
+    @property
+    def metric_dict(self):
         return {"MAE": self.mae_meter.avg, "RMSE": self.rmse_meter.avg}
 
 
@@ -322,7 +334,8 @@ class ClassificationMetrics(object):
         fscore = f1_score(target, np.argmax(pred, axis=1), average="weighted")
         self.fscore_meter.update(fscore)
 
-    def metric_dict(self,):
+    @property
+    def metric_dict(self):
         return {"Acc": self.acc_meter.avg, "F1": self.fscore_meter.avg}
 
 
@@ -373,6 +386,7 @@ class Featuriser(object):
     def get_state_dict(self):
         return self._embedding
 
+    @property
     def embedding_size(self):
         return len(self._embedding[list(self._embedding.keys())[0]])
 
@@ -408,7 +422,7 @@ def save_checkpoint(state, is_best, model_name, run_id):
         shutil.copyfile(checkpoint, best)
 
 
-def RobustL1(output, log_std, target):
+def RobustL1Loss(output, log_std, target):
     """
     Robust L1 loss using a lorentzian prior. Allows for estimation
     of an aleatoric uncertainty.
@@ -417,7 +431,7 @@ def RobustL1(output, log_std, target):
     return torch.mean(loss)
 
 
-def RobustL2(output, log_std, target):
+def RobustL2Loss(output, log_std, target):
     """
     Robust L2 loss using a gaussian prior. Allows for estimation
     of an aleatoric uncertainty.

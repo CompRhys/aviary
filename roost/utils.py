@@ -15,7 +15,7 @@ from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from roost.core import Normalizer, RobustL1, RobustL2, sampled_softmax
+from roost.core import Normalizer, RobustL1Loss, RobustL2Loss, sampled_softmax
 from roost.segments import ResidualNetwork
 
 
@@ -130,9 +130,7 @@ def init_model(
         raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer,
-        milestones=milestones,
-        gamma=gamma
+        optimizer, milestones=milestones, gamma=gamma
     )
 
     # Select Task and Loss Function
@@ -147,9 +145,9 @@ def init_model(
         normalizer = Normalizer()
         if robust:
             if loss == "L1":
-                criterion = RobustL1
+                criterion = RobustL1Loss
             elif loss == "L2":
-                criterion = RobustL2
+                criterion = RobustL2Loss
             else:
                 raise NameError(
                     "Only L1 or L2 losses are allowed for robust regression tasks"

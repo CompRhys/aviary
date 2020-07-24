@@ -47,12 +47,13 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
-    assert evaluate or train, (
-        "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
-    )
-    assert task in ["regression", "classification"], (
-        "Only 'regression' or 'classification' allowed for 'task'"
-    )
+    assert (
+        evaluate or train
+    ), "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
+    assert task in [
+        "regression",
+        "classification",
+    ], "Only 'regression' or 'classification' allowed for 'task'"
 
     if test_path:
         test_size = 0.0
@@ -70,9 +71,9 @@ def main(
             " run-id flag."
         )
 
-    assert not (fine_tune and transfer), (
-        "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
-    )
+    assert not (
+        fine_tune and transfer
+    ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
 
     dataset = CompositionData(data_path=data_path, fea_path=fea_path, task=task)
     n_targets = dataset.n_targets

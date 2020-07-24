@@ -1,15 +1,16 @@
+import argparse
 import os
 import sys
-import torch
-import argparse
 
+import torch
 from sklearn.model_selection import train_test_split as split
-from roost.cgcnn.model import CrystalGraphConvNet
+
 from roost.cgcnn.data import CrystalGraphData, collate_batch
+from roost.cgcnn.model import CrystalGraphConvNet
 from roost.utils import (
-    train_ensemble,
-    results_regression,
     results_classification,
+    results_regression,
+    train_ensemble,
 )
 
 
@@ -48,12 +49,13 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
-    assert evaluate or train, (
-        "No task given - Set at least one of " "'train' or 'evaluate' kwargs as True"
-    )
-    assert task in ["regression", "classification"], (
-        "Only " "'regression' or 'classification' allowed for 'task'"
-    )
+    assert (
+        evaluate or train
+    ), "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
+    assert task in [
+        "regression",
+        "classification",
+    ], "Only 'regression' or 'classification' allowed for 'task'"
 
     if test_path:
         test_size = 0.0
@@ -71,14 +73,14 @@ def main(
             " run-id flag."
         )
 
-    assert not (fine_tune and transfer), (
-        "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
-    )
+    assert not (
+        fine_tune and transfer
+    ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
 
     if transfer:
         raise NotImplementedError(
-            "Transfer option not availiable for CGCNN in order to stay "
-            "faithful to the original implmentation."
+            "Transfer option not available for CGCNN in order to stay "
+            "faithful to the original implementation."
         )
 
     dist_dict = {
@@ -90,10 +92,7 @@ def main(
     }
 
     dataset = CrystalGraphData(
-        data_path=data_path,
-        fea_path=fea_path,
-        task=task,
-        **dist_dict
+        data_path=data_path, fea_path=fea_path, task=task, **dist_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_fea_dim
@@ -105,10 +104,7 @@ def main(
         if test_path:
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                data_path=test_path,
-                fea_path=fea_path,
-                task=task,
-                **dist_dict
+                data_path=test_path, fea_path=fea_path, task=task, **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -124,10 +120,7 @@ def main(
         if val_path:
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                data_path=val_path,
-                fea_path=fea_path,
-                task=task,
-                **dist_dict
+                data_path=val_path, fea_path=fea_path, task=task, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -272,10 +265,7 @@ def input_parser():
     )
     test_group = parser.add_mutually_exclusive_group()
     test_group.add_argument(
-        "--test-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent test set"
+        "--test-path", type=str, metavar="PATH", help="Path to independent test set"
     )
     test_group.add_argument(
         "--test-size",
@@ -439,10 +429,7 @@ def input_parser():
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--fine-tune",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for fine tuning"
+        "--fine-tune", type=str, metavar="PATH", help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
         "--transfer",
@@ -451,44 +438,26 @@ def input_parser():
         help="Checkpoint path for transfer learning",
     )
     use_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from previous checkpoint"
+        "--resume", action="store_true", help="Resume from previous checkpoint"
     )
 
     # task type
     task_group = parser.add_mutually_exclusive_group()
     task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="Specifies a classification task"
+        "--classification", action="store_true", help="Specifies a classification task"
     )
     task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="Specifies a regression task"
+        "--regression", action="store_true", help="Specifies a regression task"
     )
     parser.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Evaluate the model/ensemble",
+        "--evaluate", action="store_true", help="Evaluate the model/ensemble",
     )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train the model/ensemble"
-    )
+    parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
 
     # misc
+    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--disable-cuda",
-        action="store_true",
-        help="Disable CUDA"
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="Log training metrics to tensorboard"
+        "--log", action="store_true", help="Log training metrics to tensorboard"
     )
 
     args = parser.parse_args(sys.argv[1:])

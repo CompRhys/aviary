@@ -72,7 +72,7 @@ class CrystalGraphData(Dataset):
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.ari = LoadFeaturiser(fea_path)
-        self.elem_fea_dim = self.ari.embedding_size()
+        self.elem_fea_dim = self.ari.embedding_size
 
         self.max_num_nbr = max_num_nbr
         self.radius = radius
