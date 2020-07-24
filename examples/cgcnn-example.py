@@ -1,16 +1,16 @@
-import argparse
 import os
 import sys
+import argparse
 
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.cgcnn.data import CrystalGraphData, collate_batch
 from roost.cgcnn.model import CrystalGraphConvNet
+from roost.cgcnn.data import CrystalGraphData, collate_batch
 from roost.utils import (
+    train_ensemble,
     results_classification,
     results_regression,
-    train_ensemble,
 )
 
 
@@ -244,8 +244,7 @@ def input_parser():
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/mp-cgcnn-orig.csv",
-        # default="data/datasets/taata-cgcnn.csv",
+        default="data/datasets/cgcnn-example.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -265,7 +264,10 @@ def input_parser():
     )
     test_group = parser.add_mutually_exclusive_group()
     test_group.add_argument(
-        "--test-path", type=str, metavar="PATH", help="Path to independent test set"
+        "--test-path",
+        type=str,
+        metavar="PATH",
+        help="Path to independent test set"
     )
     test_group.add_argument(
         "--test-size",
@@ -429,7 +431,10 @@ def input_parser():
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--fine-tune", type=str, metavar="PATH", help="Checkpoint path for fine tuning"
+        "--fine-tune",
+        type=str,
+        metavar="PATH",
+        help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
         "--transfer",
@@ -438,26 +443,44 @@ def input_parser():
         help="Checkpoint path for transfer learning",
     )
     use_group.add_argument(
-        "--resume", action="store_true", help="Resume from previous checkpoint"
+        "--resume",
+        action="store_true",
+        help="Resume from previous checkpoint"
     )
 
     # task type
     task_group = parser.add_mutually_exclusive_group()
     task_group.add_argument(
-        "--classification", action="store_true", help="Specifies a classification task"
+        "--classification",
+        action="store_true",
+        help="Specifies a classification task"
     )
     task_group.add_argument(
-        "--regression", action="store_true", help="Specifies a regression task"
+        "--regression",
+        action="store_true",
+        help="Specifies a regression task"
     )
     parser.add_argument(
-        "--evaluate", action="store_true", help="Evaluate the model/ensemble",
+        "--evaluate",
+        action="store_true",
+        help="Evaluate the model/ensemble",
     )
-    parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
+    parser.add_argument(
+        "--train",
+        action="store_true",
+        help="Train the model/ensemble"
+    )
 
     # misc
-    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--log", action="store_true", help="Log training metrics to tensorboard"
+        "--disable-cuda",
+        action="store_true",
+        help="Disable CUDA"
+        )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Log training metrics to tensorboard"
     )
 
     args = parser.parse_args(sys.argv[1:])
