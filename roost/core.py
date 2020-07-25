@@ -246,32 +246,31 @@ class BaseModelClass(nn.Module, ABC):
             torch.cat(test_output, dim=0).view(-1).numpy(),
         )
 
+    def featurise(self, generator):
+        """Generate features for a list of composition strings. When using Roost,
+        this runs only the message-passing part of the model without the ResNet.
 
-def featurise(self, generator):
-    """Generate features for a list of composition strings. When using Roost,
-    this runs only the message-passing part of the model without the ResNet.
+        Args:
+            generator (DataLoader): PyTorch loader with the same data format used in fit()
 
-    Args:
-        generator (DataLoader): PyTorch loader with the same data format used in fit()
+        Returns:
+            np.array: 2d array of features
+        """
+        err_msg = f"{self} needs to be fitted before it can be used for featurisation"
+        assert self.epoch > 0, err_msg
 
-    Returns:
-        np.array: 2d array of features
-    """
-    err_msg = f"{self} needs to be fitted before it can be used for featurisation"
-    assert self.epoch > 0, err_msg
+        self.eval()  # ensure model is in evaluation mode
+        features = []
 
-    self.eval()  # ensure model is in evaluation mode
-    features = []
+        with torch.no_grad():
+            for input_, *_ in generator:
 
-    with torch.no_grad():
-        for input_, *_ in generator:
+                input_ = (tensor.to(self.device) for tensor in input_)
 
-            input_ = (tensor.to(self.device) for tensor in input_)
+                output = self.material_nn(*input_).numpy()
+                features.append(output)
 
-            output = self.material_nn(*input_).numpy()
-            features.append(output)
-
-    return np.vstack(features)
+        return np.vstack(features)
 
     @abstractmethod
     def forward(self, *x):
@@ -449,6 +448,8 @@ def sampled_softmax(pre_logits, log_std, samples=10):
     # predicting log_std or is there another way to deal with negative numbers?
     # This choice may have an unknown effect on the calibration of the uncertainties
     sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
+    # TODO here we are normally distributing the samples even if the loss
+    # uses a different prior? 
     epsilon = torch.randn_like(sam_std)
     pre_logits = pre_logits.repeat_interleave(samples, dim=0) + torch.mul(
         epsilon, sam_std
