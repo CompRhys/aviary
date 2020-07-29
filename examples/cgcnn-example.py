@@ -27,7 +27,7 @@ def main(
     h_fea_len=128,
     ensemble=1,
     run_id=1,
-    seed=42,
+    data_seed=42,
     epochs=100,
     log=True,
     sample=1,
@@ -112,7 +112,7 @@ def main(
         else:
             print(f"using {test_size} of training set as test set")
             train_idx, test_idx = split(
-                train_idx, random_state=seed, test_size=test_size
+                train_idx, random_state=data_seed, test_size=test_size
             )
             test_set = torch.utils.data.Subset(dataset, test_idx)
 
@@ -136,7 +136,7 @@ def main(
             else:
                 print(f"using {val_size} of training set as validation set")
                 train_idx, val_idx = split(
-                    train_idx, random_state=seed, test_size=val_size / (1 - test_size),
+                    train_idx, random_state=data_seed, test_size=val_size / (1 - test_size),
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -303,7 +303,7 @@ def input_parser():
         help="Mini-batch size (default: 128)",
     )
     parser.add_argument(
-        "--seed",
+        "--data-seed",
         default=0,
         type=int,
         metavar="INT",
@@ -486,7 +486,7 @@ def input_parser():
     args = parser.parse_args(sys.argv[1:])
 
     if args.model_name is None:
-        args.model_name = f"{args.data_id}_s-{args.seed}_t-{args.sample}"
+        args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
     if args.regression:
         args.task = "regression"
