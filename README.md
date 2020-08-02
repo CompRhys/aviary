@@ -17,10 +17,8 @@ To use `roost` you need to create an environment with the correct dependencies. 
 ```bash
 conda create --name roost python=3.6
 conda activate roost
-pip install torch==1.5.0+${CUDA} \
-    -f https://download.pytorch.org/whl/torch_stable.html
-pip install torch-scatter==latest+${CUDA} \
-    -f https://pytorch-geometric.com/whl/torch-1.5.0.html
+pip install torch==1.5.0+${CUDA} -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch-scatter==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.5.0.html
 pip install scikit-learn tqdm pandas tensorboard
 ```
 
