@@ -354,10 +354,10 @@ def results_regression(
         r2_std = np.std(r2)
 
         mae_avg = np.mean(mae)
-        mae_std = np.std(mae)
+        mae_std = np.std(mae)/np.sqrt(mae.shape[0])
 
         rmse_avg = np.mean(rmse)
-        rmse_std = np.std(rmse)
+        rmse_std = np.std(rmse)/np.sqrt(rmse.shape[0])
 
         print("\nModel Performance Metrics:")
         print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
@@ -485,19 +485,19 @@ def results_classification(
         print("Weighted F-score   : {:.4f}".format(fscore[0]))
     else:
         acc_avg = np.mean(acc)
-        acc_std = np.std(acc)
+        acc_std = np.std(acc)/np.sqrt(acc.shape[0])
 
         roc_auc_avg = np.mean(roc_auc)
-        roc_auc_std = np.std(roc_auc)
+        roc_auc_std = np.std(roc_auc)/np.sqrt(roc_auc.shape[0])
 
         precision_avg = np.mean(precision)
-        precision_std = np.std(precision)
+        precision_std = np.std(precision)/np.sqrt(precision.shape[0])
 
         recall_avg = np.mean(recall)
-        recall_std = np.std(recall)
+        recall_std = np.std(recall)/np.sqrt(recall.shape[0])
 
         fscore_avg = np.mean(fscore)
-        fscore_std = np.std(fscore)
+        fscore_std = np.std(fscore)/np.sqrt(fscore.shape[0])
 
         print("\nModel Performance Metrics:")
         print(f"Accuracy : {acc_avg:.4f} +/- {acc_std:.4f}")
