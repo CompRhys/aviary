@@ -2,7 +2,12 @@ import torch
 import torch.nn as nn
 
 from roost.core import BaseModelClass
-from roost.segments import ResidualNetwork, SimpleNetwork, WeightedAttention
+from roost.segments import (
+    ResidualNetwork,
+    SimpleNetwork,
+    WeightedAttentionPooling,
+    MeanPooling,
+)
 
 
 class Roost(BaseModelClass):
@@ -66,7 +71,9 @@ class Roost(BaseModelClass):
         else:
             output_dim = n_targets
 
+        # self.output_nn = nn.Linear(elem_fea_len, output_dim)
         self.output_nn = ResidualNetwork(elem_fea_len, output_dim, out_hidden)
+        # self.output_nn = SimpleNetwork(elem_fea_len, output_dim, out_hidden, nn.ReLU)
 
     def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
@@ -108,6 +115,7 @@ class DescriptorNetwork(nn.Module):
         # apply linear transform to the input to get a trainable embedding
         # NOTE -1 here so we can add the weights as a node feature
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len - 1)
+        # self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList(
@@ -125,15 +133,19 @@ class DescriptorNetwork(nn.Module):
         # define a global pooling function for materials
         self.cry_pool = nn.ModuleList(
             [
-                WeightedAttention(
+                WeightedAttentionPooling(
                     gate_nn=SimpleNetwork(elem_fea_len, 1, cry_gate),
                     message_nn=SimpleNetwork(elem_fea_len, elem_fea_len, cry_msg),
-                    # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
-                    # message_nn=nn.Identity(),
                 )
                 for _ in range(cry_heads)
             ]
         )
+
+        # self.cry_pool = nn.ModuleList(
+        #     [
+        #         MeanPooling()
+        #     ]
+        # )
 
     def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
@@ -178,7 +190,8 @@ class DescriptorNetwork(nn.Module):
         head_fea = []
         for attnhead in self.cry_pool:
             head_fea.append(
-                attnhead(fea=elem_fea, index=cry_elem_idx, weights=elem_weights)
+                attnhead(elem_fea, index=cry_elem_idx, weights=elem_weights)
+                # attnhead(elem_fea, index=cry_elem_idx)
             )
 
         return torch.mean(torch.stack(head_fea), dim=0)
@@ -201,15 +214,20 @@ class MessageLayer(nn.Module):
         # Pooling and Output
         self.pooling = nn.ModuleList(
             [
-                WeightedAttention(
+                WeightedAttentionPooling(
                     gate_nn=SimpleNetwork(2 * elem_fea_len, 1, elem_gate),
                     message_nn=SimpleNetwork(2 * elem_fea_len, elem_fea_len, elem_msg),
-                    # message_nn=nn.Linear(2*elem_fea_len, elem_fea_len),
-                    # message_nn=nn.Identity(),
                 )
                 for _ in range(elem_heads)
             ]
         )
+
+        # self.pooling = nn.ModuleList(
+        #     [
+        #         MeanPooling()
+        #     ]
+        # )
+        # self.mean_msg = SimpleNetwork(2*elem_fea_len, elem_fea_len, elem_msg)
 
     def forward(self, elem_weights, elem_in_fea, self_fea_idx, nbr_fea_idx):
         """
@@ -247,13 +265,15 @@ class MessageLayer(nn.Module):
         head_fea = []
         for attnhead in self.pooling:
             head_fea.append(
-                attnhead(fea=fea, index=self_fea_idx, weights=elem_nbr_weights)
+                attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights)
+                # attnhead(self.mean_msg(fea), index=self_fea_idx)
             )
 
         # average the attention heads
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
         return fea + elem_in_fea
+        # return fea
 
     def __repr__(self):
         return self.__class__.__name__

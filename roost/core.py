@@ -243,7 +243,7 @@ class BaseModelClass(nn.Module, ABC):
             test_ids,
             test_comp,
             torch.cat(test_targets, dim=0).view(-1).numpy(),
-            torch.cat(test_output, dim=0).view(-1).numpy(),
+            torch.cat(test_output, dim=0),
         )
 
     def featurise(self, generator):
@@ -267,7 +267,7 @@ class BaseModelClass(nn.Module, ABC):
 
                 input_ = (tensor.to(self.device) for tensor in input_)
 
-                output = self.material_nn(*input_).numpy()
+                output = self.material_nn(*input_).cpu().numpy()
                 features.append(output)
 
         return np.vstack(features)
