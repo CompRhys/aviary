@@ -24,7 +24,9 @@ pip install scikit-learn tqdm pandas tensorboard
 
 `${CUDA}` Should be replaced by either `cpu`, `cu92`, `cu101` or `cu102` depending on your system CUDA version. (You can find your CUDA version via `nvidia-smi`)
 
-You may encounter issues getting the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter)
+You may encounter issues getting the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter).
+
+The was developed and tested on Linux Mint 19.1 Tessa. The code should work on with other Operating Systems but it has not been tested for such use.  
 
 ## Roost Setup
 
@@ -49,7 +51,7 @@ cd /path/to/roost/
 python examples/roost-example.py --train --evaluate --epochs 10
 ```
 
-This command runs a default task for 10 epochs -- experimental band gap regression using the data from Zhou et al. (See `data/` folder for reference). This default task has been set up to work out of the box without any changes and to give a flavour of how the model can be used.
+This command runs a default task for 10 epochs -- experimental band gap regression using the data from Zhou et al. (See `data/` folder for reference). This default task has been set up to work out of the box without any changes and to give a flavour of how the model can be used. The demo task should take less than a minute when a GPU is available are give a test set MAE of 0.42-0.45 eV after 10 epochs.
 
 If you want to use your own data set on a regression task this can be done with:
 
