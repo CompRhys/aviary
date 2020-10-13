@@ -19,12 +19,22 @@ class BaseModelClass(nn.Module, ABC):
     """
 
     def __init__(self, task, n_targets, robust, device, epoch=1, best_val_score=None):
+        """
+        Args:
+            task (str): "regression" or "classification"
+            robust (bool): whether an aleatoric loss function is being used
+            device (pytorch.device): the device the model will be run on
+            epoch (int): the epoch model training will begin/resume from
+            best_val_score (float): validation score to use for early stopping
+        """
         super().__init__()
         self.task = task
         self.robust = robust
         self.device = device
         self.epoch = epoch
         self.best_val_score = best_val_score
+        self.es_patience = 0
+
         self.model_params = {}
 
     def fit(
@@ -41,7 +51,12 @@ class BaseModelClass(nn.Module, ABC):
         checkpoint=True,
         writer=None,
         verbose=True,
+        patience=None,
     ):
+        """
+        Args:
+
+        """
         start_epoch = self.epoch
         try:
             for epoch in range(start_epoch, start_epoch + epochs):
@@ -56,6 +71,11 @@ class BaseModelClass(nn.Module, ABC):
                     verbose=verbose,
                 )
 
+                if writer is not None:
+                    writer.add_scalar("train/loss", t_loss, epoch + 1)
+                    for metric, val in t_metrics.items():
+                        writer.add_scalar(f"train/{metric}", val, epoch + 1)
+
                 if verbose:
                     print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
                     print(
@@ -66,9 +86,8 @@ class BaseModelClass(nn.Module, ABC):
                     )
 
                 # Validation
-                if val_generator is None:
-                    is_best = False
-                else:
+                is_best = False
+                if val_generator is not None:
                     with torch.no_grad():
                         # evaluate on validation set
                         v_loss, v_metrics = self.evaluate(
@@ -78,6 +97,11 @@ class BaseModelClass(nn.Module, ABC):
                             normalizer=normalizer,
                             action="val",
                         )
+
+                    if writer is not None:
+                        writer.add_scalar("validation/loss", v_loss, epoch + 1)
+                        for metric, val in v_metrics.items():
+                            writer.add_scalar(f"validation/{metric}", val, epoch + 1)
 
                     if verbose:
                         print(
@@ -94,8 +118,15 @@ class BaseModelClass(nn.Module, ABC):
                         val_score = v_metrics["Acc"]
                         is_best = val_score > self.best_val_score
 
-                if is_best:
-                    self.best_val_score = val_score
+                    if is_best:
+                        self.best_val_score = val_score
+                        self.es_patience = 0
+                    else:
+                        self.es_patience += 1
+                        if patience:
+                            if self.es_patience > patience:
+                                print("Stopping early due to lack of improvement on Validation set")
+                                break
 
                 if checkpoint:
                     checkpoint_dict = {
@@ -110,16 +141,6 @@ class BaseModelClass(nn.Module, ABC):
                         checkpoint_dict.update({"normalizer": normalizer.state_dict()})
 
                     save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
-
-                if writer is not None:
-                    writer.add_scalar("train/loss", t_loss, epoch + 1)
-                    for metric, val in t_metrics.items():
-                        writer.add_scalar(f"train/{metric}", val, epoch + 1)
-
-                    if val_generator is not None:
-                        writer.add_scalar("validation/loss", v_loss, epoch + 1)
-                        for metric, val in v_metrics.items():
-                            writer.add_scalar(f"validation/{metric}", val, epoch + 1)
 
                 scheduler.step()
 
@@ -449,7 +470,7 @@ def sampled_softmax(pre_logits, log_std, samples=10):
     # This choice may have an unknown effect on the calibration of the uncertainties
     sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
     # TODO here we are normally distributing the samples even if the loss
-    # uses a different prior? 
+    # uses a different prior?
     epsilon = torch.randn_like(sam_std)
     pre_logits = pre_logits.repeat_interleave(samples, dim=0) + torch.mul(
         epsilon, sam_std

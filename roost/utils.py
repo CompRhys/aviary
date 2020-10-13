@@ -193,6 +193,7 @@ def train_ensemble(
     setup_params,
     restart_params,
     model_params,
+    patience,
 ):
     """
     Train multiple models
@@ -268,6 +269,7 @@ def train_ensemble(
             model_name=model_name,
             run_id=j,
             writer=writer,
+            patience=patience,
         )
 
 
