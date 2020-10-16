@@ -165,8 +165,7 @@ def init_model(
         normalizer.load_state_dict(checkpoint["normalizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
 
-    num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("Total Number of Trainable Parameters: {}".format(num_param))
+    print(f"Total Number of Trainable Parameters: {model.num_params}")
 
     # TODO parallelise the code over multiple GPUs. Currently DataParallel
     # crashes as subsets of the batch have different sizes due to the use of

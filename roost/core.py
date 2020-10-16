@@ -301,6 +301,10 @@ class BaseModelClass(nn.Module, ABC):
         """
         raise NotImplementedError("forward() is not defined!")
 
+    @property
+    def num_params(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
