@@ -1,0 +1,10 @@
+scipy
+tqdm
+torch
+numpy
+pymatgen
+torch_scatter
+pandas
+scikit_learn
+pytest
+tensorboard
