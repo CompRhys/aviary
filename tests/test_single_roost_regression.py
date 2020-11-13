@@ -7,6 +7,8 @@ from roost.roost.data import CompositionData, collate_batch
 from roost.roost.model import Roost
 from roost.utils import results_regression, train_ensemble
 
+torch.manual_seed(0)  # ensure reproducible results
+
 
 def test_single_roost():
 
