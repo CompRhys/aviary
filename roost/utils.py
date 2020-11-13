@@ -344,20 +344,21 @@ def results_regression(
         multioutput="raw_values",
     )
 
+    r2_avg = np.mean(r2)
+    r2_std = np.std(r2)
+
+    mae_avg = np.mean(mae)
+    mae_std = np.std(mae)/np.sqrt(mae.shape[0])
+
+    rmse_avg = np.mean(rmse)
+    rmse_std = np.std(rmse)/np.sqrt(rmse.shape[0])
+
     if ensemble_folds == 1:
         print("\nModel Performance Metrics:")
-        print("R2 Score: {:.4f} ".format(r2[0]))
-        print("MAE: {:.4f}".format(mae[0]))
-        print("RMSE: {:.4f}".format(rmse[0]))
+        print("R2 Score: {:.4f} ".format(r2_avg))
+        print("MAE: {:.4f}".format(mae_avg))
+        print("RMSE: {:.4f}".format(rmse_avg))
     else:
-        r2_avg = np.mean(r2)
-        r2_std = np.std(r2)
-
-        mae_avg = np.mean(mae)
-        mae_std = np.std(mae)/np.sqrt(mae.shape[0])
-
-        rmse_avg = np.mean(rmse)
-        rmse_std = np.std(rmse)/np.sqrt(rmse.shape[0])
 
         print("\nModel Performance Metrics:")
         print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
@@ -395,6 +396,8 @@ def results_regression(
         df.to_csv(
             index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
         )
+
+    return r2_avg, mae_avg, rmse_avg
 
 
 def results_classification(
