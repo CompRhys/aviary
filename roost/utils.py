@@ -192,7 +192,7 @@ def train_ensemble(
     setup_params,
     restart_params,
     model_params,
-    patience,
+    patience=None,
 ):
     """
     Train multiple models

@@ -473,6 +473,7 @@ def sampled_softmax(pre_logits, log_std, samples=10):
     # predicting log_std or is there another way to deal with negative numbers?
     # This choice may have an unknown effect on the calibration of the uncertainties
     sam_std = torch.exp(log_std).repeat_interleave(samples, dim=0)
+
     # TODO here we are normally distributing the samples even if the loss
     # uses a different prior?
     epsilon = torch.randn_like(sam_std)
