@@ -1,4 +1,4 @@
-# RooSt
+# RooSt &nbsp; [![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
 
 **R**epresentati**o**n Learning fr**o**m **St**oichiometry
 

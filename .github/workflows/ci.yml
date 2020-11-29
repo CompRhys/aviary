@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    paths:
+      - '**.py' # only run workflow when source files changed
+  pull_request:
+    paths:
+      - '**.py'
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Set up latest Python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          # install torch first because torch_scatter needs it
+          pip install torch==1.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+          pip install torch-scatter==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
+          pip install -r requirements.txt
+          pip install .
+
+      - name: Run Tests
+        run: |
+          python -m pytest
