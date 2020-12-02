@@ -18,13 +18,11 @@ from torch.utils.tensorboard import SummaryWriter
 from roost.core import Normalizer, RobustL1Loss, RobustL2Loss, sampled_softmax
 from roost.segments import ResidualNetwork
 
-
 def init_model(
     model_class,
     model_name,
     model_params,
     run_id,
-    loss,
     optim,
     learning_rate,
     weight_decay,
@@ -80,6 +78,8 @@ def init_model(
         # # This is potentially not the behaviour a user might expect.
         # for p in model.material_nn.parameters():
         #     p.requires_grad = False
+        # for p in model.trunk_nn.parameters():
+        #     p.requires_grad = False
 
         if robust:
             output_dim = 2 * n_targets
@@ -133,37 +133,11 @@ def init_model(
         optimizer, milestones=milestones, gamma=gamma
     )
 
-    # Select Task and Loss Function
-    if task == "classification":
-        normalizer = None
-        if robust:
-            criterion = NLLLoss()
-        else:
-            criterion = CrossEntropyLoss()
-
-    elif task == "regression":
-        normalizer = Normalizer()
-        if robust:
-            if loss == "L1":
-                criterion = RobustL1Loss
-            elif loss == "L2":
-                criterion = RobustL2Loss
-            else:
-                raise NameError(
-                    "Only L1 or L2 losses are allowed for robust regression tasks"
-                )
-        else:
-            if loss == "L1":
-                criterion = L1Loss()
-            elif loss == "L2":
-                criterion = MSELoss()
-            else:
-                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
-
     if resume:
         optimizer.load_state_dict(checkpoint["optimizer"])
-        normalizer.load_state_dict(checkpoint["normalizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
+        if normalizer is not None:
+            normalizer.load_state_dict(checkpoint["normalizer"])
 
     print(f"Total Number of Trainable Parameters: {model.num_params}")
 
@@ -176,7 +150,39 @@ def init_model(
 
     model.to(device)
 
-    return model, criterion, optimizer, scheduler, normalizer
+    return model, optimizer, scheduler
+
+
+def init_losses(loss_dict, robust):
+    # TODO resume the normalizer
+    criterion_dict = {}
+    for target, (task, loss) in loss_dict.items():
+        # Select Task and Loss Function
+        if task == "classification":
+            if robust:
+                criterion_dict[target] = (task, NLLLoss(), None)
+            else:
+                criterion_dict[target] = (task, CrossEntropyLoss(), None)
+
+        elif task == "regression":
+            if robust:
+                if loss == "L1":
+                    criterion_dict[target] = (task, RobustL1Loss, Normalizer())
+                elif loss == "L2":
+                    criterion_dict[target] = (task, RobustL2Loss, Normalizer())
+                else:
+                    raise NameError(
+                        "Only L1 or L2 losses are allowed for robust regression tasks"
+                    )
+            else:
+                if loss == "L1":
+                    criterion_dict[target] = (task, L1Loss, Normalizer())
+                elif loss == "L2":
+                    criterion_dict[target] = (task, MSELoss, Normalizer())
+                else:
+                    raise NameError("Only L1 or L2 losses are allowed for regression tasks")
+
+    return criterion_dict
 
 
 def train_ensemble(
@@ -212,7 +218,7 @@ def train_ensemble(
         if ensemble_folds == 1:
             j = run_id
 
-        model, criterion, optimizer, scheduler, normalizer = init_model(
+        model, optimizer, scheduler = init_model(
             model_class=model_class,
             model_name=model_name,
             model_params=model_params,
@@ -221,15 +227,18 @@ def train_ensemble(
             **restart_params,
         )
 
-        if model.task == "regression":
-            sample_target = torch.Tensor(
-                train_set.dataset.df.iloc[train_set.indices, 2].values
-            )
-            if not restart_params["resume"]:
-                normalizer.fit(sample_target)
-            print(
-                f"Dummy MAE: {torch.mean(torch.abs(sample_target-normalizer.mean)):.4f}"
-            )
+        criterion_dict = init_losses(loss_dict, robust)
+
+        for target, (task, _, normalizer) in criterion_dict.items():
+            if task == "regression":
+                sample_target = torch.Tensor(
+                    train_set.dataset.df[target].iloc[train_set.indices].values
+                )
+                if not restart_params["resume"]:
+                    normalizer.fit(sample_target)
+                print(
+                    f"Dummy MAE: {torch.mean(torch.abs(sample_target-normalizer.mean)):.4f}"
+                )
 
         if log:
             writer = SummaryWriter(

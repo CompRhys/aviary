@@ -16,9 +16,23 @@ class CompositionData(Dataset):
     automatically constructed from composition strings.
     """
 
-    def __init__(self, data_path, fea_path, task):
+    def __init__(
+        self,
+        data_path,
+        fea_path,
+        tasks=["regression"],
+        inputs=["composition"],
+        targets=["Eg"],
+        identifiers=["id", "composition"],
+    ):
         """
         """
+        assert len(tasks) == len(targets), "every task needs a given target"
+
+        self.inputs = inputs
+        self.targets = targets
+        self.identifiers = identifiers
+
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
@@ -27,44 +41,50 @@ class CompositionData(Dataset):
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.elem_features = LoadFeaturiser(fea_path)
         self.elem_emb_len = self.elem_features.embedding_size
-        self.task = task
-        if self.task == "regression":
-            if self.df.shape[1] - 2 != 1:
-                raise NotImplementedError(
-                    "Multi-target regression currently not supported"
-                )
-            self.n_targets = 1
-        elif self.task == "classification":
-            if self.df.shape[1] - 2 != 1:
-                raise NotImplementedError(
-                    "One-Hot input not supported please use categorical integer"
-                    " inputs for classification i.e. Dog = 0, Cat = 1, Mouse = 2"
-                )
-            self.n_targets = np.max(self.df[self.df.columns[2]].values) + 1
+
+        self.task_dict = dict(zip(targets, tasks))
+
+        self.n_targets = []
+        for target in self.targets:
+            if self.task_dict[target] == "regression":
+                self.n_targets.append(1)
+            elif self.task == "classification":
+                n_classes = np.max(self.df[target].values) + 1
+                self.n_targets.append(n_classes)
 
     def __len__(self):
         return len(self.df)
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
-        """
+        """[summary]
 
-        Returns
-        -------
-        atom_weights: torch.Tensor shape (M, 1)
-            weights of atoms in the material
-        atom_fea: torch.Tensor shape (M, n_fea)
-            features of atoms in the material
-        self_fea_idx: torch.Tensor shape (M*M, 1)
-            list of self indices
-        nbr_fea_idx: torch.Tensor shape (M*M, 1)
-            list of neighbor indices
-        target: torch.Tensor shape (1,)
-            target value for material
-        cry_id: torch.Tensor shape (1,)
-            input id for the material
+        Args:
+            idx (int): dataset index
+
+        Raises:
+            AssertionError: [description]
+            ValueError: [description]
+
+        Returns:
+            atom_weights: torch.Tensor shape (M, 1)
+                weights of atoms in the material
+            atom_fea: torch.Tensor shape (M, n_fea)
+                features of atoms in the material
+            self_fea_idx: torch.Tensor shape (M*M, 1)
+                list of self indices
+            nbr_fea_idx: torch.Tensor shape (M*M, 1)
+                list of neighbor indices
+            target: torch.Tensor shape (1,)
+                target value for material
+            cry_id: torch.Tensor shape (1,)
+                input id for the material
+
         """
-        cry_id, composition, target = self.df.iloc[idx]
+        df_idx = self.df.iloc[idx]
+        composition = df_idx[self.inputs]
+        cry_id, composition = df_idx[self.identifiers]
+
         comp_dict = Composition(composition).get_el_amt_dict()
         elements = list(comp_dict.keys())
         weights = list(comp_dict.values())
@@ -96,16 +116,18 @@ class CompositionData(Dataset):
         atom_fea = torch.Tensor(atom_fea)
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
-        if self.task == "regression":
-            targets = torch.Tensor([float(target)])
-        elif self.task == "classification":
-            targets = torch.LongTensor([target])
+
+        targets = []
+        for target in self.targets:
+            if self.task_dict[target] == "regression":
+                targets.append(torch.Tensor([df_idx[target]]))
+            elif self.task_dict[target] == "classification":
+                targets.append(torch.LongTensor([df_idx[target]]))
 
         return (
             (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
             targets,
-            composition,
-            cry_id,
+            composition, cry_id
         )
 
 
@@ -151,7 +173,7 @@ def collate_batch(dataset_list):
     batch_self_fea_idx = []
     batch_nbr_fea_idx = []
     crystal_atom_idx = []
-    batch_target = []
+    batch_targets = []
     batch_comp = []
     batch_cry_ids = []
 
@@ -173,7 +195,7 @@ def collate_batch(dataset_list):
         crystal_atom_idx.append(torch.tensor([i] * n_i))
 
         # batch the targets and ids
-        batch_target.append(target)
+        batch_targets.append(target)
         batch_comp.append(comp)
         batch_cry_ids.append(cry_id)
 
@@ -188,7 +210,7 @@ def collate_batch(dataset_list):
             torch.cat(batch_nbr_fea_idx, dim=0),
             torch.cat(crystal_atom_idx),
         ),
-        torch.stack(batch_target, dim=0),
+        (torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         batch_comp,
         batch_cry_ids,
     )

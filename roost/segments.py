@@ -159,7 +159,15 @@ class ResidualNetwork(nn.Module):
     Feed forward Residual Neural Network
     """
 
-    def __init__(self, input_dim, output_dim, hidden_layer_dims, activation=nn.ReLU, batchnorm=False):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        hidden_layer_dims,
+        activation=nn.ReLU,
+        batchnorm=False,
+        return_features=False,
+    ):
         """
         Inputs
         ----------
@@ -177,11 +185,13 @@ class ResidualNetwork(nn.Module):
         )
 
         if batchnorm:
-            self.bns = nn.ModuleList([nn.BatchNorm1d(dims[i+1])
-                                    for i in range(len(dims)-1)])
+            self.bns = nn.ModuleList(
+                [nn.BatchNorm1d(dims[i+1]) for i in range(len(dims)-1)]
+            )
         else:
-            self.bns = nn.ModuleList([nn.Identity()
-                                    for i in range(len(dims)-1)])
+            self.bns = nn.ModuleList(
+                [nn.Identity() for i in range(len(dims)-1)]
+            )
 
         self.res_fcs = nn.ModuleList(
             [
@@ -193,14 +203,19 @@ class ResidualNetwork(nn.Module):
         )
         self.acts = nn.ModuleList([activation() for _ in range(len(dims) - 1)])
 
-        self.fc_out = nn.Linear(dims[-1], output_dim)
+        self.return_features = return_features
+        if not self.return_features:
+            self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, x):
         for fc, bn, res_fc, act in zip(self.fcs, self.bns,
                                        self.res_fcs, self.acts):
             x = act(bn(fc(x)))+res_fc(x)
 
-        return self.fc_out(x)
+        if self.return_features:
+            return x
+        else:
+            return self.fc_out(x)
 
     def __repr__(self):
         return self.__class__.__name__

@@ -75,7 +75,7 @@ def main(
         "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
     )
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task=task)
+    dataset = CompositionData(data_path=data_path, fea_path=fea_path)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -85,7 +85,7 @@ def main(
         if test_path:
             print(f"using independent test set: {test_path}")
             test_set = CompositionData(
-                data_path=test_path, fea_path=fea_path, task=task
+                data_path=test_path, fea_path=fea_path
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -100,7 +100,7 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(data_path=val_path, fea_path=fea_path, task=task)
+            val_set = CompositionData(data_path=val_path, fea_path=fea_path)
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
             if val_size == 0.0 and evaluate:
@@ -157,7 +157,8 @@ def main(
         "cry_heads": 3,
         "cry_gate": [256],
         "cry_msg": [256],
-        "out_hidden": [1024, 512, 256, 128, 64],
+        "trunk_hidden": [1024, 512],
+        "out_hidden": [256, 128, 64],
     }
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)

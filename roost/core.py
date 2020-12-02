@@ -176,10 +176,12 @@ class BaseModelClass(nn.Module, ABC):
 
         with trange(len(generator), disable=(not verbose)) as t:
             # we do not need batch_comp or batch_ids when training
-            for input_, target, _, _ in generator:
+            for inputs, target, _, _ in generator:
+
+                print(target)
 
                 # move tensors to GPU
-                input_ = (tensor.to(self.device) for tensor in input_)
+                inputs = (tensor.to(self.device) for tensor in inputs)
 
                 if self.task == "regression":
                     # normalize target if needed
@@ -189,7 +191,7 @@ class BaseModelClass(nn.Module, ABC):
                     target = target.to(self.device)
 
                 # compute output
-                output = self(*input_)
+                output = self(*inputs)
 
                 if self.task == "regression":
                     if self.robust:
@@ -209,8 +211,8 @@ class BaseModelClass(nn.Module, ABC):
                         logits = sampled_softmax(output, log_std)
                         loss = criterion(torch.log(logits), target.squeeze(1))
                     else:
-                        loss = criterion(output, target.squeeze(1))
                         logits = softmax(output, dim=1)
+                        loss = criterion(output, target.squeeze(1))
 
                     # classification metrics from sklearn need numpy arrays
                     metric_meter.update(
@@ -237,14 +239,14 @@ class BaseModelClass(nn.Module, ABC):
         test_ids = []
         test_comp = []
         test_targets = []
-        test_output = []
+        test_outputs = []
 
         # Ensure model is in evaluation mode
         self.eval()
 
         with torch.no_grad():
             with trange(len(generator), disable=(not verbose)) as t:
-                for input_, target, batch_comp, batch_ids in generator:
+                for input_, targets, batch_comp, batch_ids in generator:
 
                     # move tensors to device (GPU or CPU)
                     input_ = (tensor.to(self.device) for tensor in input_)
@@ -255,16 +257,18 @@ class BaseModelClass(nn.Module, ABC):
                     # collect the model outputs
                     test_ids += batch_ids
                     test_comp += batch_comp
-                    test_targets.append(target)
-                    test_output.append(output)
+                    test_targets.append(targets)
+                    test_outputs.append(output)
 
                     t.update()
 
         return (
             test_ids,
             test_comp,
-            torch.cat(test_targets, dim=0).view(-1).numpy(),
-            torch.cat(test_output, dim=0),
+            # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
+            # for multitask learning
+            (torch.cat(test_t, dim=0).view(-1).numpy() for test_t in zip(*test_targets)),
+            (torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
         )
 
     def featurise(self, generator):
@@ -288,7 +292,7 @@ class BaseModelClass(nn.Module, ABC):
 
                 input_ = (tensor.to(self.device) for tensor in input_)
 
-                output = self.material_nn(*input_).cpu().numpy()
+                output = self.trunk_nn(self.material_nn(*input_)).cpu().numpy()
                 features.append(output)
 
         return np.vstack(features)
