@@ -130,7 +130,7 @@ def main(
     }
 
     setup_params = {
-        "loss": loss,
+        # "loss": loss,
         "optim": optim,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
@@ -145,7 +145,8 @@ def main(
     }
 
     model_params = {
-        "task": task,
+        "tasks": dataset.tasks,
+        "target_names": dataset.targets,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
@@ -160,6 +161,8 @@ def main(
         "trunk_hidden": [1024, 512],
         "out_hidden": [256, 128, 64],
     }
+
+    loss_dict = {"Eg": ("regression", "L1")}
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)
 
@@ -183,6 +186,7 @@ def main(
             setup_params=setup_params,
             restart_params=restart_params,
             model_params=model_params,
+            loss_dict=loss_dict,
         )
 
     if evaluate:

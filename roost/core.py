@@ -18,7 +18,7 @@ class BaseModelClass(nn.Module, ABC):
     A base class for models.
     """
 
-    def __init__(self, task, n_targets, robust, device, epoch=1, best_val_score=None):
+    def __init__(self, tasks, target_names, n_targets, robust, device, epoch=1, best_val_score=None):
         """
         Args:
             task (str): "regression" or "classification"
@@ -28,7 +28,8 @@ class BaseModelClass(nn.Module, ABC):
             best_val_score (float): validation score to use for early stopping
         """
         super().__init__()
-        self.task = task
+        self.tasks = tasks
+        self.target_names = target_names
         self.robust = robust
         self.device = device
         self.epoch = epoch
@@ -44,8 +45,8 @@ class BaseModelClass(nn.Module, ABC):
         optimizer,
         scheduler,
         epochs,
-        criterion,
-        normalizer,
+        criterion_dict,
+        normalizer_dict,
         model_name,
         run_id,
         checkpoint=True,
@@ -64,9 +65,9 @@ class BaseModelClass(nn.Module, ABC):
                 # Training
                 t_loss, t_metrics = self.evaluate(
                     generator=train_generator,
-                    criterion=criterion,
+                    criterion_dict=criterion_dict,
                     optimizer=optimizer,
-                    normalizer=normalizer,
+                    normalizer_dict=normalizer_dict,
                     action="train",
                     verbose=verbose,
                 )
@@ -92,9 +93,9 @@ class BaseModelClass(nn.Module, ABC):
                         # evaluate on validation set
                         v_loss, v_metrics = self.evaluate(
                             generator=val_generator,
-                            criterion=criterion,
+                            criterion_dict=criterion_dict,
                             optimizer=None,
-                            normalizer=normalizer,
+                            normalizer_dict=normalizer_dict,
                             action="val",
                         )
 
@@ -111,10 +112,10 @@ class BaseModelClass(nn.Module, ABC):
                             )
                         )
 
-                    if self.task == "regression":
+                    if self.tasks[0] == "regression":
                         val_score = v_metrics["MAE"]
                         is_best = val_score < self.best_val_score
-                    elif self.task == "classification":
+                    elif self.tasks[0] == "classification":
                         val_score = v_metrics["Acc"]
                         is_best = val_score > self.best_val_score
 
@@ -137,7 +138,7 @@ class BaseModelClass(nn.Module, ABC):
                         "optimizer": optimizer.state_dict(),
                         "scheduler": scheduler.state_dict(),
                     }
-                    if self.task == "regression":
+                    if self.tasks[0] == "regression":
                         checkpoint_dict.update({"normalizer": normalizer.state_dict()})
 
                     save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
@@ -154,7 +155,7 @@ class BaseModelClass(nn.Module, ABC):
             writer.close()
 
     def evaluate(
-        self, generator, criterion, optimizer, normalizer, action="train", verbose=False
+        self, generator, criterion_dict, optimizer, normalizer_dict, action="train", verbose=False
     ):
         """
         evaluate the model
@@ -167,59 +168,55 @@ class BaseModelClass(nn.Module, ABC):
         else:
             raise NameError("Only train or val allowed as action")
 
-        loss_meter = AverageMeter()
-
-        if self.task == "regression":
-            metric_meter = RegressionMetrics()
-        elif self.task == "classification":
-            metric_meter = ClassificationMetrics()
-
         with trange(len(generator), disable=(not verbose)) as t:
             # we do not need batch_comp or batch_ids when training
-            for inputs, target, _, _ in generator:
-
-                print(target)
+            for inputs, targets, _, _ in generator:
 
                 # move tensors to GPU
                 inputs = (tensor.to(self.device) for tensor in inputs)
 
-                if self.task == "regression":
-                    # normalize target if needed
-                    target_norm = normalizer.norm(target)
-                    target_norm = target_norm.to(self.device)
-                elif self.task == "classification":
-                    target = target.to(self.device)
+                targets = (n.norm(tar) if n is not None else tar
+                           for tar, n in zip(targets, normalizer_dict.values()))
+
+                targets = (target.to(self.device) for target in targets)
 
                 # compute output
-                output = self(*inputs)
+                outputs = self(*inputs)
 
-                if self.task == "regression":
-                    if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        loss = criterion(output, log_std, target_norm)
+                metrics = {key: {k: [] for k in ["MAE", "RMSE", "Acc", "F1", "loss"]} for key in self.target_names}
+
+                for tar_id, output, target in zip(self.target_names, outputs, targets):
+                    task, criterion = criterion_dict[tar_id]
+
+                    if task == "regression":
+                        if self.robust:
+                            output, log_std = output.chunk(2, dim=1)
+                            loss = criterion(output, log_std, target)
+                        else:
+                            loss = criterion(output, target)
+
+                        pred = normalizer_dict[tar_id].denorm(output.data.cpu())
+                        target = normalizer_dict[tar_id].denorm(target.data.cpu())
+                        metrics[tar_id]['MAE'].append((pred - target).mean())
+                        metrics[tar_id]['RMSE'].append((pred - target).pow(2).mean().sqrt())
+
+                    elif task == "classification":
+                        if self.robust:
+                            output, log_std = output.chunk(2, dim=1)
+                            logits = sampled_softmax(output, log_std)
+                            loss = criterion(torch.log(logits), target.squeeze(1))
+                        else:
+                            logits = softmax(output, dim=1)
+                            loss = criterion(output, target.squeeze(1))
+
+                        # classification metrics from sklearn need numpy arrays
+                        metrics[tar_id]['Acc'].append(accuracy_score(target, np.argmax(pred, axis=1)))
+                        metrics[tar_id]['F1'].append(f1_score(target, np.argmax(pred, axis=1), average="weighted"))
+
                     else:
-                        loss = criterion(output, target_norm)
+                        raise ValueError(f"invalid task: {task}")
 
-                    pred = normalizer.denorm(output.data.cpu())
-                    metric_meter.update(
-                        pred.data.cpu().numpy(), target.data.cpu().numpy()
-                    )
-
-                elif self.task == "classification":
-                    if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        logits = sampled_softmax(output, log_std)
-                        loss = criterion(torch.log(logits), target.squeeze(1))
-                    else:
-                        logits = softmax(output, dim=1)
-                        loss = criterion(output, target.squeeze(1))
-
-                    # classification metrics from sklearn need numpy arrays
-                    metric_meter.update(
-                        logits.data.cpu().numpy(), target.data.cpu().numpy()
-                    )
-
-                loss_meter.update(loss.data.cpu().item())
+                    metrics[tar_id]['loss'].append(loss.cpu().item())
 
                 if action == "train":
                     # compute gradient and take an optimizer step
@@ -228,6 +225,8 @@ class BaseModelClass(nn.Module, ABC):
                     optimizer.step()
 
                 t.update()
+
+        metrics = {key: np.array(val).mean() for key, val in metrics.items() if val}
 
         return loss_meter.avg, metric_meter.metric_dict
 
@@ -347,6 +346,10 @@ class RegressionMetrics(object):
     def metric_dict(self):
         return {"MAE": self.mae_meter.avg, "RMSE": self.rmse_meter.avg}
 
+    def reset(self):
+        self.rmse_meter.reset()
+        self.mae_meter.reset()
+
 
 class ClassificationMetrics(object):
     """Computes and stores average metrics for classification tasks"""
@@ -365,6 +368,10 @@ class ClassificationMetrics(object):
     @property
     def metric_dict(self):
         return {"Acc": self.acc_meter.avg, "F1": self.fscore_meter.avg}
+
+    def reset(self):
+        self.acc_meter.reset()
+        self.fscore_meter.reset()
 
 
 class Normalizer(object):

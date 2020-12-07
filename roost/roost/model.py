@@ -23,7 +23,7 @@ class Roost(BaseModelClass):
 
     def __init__(
         self,
-        task,
+        tasks,
         robust,
         n_targets,
         elem_emb_len,
@@ -46,7 +46,7 @@ class Roost(BaseModelClass):
             # assert len(out_hidden) == len(n_targets),
             #   'out_hidden-n_targets length mismatch'
 
-        super().__init__(task=task, robust=robust, n_targets=n_targets, **kwargs)
+        super().__init__(tasks=tasks, robust=robust, n_targets=n_targets, **kwargs)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -64,7 +64,7 @@ class Roost(BaseModelClass):
 
         self.model_params.update(
             {
-                "task": task,
+                "tasks": tasks,
                 "robust": robust,
                 "n_targets": n_targets,
                 "out_hidden": out_hidden,

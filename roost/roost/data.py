@@ -31,6 +31,7 @@ class CompositionData(Dataset):
 
         self.inputs = inputs
         self.targets = targets
+        self.tasks = tasks
         self.identifiers = identifiers
 
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
