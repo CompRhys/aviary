@@ -85,14 +85,18 @@ This will output the various command-line flags that can be used to control the 
 
 If you use this code please cite our work for which this model was built:
 
-[Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://arxiv.org/abs/1910.00617)
+[Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
 
 ```tex
-@article{goodall2019predicting,
+@article{goodall2020predicting,
   title={Predicting materials properties without crystal structure: Deep representation learning from stoichiometry},
   author={Goodall, Rhys EA and Lee, Alpha A},
-  journal={arXiv preprint arXiv:1910.00617},
-  year={2019}
+  journal={Nature Communications},
+  volume={11},
+  number={1},
+  pages={1--9},
+  year={2020},
+  publisher={Nature Publishing Group}
 }
 ```
 
