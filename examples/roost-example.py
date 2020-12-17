@@ -121,6 +121,11 @@ def main(
 
         train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
 
+    print(f"Training Set {len(train_set)}")
+    if val_set is not None:
+        print(f"Validation Set {len(val_set)}")
+    print(f"Test Set {len(test_set)}")
+
     data_params = {
         "batch_size": batch_size,
         "num_workers": workers,
@@ -145,8 +150,9 @@ def main(
     }
 
     model_params = {
-        "tasks": dataset.tasks,
-        "target_names": dataset.targets,
+        "task_dict": dataset.task_dict,
+        # "tasks": dataset.tasks,
+        # "target_names": dataset.targets,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,

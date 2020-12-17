@@ -36,7 +36,6 @@ def init_model(
     transfer=None,
 ):
 
-    tasks = model_params["tasks"]
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
 
@@ -68,8 +67,6 @@ def init_model(
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        model.tasks = tasks
-        model.model_params["tasks"] = tasks
         model.robust = robust
         model.model_params["robust"] = robust
         model.model_params["n_targets"] = n_targets
@@ -268,10 +265,10 @@ def train_ensemble(
         else:
             writer = None
 
-        if (val_set is not None) and (model.best_val_score is None):
+        if (val_set is not None) and (model.best_val_scores is None):
             print("Getting Validation Baseline")
             with torch.no_grad():
-                _, v_metrics = model.evaluate(
+                v_metrics = model.evaluate(
                     generator=val_generator,
                     criterion_dict=criterion_dict,
                     optimizer=None,
@@ -279,13 +276,17 @@ def train_ensemble(
                     action="val",
                     verbose=True,
                 )
-                if model.task == "regression":
-                    val_score = v_metrics["MAE"]
-                    print(f"Validation Baseline: MAE {val_score:.3f}\n")
-                elif model.task == "classification":
-                    val_score = v_metrics["Acc"]
-                    print(f"Validation Baseline: Acc {val_score:.3f}\n")
-                model.best_val_score = val_score
+
+                val_score = {}
+
+                for name, task in model.task_dict.items():
+                    if task == "regression":
+                        val_score[name] = v_metrics[name]["MAE"]
+                        print(f"Validation Baseline - {name}: MAE {val_score[name]:.3f}\n")
+                    elif task == "classification":
+                        val_score[name] = v_metrics[name]["Acc"]
+                        print(f"Validation Baseline - {name}: Acc {val_score[name]:.3f}\n")
+                model.best_val_scores = val_score
 
         model.fit(
             train_generator=train_generator,

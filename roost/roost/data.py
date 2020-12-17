@@ -20,18 +20,16 @@ class CompositionData(Dataset):
         self,
         data_path,
         fea_path,
-        tasks=["regression"],
+        tasks={"Eg": "regression"},
         inputs=["composition"],
-        targets=["Eg"],
         identifiers=["id", "composition"],
     ):
         """
         """
-        assert len(tasks) == len(targets), "every task needs a given target"
 
         self.inputs = inputs
-        self.targets = targets
-        self.tasks = tasks
+        self.task_dict = tasks
+        self.targets = list(tasks.keys())
         self.identifiers = identifiers
 
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
@@ -42,8 +40,6 @@ class CompositionData(Dataset):
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.elem_features = LoadFeaturiser(fea_path)
         self.elem_emb_len = self.elem_features.embedding_size
-
-        self.task_dict = dict(zip(targets, tasks))
 
         self.n_targets = []
         for target in self.targets:

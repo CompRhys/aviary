@@ -18,7 +18,7 @@ class BaseModelClass(nn.Module, ABC):
     A base class for models.
     """
 
-    def __init__(self, tasks, target_names, n_targets, robust, device, epoch=1, best_val_score=None):
+    def __init__(self, task_dict, robust, device, epoch=1, best_val_scores=None):
         """
         Args:
             task (str): "regression" or "classification"
@@ -28,12 +28,12 @@ class BaseModelClass(nn.Module, ABC):
             best_val_score (float): validation score to use for early stopping
         """
         super().__init__()
-        self.tasks = tasks
-        self.target_names = target_names
+        self.task_dict = task_dict
+        self.target_names = list(task_dict.keys())
         self.robust = robust
         self.device = device
         self.epoch = epoch
-        self.best_val_score = best_val_score
+        self.best_val_scores = best_val_scores
         self.es_patience = 0
 
         self.model_params = {}
@@ -63,7 +63,7 @@ class BaseModelClass(nn.Module, ABC):
             for epoch in range(start_epoch, start_epoch + epochs):
                 self.epoch += 1
                 # Training
-                t_loss, t_metrics = self.evaluate(
+                t_metrics = self.evaluate(
                     generator=train_generator,
                     criterion_dict=criterion_dict,
                     optimizer=optimizer,
@@ -73,25 +73,26 @@ class BaseModelClass(nn.Module, ABC):
                 )
 
                 if writer is not None:
-                    writer.add_scalar("train/loss", t_loss, epoch + 1)
-                    for metric, val in t_metrics.items():
-                        writer.add_scalar(f"train/{metric}", val, epoch + 1)
+                    for task, metrics in t_metrics.items():
+                        for metric, val in metrics.items():
+                            writer.add_scalar(f"{task}/train/{metric}", val, epoch + 1)
 
                 if verbose:
                     print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
-                    print(
-                        f"Train      : Loss {t_loss:.4f}\t"
-                        + "".join(
-                            [f"{key} {val:.3f}\t" for key, val in t_metrics.items()]
+                    for task, metrics in t_metrics.items():
+                        print(
+                            f"Train \t\t: {task} - "
+                            + "".join(
+                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
+                            )
                         )
-                    )
 
                 # Validation
                 is_best = False
                 if val_generator is not None:
                     with torch.no_grad():
                         # evaluate on validation set
-                        v_loss, v_metrics = self.evaluate(
+                        v_metrics = self.evaluate(
                             generator=val_generator,
                             criterion_dict=criterion_dict,
                             optimizer=None,
@@ -100,27 +101,37 @@ class BaseModelClass(nn.Module, ABC):
                         )
 
                     if writer is not None:
-                        writer.add_scalar("validation/loss", v_loss, epoch + 1)
-                        for metric, val in v_metrics.items():
-                            writer.add_scalar(f"validation/{metric}", val, epoch + 1)
+                        for task, metrics in v_metrics.items():
+                            for metric, val in metrics.items():
+                                writer.add_scalar(f"{task}/validation/{metric}", val, epoch + 1)
 
                     if verbose:
-                        print(
-                            f"Validation : Loss {v_loss:.4f}\t"
-                            + "".join(
-                                [f"{key} {val:.3f}\t" for key, val in v_metrics.items()]
+                        for task, metrics in v_metrics.items():
+                            print(
+                                f"Validation \t: {task} - "
+                                + "".join(
+                                    [f"{key} {val:.3f}\t" for key, val in metrics.items()]
+                                )
                             )
-                        )
 
-                    if self.tasks[0] == "regression":
-                        val_score = v_metrics["MAE"]
-                        is_best = val_score < self.best_val_score
-                    elif self.tasks[0] == "classification":
-                        val_score = v_metrics["Acc"]
-                        is_best = val_score > self.best_val_score
+                    # TODO test all tasks to see if they are best, save a best model if any is best.
+                    # TODO what are the costs of this approach is could involve saving a lot of models?
 
-                    if is_best:
-                        self.best_val_score = val_score
+                    is_best = []
+
+                    for name in self.best_val_scores:
+                        if self.task_dict[name] == "regression":
+                            if v_metrics[name]["MAE"] < self.best_val_scores[name]:
+                                self.best_val_scores[name] = v_metrics[name]["MAE"]
+                                is_best.append(True)
+                            is_best.append(False)
+                        elif self.task_dict[name] == "classification":
+                            if v_metrics[name]["Acc"] > self.best_val_scores[name]:
+                                self.best_val_scores[name] = v_metrics[name]["Acc"]
+                                is_best.append(True)
+                            is_best.append(False)
+
+                    if any(is_best):
                         self.es_patience = 0
                     else:
                         self.es_patience += 1
@@ -134,14 +145,14 @@ class BaseModelClass(nn.Module, ABC):
                         "model_params": self.model_params,
                         "state_dict": self.state_dict(),
                         "epoch": self.epoch,
-                        "best_val_score": self.best_val_score,
+                        "best_val_score": self.best_val_scores,
                         "optimizer": optimizer.state_dict(),
                         "scheduler": scheduler.state_dict(),
+                        "normalizer_dict": {task: n.state_dict() for task, n in normalizer_dict.items()}
                     }
-                    if self.tasks[0] == "regression":
-                        checkpoint_dict.update({"normalizer": normalizer.state_dict()})
 
-                    save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
+                    save_checkpoint(checkpoint_dict, False, model_name, run_id)
+                    # save_checkpoint(checkpoint_dict, is_best, model_name, run_id)
 
                 scheduler.step()
 
@@ -183,7 +194,11 @@ class BaseModelClass(nn.Module, ABC):
                 # compute output
                 outputs = self(*inputs)
 
-                metrics = {key: {k: [] for k in ["MAE", "RMSE", "Acc", "F1", "loss"]} for key in self.target_names}
+                metrics = {
+                    key: {
+                        k: [] for k in ["Loss", "MAE", "RMSE", "Acc", "F1"]
+                    } for key in self.task_dict
+                }
 
                 for tar_id, output, target in zip(self.target_names, outputs, targets):
                     task, criterion = criterion_dict[tar_id]
@@ -197,7 +212,7 @@ class BaseModelClass(nn.Module, ABC):
 
                         pred = normalizer_dict[tar_id].denorm(output.data.cpu())
                         target = normalizer_dict[tar_id].denorm(target.data.cpu())
-                        metrics[tar_id]['MAE'].append((pred - target).mean())
+                        metrics[tar_id]['MAE'].append((pred - target).abs().mean())
                         metrics[tar_id]['RMSE'].append((pred - target).pow(2).mean().sqrt())
 
                     elif task == "classification":
@@ -210,13 +225,13 @@ class BaseModelClass(nn.Module, ABC):
                             loss = criterion(output, target.squeeze(1))
 
                         # classification metrics from sklearn need numpy arrays
-                        metrics[tar_id]['Acc'].append(accuracy_score(target, np.argmax(pred, axis=1)))
-                        metrics[tar_id]['F1'].append(f1_score(target, np.argmax(pred, axis=1), average="weighted"))
+                        metrics[tar_id]['Acc'].append(accuracy_score(target, np.argmax(logits, axis=1)))
+                        metrics[tar_id]['F1'].append(f1_score(target, np.argmax(logits, axis=1), average="weighted"))
 
                     else:
                         raise ValueError(f"invalid task: {task}")
 
-                    metrics[tar_id]['loss'].append(loss.cpu().item())
+                    metrics[tar_id]['Loss'].append(loss.cpu().item())
 
                 if action == "train":
                     # compute gradient and take an optimizer step
@@ -226,9 +241,9 @@ class BaseModelClass(nn.Module, ABC):
 
                 t.update()
 
-        metrics = {key: np.array(val).mean() for key, val in metrics.items() if val}
+        metrics = {key: {k: np.array(v).mean() for k, v in d.items() if v} for key, d in metrics.items()}
 
-        return loss_meter.avg, metric_meter.metric_dict
+        return metrics
 
     def predict(self, generator, verbose=False):
         """
@@ -239,7 +254,6 @@ class BaseModelClass(nn.Module, ABC):
         test_comp = []
         test_targets = []
         test_outputs = []
-
         # Ensure model is in evaluation mode
         self.eval()
 
@@ -471,8 +485,37 @@ def RobustL2Loss(output, log_std, target):
     Robust L2 loss using a gaussian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
+    # NOTE can we scale log_std by something sensible to improve the OOD behaviour?
     loss = 0.5 * torch.pow(output - target, 2.0) * torch.exp(-2.0 * log_std) + log_std
     return torch.mean(loss)
+
+
+def EvidentialL2Loss(output, target, coeff=1.0):
+    # NOTE how is this hyper-parameter selected?
+    output, v, alpha, beta = output.chunk(4, dim=1)
+    loss_nll = NIG_NLL(target, output, v, alpha, beta)
+    loss_reg = NIG_Reg(target, output, v, alpha, beta)
+    return loss_nll + coeff * loss_reg
+
+
+def NIG_NLL(target, output, v, alpha, beta):
+    twoBlambda = 2*beta*(1+v)
+
+    nll = 0.5*torch.log(np.pi/v)  \
+        - alpha*torch.log(twoBlambda)  \
+        + (alpha+0.5) * torch.log(v*(target-output)**2 + twoBlambda)  \
+        + torch.lgamma(alpha)  \
+        - torch.lgamma(alpha+0.5)
+
+    return torch.mean(nll)
+
+
+def NIG_Reg(y, gamma, v, alpha,):
+    error = torch.abs(y-gamma)
+    evi = 2*v+(alpha)
+    reg = error*evi
+
+    return torch.mean(reg)
 
 
 def sampled_softmax(pre_logits, log_std, samples=10):
