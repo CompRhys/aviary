@@ -26,7 +26,7 @@ pip install scikit-learn tqdm pandas tensorboard
 
 You may encounter issues getting the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter).
 
-The was developed and tested on Linux Mint 19.1 Tessa. The code should work on with other Operating Systems but it has not been tested for such use.  
+The was developed and tested on Linux Mint 19.1 Tessa. The code should work on with other Operating Systems but it has not been tested for such use.
 
 ## Roost Setup
 
@@ -85,7 +85,7 @@ This will output the various command-line flags that can be used to control the 
 
 If you use this code please cite our work for which this model was built:
 
-[Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
+Predicting materials properties without crystal structure: Deep representation learning from stoichiometry [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
 
 ```tex
 @article{goodall2020predicting,
@@ -108,7 +108,7 @@ If you have used Roost in your work please contact me and I will add your paper 
 
 ## Acknowledgements
 
-The open-source implementation of `cgcnn` available [here](https://github.com/txie-93/cgcnn) provided significant initial inspiration for how to structure this code-base.
+The we provide an open-source implementation of `cgcnn` without zero padding based on the implementation available [here](https://github.com/txie-93/cgcnn) that provided significant initial inspiration for how to structure this code-base.
 
 ## Disclaimer
 
