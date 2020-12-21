@@ -93,7 +93,6 @@ def init_model(
     elif resume:
         # TODO work out how to ensure that we are using the same optimizer
         # when resuming such that the state dictionaries do not clash.
-        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
@@ -151,7 +150,7 @@ def init_model(
 
 
 def init_losses(loss_dict, robust=False):
-    # TODO resume the normalizer
+
     criterion_dict = {}
     for target, (task, loss) in loss_dict.items():
         # Select Task and Loss Function
@@ -182,16 +181,17 @@ def init_losses(loss_dict, robust=False):
     return criterion_dict
 
 
-def init_normalizers(loss_dict, resume=False):
-    # resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
-    # print(f"Resuming training from '{resume}'")
-    # checkpoint = torch.load(resume, map_location=device)
-        # if normalizer is not None:        if normalizer is not None:
-            # normalizer.load_state_dict(checkpoint["normalizer"])
+def init_normalizers(task_dict, device, resume=False):
+    if resume:
+        checkpoint = torch.load(resume, map_location=device)
+        normalizer_dict = {}
+        for task, state_dict in checkpoint["normalizer_dict"].items():
+            normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
 
-    # TODO resume the normalizer
+        return normalizer_dict
+
     normalizer_dict = {}
-    for target, (task, loss) in loss_dict.items():
+    for target, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
             normalizer_dict[target] = None
@@ -245,7 +245,11 @@ def train_ensemble(
         )
 
         criterion_dict = init_losses(loss_dict, model_params["robust"])
-        normalizer_dict = init_normalizers(loss_dict)
+        normalizer_dict = init_normalizers(
+            model.task_dict,
+            setup_params["device"],
+            restart_params["resume"]
+        )
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
@@ -303,7 +307,8 @@ def train_ensemble(
         )
 
 
-def results_regression(
+@torch.no_grad()
+def results_multitask(
     model_class,
     model_name,
     run_id,
@@ -311,12 +316,20 @@ def results_regression(
     test_set,
     data_params,
     robust,
+    task_dict,
     device,
     eval_type="checkpoint",
+    print_results=True,
+    save_results=True,
 ):
     """
     take an ensemble of models and evaluate their performance on the test set
     """
+
+    assert print_results or save_results, (
+        "Evaluating Model pointless if both 'print_results' and "
+        "'save_results' are False."
+    )
 
     print(
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
@@ -326,9 +339,18 @@ def results_regression(
 
     test_generator = DataLoader(test_set, **data_params)
 
-    y_ensemble = np.zeros((ensemble_folds, len(test_set)))
-    if robust:
-        y_ale = np.zeros((ensemble_folds, len(test_set)))
+    results_dict = {n: {} for n in task_dict}
+    for name, task in task_dict.items():
+        if task == "regression":
+            results_dict[name]["pred"] = np.zeros((ensemble_folds, len(test_set)))
+            if robust:
+                results_dict[name]["ale"] = np.zeros((ensemble_folds, len(test_set)))
+
+        elif task == "classification":
+            results_dict[name]["logits"] = []
+            results_dict[name]["pre-logits"] = []
+            if robust:
+                results_dict[name]["pre-logits_ale"] = []
 
     for j in range(ensemble_folds):
 
@@ -341,38 +363,84 @@ def results_regression(
 
         assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
         checkpoint = torch.load(resume, map_location=device)
-        checkpoint["model_params"]["robust"]
+
         assert (
             checkpoint["model_params"]["robust"] == robust
         ), f"robustness of checkpoint '{resume}' is not {robust}"
 
-        model = model_class(**checkpoint["model_params"], device=device,)
+        assert (
+            checkpoint["model_params"]["task_dict"] == task_dict
+        ), f"task_dict of checkpoint '{resume}' does not match current task_dict"
+
+        model = model_class(**checkpoint["model_params"], device=device)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        normalizer = Normalizer()
-        normalizer.load_state_dict(checkpoint["normalizer"])
+        normalizer_dict = {}
+        for task, state_dict in checkpoint["normalizer_dict"].items():
+            normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
 
-        with torch.no_grad():
-            idx, comp, y_test, output = model.predict(generator=test_generator,)
+        idx, comp, y_test, output = model.predict(generator=test_generator)
 
-        if robust:
-            mean, log_std = output.chunk(2, dim=1)
-            pred = normalizer.denorm(mean.data.cpu())
-            ale_std = torch.exp(log_std).data.cpu() * normalizer.std
-            y_ale[j, :] = ale_std.view(-1).numpy()
-        else:
-            pred = normalizer.denorm(output.data.cpu())
+        # TODO should output also be a dictionary?
 
-        y_ensemble[j, :] = pred.view(-1).numpy()
+        for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
+            if task == "regression":
+                if robust:
+                    mean, log_std = pred.chunk(2, dim=1)
+                    pred = normalizer_dict[name].denorm(mean.data.cpu())
+                    ale_std = torch.exp(log_std).data.cpu() * normalizer_dict[name].std
+                    results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()
+                else:
+                    pred = normalizer_dict[name].denorm(pred.data.cpu())
 
-    res = y_ensemble - y_test
+                results_dict[name]["pred"][j, :] = pred.view(-1).numpy()
+
+            elif task == "classification":
+                if model.robust:
+                    mean, log_std = pred.chunk(2, dim=1)
+                    logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
+                    pre_logits = mean.data.cpu().numpy()
+                    pre_logits_std = torch.exp(log_std).data.cpu().numpy()
+                    results_dict[name]["pre-logits-ale"].append(pre_logits_std)
+                else:
+                    pre_logits = pred.data.cpu().numpy()
+
+                logits = softmax(pre_logits, axis=1)
+
+                results_dict[name]["pre-logits"].append(pre_logits)
+                results_dict[name]["logits"].append(logits)
+
+            results_dict[name]["target"] = target
+
+    if print_results:
+        for name, task in task_dict.items():
+            print(f"\nTask: '{name}' on Test Set")
+            if task == "regression":
+                print_metrics_regression(**results_dict[name])
+            elif task == "classification":
+                print_metrics_classification(**results_dict[name])
+
+    if save_results:
+        save_results_dict(idx, comp, results_dict, model_name)
+
+
+def print_metrics_regression(target, pred, **kwargs):
+    """print out metrics for a regression task
+
+    Args:
+        target (ndarray(n_test)): targets for regression task
+        pred (ndarray(n_ensemble, n_test)): model predictions
+        kwargs: unused entries from the results dictionary
+    """
+    ensemble_folds = pred.shape[0]
+    res = pred - target
     mae = np.mean(np.abs(res), axis=1)
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
     r2 = r2_score(
-        np.repeat(y_test[:, np.newaxis], ensemble_folds, axis=1),
-        y_ensemble.T,
+        np.repeat(target[:, np.newaxis], ensemble_folds, axis=1),
+        pred.T,
         multioutput="raw_values",
     )
 
@@ -386,132 +454,57 @@ def results_regression(
     rmse_std = np.std(rmse)/np.sqrt(rmse.shape[0])
 
     if ensemble_folds == 1:
-        print("\nModel Performance Metrics:")
+        print("Model Performance Metrics:")
         print("R2 Score: {:.4f} ".format(r2_avg))
         print("MAE: {:.4f}".format(mae_avg))
         print("RMSE: {:.4f}".format(rmse_avg))
     else:
-
-        print("\nModel Performance Metrics:")
+        print("Model Performance Metrics:")
         print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
         print(f"MAE: {mae_avg:.4f} +/- {mae_std:.4f}")
         print(f"RMSE: {rmse_avg:.4f} +/- {rmse_std:.4f}")
 
         # calculate metrics and errors with associated errors for ensembles
-        y_ens = np.mean(y_ensemble, axis=0)
+        y_ens = np.mean(pred, axis=0)
 
-        mae_ens = np.abs(y_test - y_ens).mean()
-        mse_ens = np.square(y_test - y_ens).mean()
+        mae_ens = np.abs(target - y_ens).mean()
+        mse_ens = np.square(target - y_ens).mean()
         rmse_ens = np.sqrt(mse_ens)
 
-        r2_ens = r2_score(y_test, y_ens)
+        r2_ens = r2_score(target, y_ens)
 
         print("\nEnsemble Performance Metrics:")
         print(f"R2 Score : {r2_ens:.4f} ")
         print(f"MAE  : {mae_ens:.4f}")
         print(f"RMSE : {rmse_ens:.4f}")
 
-    core = {"id": idx, "composition": comp, "target": y_test}
-    results = {f"pred_{n_ens}": val for (n_ens, val) in enumerate(y_ensemble)}
-    if model.robust:
-        ale = {f"ale_{n_ens}": val for (n_ens, val) in enumerate(y_ale)}
-        results.update(ale)
 
-    df = pd.DataFrame({**core, **results})
+def print_metrics_classification(target, logits, **kwargs):
+    """print out metrics for a classification task
 
-    if ensemble_folds == 1:
-        df.to_csv(
-            index=False,
-            path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
-        )
-    else:
-        df.to_csv(
-            index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
-        )
-
-    return r2_avg, mae_avg, rmse_avg
-
-
-def results_classification(
-    model_class,
-    model_name,
-    run_id,
-    ensemble_folds,
-    test_set,
-    data_params,
-    robust,
-    device,
-    eval_type="checkpoint",
-):
+    Args:
+        target (ndarray(n_test)): categorical encoding of the tasks
+        logits (ndarray(n_test, n_targets)): logits predicted by the model
+        kwargs: unused entries from the results dictionary
     """
-    take an ensemble of models and evaluate their performance on the test set
-    """
+    acc = np.zeros(len(logits))
+    roc_auc = np.zeros(len(logits))
+    precision = np.zeros(len(logits))
+    recall = np.zeros(len(logits))
+    fscore = np.zeros(len(logits))
 
-    print(
-        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        "------------Evaluate model on Test Set------------\n"
-        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-    )
+    for y_logit in logits:
 
-    test_generator = DataLoader(test_set, **data_params)
+        target_ohe = np.zeros_like(y_logit)
+        target_ohe[np.arange(target.size), target] = 1
 
-    y_pre_logits = []
-    y_logits = []
-    if robust:
-        y_pre_ale = []
-
-    acc = np.zeros((ensemble_folds))
-    roc_auc = np.zeros((ensemble_folds))
-    precision = np.zeros((ensemble_folds))
-    recall = np.zeros((ensemble_folds))
-    fscore = np.zeros((ensemble_folds))
-
-    for j in range(ensemble_folds):
-
-        if ensemble_folds == 1:
-            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
-            print("Evaluating Model")
-        else:
-            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
-            print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
-
-        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
-        checkpoint = torch.load(resume, map_location=device)
-        assert (
-            checkpoint["model_params"]["robust"] == robust
-        ), f"robustness of checkpoint '{resume}' is not {robust}"
-
-        model = model_class(**checkpoint["model_params"], device=device,)
-        model.to(device)
-        model.load_state_dict(checkpoint["state_dict"])
-
-        with torch.no_grad():
-            idx, comp, y_test, output = model.predict(generator=test_generator)
-
-        if model.robust:
-            mean, log_std = output.chunk(2, dim=1)
-            logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
-            pre_logits = mean.data.cpu().numpy()
-            pre_logits_std = torch.exp(log_std).data.cpu().numpy()
-            y_pre_ale.append(pre_logits_std)
-        else:
-            pre_logits = output.data.cpu().numpy()
-
-        logits = softmax(pre_logits, axis=1)
-
-        y_pre_logits.append(pre_logits)
-        y_logits.append(logits)
-
-        y_test_ohe = np.zeros_like(pre_logits)
-        y_test_ohe[np.arange(y_test.size), y_test] = 1
-
-        acc[j] = accuracy_score(y_test, np.argmax(logits, axis=1))
-        roc_auc[j] = roc_auc_score(y_test_ohe, logits)
+        acc[j] = accuracy_score(target, np.argmax(y_logit, axis=1))
+        roc_auc[j] = roc_auc_score(target_ohe, y_logit)
         precision[j], recall[j], fscore[j] = precision_recall_fscore_support(
-            y_test, np.argmax(logits, axis=1), average="weighted"
+            target, np.argmax(logits[j], axis=1), average="weighted"
         )[:3]
 
-    if ensemble_folds == 1:
+    if len(logits) == 1:
         print("\nModel Performance Metrics:")
         print("Accuracy : {:.4f} ".format(acc[0]))
         print("ROC-AUC  : {:.4f}".format(roc_auc[0]))
@@ -525,8 +518,8 @@ def results_classification(
         roc_auc_avg = np.mean(roc_auc)
         roc_auc_std = np.std(roc_auc)/np.sqrt(roc_auc.shape[0])
 
-        precision_avg = np.mean(precision)
-        precision_std = np.std(precision)/np.sqrt(precision.shape[0])
+        prec_avg = np.mean(precision)
+        prec_std = np.std(precision)/np.sqrt(precision.shape[0])
 
         recall_avg = np.mean(recall)
         recall_std = np.std(recall)/np.sqrt(recall.shape[0])
@@ -537,55 +530,74 @@ def results_classification(
         print("\nModel Performance Metrics:")
         print(f"Accuracy : {acc_avg:.4f} +/- {acc_std:.4f}")
         print(f"ROC-AUC  : {roc_auc_avg:.4f} +/- {roc_auc_std:.4f}")
-        print(f"Weighted Precision : {precision_avg:.4f} +/- {precision_std:.4f}")
+        print(f"Weighted Precision : {prec_avg:.4f} +/- {prec_std:.4f}")
         print(f"Weighted Recall    : {recall_avg:.4f} +/- {recall_std:.4f}")
         print(f"Weighted F-score   : {fscore_avg:.4f} +/- {fscore_std:.4f}")
 
         # calculate metrics and errors with associated errors for ensembles
-        ens_logits = np.mean(y_logits, axis=0)
+        ens_logits = np.mean(logits, axis=0)
 
-        y_test_ohe = np.zeros_like(ens_logits)
-        y_test_ohe[np.arange(y_test.size), y_test] = 1
+        target_ohe = np.zeros_like(ens_logits)
+        target_ohe[np.arange(target.size), target] = 1
 
-        ens_acc = accuracy_score(y_test, np.argmax(ens_logits, axis=1))
-        ens_roc_auc = roc_auc_score(y_test_ohe, ens_logits)
-        ens_precision, ens_recall, ens_fscore = precision_recall_fscore_support(
-            y_test, np.argmax(ens_logits, axis=1), average="weighted"
+        ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
+        ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
+        ens_prec, ens_recall, ens_fscore = precision_recall_fscore_support(
+            target, np.argmax(ens_logits, axis=1), average="weighted"
         )[:3]
 
         print("\nEnsemble Performance Metrics:")
         print(f"Accuracy : {ens_acc:.4f} ")
         print(f"ROC-AUC  : {ens_roc_auc:.4f}")
-        print(f"Weighted Precision : {ens_precision:.4f}")
+        print(f"Weighted Precision : {ens_prec:.4f}")
         print(f"Weighted Recall    : {ens_recall:.4f}")
         print(f"Weighted F-score   : {ens_fscore:.4f}")
 
-    # NOTE we save pre_logits rather than logits due to fact that with the
-    # hetroskedastic setup we want to be able to sample from the gaussian
-    # distributed pre_logits we parameterise.
-    core = {"id": idx, "composition": comp, "target": y_test}
 
+def save_results_dict(idx, comp, results_dict, model_name):
+    """save the results to a file after model evaluation
+
+    Args:
+        idx ([str]): list of unique identifiers
+        comp ([str]): list of compositions
+        results_dict ({name: {col: data}}): nested dictionary of results
+        model_name (str): [description]
+    """
+    core = {"id": idx, "composition": comp}
     results = {}
-    for n_ens, y_pre_logit in enumerate(y_pre_logits):
-        pred_dict = {
-            f"class-{lab}-pred_{n_ens}": val for lab, val in enumerate(y_pre_logit.T)
-        }
-        results.update(pred_dict)
-        if model.robust:
-            ale_dict = {
-                f"class-{lab}-ale_{n_ens}": val
-                for lab, val in enumerate(y_pre_ale[n_ens].T)
-            }
-            results.update(ale_dict)
+
+    for name in results_dict:
+        for col, data in results_dict[name].items():
+
+            # NOTE we save pre_logits rather than logits due to fact
+            # that with the hetroskedastic setup we want to be able to
+            # sample from the gaussian distributed pre_logits we parameterise.
+            if "pre-logits" in col:
+                for n_ens, y_pre_logit in enumerate(data):
+                    results.update({
+                        f"{name}_{col}_c{lab}_n{n_ens}": val.ravel()
+                        for lab, val in enumerate(y_pre_logit.T)
+                    })
+
+            elif "pred" in col:
+                preds = {
+                    f"{name}_{col}_n{n_ens}": val.ravel()
+                    for (n_ens, val) in enumerate(data)
+                }
+                results.update(preds)
+
+            elif "ale" in col:  # elif so that pre-logit-ale doesn't trigger
+                results.update({
+                    f"{name}_{col}_n{n_ens}": val.ravel()
+                    for (n_ens, val) in enumerate(data)
+                })
+
+            elif col == "target":
+                results.update({f"{name}_{col}": data})
 
     df = pd.DataFrame({**core, **results})
 
-    if ensemble_folds == 1:
-        df.to_csv(
-            index=False,
-            path_or_buf=(f"results/test_results_{model_name}_r-{run_id}.csv"),
-        )
-    else:
-        df.to_csv(
-            index=False, path_or_buf=(f"results/ensemble_results_{model_name}.csv")
-        )
+    df.to_csv(
+        index=False,
+        path_or_buf=(f"results/multi_results_{model_name}.csv")
+    )

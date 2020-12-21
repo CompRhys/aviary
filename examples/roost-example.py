@@ -9,8 +9,7 @@ from roost.roost.model import Roost
 from roost.roost.data import CompositionData, collate_batch
 from roost.utils import (
     train_ensemble,
-    results_regression,
-    results_classification,
+    results_multitask
 )
 
 
@@ -75,7 +74,13 @@ def main(
         "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
     )
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path)
+    task_dict = {"Eg": "regression"}
+
+    dataset = CompositionData(
+        data_path=data_path,
+        fea_path=fea_path,
+        task_dict=task_dict
+    )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -85,7 +90,9 @@ def main(
         if test_path:
             print(f"using independent test set: {test_path}")
             test_set = CompositionData(
-                data_path=test_path, fea_path=fea_path
+                data_path=test_path,
+                fea_path=fea_path,
+                task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -100,7 +107,11 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(data_path=val_path, fea_path=fea_path)
+            val_set = CompositionData(
+                data_path=val_path,
+                fea_path=fea_path,
+                task_dict=task_dict
+            )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
             if val_size == 0.0 and evaluate:
@@ -121,10 +132,6 @@ def main(
 
         train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
 
-    print(f"Training Set {len(train_set)}")
-    if val_set is not None:
-        print(f"Validation Set {len(val_set)}")
-    print(f"Test Set {len(test_set)}")
 
     data_params = {
         "batch_size": batch_size,
@@ -135,13 +142,15 @@ def main(
     }
 
     setup_params = {
-        # "loss": loss,
         "optim": optim,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
         "momentum": momentum,
         "device": device,
     }
+
+    if resume:
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
 
     restart_params = {
         "resume": resume,
@@ -150,9 +159,7 @@ def main(
     }
 
     model_params = {
-        "task_dict": dataset.task_dict,
-        # "tasks": dataset.tasks,
-        # "target_names": dataset.targets,
+        "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
@@ -168,6 +175,7 @@ def main(
         "out_hidden": [256, 128, 64],
     }
 
+    # TODO CLI controls for loss dict.
     loss_dict = {"Eg": ("regression", "L1")}
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)
@@ -203,8 +211,7 @@ def main(
         }
         data_params.update(data_reset)
 
-        if task == "regression":
-            results_regression(
+        results_multitask(
                 model_class=Roost,
                 model_name=model_name,
                 run_id=run_id,
@@ -212,18 +219,7 @@ def main(
                 test_set=test_set,
                 data_params=data_params,
                 robust=robust,
-                device=device,
-                eval_type="checkpoint",
-            )
-        elif task == "classification":
-            results_classification(
-                model_class=Roost,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
+                task_dict=dataset.task_dict,
                 device=device,
                 eval_type="checkpoint",
             )

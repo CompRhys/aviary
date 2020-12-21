@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset
 from pymatgen import Composition
 
-from roost.core import LoadFeaturiser
+from roost.core import Featurizer
 
 
 class CompositionData(Dataset):
@@ -20,29 +20,37 @@ class CompositionData(Dataset):
         self,
         data_path,
         fea_path,
-        tasks={"Eg": "regression"},
+        task_dict,
         inputs=["composition"],
         identifiers=["id", "composition"],
     ):
-        """
+        """[summary]
+
+        Args:
+            data_path (str): [description]
+            fea_path (str): [description]
+            task_dict ({name: task}): list of tasks
+            inputs (list, optional): column name for compositions.
+                Defaults to ["composition"].
+            identifiers (list, optional): column names for unique identifier
+                and pretty name. Defaults to ["id", "composition"].
         """
 
         self.inputs = inputs
-        self.task_dict = tasks
-        self.targets = list(tasks.keys())
+        self.task_dict = task_dict
         self.identifiers = identifiers
 
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
-        # NOTE make sure to use dense datasets, here do not use the default na
-        # as they can clash with "NaN" which is a valid material
+        # NOTE make sure to use dense datasets,
+        # NOTE do not use default_na as "NaN" is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
-        self.elem_features = LoadFeaturiser(fea_path)
+        self.elem_features = Featurizer.from_json(fea_path)
         self.elem_emb_len = self.elem_features.embedding_size
 
         self.n_targets = []
-        for target in self.targets:
+        for target in self.task_dict:
             if self.task_dict[target] == "regression":
                 self.n_targets.append(1)
             elif self.task == "classification":
@@ -115,7 +123,7 @@ class CompositionData(Dataset):
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
 
         targets = []
-        for target in self.targets:
+        for target in self.task_dict:
             if self.task_dict[target] == "regression":
                 targets.append(torch.Tensor([df_idx[target]]))
             elif self.task_dict[target] == "classification":
