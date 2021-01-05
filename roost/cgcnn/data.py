@@ -9,7 +9,7 @@ import torch
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset
 
-from roost.core import LoadFeaturiser
+from roost.core import Featurizer
 
 
 class CrystalGraphData(Dataset):
@@ -50,13 +50,23 @@ class CrystalGraphData(Dataset):
         self,
         data_path,
         fea_path,
-        task,
+        task_dict,
+        inputs=["lattice","sites"],
+        identifiers=["material_id", "composition"],
         max_num_nbr=12,
         radius=8,
         dmin=0,
         step=0.2,
         use_cache=True,
     ):
+
+        assert len(identifiers) == 2, "Two identifiers are required"
+        assert len(inputs) == 2, "One input column required are required"
+
+        self.inputs = inputs
+        self.task_dict = task_dict
+        self.identifiers = identifiers
+
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
         # NOTE this naming structure might lead to clashes where the model
         # loads the wrong graph from the cache.
@@ -71,7 +81,7 @@ class CrystalGraphData(Dataset):
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
-        self.ari = LoadFeaturiser(fea_path)
+        self.ari = Featurizer.from_json(fea_path)
         self.elem_fea_dim = self.ari.embedding_size
 
         self.max_num_nbr = max_num_nbr
@@ -80,8 +90,13 @@ class CrystalGraphData(Dataset):
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
 
-        self.task = task
-        self.n_targets = 1
+        self.n_targets = []
+        for target in self.task_dict:
+            if self.task_dict[target] == "regression":
+                self.n_targets.append(1)
+            elif self.task == "classification":
+                n_classes = np.max(self.df[target].values) + 1
+                self.n_targets.append(n_classes)
 
     def __len__(self):
         # return len(self.id_prop_data)
@@ -90,8 +105,9 @@ class CrystalGraphData(Dataset):
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
         # NOTE sites must be given in fractional co-ordinates
-        cif_id, comp, target, cell, sites = self.df.iloc[idx]
-        cif_id = str(cif_id)
+        df_idx = self.df.iloc[idx]
+        cell, sites = df_idx[self.inputs]
+        cif_id, comp = df_idx[self.identifiers]
 
         if self.use_cache:
             cache_path = os.path.join(self.cachedir, cif_id + ".pkl")
@@ -157,12 +173,19 @@ class CrystalGraphData(Dataset):
         self_fea_idx = torch.LongTensor(self_fea_idx)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
 
-        if self.task == "regression":
-            target = torch.Tensor([float(target)])
-        elif self.task == "classification":
-            target = torch.LongTensor([target])
+        targets = []
+        for target in self.task_dict:
+            if self.task_dict[target] == "regression":
+                targets.append(torch.Tensor([df_idx[target]]))
+            elif self.task_dict[target] == "classification":
+                targets.append(torch.LongTensor([df_idx[target]]))
 
-        return (atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx), target, comp, cif_id
+        return (
+            (atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx),
+            targets,
+            comp,
+            cif_id
+        )
 
 
 class GaussianDistance(object):
@@ -246,17 +269,18 @@ def collate_batch(dataset_list):
         Target value for prediction
     batch_cif_ids: list
     """
-    batch_atom_fea, batch_nbr_fea = [], []
-    batch_self_fea_idx, batch_nbr_fea_idx = [], []
-    crystal_atom_idx, batch_target = [], []
+    batch_atom_fea = []
+    batch_nbr_fea = []
+    batch_self_fea_idx = []
+    batch_nbr_fea_idx = []
+    crystal_atom_idx = []
+    batch_targets = []
     batch_comps = []
     batch_cif_ids = []
     base_idx = 0
-    for (
-        i,
-        ((atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx), target, comp, cif_id),
-    ) in enumerate(dataset_list):
 
+    for i, (inputs, target, comp, cif_id) in enumerate(dataset_list):
+        atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx = inputs
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
         batch_atom_fea.append(atom_fea)
@@ -265,7 +289,7 @@ def collate_batch(dataset_list):
         batch_nbr_fea_idx.append(nbr_fea_idx + base_idx)
 
         crystal_atom_idx.extend([i] * n_i)
-        batch_target.append(target)
+        batch_targets.append(target)
         batch_comps.append(comp)
         batch_cif_ids.append(cif_id)
         base_idx += n_i
@@ -278,7 +302,7 @@ def collate_batch(dataset_list):
             torch.cat(batch_nbr_fea_idx, dim=0),
             torch.LongTensor(crystal_atom_idx),
         ),
-        torch.stack(batch_target, dim=0),
+        (torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         batch_comps,
         batch_cif_ids,
     )

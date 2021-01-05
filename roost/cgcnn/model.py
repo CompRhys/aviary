@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from roost.core import BaseModelClass
 from roost.segments import MeanPooling, SumPooling, SimpleNetwork
 
@@ -17,7 +19,6 @@ class CrystalGraphConvNet(BaseModelClass):
 
     def __init__(
         self,
-        task,
         robust,
         n_targets,
         elem_emb_len,
@@ -47,7 +48,7 @@ class CrystalGraphConvNet(BaseModelClass):
         n_hidden: int
             Number of hidden layers after pooling
         """
-        super().__init__(task=task, robust=robust, n_targets=n_targets, **kwargs)
+        super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -60,7 +61,6 @@ class CrystalGraphConvNet(BaseModelClass):
 
         self.model_params.update(
             {
-                "task": task,
                 "robust": robust,
                 "n_targets": n_targets,
                 "h_fea_len": h_fea_len,
@@ -70,17 +70,17 @@ class CrystalGraphConvNet(BaseModelClass):
 
         self.model_params.update(desc_dict)
 
+        # define an output neural network
         if self.robust:
-            output_dim = 2 * n_targets
-        else:
-            output_dim = n_targets
+            n_targets = [2 * n for n in n_targets]
 
+        trunk_hidden = [h_fea_len] * n_hidden
         out_hidden = [h_fea_len] * n_hidden
+        self.trunk_nn = SimpleNetwork(elem_fea_len, out_hidden[0], trunk_hidden)
 
-        # NOTE the original model used softpluses as activation functions
-        self.output_nn = SimpleNetwork(
-            elem_fea_len, output_dim, out_hidden, nn.Softplus
-        )
+        self.output_nns = nn.ModuleList([
+            SimpleNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
+        ])
 
     def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
         """
@@ -113,8 +113,10 @@ class CrystalGraphConvNet(BaseModelClass):
             atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx
         )
 
+        crys_fea = F.relu(self.trunk_nn(crys_fea))
+
         # apply neural network to map from learned features to target
-        return self.output_nn(crys_fea)
+        return (output_nn(crys_fea) for output_nn in self.output_nns)
 
 
 class DescriptorNetwork(nn.Module):

@@ -149,32 +149,37 @@ def init_model(
     return model, optimizer, scheduler
 
 
-def init_losses(loss_dict, robust=False):
+def init_losses(task_dict, loss_dict, robust=False):
 
     criterion_dict = {}
-    for target, (task, loss) in loss_dict.items():
+    for name, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
+            if loss_dict[name] != "CSE":
+                raise NameError(
+                    "Only CSE loss allowed for classification tasks"
+                )
+
             if robust:
-                criterion_dict[target] = (task, NLLLoss())
+                criterion_dict[name] = (task, NLLLoss())
             else:
-                criterion_dict[target] = (task, CrossEntropyLoss())
+                criterion_dict[name] = (task, CrossEntropyLoss())
 
         elif task == "regression":
             if robust:
-                if loss == "L1":
-                    criterion_dict[target] = (task, RobustL1Loss)
-                elif loss == "L2":
-                    criterion_dict[target] = (task, RobustL2Loss)
+                if loss_dict[name] == "L1":
+                    criterion_dict[name] = (task, RobustL1Loss)
+                elif loss_dict[name] == "L2":
+                    criterion_dict[name] = (task, RobustL2Loss)
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"
                     )
             else:
-                if loss == "L1":
-                    criterion_dict[target] = (task, L1Loss())
-                elif loss == "L2":
-                    criterion_dict[target] = (task, MSELoss())
+                if loss_dict[name] == "L1":
+                    criterion_dict[name] = (task, L1Loss())
+                elif loss_dict[name] == "L2":
+                    criterion_dict[name] = (task, MSELoss())
                 else:
                     raise NameError("Only L1 or L2 losses are allowed for regression tasks")
 
@@ -244,7 +249,11 @@ def train_ensemble(
             **restart_params,
         )
 
-        criterion_dict = init_losses(loss_dict, model_params["robust"])
+        criterion_dict = init_losses(
+            model.task_dict,
+            loss_dict,
+            model_params["robust"]
+        )
         normalizer_dict = init_normalizers(
             model.task_dict,
             setup_params["device"],

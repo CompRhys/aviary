@@ -23,6 +23,7 @@ class CompositionData(Dataset):
         task_dict,
         inputs=["composition"],
         identifiers=["id", "composition"],
+        # identifiers=["material_id", "composition"],
     ):
         """[summary]
 
@@ -35,6 +36,9 @@ class CompositionData(Dataset):
             identifiers (list, optional): column names for unique identifier
                 and pretty name. Defaults to ["id", "composition"].
         """
+
+        assert len(identifiers) == 2, "Two identifiers are required"
+        assert len(inputs) == 1, "One input column required are required"
 
         self.inputs = inputs
         self.task_dict = task_dict
@@ -60,7 +64,7 @@ class CompositionData(Dataset):
     def __len__(self):
         return len(self.df)
 
-    @functools.lru_cache(maxsize=None)  # Cache loaded structures
+    @functools.lru_cache(maxsize=None)  # Cache data for faster training
     def __getitem__(self, idx):
         """[summary]
 
@@ -132,7 +136,8 @@ class CompositionData(Dataset):
         return (
             (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
             targets,
-            composition, cry_id
+            composition,
+            cry_id
         )
 
 
@@ -185,6 +190,7 @@ def collate_batch(dataset_list):
     cry_base_idx = 0
     for i, (inputs, target, comp, cry_id) in enumerate(dataset_list):
         atom_weights, atom_fea, self_fea_idx, nbr_fea_idx = inputs
+
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]
 

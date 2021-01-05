@@ -16,8 +16,6 @@ from roost.utils import (
 def main(
     data_path,
     fea_path,
-    task,
-    loss,
     robust,
     model_name="roost",
     elem_fea_len=64,
@@ -50,9 +48,6 @@ def main(
     assert evaluate or train, (
         "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
     )
-    assert task in ["regression", "classification"], (
-        "Only 'regression' or 'classification' allowed for 'task'"
-    )
 
     if test_path:
         test_size = 0.0
@@ -74,7 +69,19 @@ def main(
         "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
     )
 
-    task_dict = {"Eg": "regression"}
+    # TODO CLI controls for loss dict.
+
+    task_dict = {
+        # "e_f": "regression",
+        # "e_h": "regression",
+        "Eg": "regression",
+    }
+
+    loss_dict = {
+        "Eg": "L1",
+        # "e_f": "L1",
+        # "e_h": "L1",
+    }
 
     dataset = CompositionData(
         data_path=data_path,
@@ -132,7 +139,6 @@ def main(
 
         train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
 
-
     data_params = {
         "batch_size": batch_size,
         "num_workers": workers,
@@ -175,15 +181,14 @@ def main(
         "out_hidden": [256, 128, 64],
     }
 
-    # TODO CLI controls for loss dict.
-    loss_dict = {"Eg": ("regression", "L1")}
-
     os.makedirs(f"models/{model_name}/", exist_ok=True)
 
     if log:
         os.makedirs("runs/", exist_ok=True)
 
     os.makedirs("results/", exist_ok=True)
+
+    # TODO dump all args/kwargs to a file for reproducibility.
 
     if train:
         train_ensemble(
@@ -219,7 +224,7 @@ def main(
                 test_set=test_set,
                 data_params=data_params,
                 robust=robust,
-                task_dict=dataset.task_dict,
+                task_dict=task_dict,
                 device=device,
                 eval_type="checkpoint",
             )
@@ -431,17 +436,6 @@ def input_parser():
     )
 
     # task type
-    task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="Specifies a classification task"
-    )
-    task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="Specifies a regression task"
-    )
     parser.add_argument(
         "--evaluate",
         action="store_true",
@@ -469,13 +463,6 @@ def input_parser():
 
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
-
-    if args.regression:
-        args.task = "regression"
-    elif args.classification:
-        args.task = "classification"
-    else:
-        args.task = "regression"
 
     args.device = (
         torch.device("cuda")

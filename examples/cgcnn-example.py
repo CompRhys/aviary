@@ -9,16 +9,13 @@ from roost.cgcnn.model import CrystalGraphConvNet
 from roost.cgcnn.data import CrystalGraphData, collate_batch
 from roost.utils import (
     train_ensemble,
-    results_classification,
-    results_regression,
+    results_multitask,
 )
 
 
 def main(
     data_path,
     fea_path,
-    task,
-    loss,
     robust,
     model_name="cgcnn",
     elem_fea_len=64,
@@ -50,13 +47,9 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
-    assert (
-        evaluate or train
-    ), "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
-    assert task in [
-        "regression",
-        "classification",
-    ], "Only 'regression' or 'classification' allowed for 'task'"
+    assert evaluate or train , (
+        "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
+    )
 
     if test_path:
         test_size = 0.0
@@ -80,9 +73,16 @@ def main(
 
     if transfer:
         raise NotImplementedError(
-            "Transfer option not available for CGCNN in order to stay "
-            "faithful to the original implementation."
+            "Transfer option not available for CGCNN."
         )
+
+    task_dict = {
+        "formation_energy_per_atom": "regression",
+    }
+
+    loss_dict = {
+        "formation_energy_per_atom": "L1",
+    }
 
     dist_dict = {
         "max_num_nbr": 12,
@@ -93,7 +93,7 @@ def main(
     }
 
     dataset = CrystalGraphData(
-        data_path=data_path, fea_path=fea_path, task=task, **dist_dict
+        data_path=data_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_fea_dim
@@ -105,7 +105,7 @@ def main(
         if test_path:
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                data_path=test_path, fea_path=fea_path, task=task, **dist_dict
+                data_path=test_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -121,7 +121,7 @@ def main(
         if val_path:
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                data_path=val_path, fea_path=fea_path, task=task, **dist_dict
+                data_path=val_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -152,7 +152,6 @@ def main(
     }
 
     setup_params = {
-        "loss": loss,
         "optim": optim,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
@@ -166,8 +165,11 @@ def main(
         "transfer": transfer,
     }
 
+    if resume:
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+
     model_params = {
-        "task": task,
+        "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
@@ -200,6 +202,7 @@ def main(
             setup_params=setup_params,
             restart_params=restart_params,
             model_params=model_params,
+            loss_dict=loss_dict,
         )
 
     if evaluate:
@@ -210,8 +213,7 @@ def main(
         }
         data_params.update(data_reset)
 
-        if task == "regression":
-            results_regression(
+        results_multitask(
                 model_class=CrystalGraphConvNet,
                 model_name=model_name,
                 run_id=run_id,
@@ -219,18 +221,7 @@ def main(
                 test_set=test_set,
                 data_params=data_params,
                 robust=robust,
-                device=device,
-                eval_type="checkpoint",
-            )
-        elif task == "classification":
-            results_classification(
-                model_class=CrystalGraphConvNet,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
+                task_dict=task_dict,
                 device=device,
                 eval_type="checkpoint",
             )

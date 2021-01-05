@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from roost.core import BaseModelClass
 from roost.segments import (
     ResidualNetwork,
     SimpleNetwork,
     WeightedAttentionPooling,
-    MeanPooling,
 )
 
 
@@ -76,10 +76,10 @@ class Roost(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
-        self.trunk_nn = ResidualNetwork(elem_fea_len, trunk_hidden[-1], trunk_hidden[:-1])
+        self.trunk_nn = ResidualNetwork(elem_fea_len, out_hidden[0], trunk_hidden)
 
         self.output_nns = nn.ModuleList([
-            ResidualNetwork(trunk_hidden[-1], n, out_hidden) for n in n_targets
+            ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
         ])
 
     def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
@@ -90,7 +90,7 @@ class Roost(BaseModelClass):
             elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
         )
 
-        crys_fea = self.trunk_nn(crys_fea)
+        crys_fea = F.relu(self.trunk_nn(crys_fea))
 
         # apply neural network to map from learned features to target
         return (output_nn(crys_fea) for output_nn in self.output_nns)

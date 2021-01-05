@@ -16,7 +16,14 @@ class BaseModelClass(nn.Module, ABC):
     A base class for models.
     """
 
-    def __init__(self, task_dict, robust, device, epoch=1, best_val_scores=None):
+    def __init__(
+        self,
+        task_dict,
+        robust,
+        device,
+        epoch=1,
+        best_val_scores=None
+    ):
         """
         Args:
             task (str): "regression" or "classification"
@@ -73,6 +80,7 @@ class BaseModelClass(nn.Module, ABC):
                 if writer is not None:
                     for task, metrics in t_metrics.items():
                         for metric, val in metrics.items():
+                            # writer.add_scalar(f"train/{task}/{metric}", val, epoch + 1)
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch + 1)
 
                 if verbose:
@@ -101,6 +109,7 @@ class BaseModelClass(nn.Module, ABC):
                     if writer is not None:
                         for task, metrics in v_metrics.items():
                             for metric, val in metrics.items():
+                                # writer.add_scalar(f"validation/{task}/{metric}", val, epoch + 1)
                                 writer.add_scalar(f"{task}/validation/{metric}", val, epoch + 1)
 
                     if verbose:
@@ -172,7 +181,13 @@ class BaseModelClass(nn.Module, ABC):
             writer.close()
 
     def evaluate(
-        self, generator, criterion_dict, optimizer, normalizer_dict, action="train", verbose=False
+        self,
+        generator,
+        criterion_dict,
+        optimizer,
+        normalizer_dict,
+        action="train",
+        verbose=False
     ):
         """
         evaluate the model
@@ -207,8 +222,8 @@ class BaseModelClass(nn.Module, ABC):
 
             mixed_loss = 0
 
-            for tar_id, output, target in zip(self.target_names, outputs, targets):
-                task, criterion = criterion_dict[tar_id]
+            for name, output, target in zip(self.target_names, outputs, targets):
+                task, criterion = criterion_dict[name]
 
                 if task == "regression":
                     if self.robust:
@@ -217,10 +232,10 @@ class BaseModelClass(nn.Module, ABC):
                     else:
                         loss = criterion(output, target)
 
-                    pred = normalizer_dict[tar_id].denorm(output.data.cpu())
-                    target = normalizer_dict[tar_id].denorm(target.data.cpu())
-                    metrics[tar_id]['MAE'].append((pred - target).abs().mean())
-                    metrics[tar_id]['RMSE'].append((pred - target).pow(2).mean().sqrt())
+                    pred = normalizer_dict[name].denorm(output.data.cpu())
+                    target = normalizer_dict[name].denorm(target.data.cpu())
+                    metrics[name]['MAE'].append((pred - target).abs().mean())
+                    metrics[name]['RMSE'].append((pred - target).pow(2).mean().sqrt())
 
                 elif task == "classification":
                     if self.robust:
@@ -232,14 +247,17 @@ class BaseModelClass(nn.Module, ABC):
                         loss = criterion(output, target.squeeze(1))
 
                     # classification metrics from sklearn need numpy arrays
-                    metrics[tar_id]['Acc'].append(accuracy_score(target, np.argmax(logits, axis=1)))
-                    metrics[tar_id]['F1'].append(f1_score(target, np.argmax(logits, axis=1), average="weighted"))
+                    metrics[name]['Acc'].append(
+                        accuracy_score(target, np.argmax(logits, axis=1))
+                    )
+                    metrics[name]['F1'].append(
+                        f1_score(target, np.argmax(logits, axis=1), average="weighted")
+                    )
 
                 else:
                     raise ValueError(f"invalid task: {task}")
 
-                metrics[tar_id]['Loss'].append(loss.cpu().item())
-
+                metrics[name]['Loss'].append(loss.cpu().item())
 
                 # NOTE we are currently just using a direct sum of losses
                 # this should be okay but is perhaps sub-optimal
