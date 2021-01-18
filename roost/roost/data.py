@@ -22,7 +22,7 @@ class CompositionData(Dataset):
         fea_path,
         task_dict,
         inputs=["composition"],
-        identifiers=["id", "composition"],
+        identifiers=["material_id", "composition"],
         # identifiers=["material_id", "composition"],
     ):
         """[summary]
@@ -96,9 +96,10 @@ class CompositionData(Dataset):
 
         comp_dict = Composition(composition).get_el_amt_dict()
         elements = list(comp_dict.keys())
+
         weights = list(comp_dict.values())
         weights = np.atleast_2d(weights).T / np.sum(weights)
-        assert len(elements) != 1, f"cry-id {cry_id} [{composition}] is a pure system"
+
         try:
             atom_fea = np.vstack(
                 [self.elem_features.get_fea(element) for element in elements]
@@ -112,13 +113,12 @@ class CompositionData(Dataset):
                 f"cry-id {cry_id} [{composition}] composition cannot be parsed into elements"
             )
 
-        env_idx = list(range(len(elements)))
+        nele = len(elements)
         self_fea_idx = []
         nbr_fea_idx = []
-        nbrs = len(elements) - 1
         for i, _ in enumerate(elements):
-            self_fea_idx += [i] * nbrs
-            nbr_fea_idx += env_idx[:i] + env_idx[i + 1 :]
+            self_fea_idx += [i] * nele
+            nbr_fea_idx += list(range(nele))
 
         # convert all data to tensors
         atom_weights = torch.Tensor(weights)

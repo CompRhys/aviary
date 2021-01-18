@@ -16,6 +16,9 @@ from roost.utils import (
 def main(
     data_path,
     fea_path,
+    targets,
+    tasks,
+    losses,
     robust,
     model_name="cgcnn",
     elem_fea_len=64,
@@ -47,6 +50,9 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
+
+    assert len(targets) == len(tasks) == len(losses)
+
     assert evaluate or train , (
         "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
     )
@@ -76,13 +82,8 @@ def main(
             "Transfer option not available for CGCNN."
         )
 
-    task_dict = {
-        "formation_energy_per_atom": "regression",
-    }
-
-    loss_dict = {
-        "formation_energy_per_atom": "L1",
-    }
+    task_dict = {k: v for k, v in zip(targets, tasks)}
+    loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dist_dict = {
         "max_num_nbr": 12,
@@ -310,6 +311,31 @@ def input_parser():
         help="Sub-sample the training set for learning curves",
     )
 
+    # task inputs
+    parser.add_argument(
+        "--targets",
+        nargs="*",
+        type=str,
+        metavar="STR",
+        help="Task types for targets",
+    )
+    parser.add_argument(
+        "--tasks",
+        nargs="*",
+        default=["regression"],
+        type=str,
+        metavar="STR",
+        help="Task types for targets",
+    )
+    parser.add_argument(
+        "--losses",
+        nargs="*",
+        default=["L1"],
+        type=str,
+        metavar="STR",
+        help="Loss function if regression (default: 'L1')",
+    )
+
     # optimiser inputs
     parser.add_argument(
         "--epochs",
@@ -317,13 +343,6 @@ def input_parser():
         type=int,
         metavar="INT",
         help="Number of training epochs to run (default: 100)",
-    )
-    parser.add_argument(
-        "--loss",
-        default="L1",
-        type=str,
-        metavar="STR",
-        help="Loss function if regression (default: 'L1')",
     )
     parser.add_argument(
         "--robust",
@@ -442,17 +461,6 @@ def input_parser():
     )
 
     # task type
-    task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="Specifies a classification task"
-    )
-    task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="Specifies a regression task"
-    )
     parser.add_argument(
         "--evaluate",
         action="store_true",
@@ -480,13 +488,6 @@ def input_parser():
 
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
-
-    if args.regression:
-        args.task = "regression"
-    elif args.classification:
-        args.task = "classification"
-    else:
-        args.task = "regression"
 
     args.device = (
         torch.device("cuda")

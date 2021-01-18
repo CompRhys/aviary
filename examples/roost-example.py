@@ -16,6 +16,9 @@ from roost.utils import (
 def main(
     data_path,
     fea_path,
+    targets,
+    tasks,
+    losses,
     robust,
     model_name="roost",
     elem_fea_len=64,
@@ -45,6 +48,8 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
+    assert len(targets) == len(tasks) == len(losses)
+
     assert evaluate or train, (
         "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
     )
@@ -69,19 +74,8 @@ def main(
         "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
     )
 
-    # TODO CLI controls for loss dict.
-
-    task_dict = {
-        # "e_f": "regression",
-        # "e_h": "regression",
-        "Eg": "regression",
-    }
-
-    loss_dict = {
-        "Eg": "L1",
-        # "e_f": "L1",
-        # "e_h": "L1",
-    }
+    task_dict = {k: v for k, v in zip(targets, tasks)}
+    loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dataset = CompositionData(
         data_path=data_path,
@@ -318,6 +312,33 @@ def input_parser():
         help="Sub-sample the training set for learning curves",
     )
 
+    # task inputs
+    parser.add_argument(
+        "--targets",
+        nargs="*",
+        type=str,
+        metavar="STR",
+        help="Task types for targets",
+    )
+
+    parser.add_argument(
+        "--tasks",
+        nargs="*",
+        default=["regression"],
+        type=str,
+        metavar="STR",
+        help="Task types for targets",
+    )
+
+    parser.add_argument(
+        "--losses",
+        nargs="*",
+        default=["L1"],
+        type=str,
+        metavar="STR",
+        help="Loss function if regression (default: 'L1')",
+    )
+
     # optimiser inputs
     parser.add_argument(
         "--epochs",
@@ -325,13 +346,6 @@ def input_parser():
         type=int,
         metavar="INT",
         help="Number of training epochs to run (default: 100)",
-    )
-    parser.add_argument(
-        "--loss",
-        default="L1",
-        type=str,
-        metavar="STR",
-        help="Loss function if regression (default: 'L1')",
     )
     parser.add_argument(
         "--robust",

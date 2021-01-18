@@ -295,10 +295,10 @@ def train_ensemble(
                 for name, task in model.task_dict.items():
                     if task == "regression":
                         val_score[name] = v_metrics[name]["MAE"]
-                        print(f"Validation Baseline - {name}: MAE {val_score[name]:.3f}\n")
+                        print(f"Validation Baseline - {name}: MAE {val_score[name]:.3f}")
                     elif task == "classification":
                         val_score[name] = v_metrics[name]["Acc"]
-                        print(f"Validation Baseline - {name}: Acc {val_score[name]:.3f}\n")
+                        print(f"Validation Baseline - {name}: Acc {val_score[name]:.3f}")
                 model.best_val_scores = val_score
 
         model.fit(
