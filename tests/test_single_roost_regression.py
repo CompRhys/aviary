@@ -1,11 +1,13 @@
 import os
+import numpy as np
 
 import torch
 from sklearn.model_selection import train_test_split as split
+from sklearn.metrics import r2_score
 
 from roost.roost.data import CompositionData, collate_batch
 from roost.roost.model import Roost
-from roost.utils import results_regression, train_ensemble
+from roost.utils import results_multitask, train_ensemble
 
 torch.manual_seed(0)  # ensure reproducible results
 
@@ -14,8 +16,9 @@ def test_single_roost():
 
     data_path = "data/datasets/expt-non-metals.csv"
     fea_path = "data/embeddings/matscholar-embedding.json"
-    task = "regression"
-    loss = "L1"
+    targets = ["Eg"]
+    tasks = ["regression"]
+    losses = ["L1"]
     robust = True
     model_name = "roost"
     elem_fea_len = 64
@@ -38,7 +41,11 @@ def test_single_roost():
     workers = 0
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task=task)
+    task_dict = {k: v for k, v in zip(targets, tasks)}
+    loss_dict = {k: v for k, v in zip(targets, losses)}
+
+    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task_dict=task_dict
+)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -66,7 +73,6 @@ def test_single_roost():
     }
 
     setup_params = {
-        "loss": loss,
         "optim": optim,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
@@ -81,7 +87,7 @@ def test_single_roost():
     }
 
     model_params = {
-        "task": task,
+        "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
@@ -112,12 +118,13 @@ def test_single_roost():
         setup_params=setup_params,
         restart_params=restart_params,
         model_params=model_params,
+        loss_dict=loss_dict,
     )
 
     data_params["batch_size"] = 64 * batch_size  # faster model inference
     data_params["shuffle"] = False  # need fixed data order due to ensembling
 
-    r2, mae, rmse = results_regression(
+    results_dict = results_multitask(
         model_class=Roost,
         model_name=model_name,
         run_id=run_id,
@@ -125,9 +132,30 @@ def test_single_roost():
         test_set=test_set,
         data_params=data_params,
         robust=robust,
+        task_dict=task_dict,
         device=device,
         eval_type="checkpoint",
     )
+
+    pred = results_dict["Eg"]["pred"]
+    target = results_dict["Eg"]["target"]
+
+    ensemble_folds = pred.shape[0]
+    res = pred - target
+    mae = np.mean(np.abs(res), axis=1)
+    mse = np.mean(np.square(res), axis=1)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(
+        np.repeat(target[:, np.newaxis], ensemble_folds, axis=1),
+        pred.T,
+        multioutput="raw_values",
+    )
+
+    r2 = np.mean(r2)
+
+    mae = np.mean(mae)
+
+    rmse = np.mean(rmse)
 
     assert r2 > 0.7
     assert mae < 0.55
@@ -136,3 +164,7 @@ def test_single_roost():
     # - R2 Score: 0.7017
     # - MAE: 0.5470
     # - RMSE: 0.8297
+
+
+if __name__ == "__main__":
+    test_single_roost()
