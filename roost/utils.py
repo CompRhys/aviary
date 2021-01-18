@@ -395,7 +395,7 @@ def results_multitask(
 
         for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
             if task == "regression":
-                if robust:
+                if model.robust:
                     mean, log_std = pred.chunk(2, dim=1)
                     pred = normalizer_dict[name].denorm(mean.data.cpu())
                     ale_std = torch.exp(log_std).data.cpu() * normalizer_dict[name].std
@@ -432,6 +432,8 @@ def results_multitask(
 
     if save_results:
         save_results_dict(idx, comp, results_dict, model_name)
+
+    return results_dict
 
 
 def print_metrics_regression(target, pred, **kwargs):

@@ -85,7 +85,7 @@ This will output the various command-line flags that can be used to control the 
 
 If you use this code please cite our work for which this model was built:
 
-[Predicting materials properties without crystal structure: Deep representation learning from stoichiometry](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
+Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
 
 ```tex
 @article{goodall2020predicting,
@@ -102,7 +102,7 @@ If you use this code please cite our work for which this model was built:
 
 ## Work Using Roost
 
-A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
+A critical examination of compound stability predictions from machine-learned formation energies. [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
 
 If you have used Roost in your work please contact me and I will add your paper here.
 
