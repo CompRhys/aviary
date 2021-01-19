@@ -118,13 +118,3 @@ cds3/
 *.csv
 cache/
 data/datasets/process/
-
-# new work
-data/wren/
-roost/wren/
-roost/swren/
-roost/hwren/
-examples/wren-example.py
-examples/swren.py
-examples/hwren.py
-*wren*

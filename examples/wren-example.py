@@ -1,30 +1,29 @@
 import os
 import sys
+import torch
 import argparse
 
-import torch
 from sklearn.model_selection import train_test_split as split
-
-from roost.cgcnn.model import CrystalGraphConvNet
-from roost.cgcnn.data import CrystalGraphData, collate_batch
+from roost.wren.model import Wren
+from roost.wren.data import WyckoffData, collate_batch
 from roost.utils import (
     train_ensemble,
-    results_multitask,
+    results_multitask
 )
 
 
 def main(
     data_path,
     fea_path,
+    sym_path,
     targets,
     tasks,
     losses,
     robust,
-    model_name="cgcnn",
-    elem_fea_len=64,
-    n_graph=4,
-    n_hidden=1,
-    h_fea_len=128,
+    model_name="wren",
+    sym_fea_len=32,
+    elem_fea_len=32,
+    n_graph=3,
     ensemble=1,
     run_id=1,
     data_seed=42,
@@ -73,40 +72,35 @@ def main(
             " run-id flag."
         )
 
-    assert not (
-        fine_tune and transfer
-    ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
+    assert not (fine_tune and transfer), (
+        "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
+    )
 
-    if transfer:
-        raise NotImplementedError(
-            "Transfer option not available for CGCNN."
-        )
+    # TODO CLI controls for loss dict.
 
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
-    dist_dict = {
-        "max_num_nbr": 12,
-        "radius": 8,
-        "dmin": 0,
-        "step": 0.2,
-        "use_cache": True,
-    }
-
-    dataset = CrystalGraphData(
-        data_path=data_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
+    dataset = WyckoffData(
+        data_path=data_path,
+        fea_path=fea_path,
+        sym_path=sym_path,
+        task_dict=task_dict
     )
     n_targets = dataset.n_targets
+    sym_emb_len = dataset.sym_fea_dim
     elem_emb_len = dataset.elem_fea_dim
-    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
 
     if evaluate:
         if test_path:
             print(f"using independent test set: {test_path}")
-            test_set = CrystalGraphData(
-                data_path=test_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
+            test_set = WyckoffData(
+                data_path=test_path,
+                fea_path=fea_path,
+                sym_path=sym_path,
+                task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -121,8 +115,11 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CrystalGraphData(
-                data_path=val_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
+            val_set = WyckoffData(
+                data_path=val_path,
+                fea_path=fea_path,
+                sym_path=sym_path,
+                task_dict=task_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -160,25 +157,34 @@ def main(
         "device": device,
     }
 
+    if resume:
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+
     restart_params = {
         "resume": resume,
         "fine_tune": fine_tune,
         "transfer": transfer,
     }
 
-    if resume:
-        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
-
     model_params = {
         "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
-        "nbr_fea_len": nbr_fea_len,
+        "sym_emb_len": sym_emb_len,
         "elem_fea_len": elem_fea_len,
+        "sym_fea_len": sym_fea_len,
         "n_graph": n_graph,
-        "h_fea_len": h_fea_len,
-        "n_hidden": n_hidden,
+        "elem_heads": 1,
+        "elem_gate": [256],
+        "elem_msg": [256],
+        "cry_heads": 1,
+        "cry_gate": [256],
+        "cry_msg": [256],
+        # "out_hidden": [256] * 6,
+        # "out_hidden": [1024, 512, 256, 128, 64],
+        "out_hidden": [256, 256],
+        "trunk_hidden": [128, 64],
     }
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)
@@ -190,7 +196,7 @@ def main(
 
     if train:
         train_ensemble(
-            model_class=CrystalGraphConvNet,
+            model_class=Wren,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
@@ -215,7 +221,7 @@ def main(
         data_params.update(data_reset)
 
         results_multitask(
-                model_class=CrystalGraphConvNet,
+                model_class=Wren,
                 model_name=model_name,
                 run_id=run_id,
                 ensemble_folds=ensemble,
@@ -232,13 +238,13 @@ def input_parser():
     """
     parse input
     """
-    parser = argparse.ArgumentParser(description=("cgcnn"))
+    parser = argparse.ArgumentParser(description=("Wren"))
 
     # data inputs
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/cgcnn-example.csv",
+        default="/home/reag2/PhD/roost/data/datasets/wren/taata-wyk-Zn-Ti-N.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -275,7 +281,15 @@ def input_parser():
     parser.add_argument(
         "--fea-path",
         type=str,
-        default="data/embeddings/cgcnn-embedding.json",
+        default="data/embeddings/matscholar-embedding.json",
+        metavar="PATH",
+        help="Element embedding feature path",
+    )
+    parser.add_argument(
+        "--sym-path",
+        type=str,
+        default="data/wren/alg-off.json",
+        # default="data/wren/alg.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
@@ -382,31 +396,24 @@ def input_parser():
     # graph inputs
     parser.add_argument(
         "--elem-fea-len",
-        default=64,
+        default=32,
         type=int,
         metavar="INT",
         help="Number of hidden features for elements (default: 64)",
     )
     parser.add_argument(
-        "--h-fea-len",
-        default=128,
+        "--sym-fea-len",
+        default=32,
         type=int,
         metavar="INT",
-        help="Number of hidden features for output network (default: 128)",
+        help="Number of hidden features for elements (default: 64)",
     )
     parser.add_argument(
         "--n-graph",
-        default=4,
+        default=3,
         type=int,
         metavar="INT",
         help="Number of message passing layers (default: 3)",
-    )
-    parser.add_argument(
-        "--n-hidden",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Number of layers in output network (default: 1)",
     )
 
     # ensemble inputs
@@ -427,7 +434,7 @@ def input_parser():
     )
     name_group.add_argument(
         "--data-id",
-        default="cgcnn",
+        default="wren",
         type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
@@ -477,7 +484,7 @@ def input_parser():
         "--disable-cuda",
         action="store_true",
         help="Disable CUDA"
-        )
+    )
     parser.add_argument(
         "--log",
         action="store_true",
@@ -486,12 +493,12 @@ def input_parser():
 
     args = parser.parse_args(sys.argv[1:])
 
-    if args.model_name is None:
-        args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
-
     assert all([i in ["regression", "classification"] for i in args.tasks]), (
         "Only `regression` and `classification` are allowed as tasks"
     )
+
+    if args.model_name is None:
+        args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
     args.device = (
         torch.device("cuda")

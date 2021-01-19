@@ -51,7 +51,7 @@ def main(
     assert len(targets) == len(tasks) == len(losses)
 
     assert evaluate or train, (
-        "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
+        "No action given - At least one of 'train' or 'evaluate' cli flags required"
     )
 
     if test_path:
@@ -474,6 +474,10 @@ def input_parser():
     )
 
     args = parser.parse_args(sys.argv[1:])
+
+    assert all([i in ["regression", "classification"] for i in args.tasks]), (
+        "Only `regression` and `classification` are allowed as tasks"
+    )
 
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
