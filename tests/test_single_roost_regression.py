@@ -14,8 +14,8 @@ torch.manual_seed(0)  # ensure reproducible results
 
 def test_single_roost():
 
-    data_path = "data/datasets/expt-non-metals.csv"
-    fea_path = "data/embeddings/matscholar-embedding.json"
+    data_path = "data/datasets/tests/roost-regression.csv"
+    fea_path = "data/el-embeddings/matscholar-embedding.json"
     targets = ["Eg"]
     tasks = ["regression"]
     losses = ["L1"]
@@ -26,7 +26,7 @@ def test_single_roost():
     ensemble = 1
     run_id = 1
     data_seed = 42
-    epochs = 10
+    epochs = 25
     log = False
     sample = 1
     test_size = 0.2
@@ -44,8 +44,7 @@ def test_single_roost():
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task_dict=task_dict
-)
+    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -99,7 +98,8 @@ def test_single_roost():
         "cry_heads": 3,
         "cry_gate": [256],
         "cry_msg": [256],
-        "out_hidden": [1024, 512, 256, 128, 64],
+        "trunk_hidden": [1024, 512],
+        "out_hidden": [256, 128, 64],
     }
 
     os.makedirs(f"models/{model_name}", exist_ok=True)
@@ -157,8 +157,10 @@ def test_single_roost():
 
     rmse = np.mean(rmse)
 
-    assert r2 > 0.7
-    assert mae < 0.55
+    print(r2, mae, rmse)
+
+    assert r2 > 0.68
+    assert mae < 0.58
     assert rmse < 0.83
     # standard values after 10 epochs
     # - R2 Score: 0.7017
