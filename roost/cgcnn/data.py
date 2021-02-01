@@ -72,7 +72,10 @@ class CrystalGraphData(Dataset):
         # loads the wrong graph from the cache.
         self.use_cache = use_cache
         if self.use_cache:
-            self.cachedir = os.path.join(os.path.dirname(data_path), "cache/")
+            self.cachedir = os.path.join(
+                os.path.dirname(data_path),
+                f"cache-n{max_num_nbr}-r{radius}-d{dmin}-s{step}/"
+            )
             if not os.path.isdir(self.cachedir):
                 os.makedirs(self.cachedir)
 
@@ -110,8 +113,9 @@ class CrystalGraphData(Dataset):
         cif_id, comp = df_idx[self.identifiers]
 
         if self.use_cache:
-            # TODO can we make this robust to changes in the featurisation etc?
-            cache_path = os.path.join(self.cachedir, cif_id + ".pkl")
+            # hashdir = os.path.join(self.cachedir, str(abs(hash(cif_id) % 100)))
+            # os.makedirs(hashdir, exist_ok=True)
+            cache_path = os.path.join(self.cachedir, f"{cif_id}.pkl")
 
         if self.use_cache and os.path.exists(cache_path):
             with open(cache_path, "rb") as f:
@@ -152,9 +156,7 @@ class CrystalGraphData(Dataset):
                     nbr_fea_idx.extend(list(map(lambda x: x[2], nbr)))
                     nbr_fea.extend(list(map(lambda x: x[1], nbr)))
                 else:
-                    nbr_fea_idx.extend(
-                        list(map(lambda x: x[2], nbr[: self.max_num_nbr]))
-                    )
+                    nbr_fea_idx.extend(list(map(lambda x: x[2], nbr[: self.max_num_nbr])))
                     nbr_fea.extend(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))
 
                 if len(nbr) == 0:
@@ -163,8 +165,6 @@ class CrystalGraphData(Dataset):
                         "increase maximum radius or remove structure"
                     )
                 self_fea_idx.extend([i] * min(len(nbr), self.max_num_nbr))
-
-            nbr_fea = np.array(nbr_fea)
 
             if self.use_cache:
                 with open(cache_path, "wb") as f:
@@ -214,10 +214,13 @@ class GaussianDistance(object):
         """
         assert dmin < dmax
         assert dmax - dmin > step
+
         self.filter = np.arange(dmin, dmax + step, step)
         self.embedding_size = len(self.filter)
+
         if var is None:
             var = step
+
         self.var = var
 
     def expand(self, distances):
@@ -236,6 +239,8 @@ class GaussianDistance(object):
             Expanded distance matrix with the last dimension of length
             len(self.filter)
         """
+        distances = np.array(distances)
+
         return np.exp(
             -((distances[..., np.newaxis] - self.filter) ** 2) / self.var ** 2
         )
@@ -307,7 +312,7 @@ def collate_batch(dataset_list):
             torch.cat(batch_nbr_fea_idx, dim=0),
             torch.LongTensor(crystal_atom_idx),
         ),
-        (torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
+        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         batch_comps,
         batch_cif_ids,
     )

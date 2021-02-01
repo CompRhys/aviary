@@ -238,7 +238,7 @@ def input_parser():
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/tests/cgcnn-example.csv",
+        default="data/datasets/tests/cgcnn-regression.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )

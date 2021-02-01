@@ -238,7 +238,7 @@ def collate_batch(dataset_list):
             torch.cat(crystal_atom_idx),
             torch.cat(aug_cry_idx),
         ),
-        (torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
+        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         batch_comp,
         batch_cry_ids,
     )
