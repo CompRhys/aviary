@@ -110,6 +110,7 @@ class CrystalGraphData(Dataset):
         cif_id, comp = df_idx[self.identifiers]
 
         if self.use_cache:
+            # TODO can we make this robust to changes in the featurisation etc?
             cache_path = os.path.join(self.cachedir, cif_id + ".pkl")
 
         if self.use_cache and os.path.exists(cache_path):
@@ -135,7 +136,11 @@ class CrystalGraphData(Dataset):
             atom_fea = [atom.specie.symbol for atom in crystal]
 
             # neighbours
-            all_nbrs = crystal.get_all_neighbors(self.radius, include_index=True)
+            all_nbrs = crystal.get_all_neighbors(
+                self.radius,
+                include_index=True,
+                numerical_tol=1e-8
+            )
             all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
             self_fea_idx, nbr_fea_idx, nbr_fea = [], [], []
 

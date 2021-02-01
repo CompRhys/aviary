@@ -160,14 +160,14 @@ def main(
         "device": device,
     }
 
+    if resume:
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+
     restart_params = {
         "resume": resume,
         "fine_tune": fine_tune,
         "transfer": transfer,
     }
-
-    if resume:
-        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
 
     model_params = {
         "task_dict": task_dict,
@@ -238,7 +238,7 @@ def input_parser():
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/cgcnn-example.csv",
+        default="data/datasets/tests/cgcnn-example.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -275,7 +275,7 @@ def input_parser():
     parser.add_argument(
         "--fea-path",
         type=str,
-        default="data/embeddings/cgcnn-embedding.json",
+        default="data/el-embeddings/cgcnn-embedding.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
