@@ -239,7 +239,7 @@ def input_parser():
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/expt-non-metals.csv",
+        default="data/datasets/roost/expt-non-metals.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -276,7 +276,7 @@ def input_parser():
     parser.add_argument(
         "--fea-path",
         type=str,
-        default="data/embeddings/matscholar-embedding.json",
+        default="data/el-embeddings/matscholar-embedding.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
