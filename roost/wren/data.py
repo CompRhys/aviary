@@ -2,6 +2,7 @@ import os
 import ast
 import json
 import functools
+import pathlib
 
 import numpy as np
 import pandas as pd
@@ -56,7 +57,8 @@ class WyckoffData(Dataset):
         self.sym_features = Featurizer.from_json(sym_path)
 
         # TODO clean this up to use package reasources
-        with open('data/wren/relab.json', 'r') as f:
+        path = pathlib.Path(__file__).parent.absolute()
+        with open(os.path.join(path, "relab.json"), 'r') as f:
             self.relab_dict = json.load(f)
 
         for k, v in self.relab_dict.items():

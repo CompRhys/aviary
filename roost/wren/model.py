@@ -124,8 +124,8 @@ class DescriptorNetwork(nn.Module):
 
         # apply linear transform to the input to get a trainable embedding
         # NOTE -1 here so we can add the weights as a node feature
-        self.elem_embed = nn.Linear(elem_emb_len, elem_fea_len - 1)
-        self.sym_embed = nn.Linear(sym_emb_len, sym_fea_len)
+        self.elem_embed = nn.Linear(elem_emb_len, elem_fea_len)
+        self.sym_embed = nn.Linear(sym_emb_len + 1, sym_fea_len)
 
         # create a list of Message passing layers
         fea_len = elem_fea_len + sym_fea_len
@@ -184,11 +184,11 @@ class DescriptorNetwork(nn.Module):
 
         # embed the original features into the graph layer description
         elem_fea = self.elem_embed(elem_fea)
-        sym_fea = self.sym_embed(sym_fea)
+        sym_fea = self.sym_embed(torch.cat([sym_fea, elem_weights], dim=1))
 
         # # do this so that we can examine the embeddings without
         # # influence of the weights
-        elem_fea = torch.cat([elem_fea, sym_fea, elem_weights], dim=1)
+        elem_fea = torch.cat([elem_fea, sym_fea], dim=1)
 
         # apply the message passing functions
         for graph_func in self.graphs:

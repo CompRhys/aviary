@@ -244,7 +244,7 @@ def input_parser():
     parser.add_argument(
         "--data-path",
         type=str,
-        default="/home/reag2/PhD/roost/data/datasets/wren/taata-wyk-Zn-Ti-N.csv",
+        default="/home/reag2/PhD/roost/data/datasets/wren/taata-c-spglib-test.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -281,15 +281,14 @@ def input_parser():
     parser.add_argument(
         "--fea-path",
         type=str,
-        default="data/embeddings/matscholar-embedding.json",
+        default="data/el-embeddings/matscholar-embedding.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
     parser.add_argument(
         "--sym-path",
         type=str,
-        default="data/wren/alg-off.json",
-        # default="data/wren/alg.json",
+        default="data/sym-embeddings/bra-alg-off.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
