@@ -110,11 +110,16 @@ venv.bak/
 # notebooks
 .ipynb_checkpoints/
 
-# local files
+# exclude model outputs from github
 runs/
 results/
 models/
+
+# exclude local slurm and plotting scripts
+process/
 cds3/
+
+# exclude local data and cached graphs
 *.csv
-cache/
-data/datasets/process/
+*.pkl
+

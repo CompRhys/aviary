@@ -51,7 +51,7 @@ class CrystalGraphData(Dataset):
         data_path,
         fea_path,
         task_dict,
-        inputs=["lattice","sites"],
+        inputs=["lattice", "sites"],
         identifiers=["material_id", "composition"],
         max_num_nbr=12,
         radius=8,
