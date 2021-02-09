@@ -142,7 +142,6 @@ class CrystalGraphData(Dataset):
             # neighbours
             all_nbrs = crystal.get_all_neighbors(
                 self.radius,
-                include_index=True,
                 numerical_tol=1e-8
             )
             all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
@@ -164,7 +163,22 @@ class CrystalGraphData(Dataset):
                         f"Isolated atom found in {cif_id} ({comp}) - "
                         "increase maximum radius or remove structure"
                     )
+
                 self_fea_idx.extend([i] * min(len(nbr), self.max_num_nbr))
+
+
+            # NOTE cgcnn probably implements a max number of neighbours because their
+            # codebase did not have neighbour lists. Using a smaller cut-off and all
+            # neighbours seems justifiable if we believe the special bit about cgcnn
+            # is that it has the gated message passing operation.
+            # TODO after wren publication we can remove this limitation from the
+            # implementation available here using the below code - this alongside
+            # using a smaller cut-off radius ~ 5 \AA will give a 10x speed-up when
+            # not caching the dataset. This will be important for investigations of
+            # joggling.
+            # self_fea_idx, nbr_fea_idx, _, nbr_fea = crystal.get_neighbor_list(
+            #     self.radius, numerical_tol=1e-8,
+            # )
 
             if self.use_cache:
                 with open(cache_path, "wb") as f:
