@@ -86,11 +86,9 @@ def main(
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dist_dict = {
-        "max_num_nbr": 12,
-        "radius": 8,
+        "radius": 5,
         "dmin": 0,
         "step": 0.2,
-        "use_cache": True,
     }
 
     dataset = CrystalGraphData(

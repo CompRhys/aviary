@@ -53,11 +53,9 @@ class CrystalGraphData(Dataset):
         task_dict,
         inputs=["lattice", "sites"],
         identifiers=["material_id", "composition"],
-        max_num_nbr=12,
-        radius=8,
+        radius=5,
         dmin=0,
         step=0.2,
-        use_cache=True,
     ):
 
         assert len(identifiers) == 2, "Two identifiers are required"
@@ -68,16 +66,6 @@ class CrystalGraphData(Dataset):
         self.identifiers = identifiers
 
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
-        # NOTE this naming structure might lead to clashes where the model
-        # loads the wrong graph from the cache.
-        self.use_cache = use_cache
-        if self.use_cache:
-            self.cachedir = os.path.join(
-                os.path.dirname(data_path),
-                f"cache-n{max_num_nbr}-r{radius}-d{dmin}-s{step}/"
-            )
-            if not os.path.isdir(self.cachedir):
-                os.makedirs(self.cachedir)
 
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
@@ -87,7 +75,6 @@ class CrystalGraphData(Dataset):
         self.ari = Featurizer.from_json(fea_path)
         self.elem_fea_dim = self.ari.embedding_size
 
-        self.max_num_nbr = max_num_nbr
         self.radius = radius
 
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
@@ -112,77 +99,20 @@ class CrystalGraphData(Dataset):
         cell, sites = df_idx[self.inputs]
         cif_id, comp = df_idx[self.identifiers]
 
-        if self.use_cache:
-            # hashdir = os.path.join(self.cachedir, str(abs(hash(cif_id) % 100)))
-            # os.makedirs(hashdir, exist_ok=True)
-            cache_path = os.path.join(self.cachedir, f"{cif_id}.pkl")
+        cell, elems, coords = parse_cgcnn(cell, sites)
+        # NOTE getting primative structure before constructing graph
+        # significantly harms the performnace of this model.
+        crystal = Structure(
+            lattice=cell, species=elems, coords=coords, to_unit_cell=True
+        )
 
-        if self.use_cache and os.path.exists(cache_path):
-            with open(cache_path, "rb") as f:
-                try:
-                    pkl_data = pickle.load(f)
-                except EOFError:
-                    raise EOFError(f"Check {f} for issue")
-            atom_fea = pkl_data[0]
-            nbr_fea = pkl_data[1]
-            self_fea_idx = pkl_data[2]
-            nbr_fea_idx = pkl_data[3]
+        # atom features
+        atom_fea = [atom.specie.symbol for atom in crystal]
 
-        else:
-            cell, elems, coords = parse_cgcnn(cell, sites)
-            # NOTE getting primative structure before constructing graph
-            # significantly harms the performnace of this model.
-            crystal = Structure(
-                lattice=cell, species=elems, coords=coords, to_unit_cell=True
-            )
-
-            # atom features
-            atom_fea = [atom.specie.symbol for atom in crystal]
-
-            # neighbours
-            all_nbrs = crystal.get_all_neighbors(
-                self.radius,
-                numerical_tol=1e-8
-            )
-            all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
-            self_fea_idx, nbr_fea_idx, nbr_fea = [], [], []
-
-            for i, nbr in enumerate(all_nbrs):
-                # NOTE due to using a geometric learning library we do not
-                # need to set a maximum number of neighbours but do so in
-                # order to replicate the original code.
-                if len(nbr) < self.max_num_nbr:
-                    nbr_fea_idx.extend(list(map(lambda x: x[2], nbr)))
-                    nbr_fea.extend(list(map(lambda x: x[1], nbr)))
-                else:
-                    nbr_fea_idx.extend(list(map(lambda x: x[2], nbr[: self.max_num_nbr])))
-                    nbr_fea.extend(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))
-
-                if len(nbr) == 0:
-                    raise ValueError(
-                        f"Isolated atom found in {cif_id} ({comp}) - "
-                        "increase maximum radius or remove structure"
-                    )
-
-                self_fea_idx.extend([i] * min(len(nbr), self.max_num_nbr))
-
-
-            # NOTE cgcnn probably implements a max number of neighbours because their
-            # codebase did not have neighbour lists. Using a smaller cut-off and all
-            # neighbours seems justifiable if we believe the special bit about cgcnn
-            # is that it has the gated message passing operation.
-            # TODO after wren publication we can remove this limitation from the
-            # implementation available here using the below code - this alongside
-            # using a smaller cut-off radius ~ 5 \AA will give a 10x speed-up when
-            # not caching the dataset. This will be important for investigations of
-            # joggling.
-            # self_fea_idx, nbr_fea_idx, _, nbr_fea = crystal.get_neighbor_list(
-            #     self.radius, numerical_tol=1e-8,
-            # )
-
-            if self.use_cache:
-                with open(cache_path, "wb") as f:
-                    pickle.dump((atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx), f)
+        # neighbours
+        self_fea_idx, nbr_fea_idx, _, nbr_fea = crystal.get_neighbor_list(
+            self.radius, numerical_tol=1e-8,
+        )
 
         nbr_fea = self.gdf.expand(nbr_fea)
         atom_fea = np.vstack([self.ari.get_fea(atom) for atom in atom_fea])
