@@ -100,7 +100,7 @@ Predicting materials properties without crystal structure: Deep representation l
 }
 ```
 
-## Work Using Roost
+## Work Featuring Roost
 
 A critical examination of compound stability predictions from machine-learned formation energies. [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
 
