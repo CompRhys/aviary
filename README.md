@@ -102,7 +102,10 @@ If you use this code please cite our work for which this model was built:
 
 ## Work Using Roost
 
-A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
+* A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
+
+* Active learning based generative design for the discovery of wide bandgap materials [[arXiv]](https://arxiv.org/abs/2103.00608)
+
 
 If you have used Roost in your work please contact me and I will add your paper here.
 
