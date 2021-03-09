@@ -53,9 +53,9 @@ def main(
 
     assert len(targets) == len(tasks) == len(losses)
 
-    assert evaluate or train, (
-        "No action given - At least one of 'train' or 'evaluate' cli flags required"
-    )
+    assert (
+        evaluate or train
+    ), "No action given - At least one of 'train' or 'evaluate' cli flags required"
 
     if test_path:
         test_size = 0.0
@@ -78,15 +78,14 @@ def main(
     ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
 
     if transfer:
-        raise NotImplementedError(
-            "Transfer option not available for CGCNN."
-        )
+        raise NotImplementedError("Transfer option not available for CGCNN.")
 
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dist_dict = {
         "radius": 5,
+        "max_num_nbr": 12,
         "dmin": 0,
         "step": 0.2,
     }
@@ -136,7 +135,9 @@ def main(
             else:
                 print(f"using {val_size} of training set as validation set")
                 train_idx, val_idx = split(
-                    train_idx, random_state=data_seed, test_size=val_size / (1 - test_size),
+                    train_idx,
+                    random_state=data_seed,
+                    test_size=val_size / (1 - test_size),
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -213,17 +214,17 @@ def main(
         data_params.update(data_reset)
 
         results_multitask(
-                model_class=CrystalGraphConvNet,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
-                task_dict=task_dict,
-                device=device,
-                eval_type="checkpoint",
-            )
+            model_class=CrystalGraphConvNet,
+            model_name=model_name,
+            run_id=run_id,
+            ensemble_folds=ensemble,
+            test_set=test_set,
+            data_params=data_params,
+            robust=robust,
+            task_dict=task_dict,
+            device=device,
+            eval_type="checkpoint",
+        )
 
 
 def input_parser():
@@ -475,7 +476,7 @@ def input_parser():
         "--disable-cuda",
         action="store_true",
         help="Disable CUDA"
-        )
+    )
     parser.add_argument(
         "--log",
         action="store_true",
@@ -487,9 +488,9 @@ def input_parser():
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
-    assert all([i in ["regression", "classification"] for i in args.tasks]), (
-        "Only `regression` and `classification` are allowed as tasks"
-    )
+    assert all(
+        [i in ["regression", "classification"] for i in args.tasks]
+    ), "Only `regression` and `classification` are allowed as tasks"
 
     args.device = (
         torch.device("cuda")
