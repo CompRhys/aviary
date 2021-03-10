@@ -123,3 +123,5 @@ cds3/
 *.csv
 *.pkl
 
+poscar/
+wyckoff/

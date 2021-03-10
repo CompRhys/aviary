@@ -254,6 +254,19 @@ class BaseModelClass(nn.Module, ABC):
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
 
+                elif task == "pretrain":
+
+                    logits = softmax(output, dim=1)
+                    loss = criterion(output, target.squeeze(1))
+
+                    # classification metrics from sklearn need numpy arrays
+                    metrics[name]['Acc'].append(
+                        accuracy_score(target, np.argmax(logits, axis=1))
+                    )
+                    metrics[name]['F1'].append(
+                        f1_score(target, np.argmax(logits, axis=1), average="weighted")
+                    )
+
                 else:
                     raise ValueError(f"invalid task: {task}")
 
@@ -448,6 +461,8 @@ def RobustL2Loss(output, log_std, target):
 
 
 def EvidentialL2Loss(output, target, coeff=1.0):
+    # https://proceedings.neurips.cc/paper/2020/file/aab085461de182608ee9f607f3f7d18f-Paper.pdf
+
     # NOTE how is this hyper-parameter selected?
     output, v, alpha, beta = output.chunk(4, dim=1)
     loss_nll = NIG_NLL(target, output, v, alpha, beta)

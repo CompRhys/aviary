@@ -135,7 +135,7 @@ class DescriptorNetwork(nn.Module):
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
         self.convs = nn.ModuleList(
-            [ConvLayer(
+            [CGCNNConv(
                 elem_fea_len=elem_fea_len,
                 nbr_fea_len=nbr_fea_len
             ) for _ in range(n_graph)]
@@ -175,6 +175,8 @@ class DescriptorNetwork(nn.Module):
         for conv_func in self.convs:
             atom_fea = conv_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
 
+        # return the node features - atom_fea
+
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
 
         # NOTE required to match the reference implementation
@@ -183,14 +185,14 @@ class DescriptorNetwork(nn.Module):
         return crys_fea
 
 
-class ConvLayer(nn.Module):
+class CGCNNConv(nn.Module):
     """
     Convolutional operation on graphs
     """
 
     def __init__(self, elem_fea_len, nbr_fea_len):
         """
-        Initialize ConvLayer.
+        Initialize CGCNNConv.
 
         Parameters
         ----------

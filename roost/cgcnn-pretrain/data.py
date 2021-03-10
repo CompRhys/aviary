@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 
+from random import random
 from itertools import groupby
 
 from pymatgen.core.structure import Structure
@@ -12,8 +13,26 @@ from pymatgen.optimization.neighbors import find_points_in_spheres
 
 import torch
 from torch.utils.data import Dataset
-
+from random import random
 from roost.core import Featurizer
+
+
+# maskedcrystalgraphdata
+# arg: percent to mask.
+#
+
+# if crystal.num_sites < 7:
+#   crystal.make_supercell([2,2,2])
+
+# normal graph generation
+
+# randomly sample node index and set its features to 0
+
+# construct target: 2 parts
+# - list of indices that were masked
+# - list of what elements were at those indices
+# pass those as targets for regular CGCNN classification
+# training (needs custom collate_batch maybe)
 
 
 class CrystalGraphData(Dataset):
@@ -86,46 +105,16 @@ class CrystalGraphData(Dataset):
         crystal = df_idx["Structure_obj"]
         cif_id, comp = df_idx[self.identifiers]
 
+        # In place modification of structures that only contain a few sites
+        # this is to allow us to mask ~15% of sites without having a
+        # disproportionate impact on small unit cell structures.
+        if crystal.num_sites < 7:
+            crystal.make_supercell([2, 2, 2])
+
         # atom features
-        atom_fea = [atom.specie.symbol for atom in crystal]
+        atom_fea = [atom.specie.symbol if random() < self.mask_rate else "Null" if random() < self.masking_rate else "Null" for atom in crystal]
 
         # # # neighbours
-        # all_nbrs = crystal.get_all_neighbors(self.radius, include_index=True)
-        # all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
-        # self_idx_old, nbr_idx_old, nbr_dist_old = [], [], []
-
-        # for i, nbr in enumerate(all_nbrs):
-        #     # NOTE due to using a geometric learning library we do not
-        #     # need to set a maximum number of neighbours but do so in
-        #     # order to replicate the original code.
-        #     if len(nbr) < self.max_num_nbr:
-        #         nbr_idx_old.extend(list(map(lambda x: x[2], nbr)))
-        #         nbr_dist_old.extend(list(map(lambda x: x[1], nbr)))
-        #     else:
-        #         nbr_idx_old.extend(list(map(lambda x: x[2], nbr[:self.max_num_nbr])))
-        #         nbr_dist_old.extend(list(map(lambda x: x[1], nbr[:self.max_num_nbr])))
-
-        #     self_idx_old.extend([i] * min(len(nbr), self.max_num_nbr))
-
-        # nbr_dist_old = np.array(nbr_dist_old)
-
-        # pbc = np.array([1, 1, 1], dtype=int)
-        # lattice_matrix = np.ascontiguousarray(np.array(crystal.lattice.matrix), dtype=float)
-        # cart_coords = np.ascontiguousarray(np.array(crystal.cart_coords), dtype=float)
-
-        # self_idx, nbr_idx, _, nbr_dist = find_points_in_spheres(
-        #     cart_coords,
-        #     cart_coords,
-        #     r=self.radius,
-        #     pbc=pbc,
-        #     lattice=lattice_matrix,
-        #     tol=numerical_tol
-        # )
-        # self_idx = self_idx.astype(int)
-        # nbr_idx = nbr_idx.astype(int)
-        # nbr_dist = nbr_dist.astype(int)
-        # exclude_self = (self_idx != nbr_idx) | (nbr_dist > numerical_tol)
-
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
             self.radius,
             numerical_tol=1e-8,
@@ -143,10 +132,6 @@ class CrystalGraphData(Dataset):
             self_idx = np.array(_self_idx)
             nbr_idx = np.array(_nbr_idx)
             nbr_dist = np.array(_nbr_dist)
-
-        # assert (self_idx == self_idx_old).all()
-        # assert (nbr_idx == nbr_idx_old).all()
-        # assert (nbr_dist == nbr_dist_old).all()
 
         assert len(self_idx), f"All atoms in {cif_id} are isolated"
         assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
