@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-from pymatgen import Composition
+from pymatgen.core.composition import Composition
 
 from roost.core import Featurizer
 
