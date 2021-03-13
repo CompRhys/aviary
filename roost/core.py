@@ -246,6 +246,9 @@ class BaseModelClass(nn.Module, ABC):
                         logits = softmax(output, dim=1)
                         loss = criterion(output, target.squeeze(1))
 
+                    logits = logits.data.cpu()
+                    target = target.squeeze(1).data.cpu()
+
                     # classification metrics from sklearn need numpy arrays
                     metrics[name]['Acc'].append(
                         accuracy_score(target, np.argmax(logits, axis=1))

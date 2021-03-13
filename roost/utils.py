@@ -387,7 +387,10 @@ def results_multitask(
 
         normalizer_dict = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
-            normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
+            if state_dict is not None:
+                normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
+            else:
+                normalizer_dict[task] = None
 
         idx, comp, y_test, output = model.predict(generator=test_generator)
 
@@ -411,11 +414,10 @@ def results_multitask(
                     logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
                     pre_logits = mean.data.cpu().numpy()
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
-                    results_dict[name]["pre-logits-ale"].append(pre_logits_std)
+                    results_dict[name]["pre-logits_ale"].append(pre_logits_std)
                 else:
                     pre_logits = pred.data.cpu().numpy()
-
-                logits = softmax(pre_logits, axis=1)
+                    logits = softmax(pre_logits, axis=1)
 
                 results_dict[name]["pre-logits"].append(pre_logits)
                 results_dict[name]["logits"].append(logits)
@@ -504,10 +506,10 @@ def print_metrics_classification(target, logits, **kwargs):
     recall = np.zeros(len(logits))
     fscore = np.zeros(len(logits))
 
-    for y_logit in logits:
+    target_ohe = np.zeros_like(logits[0])
+    target_ohe[np.arange(target.size), target] = 1
 
-        target_ohe = np.zeros_like(y_logit)
-        target_ohe[np.arange(target.size), target] = 1
+    for j, y_logit in enumerate(logits):
 
         acc[j] = accuracy_score(target, np.argmax(y_logit, axis=1))
         roc_auc[j] = roc_auc_score(target_ohe, y_logit)
@@ -547,9 +549,6 @@ def print_metrics_classification(target, logits, **kwargs):
 
         # calculate metrics and errors with associated errors for ensembles
         ens_logits = np.mean(logits, axis=0)
-
-        target_ohe = np.zeros_like(ens_logits)
-        target_ohe[np.arange(target.size), target] = 1
 
         ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
         ens_roc_auc = roc_auc_score(target_ohe, ens_logits)

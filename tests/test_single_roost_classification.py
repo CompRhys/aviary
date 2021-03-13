@@ -3,7 +3,10 @@ import numpy as np
 
 import torch
 from sklearn.model_selection import train_test_split as split
-from sklearn.metrics import r2_score
+from sklearn.metrics import (
+    accuracy_score,
+    roc_auc_score,
+)
 
 from roost.roost.data import CompositionData, collate_batch
 from roost.roost.model import Roost
@@ -12,13 +15,13 @@ from roost.utils import results_multitask, train_ensemble
 torch.manual_seed(0)  # ensure reproducible results
 
 
-def test_single_roost():
+def test_single_roost_clf():
 
-    data_path = "data/datasets/tests/roost-regression.csv"
+    data_path = "data/datasets/tests/roost-classification.csv"
     fea_path = "data/el-embeddings/matscholar-embedding.json"
-    targets = ["Eg"]
-    tasks = ["regression"]
-    losses = ["L1"]
+    targets = ["non_metal"]
+    tasks = ["classification"]
+    losses = ["CSE"]
     robust = True
     model_name = "roost"
     elem_fea_len = 64
@@ -26,7 +29,7 @@ def test_single_roost():
     ensemble = 2
     run_id = 1
     data_seed = 42
-    epochs = 25
+    epochs = 15
     log = False
     sample = 1
     test_size = 0.2
@@ -137,20 +140,24 @@ def test_single_roost():
         eval_type="checkpoint",
     )
 
-    pred = results_dict["Eg"]["pred"]
-    target = results_dict["Eg"]["target"]
+    logits = results_dict["non_metal"]["logits"]
+    target = results_dict["non_metal"]["target"]
 
-    y_ens = np.mean(pred, axis=0)
+    # calculate metrics and errors with associated errors for ensembles
+    ens_logits = np.mean(logits, axis=0)
 
-    mae = np.abs(target - y_ens).mean()
-    mse = np.square(target - y_ens).mean()
-    rmse = np.sqrt(mse)
-    r2 = r2_score(target, y_ens)
+    target_ohe = np.zeros_like(ens_logits)
+    target_ohe[np.arange(target.size), target] = 1
 
-    assert r2 > 0.75
-    assert mae < 0.55
-    assert rmse < 0.75
+    ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
+    ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
+
+    print(f"Accuracy : {ens_acc:.4f} ")
+    print(f"ROC-AUC  : {ens_roc_auc:.4f}")
+
+    assert ens_acc > 0.75
+    assert ens_roc_auc > 0.9
 
 
 if __name__ == "__main__":
-    test_single_roost()
+    test_single_roost_clf()
