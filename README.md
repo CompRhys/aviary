@@ -1,6 +1,11 @@
-# RooSt &nbsp; [![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+<h1 align="center">Roost</h1>
+<h4 align="center">Representation Learning from Stoichiometry</h4>
+  
+[![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+[![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
+[![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)
 
-**R**epresentati**o**n Learning fr**o**m **St**oichiometry
 
 ## Premise
 
