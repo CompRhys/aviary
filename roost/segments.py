@@ -4,36 +4,24 @@ from torch_scatter import scatter_add, scatter_max, scatter_mean
 
 
 class MeanPooling(nn.Module):
-    """
-    mean pooling
-    """
-
+    """Mean pooling"""
     def __init__(self):
         super().__init__()
 
     def forward(self, x, index):
-
-        mean = scatter_mean(x, index, dim=0)
-
-        return mean
+        return scatter_mean(x, index, dim=0)
 
     def __repr__(self):
         return self.__class__.__name__
 
 
 class SumPooling(nn.Module):
-    """
-    mean pooling
-    """
-
+    """Sum pooling"""
     def __init__(self):
         super().__init__()
 
     def forward(self, x, index):
-
-        mean = scatter_add(x, index, dim=0)
-
-        return mean
+        return scatter_add(x, index, dim=0)
 
     def __repr__(self):
         return self.__class__.__name__
@@ -46,17 +34,15 @@ class AttentionPooling(nn.Module):
 
     def __init__(self, gate_nn, message_nn):
         """
-        Inputs
-        ----------
-        gate_nn: Variable(nn.Module)
+        Args:
+            gate_nn: Variable(nn.Module)
+            message_nn
         """
         super().__init__()
         self.gate_nn = gate_nn
         self.message_nn = message_nn
 
     def forward(self, x, index):
-        """ forward pass """
-
         gate = self.gate_nn(x)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
@@ -89,8 +75,6 @@ class WeightedAttentionPooling(nn.Module):
         self.pow = torch.nn.Parameter(torch.randn((1)))
 
     def forward(self, x, index, weights):
-        """ forward pass """
-
         gate = self.gate_nn(x)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]

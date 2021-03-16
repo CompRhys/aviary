@@ -152,9 +152,6 @@ def test_single_roost_clf():
     ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
     ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
 
-    print(f"Accuracy : {ens_acc:.4f} ")
-    print(f"ROC-AUC  : {ens_roc_auc:.4f}")
-
     assert ens_acc > 0.75
     assert ens_roc_auc > 0.9
 

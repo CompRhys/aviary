@@ -492,7 +492,7 @@ def print_metrics_regression(target, pred, **kwargs):
         print(f"RMSE : {rmse_ens:.4f}")
 
 
-def print_metrics_classification(target, logits, **kwargs):
+def print_metrics_classification(target, logits, average="micro", **kwargs):
     """print out metrics for a classification task
 
     Args:
@@ -512,9 +512,9 @@ def print_metrics_classification(target, logits, **kwargs):
     for j, y_logit in enumerate(logits):
 
         acc[j] = accuracy_score(target, np.argmax(y_logit, axis=1))
-        roc_auc[j] = roc_auc_score(target_ohe, y_logit)
+        roc_auc[j] = roc_auc_score(target_ohe, y_logit, average=average)
         precision[j], recall[j], fscore[j] = precision_recall_fscore_support(
-            target, np.argmax(logits[j], axis=1), average="weighted"
+            target, np.argmax(logits[j], axis=1), average=average
         )[:3]
 
     if len(logits) == 1:
@@ -551,9 +551,9 @@ def print_metrics_classification(target, logits, **kwargs):
         ens_logits = np.mean(logits, axis=0)
 
         ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
-        ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
+        ens_roc_auc = roc_auc_score(target_ohe, ens_logits, average=average)
         ens_prec, ens_recall, ens_fscore = precision_recall_fscore_support(
-            target, np.argmax(ens_logits, axis=1), average="weighted"
+            target, np.argmax(ens_logits, axis=1), average=average
         )[:3]
 
         print("\nEnsemble Performance Metrics:")

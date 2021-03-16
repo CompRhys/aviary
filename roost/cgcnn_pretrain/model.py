@@ -1,7 +1,9 @@
 import torch.nn as nn
 
 from roost.core import BaseModelClass
-from roost.cgcnn import CGCNNConv
+from roost.cgcnn.model import CGCNNConv
+
+from roost.segments import MeanPooling
 
 num_elements_in_ptable = 118
 
@@ -68,10 +70,13 @@ class CrystalGraphPreNet(BaseModelClass):
             }
         )
 
-        self.linear = nn.Linear(elem_fea_len, num_elements_in_ptable)
+        self.node_linear = nn.Linear(elem_fea_len, num_elements_in_ptable)
+        # self.global_pooling = MeanPooling()
+        # print(f"{n_targets=}")
+        # self.global_linear = nn.Linear(elem_fea_len, n_targets)
         self.model_params.update(desc_dict)
 
-    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx):
+    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx, mask_idx, cry_idx):
         """
         Forward pass
 
@@ -100,7 +105,9 @@ class CrystalGraphPreNet(BaseModelClass):
         """
         crys_fea = self.material_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
-        return self.linear(crys_fea)
+        nodes = self.node_linear(crys_fea)
+
+        return nodes
 
 
 class NodeNetwork(nn.Module):
@@ -125,7 +132,7 @@ class NodeNetwork(nn.Module):
             ) for _ in range(n_graph)]
         )
 
-    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx, mask_idx):
+    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx):
         """Forward pass
 
         Args:

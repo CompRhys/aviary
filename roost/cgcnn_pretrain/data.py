@@ -5,32 +5,19 @@ import os
 import numpy as np
 import pandas as pd
 
-from random import random
 from itertools import groupby
 
-from pymatgen.core.structure import Structure
+from pymatgen.core.structure import Structure, Element
 from pymatgen.optimization.neighbors import find_points_in_spheres
 
 import torch
 from torch.utils.data import Dataset
-from random import random
+from random import sample
 from roost.core import Featurizer
 
 
-# maskedcrystalgraphdata
-# arg: percent to mask.
-#
 
-# if crystal.num_sites < 7:
-#   crystal.make_supercell([2,2,2])
 
-# normal graph generation
-
-# randomly sample node index and set its features to 0
-
-# construct target: 2 parts
-# - list of indices that were masked
-# - list of what elements were at those indices
 # pass those as targets for regular CGCNN classification
 # training (needs custom collate_batch maybe)
 
@@ -47,6 +34,7 @@ class CrystalGraphData(Dataset):
         max_num_nbr=12,
         dmin=0,
         step=0.2,
+        p_mask=0.15,
     ):
         """CrystalGraphData returns neighbourhood graphs
 
@@ -54,8 +42,10 @@ class CrystalGraphData(Dataset):
             data_path (str): The path to the dataset
             fea_path (str): The path to the element embedding
             task_dict ({target: task}): task dict for multi-task learning
-            inputs (list, optional): df columns for lattice and sites. Defaults to ["lattice", "sites"].
-            identifiers (list, optional): df columns for distinguishing data points. Defaults to ["material_id", "composition"].
+            inputs (list, optional): df columns for lattice and sites.
+                Defaults to ["lattice", "sites"].
+            identifiers (list, optional): df columns for distinguishing data points.
+                Defaults to ["material_id", "composition"].
             radius (int, optional): cut-off radius for neighbourhood. Defaults to 5.
             max_num_nbr (int, optional): maximum number of neighbours to consider. Defaults to 12.
             dmin (int, optional): minimum distance in gaussian basis. Defaults to 0.
@@ -78,6 +68,7 @@ class CrystalGraphData(Dataset):
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.ari = Featurizer.from_json(fea_path)
+        self.ohe = Featurizer.from_json("data/el-embeddings/onehot-embedding.json")
         self.elem_fea_dim = self.ari.embedding_size
 
         self.radius = radius
@@ -85,6 +76,7 @@ class CrystalGraphData(Dataset):
 
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
+        self.p_mask = p_mask
 
         self.n_targets = []
         for target in self.task_dict:
@@ -105,14 +97,24 @@ class CrystalGraphData(Dataset):
         crystal = df_idx["Structure_obj"]
         cif_id, comp = df_idx[self.identifiers]
 
-        # In place modification of structures that only contain a few sites
-        # this is to allow us to mask ~15% of sites without having a
-        # disproportionate impact on small unit cell structures.
-        if crystal.num_sites < 7:
-            crystal.make_supercell([2, 2, 2])
-
         # atom features
-        atom_fea = [atom.specie.symbol if random() < self.mask_rate else "Null" if random() < self.masking_rate else "Null" for atom in crystal]
+        # TODO can this be vectorised with numpy?
+
+        # handle disordered structures (multiple fractional elements per site)
+        site_atoms = [atom.species.as_dict() for atom in crystal]
+        n_sites = crystal.num_sites
+        atom_fea = np.vstack(
+            [np.sum([self.ari.get_fea(el)*amt for el, amt in site.items()], axis=0) for site in site_atoms]
+        )
+
+        mask_ids = sorted(sample(range(n_sites), int(self.p_mask * n_sites)))
+
+        # the OHE we have is 112 long
+        mask_labels = np.vstack(
+            [np.sum([self.ohe.get_fea(el)*amt for el, amt in site_atoms[idx].items()], axis=0) for idx in mask_ids]
+        )
+
+        atom_fea[mask_ids, :] = 0
 
         # # # neighbours
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
@@ -138,21 +140,21 @@ class CrystalGraphData(Dataset):
         assert set(self_idx) == set(range(len(atom_fea))), f"At least one atom in {cif_id} is isolated"
 
         nbr_dist = self.gdf.expand(nbr_dist)
-        atom_fea = np.vstack([self.ari.get_fea(atom) for atom in atom_fea])
 
         atom_fea = torch.Tensor(atom_fea)
         nbr_dist = torch.Tensor(nbr_dist)
         self_idx = torch.LongTensor(self_idx)
         nbr_idx = torch.LongTensor(nbr_idx)
+        mask_ids = torch.LongTensor(mask_ids)
 
         targets = []
         for target in self.task_dict:
-            if self.task_dict[target] == "regression":
-                targets.append(torch.Tensor([df_idx[target]]))
-            elif self.task_dict[target] == "classification":
-                targets.append(torch.LongTensor([df_idx[target]]))
+            if self.task_dict[target] == "pretrain-mask":
+                targets.append(torch.Tensor([mask_labels]))
+            elif self.task_dict[target] == "pretrain-global":
+                raise NotImplementedError("bad user")
 
-        return ((atom_fea, nbr_dist, self_idx, nbr_idx), targets, comp, cif_id)
+        return ((atom_fea, nbr_dist, self_idx, nbr_idx, mask_ids), targets, comp, cif_id)
 
 
 class GaussianDistance(object):
@@ -236,34 +238,43 @@ def collate_batch(dataset_list):
     batch_self_idx = []
     batch_nbr_idx = []
     crystal_atom_idx = []
+    batch_mask_idx = []
     batch_targets = []
     batch_comps = []
     batch_cif_ids = []
     base_idx = 0
+    mask_base_idx = 0
 
     for i, (inputs, target, comp, cif_id) in enumerate(dataset_list):
-        atom_fea, nbr_dist, self_idx, nbr_idx = inputs
-        n_i = atom_fea.shape[0]  # number of atoms for this crystal
+        atom_fea, nbr_dist, self_idx, nbr_idx, mask_idx = inputs
+        n_atoms = atom_fea.shape[0]  # number of atoms for this crystal
+        n_mask = mask_idx.shape[0]
 
         batch_atom_fea.append(atom_fea)
         batch_nbr_dist.append(nbr_dist)
         batch_self_idx.append(self_idx + base_idx)
         batch_nbr_idx.append(nbr_idx + base_idx)
+        batch_mask_idx.append(mask_idx + mask_base_idx)
 
-        crystal_atom_idx.extend([i] * n_i)
+        crystal_atom_idx.extend([i] * n_atoms)
+
         batch_targets.append(target)
         batch_comps.append(comp)
         batch_cif_ids.append(cif_id)
-        base_idx += n_i
+
+        base_idx += n_atoms
+        mask_base_idx += n_mask
 
     atom_fea = torch.cat(batch_atom_fea, dim=0)
     nbr_dist = torch.cat(batch_nbr_dist, dim=0)
     self_idx = torch.cat(batch_self_idx, dim=0)
     nbr_idx = torch.cat(batch_nbr_idx, dim=0)
+    mask_idx = torch.cat(batch_mask_idx, dim=0)
+
     cry_idx = torch.LongTensor(crystal_atom_idx)
 
     return (
-        (atom_fea, nbr_dist, self_idx, nbr_idx, cry_idx),
+        (atom_fea, nbr_dist, self_idx, nbr_idx, mask_idx, cry_idx),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         batch_comps,
         batch_cif_ids,
@@ -276,9 +287,18 @@ def get_structure(cols):
     cell, elems, coords = parse_cgcnn(cell, sites)
     # NOTE getting primative structure before constructing graph
     # significantly harms the performnace of this model.
-    return Structure(
+
+    crystal = Structure(
         lattice=cell, species=elems, coords=coords, to_unit_cell=True
     )
+
+    # In place modification of structures that only contain a few sites
+    # this is to allow us to mask ~15% of sites without having a
+    # disproportionate impact on small unit cell structures.
+    if crystal.num_sites < 7:
+        crystal.make_supercell([2, 2, 2])
+
+    return crystal
 
 
 def parse_cgcnn(cell, sites):
