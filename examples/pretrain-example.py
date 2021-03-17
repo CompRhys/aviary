@@ -489,7 +489,7 @@ def input_parser():
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
     assert all(
-        [i in ["regression", "classification"] for i in args.tasks]
+        [i in ["regression", "classification", "pretrain-mask"] for i in args.tasks]
     ), "Only `regression` and `classification` are allowed as tasks"
 
     args.device = (

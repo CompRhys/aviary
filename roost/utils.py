@@ -165,6 +165,17 @@ def init_losses(task_dict, loss_dict, robust=False):
             else:
                 criterion_dict[name] = (task, CrossEntropyLoss())
 
+        if task == "pretrain-mask":
+            if loss_dict[name] != "CSE":
+                raise NameError(
+                    "Only CSE loss allowed for classification tasks"
+                )
+
+            if robust:
+                criterion_dict[name] = (task, MSELoss())
+            else:
+                criterion_dict[name] = (task, MSELoss())
+
         elif task == "regression":
             if robust:
                 if loss_dict[name] == "L1":
@@ -198,10 +209,10 @@ def init_normalizers(task_dict, device, resume=False):
     normalizer_dict = {}
     for target, task in task_dict.items():
         # Select Task and Loss Function
-        if task == "classification":
-            normalizer_dict[target] = None
-        elif task == "regression":
+        if task == "regression":
             normalizer_dict[target] = Normalizer()
+        else:
+            normalizer_dict[target] = None
 
     return normalizer_dict
 

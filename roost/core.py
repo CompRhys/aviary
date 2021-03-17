@@ -215,7 +215,7 @@ class BaseModelClass(nn.Module, ABC):
             targets = (n.norm(tar) if n is not None else tar
                         for tar, n in zip(targets, normalizer_dict.values()))
 
-            targets = (target.to(self.device) for target in targets)
+            targets = [target.to(self.device) for target in targets]
 
             # compute output
             outputs = self(*inputs)
@@ -257,18 +257,17 @@ class BaseModelClass(nn.Module, ABC):
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
 
-                elif task == "pretrain":
+                elif task == "pretrain-mask":
+                    logits = softmax(output, dim=-1)
+                    loss = criterion(output, target.squeeze())
 
-                    logits = softmax(output, dim=1)
-                    loss = criterion(output, target.squeeze(1))
-
-                    # classification metrics from sklearn need numpy arrays
-                    metrics[name]['Acc'].append(
-                        accuracy_score(target, np.argmax(logits, axis=1))
-                    )
-                    metrics[name]['F1'].append(
-                        f1_score(target, np.argmax(logits, axis=1), average="weighted")
-                    )
+                    # # classification metrics from sklearn need numpy arrays
+                    # metrics[name]['Acc'].append(
+                    #     accuracy_score(target, np.argmax(logits, axis=1))
+                    # )
+                    # metrics[name]['F1'].append(
+                    #     f1_score(target, np.argmax(logits, axis=1), average="weighted")
+                    # )
 
                 else:
                     raise ValueError(f"invalid task: {task}")
@@ -419,7 +418,7 @@ class Featurizer:
 
     @property
     def embedding_size(self):
-        return len(self._embedding[list(self._embedding.keys())[0]])
+        return len(list(self._embedding.values())[0])
 
     @classmethod
     def from_json(cls, embedding_file):

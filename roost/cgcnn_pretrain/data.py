@@ -5,21 +5,15 @@ import os
 import numpy as np
 import pandas as pd
 
+from random import sample
 from itertools import groupby
 
-from pymatgen.core.structure import Structure, Element
-from pymatgen.optimization.neighbors import find_points_in_spheres
+from pymatgen.core.structure import Structure
 
 import torch
 from torch.utils.data import Dataset
-from random import sample
+
 from roost.core import Featurizer
-
-
-
-
-# pass those as targets for regular CGCNN classification
-# training (needs custom collate_batch maybe)
 
 
 class CrystalGraphData(Dataset):
@@ -80,11 +74,10 @@ class CrystalGraphData(Dataset):
 
         self.n_targets = []
         for target in self.task_dict:
-            if self.task_dict[target] == "regression":
-                self.n_targets.append(1)
-            elif self.task == "classification":
-                n_classes = np.max(self.df[target].values) + 1
-                self.n_targets.append(n_classes)
+            if self.task_dict[target] == "pretrain-mask":
+                self.n_targets.append(self.ohe.embedding_size)
+            elif self.task_dict[target] == "pretrain-global":
+                raise NotImplementedError("bad user")
 
     def __len__(self):
         # return len(self.id_prop_data)
@@ -275,7 +268,7 @@ def collate_batch(dataset_list):
 
     return (
         (atom_fea, nbr_dist, self_idx, nbr_idx, mask_idx, cry_idx),
-        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
+        tuple(torch.cat(b_target, dim=1) for b_target in zip(*batch_targets)),
         batch_comps,
         batch_cif_ids,
     )
