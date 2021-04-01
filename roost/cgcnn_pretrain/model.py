@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from roost.core import BaseModelClass
-from roost.cgcnn.model import CGCNNConv
+from roost.cgcnn.model import DescriptorNetwork
 
 
 class CrystalGraphPreNet(BaseModelClass):
@@ -23,8 +23,6 @@ class CrystalGraphPreNet(BaseModelClass):
         nbr_fea_len,
         elem_fea_len=64,
         n_graph=4,
-        h_fea_len=128,
-        n_hidden=1,
         **kwargs,
     ):
         """
@@ -55,14 +53,12 @@ class CrystalGraphPreNet(BaseModelClass):
             "n_graph": n_graph,
         }
 
-        self.material_nn = NodeNetwork(**desc_dict)
+        self.node_nn = DescriptorNetwork(**desc_dict)
 
         self.model_params.update(
             {
                 "robust": robust,
                 "n_targets": n_targets,
-                "h_fea_len": h_fea_len,
-                "n_hidden": n_hidden,
             }
         )
 
@@ -97,50 +93,8 @@ class CrystalGraphPreNet(BaseModelClass):
             Atom hidden features after convolution
 
         """
-        crys_fea = self.material_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
+        crys_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
-        nodes = self.node_linear(crys_fea)
+        nodes = self.node_linear(crys_fea[mask_idx, :])
 
-        return [nodes[mask_idx],]
-
-
-class NodeNetwork(nn.Module):
-    """
-    The Descriptor Network is the message passing section of the
-    CrystalGraphConvNet Model.
-    """
-
-    def __init__(
-        self, elem_emb_len, nbr_fea_len, elem_fea_len=64, n_graph=4,
-    ):
-        """
-        """
-        super().__init__()
-
-        self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
-
-        self.convs = nn.ModuleList(
-            [CGCNNConv(
-                elem_fea_len=elem_fea_len,
-                nbr_fea_len=nbr_fea_len
-            ) for _ in range(n_graph)]
-        )
-
-    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx):
-        """Forward pass
-
-        Args:
-            atom_fea (Tensor): Atom features from atom type
-            nbr_fea (Tensor): Bond features of each atom's M neighbors
-            self_idx (LongTensor): Indices of M neighbors of each atom
-            nbr_idx (LongTensor): Indices of M neighbors of each atom
-
-        Returns:
-            Atom hidden features after convolution
-        """
-        atom_fea = self.embedding(atom_fea)
-
-        for conv_func in self.convs:
-            atom_fea = conv_func(atom_fea, nbr_fea, self_idx, nbr_idx)
-
-        return atom_fea
+        return [nodes, ]

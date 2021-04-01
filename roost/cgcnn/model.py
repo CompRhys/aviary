@@ -57,7 +57,7 @@ class CrystalGraphConvNet(BaseModelClass):
             "n_graph": n_graph,
         }
 
-        self.material_nn = DescriptorNetwork(**desc_dict)
+        self.node_nn = DescriptorNetwork(**desc_dict)
 
         self.model_params.update(
             {
@@ -70,6 +70,8 @@ class CrystalGraphConvNet(BaseModelClass):
 
         self.model_params.update(desc_dict)
 
+        self.pooling = MeanPooling()
+
         # define an output neural network
         if self.robust:
             n_targets = [2 * n for n in n_targets]
@@ -78,11 +80,11 @@ class CrystalGraphConvNet(BaseModelClass):
         out_hidden = [h_fea_len] * n_hidden
         self.trunk_nn = SimpleNetwork(elem_fea_len, out_hidden[0], trunk_hidden)
 
-        self.output_nns = nn.ModuleList([
+        self.output_nns = nn.ModuleList(
             SimpleNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
-        ])
+        )
 
-    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
+    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx, crystal_atom_idx):
         """
         Forward pass
 
@@ -109,9 +111,14 @@ class CrystalGraphConvNet(BaseModelClass):
             Atom hidden features after convolution
 
         """
-        crys_fea = self.material_nn(
-            atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx
+        atom_fea = self.node_nn(
+            atom_fea, nbr_fea, self_idx, nbr_idx
         )
+
+        crys_fea = self.pooling(atom_fea, crystal_atom_idx)
+
+        # NOTE required to match the reference implementation
+        crys_fea = nn.functional.softplus(crys_fea)
 
         crys_fea = F.relu(self.trunk_nn(crys_fea))
 
@@ -141,9 +148,7 @@ class DescriptorNetwork(nn.Module):
             ) for _ in range(n_graph)]
         )
 
-        self.pooling = MeanPooling()
-
-    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
+    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx):
         """
         Forward pass
 
@@ -175,14 +180,7 @@ class DescriptorNetwork(nn.Module):
         for conv_func in self.convs:
             atom_fea = conv_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
 
-        # return the node features - atom_fea
-
-        crys_fea = self.pooling(atom_fea, crystal_atom_idx)
-
-        # NOTE required to match the reference implementation
-        crys_fea = nn.functional.softplus(crys_fea)
-
-        return crys_fea
+        return atom_fea
 
 
 class CGCNNConv(nn.Module):

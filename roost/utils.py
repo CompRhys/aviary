@@ -63,32 +63,14 @@ def init_model(
             "train the output_nn from scratch"
         )
         checkpoint = torch.load(transfer, map_location=device)
-        model = model_class(**checkpoint["model_params"], device=device,)
+
+        model = model_class(device=device, **model_params)
         model.to(device)
-        model.load_state_dict(checkpoint["state_dict"])
 
-        model.robust = robust
-        model.model_params["robust"] = robust
-        model.model_params["n_targets"] = n_targets
-
-        # # NOTE currently if you use a model as a feature extractor and then
-        # # resume for a checkpoint of that model the material_nn unfreezes.
-        # # This is potentially not the behaviour a user might expect.
-        # for p in model.material_nn.parameters():
-        #     p.requires_grad = False
-        # for p in model.trunk_nn.parameters():
-        #     p.requires_grad = False
-
-        if robust:
-            output_dim = 2 * n_targets
-        else:
-            output_dim = n_targets
-
-        model.output_nn = ResidualNetwork(
-            input_dim=model_params["elem_fea_len"],
-            hidden_layer_dims=model_params["out_hidden"],
-            output_dim=output_dim,
-        )
+        model_dict = model.state_dict()
+        pretrained_dict = {k: v for k, v in checkpoint["state_dict"].items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
 
     elif resume:
         # TODO work out how to ensure that we are using the same optimizer
@@ -165,10 +147,10 @@ def init_losses(task_dict, loss_dict, robust=False):
             else:
                 criterion_dict[name] = (task, CrossEntropyLoss())
 
-        if task == "pretrain-mask":
-            if loss_dict[name] != "CSE":
+        if task == "mask":
+            if loss_dict[name] != "Brier":
                 raise NameError(
-                    "Only CSE loss allowed for classification tasks"
+                    "Only Brier loss allowed for masking tasks"
                 )
 
             if robust:
@@ -202,7 +184,10 @@ def init_normalizers(task_dict, device, resume=False):
         checkpoint = torch.load(resume, map_location=device)
         normalizer_dict = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
-            normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
+            if task == "regression":
+                normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
+            else:
+                normalizer_dict[task] = None
 
         return normalizer_dict
 

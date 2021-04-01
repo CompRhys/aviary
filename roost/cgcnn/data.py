@@ -35,12 +35,18 @@ class CrystalGraphData(Dataset):
             data_path (str): The path to the dataset
             fea_path (str): The path to the element embedding
             task_dict ({target: task}): task dict for multi-task learning
-            inputs (list, optional): df columns for lattice and sites. Defaults to ["lattice", "sites"].
-            identifiers (list, optional): df columns for distinguishing data points. Defaults to ["material_id", "composition"].
-            radius (int, optional): cut-off radius for neighbourhood. Defaults to 5.
-            max_num_nbr (int, optional): maximum number of neighbours to consider. Defaults to 12.
-            dmin (int, optional): minimum distance in gaussian basis. Defaults to 0.
-            step (float, optional): increment size of gaussian basis. Defaults to 0.2.
+            inputs (list, optional): df columns for lattice and sites.
+                Defaults to ["lattice", "sites"].
+            identifiers (list, optional): df columns for distinguishing data points.
+                Defaults to ["material_id", "composition"].
+            radius (int, optional): cut-off radius for neighbourhood.
+                Defaults to 5.
+            max_num_nbr (int, optional): maximum number of neighbours to consider.
+                Defaults to 12.
+            dmin (int, optional): minimum distance in gaussian basis.
+                Defaults to 0.
+            step (float, optional): increment size of gaussian basis.
+                Defaults to 0.2.
         """
         assert len(identifiers) == 2, "Two identifiers are required"
         assert len(inputs) == 2, "One input column required are required"
@@ -49,23 +55,24 @@ class CrystalGraphData(Dataset):
         self.task_dict = task_dict
         self.identifiers = identifiers
 
-        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
+        self.radius = radius
+        self.max_num_nbr = max_num_nbr
 
+        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
+        self.ari = Featurizer.from_json(fea_path)
+        self.elem_fea_dim = self.ari.embedding_size
+
+        self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
+        self.nbr_fea_dim = self.gdf.embedding_size
+
+        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[], comment="#")
 
         self.df["Structure_obj"] = self.df[inputs].apply(get_structure, axis=1)
 
-        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
-        self.ari = Featurizer.from_json(fea_path)
-        self.elem_fea_dim = self.ari.embedding_size
-
-        self.radius = radius
-        self.max_num_nbr = max_num_nbr
-
-        self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
-        self.nbr_fea_dim = self.gdf.embedding_size
+        self._pre_check()
 
         self.n_targets = []
         for target in self.task_dict:
@@ -76,56 +83,14 @@ class CrystalGraphData(Dataset):
                 self.n_targets.append(n_classes)
 
     def __len__(self):
-        # return len(self.id_prop_data)
         return len(self.df)
 
-    @functools.lru_cache(maxsize=None)  # Cache loaded structures
-    def __getitem__(self, idx):
-        # NOTE sites must be given in fractional co-ordinates
-        df_idx = self.df.iloc[idx]
-        crystal = df_idx["Structure_obj"]
-        cif_id, comp = df_idx[self.identifiers]
+    def _get_nbr_data(self, crystal):
+        """get neighbours for every site
 
-        # atom features
-        atom_fea = [atom.specie.symbol for atom in crystal]
-
-        # # # neighbours
-        # all_nbrs = crystal.get_all_neighbors(self.radius, include_index=True)
-        # all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
-        # self_idx_old, nbr_idx_old, nbr_dist_old = [], [], []
-
-        # for i, nbr in enumerate(all_nbrs):
-        #     # NOTE due to using a geometric learning library we do not
-        #     # need to set a maximum number of neighbours but do so in
-        #     # order to replicate the original code.
-        #     if len(nbr) < self.max_num_nbr:
-        #         nbr_idx_old.extend(list(map(lambda x: x[2], nbr)))
-        #         nbr_dist_old.extend(list(map(lambda x: x[1], nbr)))
-        #     else:
-        #         nbr_idx_old.extend(list(map(lambda x: x[2], nbr[:self.max_num_nbr])))
-        #         nbr_dist_old.extend(list(map(lambda x: x[1], nbr[:self.max_num_nbr])))
-
-        #     self_idx_old.extend([i] * min(len(nbr), self.max_num_nbr))
-
-        # nbr_dist_old = np.array(nbr_dist_old)
-
-        # pbc = np.array([1, 1, 1], dtype=int)
-        # lattice_matrix = np.ascontiguousarray(np.array(crystal.lattice.matrix), dtype=float)
-        # cart_coords = np.ascontiguousarray(np.array(crystal.cart_coords), dtype=float)
-
-        # self_idx, nbr_idx, _, nbr_dist = find_points_in_spheres(
-        #     cart_coords,
-        #     cart_coords,
-        #     r=self.radius,
-        #     pbc=pbc,
-        #     lattice=lattice_matrix,
-        #     tol=numerical_tol
-        # )
-        # self_idx = self_idx.astype(int)
-        # nbr_idx = nbr_idx.astype(int)
-        # nbr_dist = nbr_dist.astype(int)
-        # exclude_self = (self_idx != nbr_idx) | (nbr_dist > numerical_tol)
-
+        Args:
+            crystal ([Structure]): pymatgen structure to get neighbours for
+        """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
             self.radius,
             numerical_tol=1e-8,
@@ -144,16 +109,56 @@ class CrystalGraphData(Dataset):
             nbr_idx = np.array(_nbr_idx)
             nbr_dist = np.array(_nbr_dist)
 
-        # assert (self_idx == self_idx_old).all()
-        # assert (nbr_idx == nbr_idx_old).all()
-        # assert (nbr_dist == nbr_dist_old).all()
+        return self_idx, nbr_idx, nbr_dist
+
+    def _pre_check(self):
+        """Check that none of the structures have isolated atoms.
+
+        Raises:
+            ValueError: if isolated structures are present
+        """
+        print("Precheck that all structures are valid")
+        all_iso = []
+        some_iso = []
+
+        for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
+            self_idx, nbr_idx, _ = self._get_nbr_data(crystal)
+
+            if len(self_idx) == 0:
+                all_iso.append(cif_id)
+            elif len(nbr_idx) == 0:
+                all_iso.append(cif_id)
+            elif set(self_idx) != set(range(crystal.num_sites)):
+                some_iso.append(cif_id)
+
+        if (len(all_iso) > 0) or (len(some_iso) > 0):
+            print("All atoms isolated")
+            print(all_iso)
+            print("Some atoms isolated")
+            print(some_iso)
+            raise ValueError("isolated structures contained in dataframe")
+
+    @functools.lru_cache(maxsize=None)  # Cache loaded structures
+    def __getitem__(self, idx):
+        # NOTE sites must be given in fractional co-ordinates
+        df_idx = self.df.iloc[idx]
+        crystal = df_idx["Structure_obj"]
+        cif_id, comp = df_idx[self.identifiers]
+
+        # atom features for disordered sites
+        site_atoms = [atom.species.as_dict() for atom in crystal]
+        atom_fea = np.vstack(
+            [np.sum([self.ari.get_fea(el)*amt for el, amt in site.items()], axis=0) for site in site_atoms]
+        )
+
+        # # # neighbours
+        self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
         assert len(self_idx), f"All atoms in {cif_id} are isolated"
         assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
-        assert set(self_idx) == set(range(len(atom_fea))), f"At least one atom in {cif_id} is isolated"
+        assert set(self_idx) == set(range(crystal.num_sites)), f"At least one atom in {cif_id} is isolated"
 
         nbr_dist = self.gdf.expand(nbr_dist)
-        atom_fea = np.vstack([self.ari.get_fea(atom) for atom in atom_fea])
 
         atom_fea = torch.Tensor(atom_fea)
         nbr_dist = torch.Tensor(nbr_dist)

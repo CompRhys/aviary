@@ -51,6 +51,8 @@ class CrystalGraphData(Dataset):
         self.inputs = inputs
         self.task_dict = task_dict
         self.identifiers = identifiers
+        self.radius = radius
+        self.max_num_nbr = max_num_nbr
 
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
 
@@ -60,13 +62,12 @@ class CrystalGraphData(Dataset):
 
         self.df["Structure_obj"] = self.df[inputs].apply(get_structure, axis=1)
 
+        self._pre_check()
+
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
         self.ari = Featurizer.from_json(fea_path)
         self.ohe = Featurizer.from_json("data/el-embeddings/onehot-embedding.json")
         self.elem_fea_dim = self.ari.embedding_size
-
-        self.radius = radius
-        self.max_num_nbr = max_num_nbr
 
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
@@ -74,16 +75,80 @@ class CrystalGraphData(Dataset):
 
         self.n_targets = []
         for target in self.task_dict:
-            if self.task_dict[target] == "pretrain-mask":
+            if self.task_dict[target] == "mask":
                 self.n_targets.append(self.ohe.embedding_size)
             elif self.task_dict[target] == "pretrain-global":
                 raise NotImplementedError("bad user")
 
     def __len__(self):
-        # return len(self.id_prop_data)
         return len(self.df)
 
-    @functools.lru_cache(maxsize=None)  # Cache loaded structures
+    def _get_nbr_data(self, crystal):
+        """get neighbours for every site
+
+        Args:
+            crystal ([Structure]): pymatgen structure to get neighbours for
+        """
+        # # # neighbours
+        self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
+            self.radius,
+            numerical_tol=1e-8,
+        )
+
+        if self.max_num_nbr is not None:
+            _self_idx, _nbr_idx, _nbr_dist = [], [], []
+
+            for _, g in groupby(zip(self_idx, nbr_idx, nbr_dist), key=lambda x: x[0]):
+                s, n, d = zip(*sorted(g, key=lambda x: x[2]))
+                _self_idx.extend(s[:self.max_num_nbr])
+                _nbr_idx.extend(n[:self.max_num_nbr])
+                _nbr_dist.extend(d[:self.max_num_nbr])
+
+            self_idx = np.array(_self_idx)
+            nbr_idx = np.array(_nbr_idx)
+            nbr_dist = np.array(_nbr_dist)
+
+        return self_idx, nbr_idx, nbr_dist
+
+    def _pre_check(self):
+        """Check that none of the structures have isolated atoms.
+
+        Raises:
+            ValueError: if isolated structures are present
+        """
+        print("checking all structures valid")
+        all_iso = []
+        some_iso = []
+
+        for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
+            image = 0
+
+            while image == 0:
+                self_idx, nbr_idx, _ = self._get_nbr_data(crystal)
+
+                if np.any(self_idx == nbr_idx):
+                    # TODO only double along the shortest dimension
+                    crystal.make_supercell([2, 2, 2])
+                else:
+                    image = 1
+
+            if len(self_idx) == 0:
+                all_iso.append(cif_id)
+            elif len(nbr_idx) == 0:
+                all_iso.append(cif_id)
+            elif set(self_idx) != set(range(crystal.num_sites)):
+                some_iso.append(cif_id)
+
+        # TODO have the option for the pre-check to delete non-valid entries from the df?
+
+        if (len(all_iso) > 0) or (len(some_iso) > 0):
+            print(all_iso)
+            print(some_iso)
+            raise ValueError("isolated structures contained in dataframe")
+
+    # NOTE do not cache the pre-training structures as we want to see new sets of
+    # masked structures each epoch as this effectively expands the training set
+    # @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
         # NOTE sites must be given in fractional co-ordinates
         df_idx = self.df.iloc[idx]
@@ -95,42 +160,30 @@ class CrystalGraphData(Dataset):
 
         # handle disordered structures (multiple fractional elements per site)
         site_atoms = [atom.species.as_dict() for atom in crystal]
-        n_sites = crystal.num_sites
         atom_fea = np.vstack(
             [np.sum([self.ari.get_fea(el)*amt for el, amt in site.items()], axis=0) for site in site_atoms]
         )
 
-        mask_ids = sorted(sample(range(n_sites), int(self.p_mask * n_sites)))
+        # select atleast one site in the crystal to mask
+        mask_ids = np.sort(np.random.choice(
+            np.arange(crystal.num_sites, dtype=int), max(1, int(self.p_mask * crystal.num_sites))
+        ))
 
-        # the OHE we have is 112 long
+        # get the mask labels via use of a OHE of elements to handle disordered structures
         mask_labels = np.vstack(
             [np.sum([self.ohe.get_fea(el)*amt for el, amt in site_atoms[idx].items()], axis=0) for idx in mask_ids]
         )
 
-        atom_fea[mask_ids, :] = 0
+        # TODO currently 20% no mask -> 10% no mask, 10% random mask
+        mask_filter = np.random.rand(len(mask_ids))
+        atom_fea[mask_ids[np.where(mask_filter < 0.8)], :] = 0
 
         # # # neighbours
-        self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
-            self.radius,
-            numerical_tol=1e-8,
-        )
-
-        if self.max_num_nbr is not None:
-            _self_idx, _nbr_idx, _nbr_dist = [], [], []
-
-            for i, g in groupby(zip(self_idx, nbr_idx, nbr_dist), key=lambda x: x[0]):
-                s, n, d = zip(*sorted(g, key=lambda x: x[2]))
-                _self_idx.extend(s[:self.max_num_nbr])
-                _nbr_idx.extend(n[:self.max_num_nbr])
-                _nbr_dist.extend(d[:self.max_num_nbr])
-
-            self_idx = np.array(_self_idx)
-            nbr_idx = np.array(_nbr_idx)
-            nbr_dist = np.array(_nbr_dist)
+        self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
         assert len(self_idx), f"All atoms in {cif_id} are isolated"
         assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
-        assert set(self_idx) == set(range(len(atom_fea))), f"At least one atom in {cif_id} is isolated"
+        assert set(self_idx) == set(range(crystal.num_sites)), f"At least one atom in {cif_id} is isolated"
 
         nbr_dist = self.gdf.expand(nbr_dist)
 
@@ -142,8 +195,8 @@ class CrystalGraphData(Dataset):
 
         targets = []
         for target in self.task_dict:
-            if self.task_dict[target] == "pretrain-mask":
-                targets.append(torch.Tensor([mask_labels]))
+            if self.task_dict[target] == "mask":
+                targets.append(torch.Tensor(mask_labels))
             elif self.task_dict[target] == "pretrain-global":
                 raise NotImplementedError("bad user")
 
@@ -236,18 +289,16 @@ def collate_batch(dataset_list):
     batch_comps = []
     batch_cif_ids = []
     base_idx = 0
-    mask_base_idx = 0
 
     for i, (inputs, target, comp, cif_id) in enumerate(dataset_list):
         atom_fea, nbr_dist, self_idx, nbr_idx, mask_idx = inputs
         n_atoms = atom_fea.shape[0]  # number of atoms for this crystal
-        n_mask = mask_idx.shape[0]
 
         batch_atom_fea.append(atom_fea)
         batch_nbr_dist.append(nbr_dist)
         batch_self_idx.append(self_idx + base_idx)
         batch_nbr_idx.append(nbr_idx + base_idx)
-        batch_mask_idx.append(mask_idx + mask_base_idx)
+        batch_mask_idx.append(mask_idx + base_idx)
 
         crystal_atom_idx.extend([i] * n_atoms)
 
@@ -256,7 +307,6 @@ def collate_batch(dataset_list):
         batch_cif_ids.append(cif_id)
 
         base_idx += n_atoms
-        mask_base_idx += n_mask
 
     atom_fea = torch.cat(batch_atom_fea, dim=0)
     nbr_dist = torch.cat(batch_nbr_dist, dim=0)
@@ -268,7 +318,7 @@ def collate_batch(dataset_list):
 
     return (
         (atom_fea, nbr_dist, self_idx, nbr_idx, mask_idx, cry_idx),
-        tuple(torch.cat(b_target, dim=1) for b_target in zip(*batch_targets)),
+        tuple(torch.cat(b_target, dim=0) for b_target in zip(*batch_targets)),
         batch_comps,
         batch_cif_ids,
     )

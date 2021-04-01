@@ -64,6 +64,11 @@ class BaseModelClass(nn.Module, ABC):
 
         """
         start_epoch = self.epoch
+
+        if writer is not None:
+            for name, param in self.named_parameters():
+                writer.add_histogram(name, param.clone().cpu().data.numpy(), start_epoch)
+
         try:
             for epoch in range(start_epoch, start_epoch + epochs):
                 self.epoch += 1
@@ -80,8 +85,12 @@ class BaseModelClass(nn.Module, ABC):
                 if writer is not None:
                     for task, metrics in t_metrics.items():
                         for metric, val in metrics.items():
-                            # writer.add_scalar(f"train/{task}/{metric}", val, epoch + 1)
-                            writer.add_scalar(f"{task}/train/{metric}", val, epoch + 1)
+                            writer.add_scalar(f"{task}/train/{metric}", val, epoch)
+
+                        if epoch % 5 == 0:
+                            for name, param in self.named_parameters():
+                                writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)
+                                writer.add_histogram(name+"/grad", param.grad.clone().cpu().data.numpy(), epoch)
 
                 if verbose:
                     print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
@@ -109,8 +118,7 @@ class BaseModelClass(nn.Module, ABC):
                     if writer is not None:
                         for task, metrics in v_metrics.items():
                             for metric, val in metrics.items():
-                                # writer.add_scalar(f"validation/{task}/{metric}", val, epoch + 1)
-                                writer.add_scalar(f"{task}/validation/{metric}", val, epoch + 1)
+                                writer.add_scalar(f"{task}/validation/{metric}", val, epoch)
 
                     if verbose:
                         for task, metrics in v_metrics.items():
@@ -257,17 +265,21 @@ class BaseModelClass(nn.Module, ABC):
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
 
-                elif task == "pretrain-mask":
+                elif task == "mask":
                     logits = softmax(output, dim=-1)
-                    loss = criterion(output, target.squeeze())
+                    loss = criterion(logits, target)
 
-                    # # classification metrics from sklearn need numpy arrays
-                    # metrics[name]['Acc'].append(
-                    #     accuracy_score(target, np.argmax(logits, axis=1))
-                    # )
-                    # metrics[name]['F1'].append(
-                    #     f1_score(target, np.argmax(logits, axis=1), average="weighted")
-                    # )
+                    logits = logits.data.cpu()
+                    target = target.data.cpu()
+
+                    # classification metrics from sklearn need numpy arrays
+                    # NOTE these metrics are misleading on disordered structures
+                    metrics[name]['Acc'].append(
+                        accuracy_score(np.argmax(target, axis=1), np.argmax(logits, axis=1))
+                    )
+                    metrics[name]['F1'].append(
+                        f1_score(np.argmax(target, axis=1), np.argmax(logits, axis=1), average="weighted")
+                    )
 
                 else:
                     raise ValueError(f"invalid task: {task}")
@@ -402,7 +414,7 @@ class Featurizer:
     """Base class for featurizing nodes and edges."""
 
     def __init__(self, allowed_types):
-        self.allowed_types = set(allowed_types)
+        self.allowed_types = allowed_types
         self._embedding = {}
 
     def get_fea(self, key):
@@ -411,7 +423,7 @@ class Featurizer:
 
     def load_state_dict(self, state_dict):
         self._embedding = state_dict
-        self.allowed_types = set(self._embedding.keys())
+        self.allowed_types = self._embedding.keys()
 
     def get_state_dict(self):
         return self._embedding
@@ -424,7 +436,7 @@ class Featurizer:
     def from_json(cls, embedding_file):
         with open(embedding_file) as f:
             embedding = json.load(f)
-        allowed_types = set(embedding.keys())
+        allowed_types = embedding.keys()
         instance = cls(allowed_types)
         for key, value in embedding.items():
             instance._embedding[key] = np.array(value, dtype=float)
@@ -460,36 +472,6 @@ def RobustL2Loss(output, log_std, target):
     # NOTE can we scale log_std by something sensible to improve the OOD behaviour?
     loss = 0.5 * torch.pow(output - target, 2.0) * torch.exp(-2.0 * log_std) + log_std
     return torch.mean(loss)
-
-
-def EvidentialL2Loss(output, target, coeff=1.0):
-    # https://proceedings.neurips.cc/paper/2020/file/aab085461de182608ee9f607f3f7d18f-Paper.pdf
-
-    # NOTE how is this hyper-parameter selected?
-    output, v, alpha, beta = output.chunk(4, dim=1)
-    loss_nll = NIG_NLL(target, output, v, alpha, beta)
-    loss_reg = NIG_Reg(target, output, v, alpha, beta)
-    return loss_nll + coeff * loss_reg
-
-
-def NIG_NLL(target, output, v, alpha, beta):
-    twoBlambda = 2*beta*(1+v)
-
-    nll = 0.5*torch.log(np.pi/v)  \
-        - alpha*torch.log(twoBlambda)  \
-        + (alpha+0.5) * torch.log(v*(target-output)**2 + twoBlambda)  \
-        + torch.lgamma(alpha)  \
-        - torch.lgamma(alpha+0.5)
-
-    return torch.mean(nll)
-
-
-def NIG_Reg(y, gamma, v, alpha,):
-    error = torch.abs(y-gamma)
-    evi = 2*v+(alpha)
-    reg = error*evi
-
-    return torch.mean(reg)
 
 
 def sampled_softmax(pre_logits, log_std, samples=10):

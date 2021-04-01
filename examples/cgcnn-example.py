@@ -77,9 +77,6 @@ def main(
         fine_tune and transfer
     ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
 
-    if transfer:
-        raise NotImplementedError("Transfer option not available for CGCNN.")
-
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 

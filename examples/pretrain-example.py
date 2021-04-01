@@ -20,11 +20,9 @@ def main(
     tasks,
     losses,
     robust,
-    model_name="cgcnn",
+    model_name="pre-cgcnn",
     elem_fea_len=64,
     n_graph=4,
-    n_hidden=1,
-    h_fea_len=128,
     ensemble=1,
     run_id=1,
     data_seed=42,
@@ -32,9 +30,7 @@ def main(
     patience=None,
     log=True,
     sample=1,
-    test_size=0.2,
-    test_path=None,
-    val_size=0.0,
+    val_size=0.2,
     val_path=None,
     resume=None,
     fine_tune=None,
@@ -57,14 +53,12 @@ def main(
         evaluate or train
     ), "No action given - At least one of 'train' or 'evaluate' cli flags required"
 
-    if test_path:
-        test_size = 0.0
+    if val_path:
+        val_size = 0.0
 
-    if not (test_path and val_path):
-        assert test_size + val_size < 1.0, (
-            f"'test_size'({test_size}) "
-            f"plus 'val_size'({val_size}) must be less than 1"
-        )
+    assert val_size < 1.0, (
+        f"'val_size'({val_size}) must be less than 1"
+    )
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
@@ -76,9 +70,6 @@ def main(
     assert not (
         fine_tune and transfer
     ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
-
-    if transfer:
-        raise NotImplementedError("Transfer option not available for CGCNN.")
 
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
@@ -99,21 +90,6 @@ def main(
 
     train_idx = list(range(len(dataset)))
 
-    if evaluate:
-        if test_path:
-            print(f"using independent test set: {test_path}")
-            test_set = CrystalGraphData(
-                data_path=test_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
-            )
-            test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
-        elif test_size == 0.0:
-            raise ValueError("test-size must be non-zero to evaluate model")
-        else:
-            print(f"using {test_size} of training set as test set")
-            train_idx, test_idx = split(
-                train_idx, random_state=data_seed, test_size=test_size
-            )
-            test_set = torch.utils.data.Subset(dataset, test_idx)
 
     if train:
         if val_path:
@@ -123,21 +99,14 @@ def main(
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
-            if val_size == 0.0 and evaluate:
-                print("No validation set used, using test set for evaluation purposes")
-                # NOTE that when using this option care must be taken not to
-                # peak at the test-set. The only valid model to use is the one
-                # obtained after the final epoch where the epoch count is
-                # decided in advance of the experiment.
-                val_set = test_set
-            elif val_size == 0.0:
+            if val_size == 0.0:
                 val_set = None
             else:
                 print(f"using {val_size} of training set as validation set")
                 train_idx, val_idx = split(
                     train_idx,
                     random_state=data_seed,
-                    test_size=val_size / (1 - test_size),
+                    test_size=val_size,
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -176,8 +145,6 @@ def main(
         "nbr_fea_len": nbr_fea_len,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
-        "h_fea_len": h_fea_len,
-        "n_hidden": n_hidden,
     }
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)
@@ -205,27 +172,6 @@ def main(
             loss_dict=loss_dict,
         )
 
-    if evaluate:
-
-        data_reset = {
-            "batch_size": 16 * batch_size,  # faster model inference
-            "shuffle": False,  # need fixed data order due to ensembling
-        }
-        data_params.update(data_reset)
-
-        results_multitask(
-            model_class=CrystalGraphPreNet,
-            model_name=model_name,
-            run_id=run_id,
-            ensemble_folds=ensemble,
-            test_set=test_set,
-            data_params=data_params,
-            robust=robust,
-            task_dict=task_dict,
-            device=device,
-            eval_type="checkpoint",
-        )
-
 
 def input_parser():
     """
@@ -250,24 +196,10 @@ def input_parser():
     )
     valid_group.add_argument(
         "--val-size",
-        default=0.0,
-        type=float,
-        metavar="FLOAT",
-        help="Proportion of data used for validation",
-    )
-    test_group = parser.add_mutually_exclusive_group()
-    test_group.add_argument(
-        "--test-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent test set"
-    )
-    test_group.add_argument(
-        "--test-size",
         default=0.2,
         type=float,
         metavar="FLOAT",
-        help="Proportion of data set for testing",
+        help="Proportion of data used for validation",
     )
 
     # data embeddings
@@ -387,25 +319,11 @@ def input_parser():
         help="Number of hidden features for elements (default: 64)",
     )
     parser.add_argument(
-        "--h-fea-len",
-        default=128,
-        type=int,
-        metavar="INT",
-        help="Number of hidden features for output network (default: 128)",
-    )
-    parser.add_argument(
         "--n-graph",
         default=4,
         type=int,
         metavar="INT",
         help="Number of message passing layers (default: 3)",
-    )
-    parser.add_argument(
-        "--n-hidden",
-        default=1,
-        type=int,
-        metavar="INT",
-        help="Number of layers in output network (default: 1)",
     )
 
     # ensemble inputs
@@ -426,7 +344,7 @@ def input_parser():
     )
     name_group.add_argument(
         "--data-id",
-        default="cgcnn",
+        default="pre-cgcnn",
         type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
@@ -489,8 +407,8 @@ def input_parser():
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
     assert all(
-        [i in ["regression", "classification", "pretrain-mask"] for i in args.tasks]
-    ), "Only `regression` and `classification` are allowed as tasks"
+        [i in ["regression", "classification", "mask"] for i in args.tasks]
+    ), "Only `regression`, `classification` and `mask` are allowed as tasks"
 
     args.device = (
         torch.device("cuda")
