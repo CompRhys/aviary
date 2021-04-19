@@ -65,9 +65,9 @@ class BaseModelClass(nn.Module, ABC):
         """
         start_epoch = self.epoch
 
-        if writer is not None:
-            for name, param in self.named_parameters():
-                writer.add_histogram(name, param.clone().cpu().data.numpy(), start_epoch)
+        # if writer is not None:
+        #     for name, param in self.named_parameters():
+        #         writer.add_histogram(name, param.clone().cpu().data.numpy(), start_epoch)
 
         try:
             for epoch in range(start_epoch, start_epoch + epochs):
@@ -87,10 +87,10 @@ class BaseModelClass(nn.Module, ABC):
                         for metric, val in metrics.items():
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch)
 
-                        if epoch % 5 == 0:
-                            for name, param in self.named_parameters():
-                                writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)
-                                writer.add_histogram(name+"/grad", param.grad.clone().cpu().data.numpy(), epoch)
+                        # if epoch % 5 == 0:
+                        #     for name, param in self.named_parameters():
+                        #         writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)
+                        #         writer.add_histogram(name+"/grad", param.grad.clone().cpu().data.numpy(), epoch)
 
                 if verbose:
                     print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
