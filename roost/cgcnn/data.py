@@ -132,11 +132,12 @@ class CrystalGraphData(Dataset):
                 some_iso.append(cif_id)
 
         if (len(all_iso) > 0) or (len(some_iso) > 0):
-            print("All atoms isolated")
+            # drop the data points that do not give rise to dense crystal graphs
+            self.df = self.df.drop(self.df[self.df["material_id"].isin(all_iso)].index)
+            self.df = self.df.drop(self.df[self.df["material_id"].isin(some_iso)].index)
+
             print(all_iso)
-            print("Some atoms isolated")
             print(some_iso)
-            raise ValueError("isolated structures contained in dataframe")
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):

@@ -21,10 +21,14 @@ def main(
     losses,
     robust,
     model_name="cgcnn",
-    elem_fea_len=64,
     n_graph=4,
+    elem_fea_len=64,
     n_hidden=1,
     h_fea_len=128,
+    radius=5,
+    max_num_nbr=12,
+    dmin=0,
+    step=0.2,
     ensemble=1,
     run_id=1,
     data_seed=42,
@@ -81,10 +85,10 @@ def main(
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dist_dict = {
-        "radius": 5,
-        "max_num_nbr": 12,
-        "dmin": 0,
-        "step": 0.2,
+        "radius": radius,
+        "max_num_nbr": max_num_nbr,
+        "dmin": dmin,
+        "step": step,
     }
 
     dataset = CrystalGraphData(
@@ -403,6 +407,34 @@ def input_parser():
         type=int,
         metavar="INT",
         help="Number of layers in output network (default: 1)",
+    )
+    parser.add_argument(
+        "--radius",
+        default=5,
+        type=float,
+        metavar="FLOAT",
+        help="Maximum radius for local neighbour graph (default: 5)",
+    )
+    parser.add_argument(
+        "--max-num-nbr",
+        default=12,
+        type=int,
+        metavar="INT",
+        help="Maximum number of neighbours to consider (default: 12)",
+    )
+    parser.add_argument(
+        "--dmin",
+        default=0.0,
+        type=float,
+        metavar="FLOAT",
+        help="Minimum distance of smeared gaussian basis (default 0.0)",
+    )
+    parser.add_argument(
+        "--step",
+        default=0.2,
+        type=float,
+        metavar="FLOAT",
+        help="Step size of smeared gaussian basis (default: 0.2)",
     )
 
     # ensemble inputs

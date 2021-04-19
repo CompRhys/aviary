@@ -26,6 +26,7 @@ class CrystalGraphConvNet(BaseModelClass):
         elem_fea_len=64,
         n_graph=4,
         h_fea_len=128,
+        n_trunk=1,
         n_hidden=1,
         **kwargs,
     ):
@@ -76,12 +77,12 @@ class CrystalGraphConvNet(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
-        trunk_hidden = [h_fea_len] * n_hidden
         out_hidden = [h_fea_len] * n_hidden
-        self.trunk_nn = SimpleNetwork(elem_fea_len, out_hidden[0], trunk_hidden)
+        trunk_hidden = [h_fea_len] * n_trunk
+        self.trunk_nn = SimpleNetwork(elem_fea_len, h_fea_len, trunk_hidden)
 
         self.output_nns = nn.ModuleList(
-            SimpleNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
+            SimpleNetwork(h_fea_len, n, out_hidden) for n in n_targets
         )
 
     def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx, crystal_atom_idx):
