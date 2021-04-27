@@ -23,6 +23,12 @@ def main(
     model_name="pre-cgcnn",
     elem_fea_len=64,
     n_graph=4,
+    radius=5,
+    max_num_nbr=12,
+    dmin=0,
+    step=0.2,
+    p_mask=0.15,
+    p_zero=0.8,
     ensemble=1,
     run_id=1,
     data_seed=42,
@@ -75,21 +81,23 @@ def main(
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dist_dict = {
-        "radius": 5,
-        "max_num_nbr": 12,
-        "dmin": 0,
-        "step": 0.2,
+        "radius": radius,
+        "max_num_nbr": max_num_nbr,
+        "dmin": dmin,
+        "step": step,
+        "p_mask": p_mask,
+        "p_zero": p_zero,
     }
 
     dataset = CrystalGraphData(
         data_path=data_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
     )
+
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_fea_dim
     nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
-
 
     if train:
         if val_path:
@@ -116,6 +124,7 @@ def main(
         "batch_size": batch_size,
         "num_workers": workers,
         "pin_memory": False,
+        # "shuffle": False,
         "shuffle": True,
         "collate_fn": collate_batch,
     }
@@ -207,6 +216,7 @@ def input_parser():
         "--fea-path",
         type=str,
         default="data/el-embeddings/cgcnn-embedding.json",
+        # default="data/el-embeddings/megnet16-embedding.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
@@ -325,6 +335,48 @@ def input_parser():
         metavar="INT",
         help="Number of message passing layers (default: 3)",
     )
+    parser.add_argument(
+        "--radius",
+        default=5,
+        type=float,
+        metavar="FLOAT",
+        help="Maximum radius for local neighbour graph (default: 5)",
+    )
+    parser.add_argument(
+        "--max-num-nbr",
+        default=12,
+        type=int,
+        metavar="INT",
+        help="Maximum number of neighbours to consider (default: 12)",
+    )
+    parser.add_argument(
+        "--dmin",
+        default=0.0,
+        type=float,
+        metavar="FLOAT",
+        help="Minimum distance of smeared gaussian basis (default 0.0)",
+    )
+    parser.add_argument(
+        "--step",
+        default=0.2,
+        type=float,
+        metavar="FLOAT",
+        help="Step size of smeared gaussian basis (default: 0.2)",
+    )
+    parser.add_argument(
+        "--p-mask",
+        default=0.15,
+        type=float,
+        metavar="FLOAT",
+        help="Proportion of crystal sites to mask (default: 0.15)",
+    )
+    parser.add_argument(
+        "--p-zero",
+        default=0.8,
+        type=float,
+        metavar="FLOAT",
+        help="Proportion of masked sites to zero (default: 0.8)",
+    )
 
     # ensemble inputs
     parser.add_argument(
@@ -407,8 +459,8 @@ def input_parser():
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
     assert all(
-        [i in ["regression", "classification", "mask"] for i in args.tasks]
-    ), "Only `regression`, `classification` and `mask` are allowed as tasks"
+        [i in ["regression", "classification", "mask", "global"] for i in args.tasks]
+    ), "Only `regression`, `classification`, `mask` and `global` are allowed as tasks"
 
     args.device = (
         torch.device("cuda")

@@ -137,6 +137,12 @@ class SimpleNetwork(nn.Module):
     def __repr__(self):
         return self.__class__.__name__
 
+    def reset_parameters(self):
+        for fc in self.fcs:
+            fc.reset_parameters()
+
+        self.fc_out.reset_parameters()
+
 
 class ResidualNetwork(nn.Module):
     """

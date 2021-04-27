@@ -29,6 +29,7 @@ class CrystalGraphData(Dataset):
         dmin=0,
         step=0.2,
         p_mask=0.15,
+        p_zero=0.8,
     ):
         """CrystalGraphData returns neighbourhood graphs
 
@@ -53,6 +54,18 @@ class CrystalGraphData(Dataset):
         self.identifiers = identifiers
         self.radius = radius
         self.max_num_nbr = max_num_nbr
+        self.p_mask = p_mask
+        self.p_zero = p_zero
+
+        self.graph = ["self", "nbr", "dist"]
+
+        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
+        self.ari = Featurizer.from_json(fea_path)
+        self.ohe = Featurizer.from_json("data/el-embeddings/onehot-embedding.json")
+        self.elem_fea_dim = self.ari.embedding_size
+
+        self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
+        self.nbr_fea_dim = self.gdf.embedding_size
 
         assert os.path.exists(data_path), "{} does not exist!".format(data_path)
 
@@ -64,25 +77,19 @@ class CrystalGraphData(Dataset):
 
         self._pre_check()
 
-        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
-        self.ari = Featurizer.from_json(fea_path)
-        self.ohe = Featurizer.from_json("data/el-embeddings/onehot-embedding.json")
-        self.elem_fea_dim = self.ari.embedding_size
-
-        self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
-        self.nbr_fea_dim = self.gdf.embedding_size
-        self.p_mask = p_mask
-
         self.n_targets = []
         for target in self.task_dict:
             if self.task_dict[target] == "mask":
                 self.n_targets.append(self.ohe.embedding_size)
-            elif self.task_dict[target] == "pretrain-global":
+            elif self.task_dict[target] == "regression":
+                self.n_targets.append(1)
+            else:
                 raise NotImplementedError("bad user")
 
     def __len__(self):
         return len(self.df)
 
+    # @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def _get_nbr_data(self, crystal):
         """get neighbours for every site
 
@@ -120,11 +127,20 @@ class CrystalGraphData(Dataset):
         all_iso = []
         some_iso = []
 
-        for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
+        # initialise empty columns of objects to insert the lists
+        self.df[self.graph[0]] = [[] for _ in range(len(self.df))]
+        self.df[self.graph[1]] = [[] for _ in range(len(self.df))]
+        self.df[self.graph[2]] = [[] for _ in range(len(self.df))]
+
+        for index, row in self.df.iterrows():
+        # for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
             image = 0
 
+            cif_id = row["material_id"]
+            crystal = row["Structure_obj"]
+
             while image == 0:
-                self_idx, nbr_idx, _ = self._get_nbr_data(crystal)
+                self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
                 if np.any(self_idx == nbr_idx):
                     # TODO only double along the shortest dimension
@@ -139,12 +155,25 @@ class CrystalGraphData(Dataset):
             elif set(self_idx) != set(range(crystal.num_sites)):
                 some_iso.append(cif_id)
 
+            nbr_dist = self.gdf.expand(nbr_dist)
+
+            nbr_dist = torch.Tensor(nbr_dist)
+            self_idx = torch.LongTensor(self_idx)
+            nbr_idx = torch.LongTensor(nbr_idx)
+
+            self.df.at[index, self.graph[0]] = self_idx
+            self.df.at[index, self.graph[1]] = nbr_idx
+            self.df.at[index, self.graph[2]] = nbr_dist
+
         # TODO have the option for the pre-check to delete non-valid entries from the df?
 
         if (len(all_iso) > 0) or (len(some_iso) > 0):
+            self.df = self.df.drop(self.df[self.df["material_id"].isin(all_iso)].index)
+            self.df = self.df.drop(self.df[self.df["material_id"].isin(some_iso)].index)
+
             print(all_iso)
             print(some_iso)
-            raise ValueError("isolated structures contained in dataframe")
+            # raise ValueError("isolated structures contained in dataframe")
 
     # NOTE do not cache the pre-training structures as we want to see new sets of
     # masked structures each epoch as this effectively expands the training set
@@ -154,6 +183,7 @@ class CrystalGraphData(Dataset):
         df_idx = self.df.iloc[idx]
         crystal = df_idx["Structure_obj"]
         cif_id, comp = df_idx[self.identifiers]
+        self_idx, nbr_idx, nbr_dist = df_idx[self.graph]
 
         # atom features
         # TODO can this be vectorised with numpy?
@@ -176,28 +206,34 @@ class CrystalGraphData(Dataset):
 
         # TODO currently 20% no mask -> 10% no mask, 10% random mask
         mask_filter = np.random.rand(len(mask_ids))
-        atom_fea[mask_ids[np.where(mask_filter < 0.8)], :] = 0
+        atom_fea[mask_ids[np.where(mask_filter < self.p_zero)], :] = 0
+        # atom_fea[:, :] = 0
+
+
+        # TODO mask distances
+
+        # print(atom_fea)
+        # exit()
 
         # # # neighbours
-        self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
+        # self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
-        assert len(self_idx), f"All atoms in {cif_id} are isolated"
-        assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
-        assert set(self_idx) == set(range(crystal.num_sites)), f"At least one atom in {cif_id} is isolated"
+        # assert len(self_idx), f"All atoms in {cif_id} are isolated"
+        # assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
+        # assert set(self_idx) == set(range(crystal.num_sites)), f"At least one atom in {cif_id} is isolated"
 
-        nbr_dist = self.gdf.expand(nbr_dist)
+        # nbr_dist = self.gdf.expand(nbr_dist)
 
         atom_fea = torch.Tensor(atom_fea)
-        nbr_dist = torch.Tensor(nbr_dist)
-        self_idx = torch.LongTensor(self_idx)
-        nbr_idx = torch.LongTensor(nbr_idx)
         mask_ids = torch.LongTensor(mask_ids)
 
         targets = []
         for target in self.task_dict:
             if self.task_dict[target] == "mask":
                 targets.append(torch.Tensor(mask_labels))
-            elif self.task_dict[target] == "pretrain-global":
+            elif self.task_dict[target] == "regression":
+                targets.append(torch.Tensor([[df_idx["e_form"],],]))
+            else:
                 raise NotImplementedError("bad user")
 
         return ((atom_fea, nbr_dist, self_idx, nbr_idx, mask_ids), targets, comp, cif_id)

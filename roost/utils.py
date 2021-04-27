@@ -42,9 +42,17 @@ def init_model(
     if fine_tune is not None:
         print(f"Use material_nn and output_nn from '{fine_tune}' as a starting point")
         checkpoint = torch.load(fine_tune, map_location=device)
+
+        # update the task disk to fine tuning task
+        checkpoint["model_params"]["task_dict"] = model_params["task_dict"]
+
         model = model_class(**checkpoint["model_params"], device=device,)
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
+
+        # model.trunk_nn.reset_parameters()
+        # for m in model.output_nns:
+        #     m.reset_parameters()
 
         assert model.model_params["robust"] == robust, (
             "cannot fine-tune "
@@ -184,10 +192,7 @@ def init_normalizers(task_dict, device, resume=False):
         checkpoint = torch.load(resume, map_location=device)
         normalizer_dict = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
-            if task == "regression":
-                normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
-            else:
-                normalizer_dict[task] = None
+            normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
 
         return normalizer_dict
 
@@ -269,7 +274,7 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                log_dir=(f"runs/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}")
+                log_dir=(f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}")
             )
         else:
             writer = None
