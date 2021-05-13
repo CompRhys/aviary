@@ -207,22 +207,6 @@ class CrystalGraphData(Dataset):
         # TODO currently 20% no mask -> 10% no mask, 10% random mask
         mask_filter = np.random.rand(len(mask_ids))
         atom_fea[mask_ids[np.where(mask_filter < self.p_zero)], :] = 0
-        # atom_fea[:, :] = 0
-
-
-        # TODO mask distances
-
-        # print(atom_fea)
-        # exit()
-
-        # # # neighbours
-        # self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
-
-        # assert len(self_idx), f"All atoms in {cif_id} are isolated"
-        # assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
-        # assert set(self_idx) == set(range(crystal.num_sites)), f"At least one atom in {cif_id} is isolated"
-
-        # nbr_dist = self.gdf.expand(nbr_dist)
 
         atom_fea = torch.Tensor(atom_fea)
         mask_ids = torch.LongTensor(mask_ids)

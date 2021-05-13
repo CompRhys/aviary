@@ -265,6 +265,15 @@ class BaseModelClass(nn.Module, ABC):
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
 
+                elif task == "dist":
+                    loss = criterion(output, target)
+
+                    pred = output.data.cpu()
+                    target = target.data.cpu()
+
+                    metrics[name]['MAE'].append((pred - target).abs().mean())
+                    metrics[name]['RMSE'].append((pred - target).pow(2).mean().sqrt())
+
                 elif task == "mask":
                     logits = softmax(output, dim=-1)
                     loss = criterion(logits, target)

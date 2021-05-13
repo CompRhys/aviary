@@ -166,6 +166,14 @@ def init_losses(task_dict, loss_dict, robust=False):
             else:
                 criterion_dict[name] = (task, MSELoss())
 
+        elif task == "dist":
+            if loss_dict[name] == "L1":
+                criterion_dict[name] = (task, L1Loss())
+            elif loss_dict[name] == "L2":
+                criterion_dict[name] = (task, MSELoss())
+            else:
+                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
+
         elif task == "regression":
             if robust:
                 if loss_dict[name] == "L1":
