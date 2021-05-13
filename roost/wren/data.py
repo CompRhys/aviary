@@ -261,19 +261,18 @@ def parse_wren(swyk_list, relab_dict):
     wyk_list = []
 
     for swyk in swyk_list:
-        # mult, ele, wyk = swyk.split("_")
-        ele, wyk = swyk.split(" @ ")
-        mult, _, spg = wyk.split("-")
+        ele_mult, wyk = swyk.split(" @ ")
+        ele, mult = ele_mult.split("-")
         mult_list.append(float(mult))
         ele_list.append(ele)
         wyk_list.append(wyk)
 
+    _, spg = wyk_list[0].split("-")
+
     aug_wyks = []
     for trans in relab_dict[spg]:
         t = str.maketrans(trans)
-        aug_wyks.append(
-            tuple(",".join(wyk_list).translate(t).split(","))
-        )
+        aug_wyks.append(tuple(",".join(wyk_list).translate(t).split(",")))
 
     aug_wyks = list(set(aug_wyks))
 
