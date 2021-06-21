@@ -102,9 +102,19 @@ Predicting materials properties without crystal structure: Deep representation l
 
 ## Work Using Roost
 
+Work using Roost as presented:
+
 * A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
 
 * Active learning based generative design for the discovery of wide bandgap materials [[arXiv]](https://arxiv.org/abs/2103.00608)
+
+Work building-on/using-parts-of the code shared here:
+
+* Predicting the Outcomes of Material Syntheses with Deep Learning [[Paper]](https://pubs.acs.org/doi/abs/10.1021/acs.chemmater.0c03885)
+
+* Compositionally restricted attention-based network for materials property predictions [[Paper]](https://www.nature.com/articles/s41524-021-00545-1)
+
+* Materials Representation and Transfer Learning for Multi-Property Prediction [[arXiv]](https://arxiv.org/abs/2106.02225)
 
 
 If you have used Roost in your work please contact me and I will add your paper here.
