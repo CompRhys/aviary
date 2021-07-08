@@ -396,7 +396,7 @@ def input_parser():
     )
     name_group.add_argument(
         "--data-id",
-        default="pre-cgcnn",
+        default="pre-elem",
         type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",

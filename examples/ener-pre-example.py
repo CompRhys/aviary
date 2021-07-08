@@ -5,8 +5,8 @@ import argparse
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.cgcnn_pretrain.model import CrystalGraphPreNet
-from roost.cgcnn_pretrain.data import CrystalGraphData, collate_batch
+from roost.pretrain.ener_model import CrystalGraphPreNet
+from roost.pretrain.ener_data import CrystalGraphData, collate_batch
 from roost.utils import (
     train_ensemble,
     results_multitask,
@@ -396,7 +396,7 @@ def input_parser():
     )
     name_group.add_argument(
         "--data-id",
-        default="pre-cgcnn",
+        default="pre-ener",
         type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
