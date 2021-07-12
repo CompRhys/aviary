@@ -91,8 +91,8 @@ class CompositionData(Dataset):
 
         """
         df_idx = self.df.iloc[idx]
-        composition = df_idx[self.inputs]
-        cry_id, composition = df_idx[self.identifiers]
+        composition = df_idx[self.inputs][0]
+        cry_ids = df_idx[self.identifiers].values
 
         comp_dict = Composition(composition).get_el_amt_dict()
         elements = list(comp_dict.keys())
@@ -106,11 +106,11 @@ class CompositionData(Dataset):
             )
         except AssertionError:
             raise AssertionError(
-                f"cry-id {cry_id} [{composition}] contains element types not in embedding"
+                f"cry-id {cry_ids[0]} [{composition}] contains element types not in embedding"
             )
         except ValueError:
             raise ValueError(
-                f"cry-id {cry_id} [{composition}] composition cannot be parsed into elements"
+                f"cry-id {cry_ids[0]} [{composition}] composition cannot be parsed into elements"
             )
 
         nele = len(elements)
@@ -136,8 +136,7 @@ class CompositionData(Dataset):
         return (
             (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
             targets,
-            composition,
-            cry_id
+            *cry_ids,
         )
 
 
@@ -188,7 +187,7 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, (inputs, target, comp, cry_id) in enumerate(dataset_list):
+    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
         atom_weights, atom_fea, self_fea_idx, nbr_fea_idx = inputs
 
         # number of atoms for this crystal
@@ -207,8 +206,7 @@ def collate_batch(dataset_list):
 
         # batch the targets and ids
         batch_targets.append(target)
-        batch_comp.append(comp)
-        batch_cry_ids.append(cry_id)
+        batch_cry_ids.append(cry_ids)
 
         # increment the id counter
         cry_base_idx += n_i
@@ -222,6 +220,5 @@ def collate_batch(dataset_list):
             torch.cat(crystal_atom_idx),
         ),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        batch_comp,
-        batch_cry_ids,
+        *zip(*batch_cry_ids)
     )

@@ -401,7 +401,7 @@ def results_multitask(
             else:
                 normalizer_dict[task] = None
 
-        idx, comp, y_test, output = model.predict(generator=test_generator)
+        y_test, output, *ids = model.predict(generator=test_generator)
 
         # TODO should output also be a dictionary?
 
@@ -441,8 +441,9 @@ def results_multitask(
             elif task == "classification":
                 print_metrics_classification(**results_dict[name])
 
+    # TODO cleaner way to get identifier names
     if save_results:
-        save_results_dict(idx, comp, results_dict, model_name)
+        save_results_dict(dict(zip(test_generator.dataset.dataset.identifiers, ids)), results_dict, model_name)
 
     return results_dict
 
@@ -573,7 +574,7 @@ def print_metrics_classification(target, logits, average="micro", **kwargs):
         print(f"Weighted F-score   : {ens_fscore:.4f}")
 
 
-def save_results_dict(idx, comp, results_dict, model_name):
+def save_results_dict(ids, results_dict, model_name):
     """save the results to a file after model evaluation
 
     Args:
@@ -582,7 +583,6 @@ def save_results_dict(idx, comp, results_dict, model_name):
         results_dict ({name: {col: data}}): nested dictionary of results
         model_name (str): [description]
     """
-    core = {"id": idx, "composition": comp}
     results = {}
 
     for name in results_dict:
@@ -614,7 +614,11 @@ def save_results_dict(idx, comp, results_dict, model_name):
             elif col == "target":
                 results.update({f"{name}_{col}": data})
 
-    df = pd.DataFrame({**core, **results})
+    print(len(ids["material_id"]))
+    print(ids["material_id"])
+    print(len(results["E_f_target"]))
+
+    df = pd.DataFrame({**ids, **results})
 
     df.to_csv(
         index=False,

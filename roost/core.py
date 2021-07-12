@@ -1,6 +1,7 @@
 import gc
 import json
 import shutil
+from itertools import chain
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -316,13 +317,12 @@ class BaseModelClass(nn.Module, ABC):
         """
 
         test_ids = []
-        test_comp = []
         test_targets = []
         test_outputs = []
         # Ensure model is in evaluation mode
         self.eval()
 
-        for input_, targets, batch_comp, batch_ids in tqdm(generator, disable=not verbose):
+        for input_, targets, *batch_ids in tqdm(generator, disable=not verbose):
 
             # move tensors to device (GPU or CPU)
             input_ = (tensor.to(self.device) for tensor in input_)
@@ -331,18 +331,18 @@ class BaseModelClass(nn.Module, ABC):
             output = self(*input_)
 
             # collect the model outputs
-            test_ids += batch_ids
-            test_comp += batch_comp
+
+            test_ids.append(batch_ids)
             test_targets.append(targets)
             test_outputs.append(output)
 
         return (
-            test_ids,
-            test_comp,
             # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
             # for multitask learning
             (torch.cat(test_t, dim=0).view(-1).numpy() for test_t in zip(*test_targets)),
             (torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
+            # return identifier columns
+            *[list(chain(*x)) for x in list(zip(*test_ids))],
         )
 
     @torch.no_grad()

@@ -1,8 +1,9 @@
 import os
-import ast
+import re
 import json
+import ast
 import functools
-import pathlib
+from itertools import groupby
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,8 @@ import torch
 from torch.utils.data import Dataset
 
 from roost.core import Featurizer
+from roost.wren.utils import relab_dict
+from roost.wren.utils import mult_dict
 
 
 class WyckoffData(Dataset):
@@ -26,7 +29,7 @@ class WyckoffData(Dataset):
         fea_path,
         task_dict,
         inputs=["wyckoff"],
-        identifiers=["material_id", "composition"],
+        identifiers=["material_id", "composition", "wyckoff"],
     ):
         """[summary]
 
@@ -38,7 +41,7 @@ class WyckoffData(Dataset):
             inputs (list, optional): [description]. Defaults to ["composition"].
             identifiers (list, optional): [description]. Defaults to ["material_id", "composition"].
         """
-        assert len(identifiers) == 2, "Two identifiers are required"
+        assert len(identifiers) >= 2, "Two identifiers are required"
         assert len(inputs) == 1, "One input column required"
 
         self.inputs = inputs
@@ -51,21 +54,22 @@ class WyckoffData(Dataset):
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
         assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
-        self.atom_features = Featurizer.from_json(fea_path)
+
+        # TODO now using 2 level dicts so can't use featuriser, can this be standardised?
+        # self.atom_features = Featurizer.from_json(fea_path)
+        with open(fea_path) as f:
+            self.atom_features = json.load(f)
 
         assert os.path.exists(sym_path), "{} does not exist!".format(sym_path)
-        self.sym_features = Featurizer.from_json(sym_path)
+        # self.sym_features = Featurizer.from_json(sym_path)
+        with open(sym_path) as f:
+            self.sym_features = json.load(f)
 
-        # TODO clean this up to use package reasources
-        path = pathlib.Path(__file__).parent.absolute()
-        with open(os.path.join(path, "relab.json"), 'r') as f:
-            self.relab_dict = json.load(f)
+        # self.elem_fea_dim = self.atom_features.embedding_size
+        # self.sym_fea_dim = self.sym_features.embedding_size
 
-        for k, v in self.relab_dict.items():
-            self.relab_dict[k] = [{int(sk): sv for sk, sv in l.items()} for l in v]
-
-        self.elem_fea_dim = self.atom_features.embedding_size
-        self.sym_fea_dim = self.sym_features.embedding_size
+        self.elem_fea_dim = len(list(self.atom_features.values())[0])
+        self.sym_fea_dim = len(list(list(self.sym_features.values())[0].values())[0])
 
         self.n_targets = []
         for target, task in self.task_dict.items():
@@ -102,20 +106,25 @@ class WyckoffData(Dataset):
             cry_id: torch.Tensor shape (1,)
                 input id for the material
         """
-        cry_id, composition, swyks = self.df.iloc[idx][self.identifiers+self.inputs]
+        df_idx = self.df.iloc[idx]
+        swyks = df_idx[self.inputs][0]
+        cry_ids = df_idx[self.identifiers].values
 
-        weights, elements, aug_wyks = parse_wren(swyks, self.relab_dict)
+        # print(cry_id, composition, swyks)
+
+        spg_no, weights, elements, aug_wyks = parse_aflow(swyks)
+        # spg_no, weights, elements, aug_wyks = parse_wren(swyks)
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
             atom_fea = np.vstack(
-                [self.atom_features.get_fea(el) for el in elements]
+                [self.atom_features[el] for el in elements]
             )
             sym_fea = np.vstack(
-                [self.sym_features.get_fea(wyk) for wyks in aug_wyks for wyk in wyks]
+                [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
             )
         except AssertionError:
-            print(f"failed to process {cry_id}: {composition}")
+            print(f"failed to process {cry_ids[0]}: {cry_ids[1]}-{swyks}")
             raise
 
         n_wyks = len(elements)
@@ -149,8 +158,7 @@ class WyckoffData(Dataset):
         return (
             (atom_weights, atom_fea, sym_fea, self_fea_idx, nbr_fea_idx),
             targets,
-            composition,
-            cry_id,
+            *cry_ids,
         )
 
 
@@ -192,12 +200,11 @@ def collate_batch(dataset_list):
     crystal_atom_idx = []
     aug_cry_idx = []
     batch_targets = []
-    batch_comp = []
     batch_cry_ids = []
 
     aug_count = 0
     cry_base_idx = 0
-    for i, (inputs, target, comp, cry_id) in enumerate(dataset_list):
+    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
         atom_weights, atom_fea, sym_fea, self_fea_idx, nbr_fea_idx = inputs
 
         # number of atoms for this crystal
@@ -219,10 +226,10 @@ def collate_batch(dataset_list):
         crystal_atom_idx.append(torch.tensor(range(aug_count, aug_count+n_aug)).repeat_interleave(n_el))
         aug_cry_idx.append(torch.tensor([i] * n_aug))
 
+
         # batch the targets and ids
         batch_targets.append(target)
-        batch_comp.append(comp)
-        batch_cry_ids.append(cry_id)
+        batch_cry_ids.append(cry_ids)
 
         # increment the id counter
         aug_count += n_aug
@@ -239,17 +246,15 @@ def collate_batch(dataset_list):
             torch.cat(aug_cry_idx),
         ),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        batch_comp,
-        batch_cry_ids,
+        *zip(*batch_cry_ids),
     )
 
 
-def parse_wren(swyk_list, relab_dict):
+def parse_wren(swyk_list):
     """parse the wyckoff format
 
     Args:
         swyk_list ([type]): [description]
-        relab_dict ([type]): [description]
 
     Returns:
         mult_list, ele_list, aug_wyks
@@ -260,20 +265,72 @@ def parse_wren(swyk_list, relab_dict):
     ele_list = []
     wyk_list = []
 
+    spg_no = swyk_list[0].split("-")[-1]
+
     for swyk in swyk_list:
         ele_mult, wyk = swyk.split(" @ ")
         ele, mult = ele_mult.split("-")
+        let, _ = wyk.split("-")
+
+        # ele, wyk = swyk.split(" @ ")
+        # mult, let, _ = wyk.split("-")
+
         mult_list.append(float(mult))
         ele_list.append(ele)
-        wyk_list.append(wyk)
-
-    _, spg = wyk_list[0].split("-")
+        wyk_list.append(let)
 
     aug_wyks = []
-    for trans in relab_dict[spg]:
+    for trans in relab_dict[spg_no]:
         t = str.maketrans(trans)
         aug_wyks.append(tuple(",".join(wyk_list).translate(t).split(",")))
 
     aug_wyks = list(set(aug_wyks))
+    # print(len(aug_wyks))
+    # print(aug_wyks)
+    # exit()
 
-    return mult_list, ele_list, aug_wyks
+    return spg_no, mult_list, ele_list, aug_wyks
+
+
+def parse_aflow(aflow_label):
+    """parse the wyckoff format
+
+    Args:
+        swyk_list ([type]): [description]
+        relab_dict ([type]): [description]
+
+    Returns:
+        mult_list, ele_list, aug_wyks
+    """
+    proto, chemsys = aflow_label.split(":")
+    elems = chemsys.split("-")
+    _, _, spg_no, *wyks = proto.split("_")
+
+    mult_list = []
+    ele_list = []
+    wyk_list = []
+
+    subst = r"1\g<1>"
+    for el, wyk in zip(elems, wyks):
+        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
+        sep_n_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+
+        for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
+            n = int(n)
+            ele_list.extend([el]*n)
+            wyk_list.extend([l]*n)
+            mult_list.extend([float(mult_dict[spg_no][l])]*n)
+
+    aug_wyks = []
+    for trans in relab_dict[spg_no]:
+        t = str.maketrans(trans)
+        aug_wyks.append(tuple(",".join(wyk_list).translate(t).split(",")))
+
+    aug_wyks = list(set(aug_wyks))
+    # print(len(aug_wyks))
+    # print(aug_wyks)
+    # exit()
+
+    return spg_no, mult_list, ele_list, aug_wyks
+
+
