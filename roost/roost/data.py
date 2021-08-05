@@ -116,6 +116,7 @@ class CompositionData(Dataset):
         nele = len(elements)
         self_fea_idx = []
         nbr_fea_idx = []
+        nbrs = len(elements)
         for i, _ in enumerate(elements):
             self_fea_idx += [i] * nele
             nbr_fea_idx += list(range(nele))
