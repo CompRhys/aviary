@@ -614,10 +614,6 @@ def save_results_dict(ids, results_dict, model_name):
             elif col == "target":
                 results.update({f"{name}_{col}": data})
 
-    print(len(ids["material_id"]))
-    print(ids["material_id"])
-    print(len(results["E_f_target"]))
-
     df = pd.DataFrame({**ids, **results})
 
     df.to_csv(
