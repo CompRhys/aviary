@@ -28,7 +28,7 @@ relab_dict = {
 cry_sys_dict = {
         "triclinic": "a",
         'monoclinic': "m",
-        'orthorhombic': "m",
+        'orthorhombic': "o",
         'tetragonal': "t",
         'trigonal': "h",
         'hexagonal': "h",
