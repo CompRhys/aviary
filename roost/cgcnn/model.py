@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from roost.core import BaseModelClass
 from roost.segments import MeanPooling, SumPooling, SimpleNetwork
 
@@ -17,7 +19,6 @@ class CrystalGraphConvNet(BaseModelClass):
 
     def __init__(
         self,
-        task,
         robust,
         n_targets,
         elem_emb_len,
@@ -25,6 +26,7 @@ class CrystalGraphConvNet(BaseModelClass):
         elem_fea_len=64,
         n_graph=4,
         h_fea_len=128,
+        n_trunk=1,
         n_hidden=1,
         **kwargs,
     ):
@@ -47,7 +49,7 @@ class CrystalGraphConvNet(BaseModelClass):
         n_hidden: int
             Number of hidden layers after pooling
         """
-        super().__init__(task=task, robust=robust, n_targets=n_targets, **kwargs)
+        super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -56,11 +58,10 @@ class CrystalGraphConvNet(BaseModelClass):
             "n_graph": n_graph,
         }
 
-        self.material_nn = DescriptorNetwork(**desc_dict)
+        self.node_nn = DescriptorNetwork(**desc_dict)
 
         self.model_params.update(
             {
-                "task": task,
                 "robust": robust,
                 "n_targets": n_targets,
                 "h_fea_len": h_fea_len,
@@ -70,19 +71,21 @@ class CrystalGraphConvNet(BaseModelClass):
 
         self.model_params.update(desc_dict)
 
+        self.pooling = MeanPooling()
+
+        # define an output neural network
         if self.robust:
-            output_dim = 2 * n_targets
-        else:
-            output_dim = n_targets
+            n_targets = [2 * n for n in n_targets]
 
         out_hidden = [h_fea_len] * n_hidden
+        trunk_hidden = [h_fea_len] * n_trunk
+        self.trunk_nn = SimpleNetwork(elem_fea_len, h_fea_len, trunk_hidden)
 
-        # NOTE the original model used softpluses as activation functions
-        self.output_nn = SimpleNetwork(
-            elem_fea_len, output_dim, out_hidden, nn.Softplus
+        self.output_nns = nn.ModuleList(
+            SimpleNetwork(h_fea_len, n, out_hidden) for n in n_targets
         )
 
-    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
+    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx, crystal_atom_idx):
         """
         Forward pass
 
@@ -109,12 +112,19 @@ class CrystalGraphConvNet(BaseModelClass):
             Atom hidden features after convolution
 
         """
-        crys_fea = self.material_nn(
-            atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx
+        atom_fea = self.node_nn(
+            atom_fea, nbr_fea, self_idx, nbr_idx
         )
 
+        crys_fea = self.pooling(atom_fea, crystal_atom_idx)
+
+        # NOTE required to match the reference implementation
+        crys_fea = nn.functional.softplus(crys_fea)
+
+        crys_fea = F.relu(self.trunk_nn(crys_fea))
+
         # apply neural network to map from learned features to target
-        return self.output_nn(crys_fea)
+        return (output_nn(crys_fea) for output_nn in self.output_nns)
 
 
 class DescriptorNetwork(nn.Module):
@@ -133,15 +143,13 @@ class DescriptorNetwork(nn.Module):
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
         self.convs = nn.ModuleList(
-            [ConvLayer(
+            [CGCNNConv(
                 elem_fea_len=elem_fea_len,
                 nbr_fea_len=nbr_fea_len
             ) for _ in range(n_graph)]
         )
 
-        self.pooling = MeanPooling()
-
-    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx, crystal_atom_idx):
+    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx):
         """
         Forward pass
 
@@ -173,22 +181,17 @@ class DescriptorNetwork(nn.Module):
         for conv_func in self.convs:
             atom_fea = conv_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
 
-        crys_fea = self.pooling(atom_fea, crystal_atom_idx)
-
-        # NOTE required to match the reference implementation
-        crys_fea = nn.functional.softplus(crys_fea)
-
-        return crys_fea
+        return atom_fea
 
 
-class ConvLayer(nn.Module):
+class CGCNNConv(nn.Module):
     """
     Convolutional operation on graphs
     """
 
     def __init__(self, elem_fea_len, nbr_fea_len):
         """
-        Initialize ConvLayer.
+        Initialize CGCNNConv.
 
         Parameters
         ----------

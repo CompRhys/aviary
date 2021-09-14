@@ -5,11 +5,11 @@ import argparse
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.roost.model import Roost
-from roost.roost.data import CompositionData, collate_batch
+from roost.pretrain.ele_model import CrystalGraphPreNet
+from roost.pretrain.ele_data import CrystalGraphData, collate_batch
 from roost.utils import (
     train_ensemble,
-    results_multitask
+    results_multitask,
 )
 
 
@@ -20,9 +20,15 @@ def main(
     tasks,
     losses,
     robust,
-    model_name="roost",
+    model_name="pre-cgcnn",
     elem_fea_len=64,
-    n_graph=3,
+    n_graph=4,
+    radius=5,
+    max_num_nbr=12,
+    dmin=0,
+    step=0.2,
+    p_mask=0.15,
+    p_zero=0.8,
     ensemble=1,
     run_id=1,
     data_seed=42,
@@ -30,9 +36,7 @@ def main(
     patience=None,
     log=True,
     sample=1,
-    test_size=0.2,
-    test_path=None,
-    val_size=0.0,
+    val_size=0.2,
     val_path=None,
     resume=None,
     fine_tune=None,
@@ -48,20 +52,19 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
+
     assert len(targets) == len(tasks) == len(losses)
 
-    assert evaluate or train, (
-        "No action given - At least one of 'train' or 'evaluate' cli flags required"
+    assert (
+        evaluate or train
+    ), "No action given - At least one of 'train' or 'evaluate' cli flags required"
+
+    if val_path:
+        val_size = 0.0
+
+    assert val_size < 1.0, (
+        f"'val_size'({val_size}) must be less than 1"
     )
-
-    if test_path:
-        test_size = 0.0
-
-    if not (test_path and val_path):
-        assert test_size + val_size < 1.0, (
-            f"'test_size'({test_size}) "
-            f"plus 'val_size'({val_size}) must be less than 1"
-        )
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
@@ -70,64 +73,48 @@ def main(
             " run-id flag."
         )
 
-    assert not (fine_tune and transfer), (
-        "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
-    )
+    assert not (
+        fine_tune and transfer
+    ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
 
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
-    dataset = CompositionData(
-        data_path=data_path,
-        fea_path=fea_path,
-        task_dict=task_dict
+    dist_dict = {
+        "radius": radius,
+        "max_num_nbr": max_num_nbr,
+        "dmin": dmin,
+        "step": step,
+        "p_mask": p_mask,
+        "p_zero": p_zero,
+    }
+
+    dataset = CrystalGraphData(
+        data_path=data_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
     )
+
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
+    elem_emb_len = dataset.elem_fea_dim
+    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
-
-    if evaluate:
-        if test_path:
-            print(f"using independent test set: {test_path}")
-            test_set = CompositionData(
-                data_path=test_path,
-                fea_path=fea_path,
-                task_dict=task_dict
-            )
-            test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
-        elif test_size == 0.0:
-            raise ValueError("test-size must be non-zero to evaluate model")
-        else:
-            print(f"using {test_size} of training set as test set")
-            train_idx, test_idx = split(
-                train_idx, random_state=data_seed, test_size=test_size
-            )
-            test_set = torch.utils.data.Subset(dataset, test_idx)
 
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(
-                data_path=val_path,
-                fea_path=fea_path,
-                task_dict=task_dict
+            val_set = CrystalGraphData(
+                data_path=val_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
-            if val_size == 0.0 and evaluate:
-                print("No validation set used, using test set for evaluation purposes")
-                # NOTE that when using this option care must be taken not to
-                # peak at the test-set. The only valid model to use is the one
-                # obtained after the final epoch where the epoch count is
-                # decided in advance of the experiment.
-                val_set = test_set
-            elif val_size == 0.0:
+            if val_size == 0.0:
                 val_set = None
             else:
                 print(f"using {val_size} of training set as validation set")
                 train_idx, val_idx = split(
-                    train_idx, random_state=data_seed, test_size=val_size / (1 - test_size),
+                    train_idx,
+                    random_state=data_seed,
+                    test_size=val_size,
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -137,6 +124,7 @@ def main(
         "batch_size": batch_size,
         "num_workers": workers,
         "pin_memory": False,
+        # "shuffle": False,
         "shuffle": True,
         "collate_fn": collate_batch,
     }
@@ -163,16 +151,9 @@ def main(
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
+        "nbr_fea_len": nbr_fea_len,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
-        "elem_heads": 3,
-        "elem_gate": [256],
-        "elem_msg": [256],
-        "cry_heads": 3,
-        "cry_gate": [256],
-        "cry_msg": [256],
-        "trunk_hidden": [1024, 512],
-        "out_hidden": [256, 128, 64],
     }
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)
@@ -182,11 +163,9 @@ def main(
 
     os.makedirs("results/", exist_ok=True)
 
-    # TODO dump all args/kwargs to a file for reproducibility.
-
     if train:
         train_ensemble(
-            model_class=Roost,
+            model_class=CrystalGraphPreNet,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
@@ -202,44 +181,18 @@ def main(
             loss_dict=loss_dict,
         )
 
-    if evaluate:
-
-        data_reset = {
-            "batch_size": 16 * batch_size,  # faster model inference
-            "shuffle": False,  # need fixed data order due to ensembling
-        }
-        data_params.update(data_reset)
-
-        results_multitask(
-                model_class=Roost,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
-                task_dict=task_dict,
-                device=device,
-                eval_type="checkpoint",
-            )
-
 
 def input_parser():
     """
     parse input
     """
-    parser = argparse.ArgumentParser(
-        description=(
-            "Roost - a Structure Agnostic Message Passing "
-            "Neural Network for Inorganic Materials"
-        )
-    )
+    parser = argparse.ArgumentParser(description=("cgcnn"))
 
     # data inputs
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/roost/expt-non-metals.csv",
+        default="data/datasets/tests/cgcnn-regression.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -252,31 +205,18 @@ def input_parser():
     )
     valid_group.add_argument(
         "--val-size",
-        default=0.0,
-        type=float,
-        metavar="FLOAT",
-        help="Proportion of data used for validation",
-    )
-    test_group = parser.add_mutually_exclusive_group()
-    test_group.add_argument(
-        "--test-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent test set"
-    )
-    test_group.add_argument(
-        "--test-size",
         default=0.2,
         type=float,
         metavar="FLOAT",
-        help="Proportion of data set for testing",
+        help="Proportion of data used for validation",
     )
 
     # data embeddings
     parser.add_argument(
         "--fea-path",
         type=str,
-        default="data/el-embeddings/matscholar-embedding.json",
+        default="data/el-embeddings/cgcnn-embedding.json",
+        # default="data/el-embeddings/megnet16-embedding.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
@@ -320,7 +260,6 @@ def input_parser():
         metavar="STR",
         help="Task types for targets",
     )
-
     parser.add_argument(
         "--tasks",
         nargs="*",
@@ -329,7 +268,6 @@ def input_parser():
         metavar="STR",
         help="Task types for targets",
     )
-
     parser.add_argument(
         "--losses",
         nargs="*",
@@ -392,10 +330,52 @@ def input_parser():
     )
     parser.add_argument(
         "--n-graph",
-        default=3,
+        default=4,
         type=int,
         metavar="INT",
         help="Number of message passing layers (default: 3)",
+    )
+    parser.add_argument(
+        "--radius",
+        default=5,
+        type=float,
+        metavar="FLOAT",
+        help="Maximum radius for local neighbour graph (default: 5)",
+    )
+    parser.add_argument(
+        "--max-num-nbr",
+        default=12,
+        type=int,
+        metavar="INT",
+        help="Maximum number of neighbours to consider (default: 12)",
+    )
+    parser.add_argument(
+        "--dmin",
+        default=0.0,
+        type=float,
+        metavar="FLOAT",
+        help="Minimum distance of smeared gaussian basis (default 0.0)",
+    )
+    parser.add_argument(
+        "--step",
+        default=0.2,
+        type=float,
+        metavar="FLOAT",
+        help="Step size of smeared gaussian basis (default: 0.2)",
+    )
+    parser.add_argument(
+        "--p-mask",
+        default=0.15,
+        type=float,
+        metavar="FLOAT",
+        help="Proportion of crystal sites to mask (default: 0.15)",
+    )
+    parser.add_argument(
+        "--p-zero",
+        default=0.8,
+        type=float,
+        metavar="FLOAT",
+        help="Proportion of masked sites to zero (default: 0.8)",
     )
 
     # ensemble inputs
@@ -416,7 +396,7 @@ def input_parser():
     )
     name_group.add_argument(
         "--data-id",
-        default="roost",
+        default="pre-elem",
         type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
@@ -475,12 +455,12 @@ def input_parser():
 
     args = parser.parse_args(sys.argv[1:])
 
-    assert all([i in ["regression", "classification"] for i in args.tasks]), (
-        "Only `regression` and `classification` are allowed as tasks"
-    )
-
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
+
+    assert all(
+        [i in ["regression", "classification", "mask", "global"] for i in args.tasks]
+    ), "Only `regression`, `classification`, `mask` and `global` are allowed as tasks"
 
     args.device = (
         torch.device("cuda")

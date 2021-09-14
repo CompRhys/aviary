@@ -1,6 +1,11 @@
-# RooSt &nbsp; [![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+<h1 align="center">Roost</h1>
+<h4 align="center">Representation Learning from Stoichiometry</h4>
 
-**R**epresentati**o**n Learning fr**o**m **St**oichiometry
+[![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+[![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
+[![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)
+
 
 ## Premise
 
@@ -85,7 +90,7 @@ This will output the various command-line flags that can be used to control the 
 
 If you use this code please cite our work for which this model was built:
 
-Predicting materials properties without crystal structure: Deep representation learning from stoichiometry [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
+Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
 
 ```tex
 @article{goodall2020predicting,
@@ -100,9 +105,22 @@ Predicting materials properties without crystal structure: Deep representation l
 }
 ```
 
-## Work Using Roost
+## Work Featuring Roost
 
-A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
+Work using Roost as presented:
+
+* A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
+
+* Active learning based generative design for the discovery of wide bandgap materials. [[arXiv]](https://arxiv.org/abs/2103.00608)
+
+Work building-on/using-parts-of the code shared here:
+
+* Predicting the Outcomes of Material Syntheses with Deep Learning [[Paper]](https://pubs.acs.org/doi/abs/10.1021/acs.chemmater.0c03885)
+
+* Compositionally restricted attention-based network for materials property predictions [[Paper]](https://www.nature.com/articles/s41524-021-00545-1)
+
+* Materials Representation and Transfer Learning for Multi-Property Prediction [[arXiv]](https://arxiv.org/abs/2106.02225)
+
 
 If you have used Roost in your work please contact me and I will add your paper here.
 

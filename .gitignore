@@ -110,20 +110,16 @@ venv.bak/
 # notebooks
 .ipynb_checkpoints/
 
-# local files
+# exclude model outputs from github
 runs/
 results/
 models/
-cds3/
-*.csv
-cache/
-data/datasets/process/
 
-# new work
-data/wren/
-roost/wren/
-roost/swren/
-roost/hwren/
-examples/wren-example.py
-examples/swren.py
-examples/hwren.py
+# exclude local slurm and plotting scripts
+process/
+papers/
+cds3/
+
+# exclude local data and cached graphs
+*.csv
+*.pkl
