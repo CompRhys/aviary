@@ -65,7 +65,9 @@ class CrystalGraphData(Dataset):
         assert os.path.exists(data_path), f"{data_path} does not exist!"
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
-        self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[], comment="#")
+        self.df = pd.read_csv(
+            data_path, keep_default_na=False, na_values=[], comment="#"
+        )
 
         self.df["Structure_obj"] = self.df[inputs].apply(get_structure, axis=1)
 
@@ -98,9 +100,9 @@ class CrystalGraphData(Dataset):
 
             for i, g in groupby(zip(self_idx, nbr_idx, nbr_dist), key=lambda x: x[0]):
                 s, n, d = zip(*sorted(g, key=lambda x: x[2]))
-                _self_idx.extend(s[:self.max_num_nbr])
-                _nbr_idx.extend(n[:self.max_num_nbr])
-                _nbr_dist.extend(d[:self.max_num_nbr])
+                _self_idx.extend(s[: self.max_num_nbr])
+                _nbr_idx.extend(n[: self.max_num_nbr])
+                _nbr_dist.extend(d[: self.max_num_nbr])
 
             self_idx = np.array(_self_idx)
             nbr_idx = np.array(_nbr_idx)
@@ -146,7 +148,10 @@ class CrystalGraphData(Dataset):
         # atom features for disordered sites
         site_atoms = [atom.species.as_dict() for atom in crystal]
         atom_fea = np.vstack(
-            [np.sum([self.ari.get_fea(el)*amt for el, amt in site.items()], axis=0) for site in site_atoms]
+            [
+                np.sum([self.ari.get_fea(el) * amt for el, amt in site.items()], axis=0)
+                for site in site_atoms
+            ]
         )
 
         # # # neighbours
@@ -154,7 +159,9 @@ class CrystalGraphData(Dataset):
 
         assert len(self_idx), f"All atoms in {cif_id} are isolated"
         assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
-        assert set(self_idx) == set(range(crystal.num_sites)), f"At least one atom in {cif_id} is isolated"
+        assert set(self_idx) == set(
+            range(crystal.num_sites)
+        ), f"At least one atom in {cif_id} is isolated"
 
         nbr_dist = self.gdf.expand(nbr_dist)
 
@@ -289,18 +296,16 @@ def collate_batch(dataset_list):
 
 
 def get_structure(cols):
-    """ Return pymatgen structure from lattice and sites cols """
+    """Return pymatgen structure from lattice and sites cols"""
     cell, sites = cols
     cell, elems, coords = parse_cgcnn(cell, sites)
     # NOTE getting primative structure before constructing graph
     # significantly harms the performnace of this model.
-    return Structure(
-        lattice=cell, species=elems, coords=coords, to_unit_cell=True
-    )
+    return Structure(lattice=cell, species=elems, coords=coords, to_unit_cell=True)
 
 
 def parse_cgcnn(cell, sites):
-    """ Parse str representation into lists """
+    """Parse str representation into lists"""
     cell = np.array(ast.literal_eval(cell), dtype=float)
     elems = []
     coords = []

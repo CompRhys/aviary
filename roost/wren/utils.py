@@ -10,7 +10,9 @@ from pymatgen.core.composition import Composition
 from pymatgen.io.vasp import Poscar
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-mult_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "allowed-wp-mult.json")
+mult_file = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "allowed-wp-mult.json"
+)
 param_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-params.json")
 relab_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relab.json")
 
@@ -30,12 +32,12 @@ relab_dict = {
 
 cry_sys_dict = {
     "triclinic": "a",
-    'monoclinic': "m",
-    'orthorhombic': "o",
-    'tetragonal': "t",
-    'trigonal': "h",
-    'hexagonal': "h",
-    'cubic': "c",
+    "monoclinic": "m",
+    "orthorhombic": "o",
+    "tetragonal": "t",
+    "trigonal": "h",
+    "hexagonal": "h",
+    "cubic": "c",
 }
 
 cry_param_dict = {
@@ -75,7 +77,9 @@ def get_aflow_label_aflow(struct, aflow_executable=AFLOW_EXECUTABLE) -> str:
 
     aflow_label = aflow_proto["aflow_label"]
 
-    aflow_label = aflow_label.replace("alpha", "A")  # to be consistent with spglib and wren embeddings
+    aflow_label = aflow_label.replace(
+        "alpha", "A"
+    )  # to be consistent with spglib and wren embeddings
 
     # check that multiplicities satisfy original composition
     symm = aflow_label.split("_")
@@ -92,7 +96,7 @@ def get_aflow_label_aflow(struct, aflow_executable=AFLOW_EXECUTABLE) -> str:
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
         )
 
-    aflow_label += ":"+"-".join(elems)
+    aflow_label += ":" + "-".join(elems)
 
     eqi_comp = Composition(elem_dict)
     if not eqi_comp.reduced_formula == struct.composition.reduced_formula:
@@ -116,7 +120,9 @@ def get_aflow_label_spglib(struct) -> str:
     # try again with refined structure if it initially fails
     # NOTE structures with magmoms fail unless all have same magmom
     if "Invalid" in aflow:
-        spga = SpacegroupAnalyzer(spga.get_refined_structure(), symprec=1e-5, angle_tolerance=-1)
+        spga = SpacegroupAnalyzer(
+            spga.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
+        )
         aflow = get_aflow_label_from_spga(spga)
 
     return aflow
@@ -139,7 +145,9 @@ def get_aflow_label_from_spga(spga):
         g = list(g)
         elem_dict[el] = sum(float(mult_dict[str(spg_no)][e[2]]) for e in g)
         wyks = ""
-        for wyk, w in groupby(g, key=lambda x: x[2]):  # sort alphabetically by wyckoff letter
+        for wyk, w in groupby(
+            g, key=lambda x: x[2]
+        ):  # sort alphabetically by wyckoff letter
             w = list(w)
             wyks += f"{len(w)}{wyk}"
         elem_wyks.append(wyks)
@@ -158,7 +166,8 @@ def get_aflow_label_from_spga(spga):
     prototype_form = prototype_formula(spga._structure.composition)
 
     aflow_label = (
-        f"{prototype_form}_{pearson}_{spg_no}_{cannonical}:{spga._structure.composition.chemical_system}"
+        f"{prototype_form}_{pearson}_{spg_no}_{cannonical}:"
+        f"{spga._structure.composition.chemical_system}"
     )
 
     eqi_comp = Composition(elem_dict)
@@ -191,12 +200,14 @@ def cannonicalise_elem_wyks(elem_wyks, spg_no):
             sep_el_wyks = ["".join(g) for _, g in groupby(el_wyks, str.isalpha)]
             sep_el_wyks = ["" if i == "1" else i for i in sep_el_wyks]
             sorted_el_wyks.append(
-                "".join([
-                    f"{n}{w}"
-                    for n, w in sorted(
-                        zip(sep_el_wyks[0::2], sep_el_wyks[1::2]),
-                        key=lambda x: x[1],
-                    )]
+                "".join(
+                    [
+                        f"{n}{w}"
+                        for n, w in sorted(
+                            zip(sep_el_wyks[0::2], sep_el_wyks[1::2]),
+                            key=lambda x: x[1],
+                        )
+                    ]
                 )
             )
             score += sum(0 if l == "A" else ord(l) - 96 for l in sep_el_wyks[1::2])
@@ -265,7 +276,10 @@ def count_params(aflow_label):
         wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
         sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
         try:
-            num_params += sum(float(n) * param_dict[spg][k] for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2]))
+            num_params += sum(
+                float(n) * param_dict[spg][k]
+                for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
+            )
         except ValueError:
             print(sep_el_wyks)
             raise

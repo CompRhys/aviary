@@ -16,7 +16,6 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from roost.core import Normalizer, RobustL1Loss, RobustL2Loss, sampled_softmax
-from roost.segments import ResidualNetwork
 
 
 def init_model(
@@ -46,7 +45,10 @@ def init_model(
         # update the task disk to fine tuning task
         checkpoint["model_params"]["task_dict"] = model_params["task_dict"]
 
-        model = model_class(**checkpoint["model_params"], device=device,)
+        model = model_class(
+            **checkpoint["model_params"],
+            device=device,
+        )
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -76,7 +78,9 @@ def init_model(
         model.to(device)
 
         model_dict = model.state_dict()
-        pretrained_dict = {k: v for k, v in checkpoint["state_dict"].items() if k in model_dict}
+        pretrained_dict = {
+            k: v for k, v in checkpoint["state_dict"].items() if k in model_dict
+        }
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
 
@@ -86,7 +90,10 @@ def init_model(
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        model = model_class(**checkpoint["model_params"], device=device,)
+        model = model_class(
+            **checkpoint["model_params"],
+            device=device,
+        )
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
         model.epoch = checkpoint["epoch"]
@@ -146,9 +153,7 @@ def init_losses(task_dict, loss_dict, robust=False):
         # Select Task and Loss Function
         if task == "classification":
             if loss_dict[name] != "CSE":
-                raise NameError(
-                    "Only CSE loss allowed for classification tasks"
-                )
+                raise NameError("Only CSE loss allowed for classification tasks")
 
             if robust:
                 criterion_dict[name] = (task, NLLLoss())
@@ -157,9 +162,7 @@ def init_losses(task_dict, loss_dict, robust=False):
 
         if task == "mask":
             if loss_dict[name] != "Brier":
-                raise NameError(
-                    "Only Brier loss allowed for masking tasks"
-                )
+                raise NameError("Only Brier loss allowed for masking tasks")
 
             if robust:
                 criterion_dict[name] = (task, MSELoss())
@@ -190,7 +193,9 @@ def init_losses(task_dict, loss_dict, robust=False):
                 elif loss_dict[name] == "L2":
                     criterion_dict[name] = (task, MSELoss())
                 else:
-                    raise NameError("Only L1 or L2 losses are allowed for regression tasks")
+                    raise NameError(
+                        "Only L1 or L2 losses are allowed for regression tasks"
+                    )
 
     return criterion_dict
 
@@ -258,15 +263,9 @@ def train_ensemble(
             **restart_params,
         )
 
-        criterion_dict = init_losses(
-            model.task_dict,
-            loss_dict,
-            model_params["robust"]
-        )
+        criterion_dict = init_losses(model.task_dict, loss_dict, model_params["robust"])
         normalizer_dict = init_normalizers(
-            model.task_dict,
-            setup_params["device"],
-            restart_params["resume"]
+            model.task_dict, setup_params["device"], restart_params["resume"]
         )
 
         for target, normalizer in normalizer_dict.items():
@@ -282,7 +281,9 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                log_dir=(f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}")
+                log_dir=(
+                    f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
+                )
             )
         else:
             writer = None
@@ -304,10 +305,14 @@ def train_ensemble(
                 for name, task in model.task_dict.items():
                     if task == "regression":
                         val_score[name] = v_metrics[name]["MAE"]
-                        print(f"Validation Baseline - {name}: MAE {val_score[name]:.3f}")
+                        print(
+                            f"Validation Baseline - {name}: MAE {val_score[name]:.3f}"
+                        )
                     elif task == "classification":
                         val_score[name] = v_metrics[name]["Acc"]
-                        print(f"Validation Baseline - {name}: Acc {val_score[name]:.3f}")
+                        print(
+                            f"Validation Baseline - {name}: Acc {val_score[name]:.3f}"
+                        )
                 model.best_val_scores = val_score
 
         model.fit(
@@ -420,7 +425,9 @@ def results_multitask(
             elif task == "classification":
                 if model.robust:
                     mean, log_std = pred.chunk(2, dim=1)
-                    logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
+                    logits = (
+                        sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
+                    )
                     pre_logits = mean.data.cpu().numpy()
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
                     results_dict[name]["pre-logits_ale"].append(pre_logits_std)
@@ -443,7 +450,11 @@ def results_multitask(
 
     # TODO cleaner way to get identifier names
     if save_results:
-        save_results_dict(dict(zip(test_generator.dataset.dataset.identifiers, ids)), results_dict, model_name)
+        save_results_dict(
+            dict(zip(test_generator.dataset.dataset.identifiers, ids)),
+            results_dict,
+            model_name,
+        )
 
     return results_dict
 
@@ -471,10 +482,10 @@ def print_metrics_regression(target, pred, **kwargs):
     r2_std = np.std(r2)
 
     mae_avg = np.mean(mae)
-    mae_std = np.std(mae)/np.sqrt(mae.shape[0])
+    mae_std = np.std(mae) / np.sqrt(mae.shape[0])
 
     rmse_avg = np.mean(rmse)
-    rmse_std = np.std(rmse)/np.sqrt(rmse.shape[0])
+    rmse_std = np.std(rmse) / np.sqrt(rmse.shape[0])
 
     if ensemble_folds == 1:
         print("Model Performance Metrics:")
@@ -536,19 +547,19 @@ def print_metrics_classification(target, logits, average="micro", **kwargs):
         print(f"Weighted F-score   : {fscore[0]:.4f}")
     else:
         acc_avg = np.mean(acc)
-        acc_std = np.std(acc)/np.sqrt(acc.shape[0])
+        acc_std = np.std(acc) / np.sqrt(acc.shape[0])
 
         roc_auc_avg = np.mean(roc_auc)
-        roc_auc_std = np.std(roc_auc)/np.sqrt(roc_auc.shape[0])
+        roc_auc_std = np.std(roc_auc) / np.sqrt(roc_auc.shape[0])
 
         prec_avg = np.mean(precision)
-        prec_std = np.std(precision)/np.sqrt(precision.shape[0])
+        prec_std = np.std(precision) / np.sqrt(precision.shape[0])
 
         recall_avg = np.mean(recall)
-        recall_std = np.std(recall)/np.sqrt(recall.shape[0])
+        recall_std = np.std(recall) / np.sqrt(recall.shape[0])
 
         fscore_avg = np.mean(fscore)
-        fscore_std = np.std(fscore)/np.sqrt(fscore.shape[0])
+        fscore_std = np.std(fscore) / np.sqrt(fscore.shape[0])
 
         print("\nModel Performance Metrics:")
         print(f"Accuracy : {acc_avg:.4f} +/- {acc_std:.4f}")
@@ -616,7 +627,4 @@ def save_results_dict(ids, results_dict, model_name):
 
     df = pd.DataFrame({**ids, **results})
 
-    df.to_csv(
-        index=False,
-        path_or_buf=(f"results/multi_results_{model_name}.csv")
-    )
+    df.to_csv(index=False, path_or_buf=(f"results/multi_results_{model_name}.csv"))
