@@ -2,11 +2,11 @@
 <h4 align="center">Representation Learning from Stoichiometry</h4>
 
 <h4 align="center">
-
-[![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+  
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 [![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
 [![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)
+[![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CompRhys/roost/main.svg)](https://results.pre-commit.ci/latest/github/CompRhys/roost/main)
 
 </h4>
