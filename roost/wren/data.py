@@ -330,5 +330,3 @@ def parse_aflow(aflow_label):
     # exit()
 
     return spg_no, mult_list, ele_list, aug_wyks
-
-
