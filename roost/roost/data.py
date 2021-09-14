@@ -44,12 +44,12 @@ class CompositionData(Dataset):
         self.task_dict = task_dict
         self.identifiers = identifiers
 
-        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
+        assert os.path.exists(data_path), f"{data_path} does not exist!"
         # NOTE make sure to use dense datasets,
         # NOTE do not use default_na as "NaN" is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
+        assert os.path.exists(fea_path), f"{fea_path} does not exist!"
         self.elem_features = Featurizer.from_json(fea_path)
         self.elem_emb_len = self.elem_features.embedding_size
 

@@ -72,7 +72,7 @@ class WeightedAttentionPooling(nn.Module):
         super().__init__()
         self.gate_nn = gate_nn
         self.message_nn = message_nn
-        self.pow = torch.nn.Parameter(torch.randn((1)))
+        self.pow = torch.nn.Parameter(torch.randn(1))
 
     def forward(self, x, index, weights):
         gate = self.gate_nn(x)

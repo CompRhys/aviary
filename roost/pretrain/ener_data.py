@@ -59,7 +59,7 @@ class CrystalGraphData(Dataset):
 
         self.graph = ["self", "nbr", "dist"]
 
-        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
+        assert os.path.exists(fea_path), f"{fea_path} does not exist!"
         self.ari = Featurizer.from_json(fea_path)
         self.ohe = Featurizer.from_json("data/el-embeddings/onehot-embedding.json")
         self.elem_fea_dim = self.ari.embedding_size
@@ -67,7 +67,7 @@ class CrystalGraphData(Dataset):
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
 
-        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
+        assert os.path.exists(data_path), f"{data_path} does not exist!"
 
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
@@ -206,7 +206,7 @@ class CrystalGraphData(Dataset):
         return ((atom_fea, nbr_dist, self_idx, nbr_idx), targets, comp, cif_id)
 
 
-class GaussianDistance(object):
+class GaussianDistance:
     """
     Expands the distance by Gaussian basis.
 

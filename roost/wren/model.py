@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -42,7 +41,7 @@ class Wren(BaseModelClass):
         out_hidden=[256, 128, 64],
         **kwargs
     ):
-        super(Wren, self).__init__(robust=robust, **kwargs)
+        super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -95,7 +94,7 @@ class Wren(BaseModelClass):
         return (output_nn(crys_fea) for output_nn in self.output_nns)
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return f"{self.__class__.__name__}"
 
 
 class DescriptorNetwork(nn.Module):
@@ -120,7 +119,7 @@ class DescriptorNetwork(nn.Module):
     ):
         """
         """
-        super(DescriptorNetwork, self).__init__()
+        super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
         # NOTE -1 here so we can add the weights as a node feature
@@ -209,7 +208,7 @@ class DescriptorNetwork(nn.Module):
         return cry_fea
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return f"{self.__class__.__name__}"
 
 
 class MessageLayer(nn.Module):
@@ -221,7 +220,7 @@ class MessageLayer(nn.Module):
     def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
         """
         """
-        super(MessageLayer, self).__init__()
+        super().__init__()
 
         # Pooling and Output
         self.pooling = nn.ModuleList(
@@ -281,4 +280,4 @@ class MessageLayer(nn.Module):
         return fea + elem_in_fea
 
     def __repr__(self):
-        return "{}".format(self.__class__.__name__)
+        return f"{self.__class__.__name__}"
