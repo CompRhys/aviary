@@ -7,6 +7,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 [![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
 [![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CompRhys/roost/main.svg)](https://results.pre-commit.ci/latest/github/CompRhys/roost/main)
 
 </h4>
 
