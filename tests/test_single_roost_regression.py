@@ -14,7 +14,7 @@ torch.manual_seed(0)  # ensure reproducible results
 
 def test_single_roost():
 
-    data_path = "data/datasets/tests/roost-regression.csv"
+    data_path = "tests/data/roost-regression.csv"
     fea_path = "data/el-embeddings/matscholar-embedding.json"
     targets = ["Eg"]
     tasks = ["regression"]

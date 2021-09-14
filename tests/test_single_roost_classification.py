@@ -17,7 +17,7 @@ torch.manual_seed(0)  # ensure reproducible results
 
 def test_single_roost_clf():
 
-    data_path = "data/datasets/tests/roost-classification.csv"
+    data_path = "tests/data/roost-classification.csv"
     fea_path = "data/el-embeddings/matscholar-embedding.json"
     targets = ["non_metal"]
     tasks = ["classification"]
