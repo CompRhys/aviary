@@ -48,19 +48,19 @@ class WyckoffData(Dataset):
         self.task_dict = task_dict
         self.identifiers = identifiers
 
-        assert os.path.exists(data_path), "{} does not exist!".format(data_path)
+        assert os.path.exists(data_path), f"{data_path} does not exist!"
         # NOTE make sure to use dense datasets,
         # NOTE do not use default_na as "NaN" is a valid material composition
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-        assert os.path.exists(fea_path), "{} does not exist!".format(fea_path)
+        assert os.path.exists(fea_path), f"{fea_path} does not exist!"
 
         # TODO now using 2 level dicts so can't use featuriser, can this be standardised?
         # self.atom_features = Featurizer.from_json(fea_path)
         with open(fea_path) as f:
             self.atom_features = json.load(f)
 
-        assert os.path.exists(sym_path), "{} does not exist!".format(sym_path)
+        assert os.path.exists(sym_path), f"{sym_path} does not exist!"
         # self.sym_features = Featurizer.from_json(sym_path)
         with open(sym_path) as f:
             self.sym_features = json.load(f)

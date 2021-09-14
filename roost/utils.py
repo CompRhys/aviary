@@ -377,7 +377,7 @@ def results_multitask(
             print("Evaluating Model")
         else:
             resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
-            print("Evaluating Model {}/{}".format(j + 1, ensemble_folds))
+            print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
         assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
         checkpoint = torch.load(resume, map_location=device)
@@ -478,9 +478,9 @@ def print_metrics_regression(target, pred, **kwargs):
 
     if ensemble_folds == 1:
         print("Model Performance Metrics:")
-        print("R2 Score: {:.4f} ".format(r2_avg))
-        print("MAE: {:.4f}".format(mae_avg))
-        print("RMSE: {:.4f}".format(rmse_avg))
+        print(f"R2 Score: {r2_avg:.4f} ")
+        print(f"MAE: {mae_avg:.4f}")
+        print(f"RMSE: {rmse_avg:.4f}")
     else:
         print("Model Performance Metrics:")
         print(f"R2 Score: {r2_avg:.4f} +/- {r2_std:.4f}")
@@ -529,11 +529,11 @@ def print_metrics_classification(target, logits, average="micro", **kwargs):
 
     if len(logits) == 1:
         print("\nModel Performance Metrics:")
-        print("Accuracy : {:.4f} ".format(acc[0]))
-        print("ROC-AUC  : {:.4f}".format(roc_auc[0]))
-        print("Weighted Precision : {:.4f}".format(precision[0]))
-        print("Weighted Recall    : {:.4f}".format(recall[0]))
-        print("Weighted F-score   : {:.4f}".format(fscore[0]))
+        print(f"Accuracy : {acc[0]:.4f} ")
+        print(f"ROC-AUC  : {roc_auc[0]:.4f}")
+        print(f"Weighted Precision : {precision[0]:.4f}")
+        print(f"Weighted Recall    : {recall[0]:.4f}")
+        print(f"Weighted F-score   : {fscore[0]:.4f}")
     else:
         acc_avg = np.mean(acc)
         acc_std = np.std(acc)/np.sqrt(acc.shape[0])

@@ -15,13 +15,13 @@ mult_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "allowed-wp
 param_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-params.json")
 relab_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relab.json")
 
-with open(mult_file, "r") as f:
+with open(mult_file) as f:
     mult_dict = json.load(f)
 
-with open(param_file, "r") as f:
+with open(param_file) as f:
     param_dict = json.load(f)
 
-with open(relab_file, "r") as f:
+with open(relab_file) as f:
     relab_dict = json.load(f)
 
 relab_dict = {
@@ -230,7 +230,7 @@ def prototype_formula(composition) -> str:
             amt_str = str(int(amt))
         else:
             amt_str = str(amt)
-        anon += "{}{}".format(e, amt_str)
+        anon += f"{e}{amt_str}"
     return anon
 
 

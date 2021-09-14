@@ -1,5 +1,3 @@
-
-
 def get_cgcnn_input(struct):
     """return the wren input string
 
