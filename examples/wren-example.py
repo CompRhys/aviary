@@ -288,7 +288,7 @@ def input_parser():
     parser.add_argument(
         "--sym-path",
         type=str,
-        default="data/sym-embeddings/bra-alg-off.json",
+        default="data/wp-embeddings/bra-alg-off.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
