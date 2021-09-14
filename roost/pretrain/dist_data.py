@@ -1,8 +1,6 @@
 import ast
-import functools
 import os
 from itertools import groupby
-from random import sample
 
 import numpy as np
 import pandas as pd

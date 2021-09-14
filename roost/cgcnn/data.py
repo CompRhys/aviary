@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 from pymatgen.core.structure import Structure
-from pymatgen.optimization.neighbors import find_points_in_spheres
 from torch.utils.data import Dataset
 
 from roost.core import Featurizer
