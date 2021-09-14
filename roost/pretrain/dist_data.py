@@ -1,16 +1,13 @@
 import ast
 import functools
 import os
+from itertools import groupby
+from random import sample
 
 import numpy as np
 import pandas as pd
-
-from random import sample
-from itertools import groupby
-
-from pymatgen.core.structure import Structure
-
 import torch
+from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset
 
 from roost.core import Featurizer
@@ -70,7 +67,9 @@ class CrystalGraphData(Dataset):
 
         # NOTE make sure to use dense datasets, here do not use the default na
         # as they can clash with "NaN" which is a valid material
-        self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[], comment="#")[:1000]
+        self.df = pd.read_csv(
+            data_path, keep_default_na=False, na_values=[], comment="#"
+        )[:1000]
 
         self.df["Structure_obj"] = self.df[inputs].apply(get_structure, axis=1)
 
@@ -106,9 +105,9 @@ class CrystalGraphData(Dataset):
 
             for _, g in groupby(zip(self_idx, nbr_idx, nbr_dist), key=lambda x: x[0]):
                 s, n, d = zip(*sorted(g, key=lambda x: x[2]))
-                _self_idx.extend(s[:self.max_num_nbr])
-                _nbr_idx.extend(n[:self.max_num_nbr])
-                _nbr_dist.extend(d[:self.max_num_nbr])
+                _self_idx.extend(s[: self.max_num_nbr])
+                _nbr_idx.extend(n[: self.max_num_nbr])
+                _nbr_dist.extend(d[: self.max_num_nbr])
 
             self_idx = np.array(_self_idx)
             nbr_idx = np.array(_nbr_idx)
@@ -132,7 +131,7 @@ class CrystalGraphData(Dataset):
         self.df[self.graph[2]] = [[] for _ in range(len(self.df))]
 
         for index, row in self.df.iterrows():
-        # for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
+            # for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
             image = 0
 
             cif_id = row["material_id"]
@@ -190,13 +189,19 @@ class CrystalGraphData(Dataset):
         # handle disordered structures (multiple fractional elements per site)
         site_atoms = [atom.species.as_dict() for atom in crystal]
         atom_fea = np.vstack(
-            [np.sum([self.ari.get_fea(el)*amt for el, amt in site.items()], axis=0) for site in site_atoms]
+            [
+                np.sum([self.ari.get_fea(el) * amt for el, amt in site.items()], axis=0)
+                for site in site_atoms
+            ]
         )
 
         # mask distances
-        mask_ids = np.sort(np.random.choice(
-            np.arange(len(self_idx), dtype=int), max(1, int(self.p_mask * len(self_idx)))
-        ))
+        mask_ids = np.sort(
+            np.random.choice(
+                np.arange(len(self_idx), dtype=int),
+                max(1, int(self.p_mask * len(self_idx))),
+            )
+        )
 
         # mask_labels = np.atleast_2d(1/nbr_dist[mask_ids]).T
         mask_labels = np.atleast_2d(nbr_dist[mask_ids]).T
@@ -216,11 +221,24 @@ class CrystalGraphData(Dataset):
             if self.task_dict[target] == "dist":
                 targets.append(torch.Tensor(mask_labels))
             elif self.task_dict[target] == "regression":
-                targets.append(torch.Tensor([[df_idx["e_form"],],]))
+                targets.append(
+                    torch.Tensor(
+                        [
+                            [
+                                df_idx["e_form"],
+                            ],
+                        ]
+                    )
+                )
             else:
                 raise NotImplementedError("bad user")
 
-        return ((atom_fea, nbr_dist, self_idx, nbr_idx, mask_ids), targets, comp, cif_id)
+        return (
+            (atom_fea, nbr_dist, self_idx, nbr_idx, mask_ids),
+            targets,
+            comp,
+            cif_id,
+        )
 
 
 class GaussianDistance:
@@ -350,15 +368,13 @@ def collate_batch(dataset_list):
 
 
 def get_structure(cols):
-    """ Return pymatgen structure from lattice and sites cols """
+    """Return pymatgen structure from lattice and sites cols"""
     cell, sites = cols
     cell, elems, coords = parse_cgcnn(cell, sites)
     # NOTE getting primative structure before constructing graph
     # significantly harms the performnace of this model.
 
-    crystal = Structure(
-        lattice=cell, species=elems, coords=coords, to_unit_cell=True
-    )
+    crystal = Structure(lattice=cell, species=elems, coords=coords, to_unit_cell=True)
 
     # In place modification of structures that only contain a few sites
     # this is to allow us to mask ~15% of sites without having a
@@ -370,7 +386,7 @@ def get_structure(cols):
 
 
 def parse_cgcnn(cell, sites):
-    """ Parse str representation into lists """
+    """Parse str representation into lists"""
     cell = np.array(ast.literal_eval(cell), dtype=float)
     elems = []
     coords = []

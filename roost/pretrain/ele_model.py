@@ -1,9 +1,9 @@
 import torch.nn as nn
 
-from roost.core import BaseModelClass
 from roost.cgcnn.model import DescriptorNetwork
-
+from roost.core import BaseModelClass
 from roost.segments import MeanPooling
+
 
 class CrystalGraphPreNet(BaseModelClass):
     """

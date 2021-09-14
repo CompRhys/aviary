@@ -1,8 +1,8 @@
 import gc
 import json
 import shutil
-from itertools import chain
 from abc import ABC, abstractmethod
+from itertools import chain
 
 import numpy as np
 import torch
@@ -17,14 +17,7 @@ class BaseModelClass(nn.Module, ABC):
     A base class for models.
     """
 
-    def __init__(
-        self,
-        task_dict,
-        robust,
-        device,
-        epoch=1,
-        best_val_scores=None
-    ):
+    def __init__(self, task_dict, robust, device, epoch=1, best_val_scores=None):
         """
         Args:
             task (str): "regression" or "classification"
@@ -88,11 +81,6 @@ class BaseModelClass(nn.Module, ABC):
                         for metric, val in metrics.items():
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch)
 
-                        # if epoch % 5 == 0:
-                        #     for name, param in self.named_parameters():
-                        #         writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)
-                        #         writer.add_histogram(name+"/grad", param.grad.clone().cpu().data.numpy(), epoch)
-
                 if verbose:
                     print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
                     for task, metrics in t_metrics.items():
@@ -119,19 +107,26 @@ class BaseModelClass(nn.Module, ABC):
                     if writer is not None:
                         for task, metrics in v_metrics.items():
                             for metric, val in metrics.items():
-                                writer.add_scalar(f"{task}/validation/{metric}", val, epoch)
+                                writer.add_scalar(
+                                    f"{task}/validation/{metric}", val, epoch
+                                )
 
                     if verbose:
                         for task, metrics in v_metrics.items():
                             print(
                                 f"Validation \t: {task} - "
                                 + "".join(
-                                    [f"{key} {val:.3f}\t" for key, val in metrics.items()]
+                                    [
+                                        f"{key} {val:.3f}\t"
+                                        for key, val in metrics.items()
+                                    ]
                                 )
                             )
 
-                    # TODO test all tasks to see if they are best, save a best model if any is best.
-                    # TODO what are the costs of this approach is could involve saving a lot of models?
+                    # TODO test all tasks to see if they are best,
+                    # save a best model if any is best.
+                    # TODO what are the costs of this approach.
+                    # It could involve saving a lot of models?
 
                     is_best = []
 
@@ -153,7 +148,9 @@ class BaseModelClass(nn.Module, ABC):
                         self.es_patience += 1
                         if patience:
                             if self.es_patience > patience:
-                                print("Stopping early due to lack of improvement on Validation set")
+                                print(
+                                    "Stopping early due to lack of improvement on Validation set"
+                                )
                                 break
 
                 if checkpoint:
@@ -165,10 +162,9 @@ class BaseModelClass(nn.Module, ABC):
                         "optimizer": optimizer.state_dict(),
                         "scheduler": scheduler.state_dict(),
                         "normalizer_dict": {
-                            task: n.state_dict() if isinstance(n, Normalizer)
-                            else None
+                            task: n.state_dict() if isinstance(n, Normalizer) else None
                             for task, n in normalizer_dict.items()
-                        }
+                        },
                     }
 
                     # TODO saving a model at each epoch may be slow?
@@ -196,7 +192,7 @@ class BaseModelClass(nn.Module, ABC):
         optimizer,
         normalizer_dict,
         action="train",
-        verbose=False
+        verbose=False,
     ):
         """
         evaluate the model
@@ -210,9 +206,8 @@ class BaseModelClass(nn.Module, ABC):
             raise NameError("Only train or val allowed as action")
 
         metrics = {
-            key: {
-                k: [] for k in ["Loss", "MAE", "RMSE", "Acc", "F1"]
-            } for key in self.task_dict
+            key: {k: [] for k in ["Loss", "MAE", "RMSE", "Acc", "F1"]}
+            for key in self.task_dict
         }
 
         # we do not need batch_comp or batch_ids when training
@@ -221,8 +216,10 @@ class BaseModelClass(nn.Module, ABC):
             # move tensors to GPU
             inputs = (tensor.to(self.device) for tensor in inputs)
 
-            targets = (n.norm(tar) if n is not None else tar
-                        for tar, n in zip(targets, normalizer_dict.values()))
+            targets = (
+                n.norm(tar) if n is not None else tar
+                for tar, n in zip(targets, normalizer_dict.values())
+            )
 
             targets = [target.to(self.device) for target in targets]
 
@@ -243,8 +240,8 @@ class BaseModelClass(nn.Module, ABC):
 
                     pred = normalizer_dict[name].denorm(output.data.cpu())
                     target = normalizer_dict[name].denorm(target.data.cpu())
-                    metrics[name]['MAE'].append((pred - target).abs().mean())
-                    metrics[name]['RMSE'].append((pred - target).pow(2).mean().sqrt())
+                    metrics[name]["MAE"].append((pred - target).abs().mean())
+                    metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
 
                 elif task == "classification":
                     if self.robust:
@@ -259,10 +256,10 @@ class BaseModelClass(nn.Module, ABC):
                     target = target.squeeze(1).data.cpu()
 
                     # classification metrics from sklearn need numpy arrays
-                    metrics[name]['Acc'].append(
+                    metrics[name]["Acc"].append(
                         accuracy_score(target, np.argmax(logits, axis=1))
                     )
-                    metrics[name]['F1'].append(
+                    metrics[name]["F1"].append(
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
 
@@ -272,8 +269,8 @@ class BaseModelClass(nn.Module, ABC):
                     pred = output.data.cpu()
                     target = target.data.cpu()
 
-                    metrics[name]['MAE'].append((pred - target).abs().mean())
-                    metrics[name]['RMSE'].append((pred - target).pow(2).mean().sqrt())
+                    metrics[name]["MAE"].append((pred - target).abs().mean())
+                    metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
 
                 elif task == "mask":
                     logits = softmax(output, dim=-1)
@@ -284,17 +281,23 @@ class BaseModelClass(nn.Module, ABC):
 
                     # classification metrics from sklearn need numpy arrays
                     # NOTE these metrics are misleading on disordered structures
-                    metrics[name]['Acc'].append(
-                        accuracy_score(np.argmax(target, axis=1), np.argmax(logits, axis=1))
+                    metrics[name]["Acc"].append(
+                        accuracy_score(
+                            np.argmax(target, axis=1), np.argmax(logits, axis=1)
+                        )
                     )
-                    metrics[name]['F1'].append(
-                        f1_score(np.argmax(target, axis=1), np.argmax(logits, axis=1), average="weighted")
+                    metrics[name]["F1"].append(
+                        f1_score(
+                            np.argmax(target, axis=1),
+                            np.argmax(logits, axis=1),
+                            average="weighted",
+                        )
                     )
 
                 else:
                     raise ValueError(f"invalid task: {task}")
 
-                metrics[name]['Loss'].append(loss.cpu().item())
+                metrics[name]["Loss"].append(loss.cpu().item())
 
                 # NOTE we are currently just using a direct sum of losses
                 # this should be okay but is perhaps sub-optimal
@@ -306,7 +309,10 @@ class BaseModelClass(nn.Module, ABC):
                 mixed_loss.backward()
                 optimizer.step()
 
-        metrics = {key: {k: np.array(v).mean() for k, v in d.items() if v} for key, d in metrics.items()}
+        metrics = {
+            key: {k: np.array(v).mean() for k, v in d.items() if v}
+            for key, d in metrics.items()
+        }
 
         return metrics
 
@@ -339,7 +345,10 @@ class BaseModelClass(nn.Module, ABC):
         return (
             # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
             # for multitask learning
-            (torch.cat(test_t, dim=0).view(-1).numpy() for test_t in zip(*test_targets)),
+            (
+                torch.cat(test_t, dim=0).view(-1).numpy()
+                for test_t in zip(*test_targets)
+            ),
             (torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
             # return identifier columns
             *(list(chain(*x)) for x in list(zip(*test_ids))),
@@ -385,7 +394,7 @@ class BaseModelClass(nn.Module, ABC):
 
 
 class Normalizer:
-    """Normalize a Tensor and restore it later. """
+    """Normalize a Tensor and restore it later."""
 
     def __init__(self):
         """tensor is taken as a sample to calculate the mean and std"""

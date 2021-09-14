@@ -4,8 +4,8 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
 from pymatgen.core.composition import Composition
+from torch.utils.data import Dataset
 
 from roost.core import Featurizer
 

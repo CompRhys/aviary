@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from roost.core import BaseModelClass
-from roost.segments import MeanPooling, SumPooling, SimpleNetwork
+from roost.segments import MeanPooling, SimpleNetwork, SumPooling
 
 
 class CrystalGraphConvNet(BaseModelClass):

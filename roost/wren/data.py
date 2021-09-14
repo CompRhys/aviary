@@ -1,19 +1,16 @@
-import os
-import re
-import json
 import ast
 import functools
+import json
+import os
+import re
 from itertools import groupby
 
 import numpy as np
 import pandas as pd
-
 import torch
 from torch.utils.data import Dataset
 
-from roost.core import Featurizer
-from roost.wren.utils import relab_dict
-from roost.wren.utils import mult_dict
+from roost.wren.utils import mult_dict, relab_dict
 
 
 class WyckoffData(Dataset):
@@ -117,9 +114,7 @@ class WyckoffData(Dataset):
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
-            atom_fea = np.vstack(
-                [self.atom_features[el] for el in elements]
-            )
+            atom_fea = np.vstack([self.atom_features[el] for el in elements])
             sym_fea = np.vstack(
                 [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
             )
@@ -138,8 +133,8 @@ class WyckoffData(Dataset):
         nbr_aug_fea_idx = []
         n_aug = len(aug_wyks)
         for i in range(n_aug):
-            self_aug_fea_idx += [x + i*n_wyks for x in self_fea_idx]
-            nbr_aug_fea_idx += [x + i*n_wyks for x in nbr_fea_idx]
+            self_aug_fea_idx += [x + i * n_wyks for x in self_fea_idx]
+            nbr_aug_fea_idx += [x + i * n_wyks for x in nbr_fea_idx]
 
         # convert all data to tensors
         atom_weights = torch.Tensor(weights)
@@ -210,7 +205,7 @@ def collate_batch(dataset_list):
         # number of atoms for this crystal
         n_el = atom_fea.shape[0]
         n_i = sym_fea.shape[0]
-        n_aug = int(float(n_i)/float(n_el))
+        n_aug = int(float(n_i) / float(n_el))
 
         # batch the features together
         batch_atom_weights.append(atom_weights.repeat((n_aug, 1)))
@@ -223,9 +218,10 @@ def collate_batch(dataset_list):
 
         # mapping from atoms to crystals
         # print(torch.tensor(range(i, i+n_aug)).size())
-        crystal_atom_idx.append(torch.tensor(range(aug_count, aug_count+n_aug)).repeat_interleave(n_el))
+        crystal_atom_idx.append(
+            torch.tensor(range(aug_count, aug_count + n_aug)).repeat_interleave(n_el)
+        )
         aug_cry_idx.append(torch.tensor([i] * n_aug))
-
 
         # batch the targets and ids
         batch_targets.append(target)
@@ -317,9 +313,9 @@ def parse_aflow(aflow_label):
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
             n = int(n)
-            ele_list.extend([el]*n)
-            wyk_list.extend([l]*n)
-            mult_list.extend([float(mult_dict[spg_no][l])]*n)
+            ele_list.extend([el] * n)
+            wyk_list.extend([l] * n)
+            mult_list.extend([float(mult_dict[spg_no][l])] * n)
 
     aug_wyks = []
     for trans in relab_dict[spg_no]:
@@ -332,5 +328,3 @@ def parse_aflow(aflow_label):
     # exit()
 
     return spg_no, mult_list, ele_list, aug_wyks
-
-

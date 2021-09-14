@@ -1,9 +1,9 @@
 import os
-import numpy as np
 
+import numpy as np
 import torch
-from sklearn.model_selection import train_test_split as split
 from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split as split
 
 from roost.roost.data import CompositionData, collate_batch
 from roost.roost.model import Roost

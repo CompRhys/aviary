@@ -4,10 +4,10 @@ import torch.nn.functional as F
 
 from roost.core import BaseModelClass
 from roost.segments import (
-    SimpleNetwork,
-    ResidualNetwork,
     MeanPooling,
-    WeightedAttentionPooling
+    ResidualNetwork,
+    SimpleNetwork,
+    WeightedAttentionPooling,
 )
 
 
@@ -39,7 +39,7 @@ class Wren(BaseModelClass):
         cry_msg=[256],
         trunk_hidden=[1024, 512],
         out_hidden=[256, 128, 64],
-        **kwargs
+        **kwargs,
     ):
         super().__init__(robust=robust, **kwargs)
 
@@ -74,18 +74,35 @@ class Wren(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
-        self.trunk_nn = ResidualNetwork(elem_fea_len+sym_fea_len, out_hidden[0], trunk_hidden)
+        self.trunk_nn = ResidualNetwork(
+            elem_fea_len + sym_fea_len, out_hidden[0], trunk_hidden
+        )
 
-        self.output_nns = nn.ModuleList([
-            ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
-        ])
+        self.output_nns = nn.ModuleList(
+            [ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets]
+        )
 
-    def forward(self, elem_weights, elem_fea, sym_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx, aug_cry_idx):
+    def forward(
+        self,
+        elem_weights,
+        elem_fea,
+        sym_fea,
+        self_fea_idx,
+        nbr_fea_idx,
+        cry_elem_idx,
+        aug_cry_idx,
+    ):
         """
         Forward pass through the material_nn and output_nn
         """
         crys_fea = self.material_nn(
-            elem_weights, elem_fea, sym_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx, aug_cry_idx
+            elem_weights,
+            elem_fea,
+            sym_fea,
+            self_fea_idx,
+            nbr_fea_idx,
+            cry_elem_idx,
+            aug_cry_idx,
         )
 
         crys_fea = F.relu(self.trunk_nn(crys_fea))
@@ -117,8 +134,7 @@ class DescriptorNetwork(nn.Module):
         cry_gate=[256],
         cry_msg=[256],
     ):
-        """
-        """
+        """ """
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
@@ -157,7 +173,16 @@ class DescriptorNetwork(nn.Module):
 
         self.aug_pool = MeanPooling()
 
-    def forward(self, elem_weights, elem_fea, sym_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx, aug_cry_idx):
+    def forward(
+        self,
+        elem_weights,
+        elem_fea,
+        sym_fea,
+        self_fea_idx,
+        nbr_fea_idx,
+        cry_elem_idx,
+        aug_cry_idx,
+    ):
         """Forward pass
 
         Args:
@@ -218,8 +243,7 @@ class MessageLayer(nn.Module):
     """
 
     def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
-        """
-        """
+        """ """
         super().__init__()
 
         # Pooling and Output
@@ -270,9 +294,7 @@ class MessageLayer(nn.Module):
         # sum selectivity over the neighbours to get elems
         head_fea = []
         for attnhead in self.pooling:
-            head_fea.append(
-                attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights)
-            )
+            head_fea.append(attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights))
 
         # average the attention heads
         fea = torch.mean(torch.stack(head_fea), dim=0)
