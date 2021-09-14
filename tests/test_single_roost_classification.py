@@ -1,12 +1,9 @@
 import os
-import numpy as np
 
+import numpy as np
 import torch
+from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split as split
-from sklearn.metrics import (
-    accuracy_score,
-    roc_auc_score,
-)
 
 from roost.roost.data import CompositionData, collate_batch
 from roost.roost.model import Roost

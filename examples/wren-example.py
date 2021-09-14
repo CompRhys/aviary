@@ -1,15 +1,13 @@
+import argparse
 import os
 import sys
-import torch
-import argparse
 
+import torch
 from sklearn.model_selection import train_test_split as split
-from roost.wren.model import Wren
+
+from roost.utils import results_multitask, train_ensemble
 from roost.wren.data import WyckoffData, collate_batch
-from roost.utils import (
-    train_ensemble,
-    results_multitask
-)
+from roost.wren.model import Wren
 
 
 def main(

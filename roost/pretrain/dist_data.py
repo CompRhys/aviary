@@ -1,16 +1,13 @@
 import ast
 import functools
 import os
+from itertools import groupby
+from random import sample
 
 import numpy as np
 import pandas as pd
-
-from random import sample
-from itertools import groupby
-
-from pymatgen.core.structure import Structure
-
 import torch
+from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset
 
 from roost.core import Featurizer

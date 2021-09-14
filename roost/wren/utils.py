@@ -1,15 +1,14 @@
-import re
-import os
 import json
+import os
+import re
 import subprocess
-from string import digits, ascii_uppercase
 from itertools import groupby
+from string import ascii_uppercase, digits
+
 from monty.fractions import gcd
-
 from pymatgen.core.composition import Composition
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.io.vasp import Poscar
-
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 mult_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "allowed-wp-mult.json")
 param_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-params.json")

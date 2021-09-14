@@ -1,16 +1,13 @@
+import argparse
 import os
 import sys
-import argparse
 
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.pretrain.ener_model import CrystalGraphPreNet
 from roost.pretrain.ener_data import CrystalGraphData, collate_batch
-from roost.utils import (
-    train_ensemble,
-    results_multitask,
-)
+from roost.pretrain.ener_model import CrystalGraphPreNet
+from roost.utils import results_multitask, train_ensemble
 
 
 def main(

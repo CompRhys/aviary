@@ -1,16 +1,13 @@
 import ast
 import functools
 import os
+from itertools import groupby
 
 import numpy as np
 import pandas as pd
-
-from itertools import groupby
-
+import torch
 from pymatgen.core.structure import Structure
 from pymatgen.optimization.neighbors import find_points_in_spheres
-
-import torch
 from torch.utils.data import Dataset
 
 from roost.core import Featurizer

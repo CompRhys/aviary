@@ -1,19 +1,17 @@
-import os
-import re
-import json
 import ast
 import functools
+import json
+import os
+import re
 from itertools import groupby
 
 import numpy as np
 import pandas as pd
-
 import torch
 from torch.utils.data import Dataset
 
 from roost.core import Featurizer
-from roost.wren.utils import relab_dict
-from roost.wren.utils import mult_dict
+from roost.wren.utils import mult_dict, relab_dict
 
 
 class WyckoffData(Dataset):

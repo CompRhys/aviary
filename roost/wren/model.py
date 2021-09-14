@@ -4,10 +4,10 @@ import torch.nn.functional as F
 
 from roost.core import BaseModelClass
 from roost.segments import (
-    SimpleNetwork,
-    ResidualNetwork,
     MeanPooling,
-    WeightedAttentionPooling
+    ResidualNetwork,
+    SimpleNetwork,
+    WeightedAttentionPooling,
 )
 
 

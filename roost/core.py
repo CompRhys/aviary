@@ -1,8 +1,8 @@
 import gc
 import json
 import shutil
-from itertools import chain
 from abc import ABC, abstractmethod
+from itertools import chain
 
 import numpy as np
 import torch
