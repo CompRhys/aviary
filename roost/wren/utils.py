@@ -12,10 +12,14 @@ from pymatgen.io.vasp import Poscar
 
 
 mult_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "allowed-wp-mult.json")
+param_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-params.json")
 relab_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relab.json")
 
 with open(mult_file, "r") as f:
     mult_dict = json.load(f)
+
+with open(param_file, "r") as f:
+    param_dict = json.load(f)
 
 with open(relab_file, "r") as f:
     relab_dict = json.load(f)
@@ -26,14 +30,23 @@ relab_dict = {
 }
 
 cry_sys_dict = {
-        "triclinic": "a",
-        'monoclinic': "m",
-        'orthorhombic': "o",
-        'tetragonal': "t",
-        'trigonal': "h",
-        'hexagonal': "h",
-        'cubic': "c",
-    }
+    "triclinic": "a",
+    'monoclinic': "m",
+    'orthorhombic': "o",
+    'tetragonal': "t",
+    'trigonal': "h",
+    'hexagonal': "h",
+    'cubic': "c",
+}
+
+cry_param_dict = {
+    "a": 6,
+    "m": 4,
+    "o": 3,
+    "t": 2,
+    "h": 2,
+    "c": 1,
+}
 
 remove_digits = str.maketrans("", "", digits)
 
@@ -238,3 +251,24 @@ def count_wyks(aflow_label):
             raise
 
     return num_wyk
+
+
+def count_params(aflow_label):
+    num_params = 0
+
+    aflow_label, _ = aflow_label.split(":")
+    pearson, spg, wyks = aflow_label.split("_")[1:4]
+
+    num_params += cry_param_dict[pearson[0]]
+
+    subst = r"1\g<1>"
+    for wyk in wyks:
+        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
+        sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+        try:
+            num_params += sum(float(n) * param_dict[spg][k] for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2]))
+        except ValueError:
+            print(sep_el_wyks)
+            raise
+
+    return int(num_params)
