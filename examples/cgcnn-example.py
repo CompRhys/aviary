@@ -9,22 +9,26 @@ from roost.cgcnn.model import CrystalGraphConvNet
 from roost.cgcnn.data import CrystalGraphData, collate_batch
 from roost.utils import (
     train_ensemble,
-    results_classification,
-    results_regression,
+    results_multitask,
 )
 
 
 def main(
     data_path,
     fea_path,
-    task,
-    loss,
+    targets,
+    tasks,
+    losses,
     robust,
     model_name="cgcnn",
-    elem_fea_len=64,
     n_graph=4,
+    elem_fea_len=64,
     n_hidden=1,
     h_fea_len=128,
+    radius=5,
+    max_num_nbr=12,
+    dmin=0,
+    step=0.2,
     ensemble=1,
     run_id=1,
     data_seed=42,
@@ -50,13 +54,12 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
+
+    assert len(targets) == len(tasks) == len(losses)
+
     assert (
         evaluate or train
-    ), "No task given - Set at least one of 'train' or 'evaluate' kwargs as True"
-    assert task in [
-        "regression",
-        "classification",
-    ], "Only 'regression' or 'classification' allowed for 'task'"
+    ), "No action given - At least one of 'train' or 'evaluate' cli flags required"
 
     if test_path:
         test_size = 0.0
@@ -78,22 +81,18 @@ def main(
         fine_tune and transfer
     ), "Cannot fine-tune and transfer checkpoint(s) at the same time."
 
-    if transfer:
-        raise NotImplementedError(
-            "Transfer option not available for CGCNN in order to stay "
-            "faithful to the original implementation."
-        )
+    task_dict = {k: v for k, v in zip(targets, tasks)}
+    loss_dict = {k: v for k, v in zip(targets, losses)}
 
     dist_dict = {
-        "max_num_nbr": 12,
-        "radius": 8,
-        "dmin": 0,
-        "step": 0.2,
-        "use_cache": True,
+        "radius": radius,
+        "max_num_nbr": max_num_nbr,
+        "dmin": dmin,
+        "step": step,
     }
 
     dataset = CrystalGraphData(
-        data_path=data_path, fea_path=fea_path, task=task, **dist_dict
+        data_path=data_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_fea_dim
@@ -105,7 +104,7 @@ def main(
         if test_path:
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                data_path=test_path, fea_path=fea_path, task=task, **dist_dict
+                data_path=test_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -121,7 +120,7 @@ def main(
         if val_path:
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                data_path=val_path, fea_path=fea_path, task=task, **dist_dict
+                data_path=val_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -137,7 +136,9 @@ def main(
             else:
                 print(f"using {val_size} of training set as validation set")
                 train_idx, val_idx = split(
-                    train_idx, random_state=data_seed, test_size=val_size / (1 - test_size),
+                    train_idx,
+                    random_state=data_seed,
+                    test_size=val_size / (1 - test_size),
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -152,13 +153,15 @@ def main(
     }
 
     setup_params = {
-        "loss": loss,
         "optim": optim,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
         "momentum": momentum,
         "device": device,
     }
+
+    if resume:
+        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
 
     restart_params = {
         "resume": resume,
@@ -167,7 +170,7 @@ def main(
     }
 
     model_params = {
-        "task": task,
+        "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
@@ -200,6 +203,7 @@ def main(
             setup_params=setup_params,
             restart_params=restart_params,
             model_params=model_params,
+            loss_dict=loss_dict,
         )
 
     if evaluate:
@@ -210,30 +214,18 @@ def main(
         }
         data_params.update(data_reset)
 
-        if task == "regression":
-            results_regression(
-                model_class=CrystalGraphConvNet,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
-                device=device,
-                eval_type="checkpoint",
-            )
-        elif task == "classification":
-            results_classification(
-                model_class=CrystalGraphConvNet,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
-                device=device,
-                eval_type="checkpoint",
-            )
+        results_multitask(
+            model_class=CrystalGraphConvNet,
+            model_name=model_name,
+            run_id=run_id,
+            ensemble_folds=ensemble,
+            test_set=test_set,
+            data_params=data_params,
+            robust=robust,
+            task_dict=task_dict,
+            device=device,
+            eval_type="checkpoint",
+        )
 
 
 def input_parser():
@@ -246,7 +238,7 @@ def input_parser():
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/cgcnn-example.csv",
+        default="data/datasets/tests/cgcnn-regression.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -283,7 +275,7 @@ def input_parser():
     parser.add_argument(
         "--fea-path",
         type=str,
-        default="data/embeddings/cgcnn-embedding.json",
+        default="data/el-embeddings/cgcnn-embedding.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
@@ -319,6 +311,31 @@ def input_parser():
         help="Sub-sample the training set for learning curves",
     )
 
+    # task inputs
+    parser.add_argument(
+        "--targets",
+        nargs="*",
+        type=str,
+        metavar="STR",
+        help="Task types for targets",
+    )
+    parser.add_argument(
+        "--tasks",
+        nargs="*",
+        default=["regression"],
+        type=str,
+        metavar="STR",
+        help="Task types for targets",
+    )
+    parser.add_argument(
+        "--losses",
+        nargs="*",
+        default=["L1"],
+        type=str,
+        metavar="STR",
+        help="Loss function if regression (default: 'L1')",
+    )
+
     # optimiser inputs
     parser.add_argument(
         "--epochs",
@@ -326,13 +343,6 @@ def input_parser():
         type=int,
         metavar="INT",
         help="Number of training epochs to run (default: 100)",
-    )
-    parser.add_argument(
-        "--loss",
-        default="L1",
-        type=str,
-        metavar="STR",
-        help="Loss function if regression (default: 'L1')",
     )
     parser.add_argument(
         "--robust",
@@ -398,6 +408,34 @@ def input_parser():
         metavar="INT",
         help="Number of layers in output network (default: 1)",
     )
+    parser.add_argument(
+        "--radius",
+        default=5,
+        type=float,
+        metavar="FLOAT",
+        help="Maximum radius for local neighbour graph (default: 5)",
+    )
+    parser.add_argument(
+        "--max-num-nbr",
+        default=12,
+        type=int,
+        metavar="INT",
+        help="Maximum number of neighbours to consider (default: 12)",
+    )
+    parser.add_argument(
+        "--dmin",
+        default=0.0,
+        type=float,
+        metavar="FLOAT",
+        help="Minimum distance of smeared gaussian basis (default 0.0)",
+    )
+    parser.add_argument(
+        "--step",
+        default=0.2,
+        type=float,
+        metavar="FLOAT",
+        help="Step size of smeared gaussian basis (default: 0.2)",
+    )
 
     # ensemble inputs
     parser.add_argument(
@@ -451,17 +489,6 @@ def input_parser():
     )
 
     # task type
-    task_group = parser.add_mutually_exclusive_group()
-    task_group.add_argument(
-        "--classification",
-        action="store_true",
-        help="Specifies a classification task"
-    )
-    task_group.add_argument(
-        "--regression",
-        action="store_true",
-        help="Specifies a regression task"
-    )
     parser.add_argument(
         "--evaluate",
         action="store_true",
@@ -478,7 +505,7 @@ def input_parser():
         "--disable-cuda",
         action="store_true",
         help="Disable CUDA"
-        )
+    )
     parser.add_argument(
         "--log",
         action="store_true",
@@ -490,12 +517,9 @@ def input_parser():
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
-    if args.regression:
-        args.task = "regression"
-    elif args.classification:
-        args.task = "classification"
-    else:
-        args.task = "regression"
+    assert all(
+        [i in ["regression", "classification"] for i in args.tasks]
+    ), "Only `regression` and `classification` are allowed as tasks"
 
     args.device = (
         torch.device("cuda")

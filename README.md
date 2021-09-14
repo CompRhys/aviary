@@ -1,6 +1,11 @@
-# RooSt &nbsp; [![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+<h1 align="center">Roost</h1>
+<h4 align="center">Representation Learning from Stoichiometry</h4>
 
-**R**epresentati**o**n Learning fr**o**m **St**oichiometry
+[![Tests](https://github.com/CompRhys/roost/workflows/Tests/badge.svg)](https://github.com/CompRhys/roost/actions)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+[![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
+[![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)
+
 
 ## Premise
 
@@ -26,7 +31,7 @@ pip install scikit-learn tqdm pandas tensorboard
 
 You may encounter issues getting the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter).
 
-The was developed and tested on Linux Mint 19.1 Tessa. The code should work on with other Operating Systems but it has not been tested for such use.  
+The was developed and tested on Linux Mint 19.1 Tessa. The code should work on with other Operating Systems but it has not been tested for such use.
 
 ## Roost Setup
 
@@ -85,7 +90,7 @@ This will output the various command-line flags that can be used to control the 
 
 If you use this code please cite our work for which this model was built:
 
-Predicting materials properties without crystal structure: Deep representation learning from stoichiometry [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
+Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv](https://arxiv.org/abs/1910.00617)]
 
 ```tex
 @article{goodall2020predicting,
@@ -100,13 +105,13 @@ Predicting materials properties without crystal structure: Deep representation l
 }
 ```
 
-## Work Using Roost
+## Work Featuring Roost
 
 Work using Roost as presented:
 
 * A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
 
-* Active learning based generative design for the discovery of wide bandgap materials [[arXiv]](https://arxiv.org/abs/2103.00608)
+* Active learning based generative design for the discovery of wide bandgap materials. [[arXiv]](https://arxiv.org/abs/2103.00608)
 
 Work building-on/using-parts-of the code shared here:
 

@@ -1,12 +1,11 @@
 import os
 import sys
+import torch
 import argparse
 
-import torch
 from sklearn.model_selection import train_test_split as split
-
-from roost.roost.model import Roost
-from roost.roost.data import CompositionData, collate_batch
+from roost.wren.model import Wren
+from roost.wren.data import WyckoffData, collate_batch
 from roost.utils import (
     train_ensemble,
     results_multitask
@@ -16,12 +15,14 @@ from roost.utils import (
 def main(
     data_path,
     fea_path,
+    sym_path,
     targets,
     tasks,
     losses,
     robust,
-    model_name="roost",
-    elem_fea_len=64,
+    model_name="wren",
+    sym_fea_len=32,
+    elem_fea_len=32,
     n_graph=3,
     ensemble=1,
     run_id=1,
@@ -48,6 +49,7 @@ def main(
     device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
     **kwargs,
 ):
+
     assert len(targets) == len(tasks) == len(losses)
 
     assert evaluate or train, (
@@ -74,25 +76,30 @@ def main(
         "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
     )
 
+    # TODO CLI controls for loss dict.
+
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
-    dataset = CompositionData(
+    dataset = WyckoffData(
         data_path=data_path,
         fea_path=fea_path,
+        sym_path=sym_path,
         task_dict=task_dict
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
+    sym_emb_len = dataset.sym_fea_dim
+    elem_emb_len = dataset.elem_fea_dim
 
     train_idx = list(range(len(dataset)))
 
     if evaluate:
         if test_path:
             print(f"using independent test set: {test_path}")
-            test_set = CompositionData(
+            test_set = WyckoffData(
                 data_path=test_path,
                 fea_path=fea_path,
+                sym_path=sym_path,
                 task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
@@ -108,9 +115,10 @@ def main(
     if train:
         if val_path:
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(
+            val_set = WyckoffData(
                 data_path=val_path,
                 fea_path=fea_path,
+                sym_path=sym_path,
                 task_dict=task_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
@@ -163,16 +171,20 @@ def main(
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
+        "sym_emb_len": sym_emb_len,
         "elem_fea_len": elem_fea_len,
+        "sym_fea_len": sym_fea_len,
         "n_graph": n_graph,
-        "elem_heads": 3,
+        "elem_heads": 1,
         "elem_gate": [256],
         "elem_msg": [256],
-        "cry_heads": 3,
+        "cry_heads": 1,
         "cry_gate": [256],
         "cry_msg": [256],
-        "trunk_hidden": [1024, 512],
-        "out_hidden": [256, 128, 64],
+        # "out_hidden": [256] * 6,
+        # "out_hidden": [1024, 512, 256, 128, 64],
+        "out_hidden": [256, 256],
+        "trunk_hidden": [128, 64],
     }
 
     os.makedirs(f"models/{model_name}/", exist_ok=True)
@@ -182,11 +194,9 @@ def main(
 
     os.makedirs("results/", exist_ok=True)
 
-    # TODO dump all args/kwargs to a file for reproducibility.
-
     if train:
         train_ensemble(
-            model_class=Roost,
+            model_class=Wren,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
@@ -211,7 +221,7 @@ def main(
         data_params.update(data_reset)
 
         results_multitask(
-                model_class=Roost,
+                model_class=Wren,
                 model_name=model_name,
                 run_id=run_id,
                 ensemble_folds=ensemble,
@@ -228,18 +238,13 @@ def input_parser():
     """
     parse input
     """
-    parser = argparse.ArgumentParser(
-        description=(
-            "Roost - a Structure Agnostic Message Passing "
-            "Neural Network for Inorganic Materials"
-        )
-    )
+    parser = argparse.ArgumentParser(description=("Wren"))
 
     # data inputs
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/datasets/roost/expt-non-metals.csv",
+        default="/home/reag2/PhD/roost/data/datasets/wren/taata-c-spglib-test.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -277,6 +282,13 @@ def input_parser():
         "--fea-path",
         type=str,
         default="data/el-embeddings/matscholar-embedding.json",
+        metavar="PATH",
+        help="Element embedding feature path",
+    )
+    parser.add_argument(
+        "--sym-path",
+        type=str,
+        default="data/wp-embeddings/bra-alg-off.json",
         metavar="PATH",
         help="Element embedding feature path",
     )
@@ -320,7 +332,6 @@ def input_parser():
         metavar="STR",
         help="Task types for targets",
     )
-
     parser.add_argument(
         "--tasks",
         nargs="*",
@@ -329,7 +340,6 @@ def input_parser():
         metavar="STR",
         help="Task types for targets",
     )
-
     parser.add_argument(
         "--losses",
         nargs="*",
@@ -385,7 +395,14 @@ def input_parser():
     # graph inputs
     parser.add_argument(
         "--elem-fea-len",
-        default=64,
+        default=32,
+        type=int,
+        metavar="INT",
+        help="Number of hidden features for elements (default: 64)",
+    )
+    parser.add_argument(
+        "--sym-fea-len",
+        default=32,
         type=int,
         metavar="INT",
         help="Number of hidden features for elements (default: 64)",
@@ -416,7 +433,7 @@ def input_parser():
     )
     name_group.add_argument(
         "--data-id",
-        default="roost",
+        default="wren",
         type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
