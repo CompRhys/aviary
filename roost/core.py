@@ -94,7 +94,7 @@ class BaseModelClass(nn.Module, ABC):
                         #         writer.add_histogram(name+"/grad", param.grad.clone().cpu().data.numpy(), epoch)
 
                 if verbose:
-                    print("Epoch: [{}/{}]".format(epoch, start_epoch + epochs - 1))
+                    print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
                     for task, metrics in t_metrics.items():
                         print(
                             f"Train \t\t: {task} - "
@@ -342,7 +342,7 @@ class BaseModelClass(nn.Module, ABC):
             (torch.cat(test_t, dim=0).view(-1).numpy() for test_t in zip(*test_targets)),
             (torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
             # return identifier columns
-            *[list(chain(*x)) for x in list(zip(*test_ids))],
+            *(list(chain(*x)) for x in list(zip(*test_ids))),
         )
 
     @torch.no_grad()
@@ -384,13 +384,13 @@ class BaseModelClass(nn.Module, ABC):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
-class Normalizer(object):
+class Normalizer:
     """Normalize a Tensor and restore it later. """
 
     def __init__(self):
         """tensor is taken as a sample to calculate the mean and std"""
-        self.mean = torch.tensor((0))
-        self.std = torch.tensor((1))
+        self.mean = torch.tensor(0)
+        self.std = torch.tensor(1)
 
     def fit(self, tensor, dim=0, keepdim=False):
         """tensor is taken as a sample to calculate the mean and std"""
