@@ -17,19 +17,14 @@ One approach for avoiding the structure bottleneck is to develop models that lea
 
 ## Environment Setup
 
-To use `roost` you need to create an environment with the correct dependencies. Using `Anaconda` this can be accomplished with the follow commands:
+To use `roost` you need to create an environment with the correct dependencies. The easiest way to get up and running it to use `Anaconda`.
+A `cudatoolkit=11.1` environment file is provided `environment-gpu-cu111.yml` allowing a working environment to be created with:
 
 ```bash
-conda create --name roost python=3.6
-conda activate roost
-pip install torch==1.5.0+${CUDA} -f https://download.pytorch.org/whl/torch_stable.html
-pip install torch-scatter==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-pip install scikit-learn tqdm pandas tensorboard
+conda env create -f environment-gpu-cu111.yml
 ```
 
-`${CUDA}` Should be replaced by either `cpu`, `cu92`, `cu101` or `cu102` depending on your system CUDA version. (You can find your CUDA version via `nvidia-smi`)
-
-You may encounter issues getting the correct installation of either `PyTorch` or `PyTorch_Scatter` for your system requirements if so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://github.com/rusty1s/pytorch_scatter).
+If you are not using `cudatoolkit=11.1` or do not have access to a GPU this setup will not work for you. If so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) for how install the core packages and then install the remaining requirements as detailed in `requirements.txt`.
 
 The was developed and tested on Linux Mint 19.1 Tessa. The code should work on with other Operating Systems but it has not been tested for such use.
 
