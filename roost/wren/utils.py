@@ -154,7 +154,7 @@ def get_aflow_label_from_spga(spga):
 
     # cannonicalise the possible wyckoff letter sequences
     elem_wyks = "_".join(elem_wyks)
-    cannonical = cannonicalise_elem_wyks(elem_wyks, spg_no)
+    cannonical = canonicalise_elem_wyks(elem_wyks, spg_no)
 
     # get pearson symbol
     cry_sys = spga.get_crystal_system()
@@ -177,9 +177,9 @@ def get_aflow_label_from_spga(spga):
     return aflow_label
 
 
-def cannonicalise_elem_wyks(elem_wyks, spg_no):
+def canonicalise_elem_wyks(elem_wyks, spg_no):
     """
-    Given an element ordering cannonicalise the associated wyckoff positions
+    Given an element ordering canonicalise the associated wyckoff positions
     based on the alphabetical weight of equivalent choices of origin.
     """
 
@@ -210,7 +210,7 @@ def cannonicalise_elem_wyks(elem_wyks, spg_no):
                     ]
                 )
             )
-            score += sum(0 if l == "A" else ord(l) - 96 for l in sep_el_wyks[1::2])
+            score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks[1::2])
 
         scores.append(score)
         sorted_iso.append("_".join(sorted_el_wyks))

@@ -2,7 +2,7 @@
 <h4 align="center">Representation Learning from Stoichiometry</h4>
 
 <h4 align="center">
-  
+
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 [![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
 [![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)

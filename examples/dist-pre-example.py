@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split as split
 
 from roost.pretrain.dist_data import CrystalGraphData, collate_batch
 from roost.pretrain.dist_model import CrystalGraphPreNet
-from roost.utils import results_multitask, train_ensemble
+from roost.utils import train_ensemble
 
 
 def main(
@@ -59,9 +59,7 @@ def main(
     if val_path:
         val_size = 0.0
 
-    assert val_size < 1.0, (
-        f"'val_size'({val_size}) must be less than 1"
-    )
+    assert val_size < 1.0, f"'val_size'({val_size}) must be less than 1"
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
@@ -409,10 +407,7 @@ def input_parser():
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--fine-tune",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for fine tuning"
+        "--fine-tune", type=str, metavar="PATH", help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
         "--transfer",
@@ -421,9 +416,7 @@ def input_parser():
         help="Checkpoint path for transfer learning",
     )
     use_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from previous checkpoint"
+        "--resume", action="store_true", help="Resume from previous checkpoint"
     )
 
     # task type
@@ -432,22 +425,12 @@ def input_parser():
         action="store_true",
         help="Evaluate the model/ensemble",
     )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train the model/ensemble"
-    )
+    parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
 
     # misc
+    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--disable-cuda",
-        action="store_true",
-        help="Disable CUDA"
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="Log training metrics to tensorboard"
+        "--log", action="store_true", help="Log training metrics to tensorboard"
     )
 
     args = parser.parse_args(sys.argv[1:])
@@ -456,7 +439,10 @@ def input_parser():
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
     assert all(
-        [i in ["regression", "classification", "mask", "global", "dist"] for i in args.tasks]
+        [
+            i in ["regression", "classification", "mask", "global", "dist"]
+            for i in args.tasks
+        ]
     ), "Only `regression`, `classification`, `mask` and `global` are allowed as tasks"
 
     args.device = (

@@ -116,7 +116,6 @@ class CompositionData(Dataset):
         nele = len(elements)
         self_fea_idx = []
         nbr_fea_idx = []
-        nbrs = len(elements)
         for i, _ in enumerate(elements):
             self_fea_idx += [i] * nele
             nbr_fea_idx += list(range(nele))
@@ -184,7 +183,6 @@ def collate_batch(dataset_list):
     batch_nbr_fea_idx = []
     crystal_atom_idx = []
     batch_targets = []
-    batch_comp = []
     batch_cry_ids = []
 
     cry_base_idx = 0
@@ -221,5 +219,5 @@ def collate_batch(dataset_list):
             torch.cat(crystal_atom_idx),
         ),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        *zip(*batch_cry_ids)
+        *zip(*batch_cry_ids),
     )

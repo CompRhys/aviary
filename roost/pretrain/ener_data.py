@@ -1,8 +1,6 @@
 import ast
-import functools
 import os
 from itertools import groupby
-from random import sample
 
 import numpy as np
 import pandas as pd
@@ -297,7 +295,6 @@ def collate_batch(dataset_list):
     batch_self_idx = []
     batch_nbr_idx = []
     crystal_atom_idx = []
-    batch_mask_idx = []
     batch_targets = []
     batch_comps = []
     batch_cif_ids = []
