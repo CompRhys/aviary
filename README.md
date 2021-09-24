@@ -112,6 +112,8 @@ Work using Roost as presented:
 
 * Active learning based generative design for the discovery of wide bandgap materials. [[arXiv]](https://arxiv.org/abs/2103.00608)
 
+* MaterialsAtlas formation energy WebApp - http://www.materialsatlas.org/formationenergy
+
 Work building-on/using-parts-of the code shared here:
 
 * Predicting the Outcomes of Material Syntheses with Deep Learning [[Paper]](https://pubs.acs.org/doi/abs/10.1021/acs.chemmater.0c03885)
