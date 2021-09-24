@@ -146,7 +146,7 @@ def init_model(
     return model, optimizer, scheduler
 
 
-def init_losses(task_dict, loss_dict, robust=False): # noqa: C901
+def init_losses(task_dict, loss_dict, robust=False):  # noqa: C901
 
     criterion_dict = {}
     for name, task in task_dict.items():
