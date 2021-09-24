@@ -2,7 +2,7 @@
 <h4 align="center">Representation Learning from Stoichiometry</h4>
 
 <h4 align="center">
-  
+
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 [![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/roost?label=Repo+Size)](https://github.com/comprhys/roost/graphs/contributors)
 [![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/roost?label=Last+Commit)](https://github.com/comprhys/roost/commits)
@@ -111,6 +111,8 @@ Work using Roost as presented:
 * A critical examination of compound stability predictions from machine-learned formation energies [[Paper]](https://www.nature.com/articles/s41524-020-00362-y) [[arXiv]](https://arxiv.org/abs/2001.10591)
 
 * Active learning based generative design for the discovery of wide bandgap materials. [[arXiv]](https://arxiv.org/abs/2103.00608)
+
+* MaterialsAtlas formation energy WebApp - http://www.materialsatlas.org/formationenergy
 
 Work building-on/using-parts-of the code shared here:
 

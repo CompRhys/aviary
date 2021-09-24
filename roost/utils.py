@@ -132,7 +132,7 @@ def init_model(
         optimizer.load_state_dict(checkpoint["optimizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
 
-    print(f"Total Number of Trainable Parameters: {model.num_params}")
+    print(f"Total Number of Trainable Parameters: {model.num_params:,}")
 
     # TODO parallelise the code over multiple GPUs. Currently DataParallel
     # crashes as subsets of the batch have different sizes due to the use of
@@ -604,10 +604,12 @@ def save_results_dict(ids, results_dict, model_name):
             # sample from the gaussian distributed pre_logits we parameterise.
             if "pre-logits" in col:
                 for n_ens, y_pre_logit in enumerate(data):
-                    results.update({
-                        f"{name}_{col}_c{lab}_n{n_ens}": val.ravel()
-                        for lab, val in enumerate(y_pre_logit.T)
-                    })
+                    results.update(
+                        {
+                            f"{name}_{col}_c{lab}_n{n_ens}": val.ravel()
+                            for lab, val in enumerate(y_pre_logit.T)
+                        }
+                    )
 
             elif "pred" in col:
                 preds = {
@@ -617,10 +619,12 @@ def save_results_dict(ids, results_dict, model_name):
                 results.update(preds)
 
             elif "ale" in col:  # elif so that pre-logit-ale doesn't trigger
-                results.update({
-                    f"{name}_{col}_n{n_ens}": val.ravel()
-                    for (n_ens, val) in enumerate(data)
-                })
+                results.update(
+                    {
+                        f"{name}_{col}_n{n_ens}": val.ravel()
+                        for (n_ens, val) in enumerate(data)
+                    }
+                )
 
             elif col == "target":
                 results.update({f"{name}_{col}": data})
