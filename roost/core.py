@@ -37,7 +37,7 @@ class BaseModelClass(nn.Module, ABC):
 
         self.model_params = {"task_dict": task_dict}
 
-    def fit(
+    def fit(  # noqa: C901
         self,
         train_generator,
         val_generator,

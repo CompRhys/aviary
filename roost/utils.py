@@ -146,7 +146,7 @@ def init_model(
     return model, optimizer, scheduler
 
 
-def init_losses(task_dict, loss_dict, robust=False):
+def init_losses(task_dict, loss_dict, robust=False): # noqa: C901
 
     criterion_dict = {}
     for name, task in task_dict.items():
@@ -331,7 +331,7 @@ def train_ensemble(
 
 
 @torch.no_grad()
-def results_multitask(
+def results_multitask(  # noqa: C901
     model_class,
     model_name,
     run_id,
