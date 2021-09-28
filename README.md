@@ -49,7 +49,7 @@ python examples/wren-example.py --train --evaluate --data-path data/datasets/exa
 python examples/cgcnn-example.py --train --evaluate --data-path data/datasets/examples/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 
-Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts in the examples folder were used for all experiments conducted.
+Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts have been used for all experiments conducted.
 
 ## Reproduction of Figures
 

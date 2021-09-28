@@ -20,7 +20,7 @@ def test_single_roost():
     tasks = ["regression"]
     losses = ["L1"]
     robust = True
-    model_name = "roost"
+    model_name = "roost-reg-test"
     elem_fea_len = 64
     n_graph = 3
     ensemble = 2

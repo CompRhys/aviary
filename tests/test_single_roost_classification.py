@@ -20,7 +20,7 @@ def test_single_roost_clf():
     tasks = ["classification"]
     losses = ["CSE"]
     robust = True
-    model_name = "roost"
+    model_name = "roost-clf-test"
     elem_fea_len = 64
     n_graph = 3
     ensemble = 2
