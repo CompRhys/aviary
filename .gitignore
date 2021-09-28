@@ -114,11 +114,7 @@ venv.bak/
 runs/
 results/
 models/
-
-# exclude local slurm and plotting scripts
-process/
-papers/
-cds3/
+csd3/
 
 # exclude local data and cached graphs
 *.csv
