@@ -5,9 +5,9 @@ import sys
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.utils import results_multitask, train_ensemble
-from roost.wren.data import WyckoffData, collate_batch
-from roost.wren.model import Wren
+from aviary.utils import results_multitask, train_ensemble
+from aviary.wren.data import WyckoffData, collate_batch
+from aviary.wren.model import Wren
 
 
 def main(

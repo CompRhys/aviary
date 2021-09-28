@@ -5,9 +5,9 @@ import sys
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.roost.data import CompositionData, collate_batch
-from roost.roost.model import Roost
-from roost.utils import results_multitask, train_ensemble
+from aviary.roost.data import CompositionData, collate_batch
+from aviary.roost.model import Roost
+from aviary.utils import results_multitask, train_ensemble
 
 
 def main(
