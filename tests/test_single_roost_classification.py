@@ -5,9 +5,9 @@ import torch
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split as split
 
-from roost.roost.data import CompositionData, collate_batch
-from roost.roost.model import Roost
-from roost.utils import results_multitask, train_ensemble
+from aviary.roost.data import CompositionData, collate_batch
+from aviary.roost.model import Roost
+from aviary.utils import results_multitask, train_ensemble
 
 torch.manual_seed(0)  # ensure reproducible results
 
