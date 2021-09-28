@@ -5,9 +5,9 @@ import sys
 import torch
 from sklearn.model_selection import train_test_split as split
 
-from roost.cgcnn.data import CrystalGraphData, collate_batch
-from roost.cgcnn.model import CrystalGraphConvNet
-from roost.utils import results_multitask, train_ensemble
+from aviary.cgcnn.data import CrystalGraphData, collate_batch
+from aviary.cgcnn.model import CrystalGraphConvNet
+from aviary.utils import results_multitask, train_ensemble
 
 
 def main(
