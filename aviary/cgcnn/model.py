@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from roost.core import BaseModelClass
-from roost.segments import MeanPooling, SimpleNetwork, SumPooling
+from aviary.core import BaseModelClass
+from aviary.segments import MeanPooling, SimpleNetwork, SumPooling
 
 
 class CrystalGraphConvNet(BaseModelClass):

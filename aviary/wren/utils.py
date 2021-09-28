@@ -285,3 +285,7 @@ def count_params(aflow_label):
             raise
 
     return int(num_params)
+
+# TODO add mapping between aflow canonicalisation (alphabetical chemsys) and canonicalisation
+# scheme based on quantities of different elements. The second scheme allows for equivalent
+# prototypes to be quickly identified even if the chemical systems are different.
