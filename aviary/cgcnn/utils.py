@@ -1,7 +1,5 @@
 def get_cgcnn_input(struct):
-    """return the wren input string
-
-    TODO update wren to use a more standard convention
+    """return a csv friendly encoding of lattice and sites given a pymatgen structure
 
     Args:
         struct (Structure): input structure to get inputs for

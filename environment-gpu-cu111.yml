@@ -1,4 +1,4 @@
-name: roost
+name: aviary
 channels:
   - pytorch
   - pyg

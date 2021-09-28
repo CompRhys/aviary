@@ -7,7 +7,7 @@ import torch
 from pymatgen.core.composition import Composition
 from torch.utils.data import Dataset
 
-from roost.core import Featurizer
+from aviary.core import Featurizer
 
 
 class CompositionData(Dataset):
@@ -23,7 +23,6 @@ class CompositionData(Dataset):
         task_dict,
         inputs=["composition"],
         identifiers=["material_id", "composition"],
-        # identifiers=["material_id", "composition"],
     ):
         """[summary]
 

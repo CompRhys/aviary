@@ -15,7 +15,7 @@ from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from roost.core import Normalizer, RobustL1Loss, RobustL2Loss, sampled_softmax
+from aviary.core import Normalizer, RobustL1Loss, RobustL2Loss, sampled_softmax
 
 
 def init_model(
@@ -631,4 +631,6 @@ def save_results_dict(ids, results_dict, model_name):
 
     df = pd.DataFrame({**ids, **results})
 
-    df.to_csv(index=False, path_or_buf=(f"results/multi_results_{model_name}.csv"))
+    file_name = model_name.replace("/", "_")
+
+    df.to_csv(index=False, path_or_buf=(f"results/multi_results_{file_name}.csv"))

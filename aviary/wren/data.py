@@ -1,4 +1,3 @@
-import ast
 import functools
 import json
 import os
@@ -10,7 +9,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from roost.wren.utils import mult_dict, relab_dict
+from aviary.wren.utils import mult_dict, relab_dict
 
 
 class WyckoffData(Dataset):
@@ -52,18 +51,12 @@ class WyckoffData(Dataset):
 
         assert os.path.exists(fea_path), f"{fea_path} does not exist!"
 
-        # TODO now using 2 level dicts so can't use featuriser, can this be standardised?
-        # self.atom_features = Featurizer.from_json(fea_path)
         with open(fea_path) as f:
             self.atom_features = json.load(f)
 
         assert os.path.exists(sym_path), f"{sym_path} does not exist!"
-        # self.sym_features = Featurizer.from_json(sym_path)
         with open(sym_path) as f:
             self.sym_features = json.load(f)
-
-        # self.elem_fea_dim = self.atom_features.embedding_size
-        # self.sym_fea_dim = self.sym_features.embedding_size
 
         self.elem_fea_dim = len(list(self.atom_features.values())[0])
         self.sym_fea_dim = len(list(list(self.sym_features.values())[0].values())[0])
@@ -107,10 +100,7 @@ class WyckoffData(Dataset):
         swyks = df_idx[self.inputs][0]
         cry_ids = df_idx[self.identifiers].values
 
-        # print(cry_id, composition, swyks)
-
         spg_no, weights, elements, aug_wyks = parse_aflow(swyks)
-        # spg_no, weights, elements, aug_wyks = parse_wren(swyks)
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
@@ -217,7 +207,6 @@ def collate_batch(dataset_list):
         batch_nbr_fea_idx.append(nbr_fea_idx + cry_base_idx)
 
         # mapping from atoms to crystals
-        # print(torch.tensor(range(i, i+n_aug)).size())
         crystal_atom_idx.append(
             torch.tensor(range(aug_count, aug_count + n_aug)).repeat_interleave(n_el)
         )
@@ -244,49 +233,6 @@ def collate_batch(dataset_list):
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         *zip(*batch_cry_ids),
     )
-
-
-def parse_wren(swyk_list):
-    """parse the wyckoff format
-
-    Args:
-        swyk_list ([type]): [description]
-
-    Returns:
-        mult_list, ele_list, aug_wyks
-    """
-    swyk_list = ast.literal_eval(swyk_list)
-
-    mult_list = []
-    ele_list = []
-    wyk_list = []
-
-    spg_no = swyk_list[0].split("-")[-1]
-
-    for swyk in swyk_list:
-        ele_mult, wyk = swyk.split(" @ ")
-        ele, mult = ele_mult.split("-")
-        let, _ = wyk.split("-")
-
-        # ele, wyk = swyk.split(" @ ")
-        # mult, let, _ = wyk.split("-")
-
-        mult_list.append(float(mult))
-        ele_list.append(ele)
-        wyk_list.append(let)
-
-    aug_wyks = []
-    for trans in relab_dict[spg_no]:
-        t = str.maketrans(trans)
-        aug_wyks.append(tuple(",".join(wyk_list).translate(t).split(",")))
-
-    aug_wyks = list(set(aug_wyks))
-    # print(len(aug_wyks))
-    # print(aug_wyks)
-    # exit()
-
-    return spg_no, mult_list, ele_list, aug_wyks
-
 
 def parse_aflow(aflow_label):
     """parse the wyckoff format
@@ -323,8 +269,5 @@ def parse_aflow(aflow_label):
         aug_wyks.append(tuple(",".join(wyk_list).translate(t).split(",")))
 
     aug_wyks = list(set(aug_wyks))
-    # print(len(aug_wyks))
-    # print(aug_wyks)
-    # exit()
 
     return spg_no, mult_list, ele_list, aug_wyks
