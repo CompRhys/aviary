@@ -21,9 +21,9 @@ class WyckoffData(Dataset):
     def __init__(
         self,
         data_path,
-        sym_path,
-        fea_path,
         task_dict,
+        elem_emb="matscholar200",
+        sym_emb="bra-alg-off",
         inputs=["wyckoff"],
         identifiers=["material_id", "composition", "wyckoff"],
     ):
@@ -31,8 +31,8 @@ class WyckoffData(Dataset):
 
         Args:
             data_path ([type]): [description]
-            sym_path ([type]): [description]
-            fea_path ([type]): [description]
+            elem_emb ([type]): [description]
+            sym_emb ([type]): [description]
             task_dict ([type]): [description]
             inputs (list, optional): [description]. Defaults to ["composition"].
             identifiers (list, optional): [description]. Defaults to ["material_id", "composition"].
@@ -49,17 +49,31 @@ class WyckoffData(Dataset):
         # NOTE do not use default_na as "NaN" is a valid material composition
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-        assert os.path.exists(fea_path), f"{fea_path} does not exist!"
+        if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_emb = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../embeddings/element/{elem_emb}.json"
+            )
+        else:
+            assert os.path.exists(elem_emb), f"{elem_emb} does not exist!"
 
-        with open(fea_path) as f:
-            self.atom_features = json.load(f)
+        with open(elem_emb) as f:
+            self.elem_features = json.load(f)
 
-        assert os.path.exists(sym_path), f"{sym_path} does not exist!"
-        with open(sym_path) as f:
+        self.elem_emb_len = len(list(self.elem_features.values())[0])
+
+        if sym_emb in ["bra-alg-off", "spg-alg-off"]:
+            sym_emb = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../embeddings/wyckoff/{sym_emb}.json"
+            )
+        else:
+            assert os.path.exists(sym_emb), f"{sym_emb} does not exist!"
+
+        with open(sym_emb) as f:
             self.sym_features = json.load(f)
 
-        self.elem_fea_dim = len(list(self.atom_features.values())[0])
-        self.sym_fea_dim = len(list(list(self.sym_features.values())[0].values())[0])
+        self.sym_emb_len = len(list(list(self.sym_features.values())[0].values())[0])
 
         self.n_targets = []
         for target, task in self.task_dict.items():
@@ -104,7 +118,7 @@ class WyckoffData(Dataset):
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
-            atom_fea = np.vstack([self.atom_features[el] for el in elements])
+            atom_fea = np.vstack([self.elem_features[el] for el in elements])
             sym_fea = np.vstack(
                 [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
             )
@@ -233,6 +247,7 @@ def collate_batch(dataset_list):
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         *zip(*batch_cry_ids),
     )
+
 
 def parse_aflow(aflow_label):
     """parse the wyckoff format

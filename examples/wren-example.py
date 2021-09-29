@@ -12,12 +12,12 @@ from aviary.wren.model import Wren
 
 def main(
     data_path,
-    fea_path,
-    sym_path,
     targets,
     tasks,
     losses,
     robust,
+    elem_emb="matscholar200",
+    sym_emb="bra-alg-off",
     model_name="wren",
     sym_fea_len=32,
     elem_fea_len=32,
@@ -81,13 +81,13 @@ def main(
 
     dataset = WyckoffData(
         data_path=data_path,
-        fea_path=fea_path,
-        sym_path=sym_path,
+        elem_emb=elem_emb,
+        sym_emb=sym_emb,
         task_dict=task_dict
     )
     n_targets = dataset.n_targets
-    sym_emb_len = dataset.sym_fea_dim
-    elem_emb_len = dataset.elem_fea_dim
+    elem_emb_len = dataset.elem_emb_len
+    sym_emb_len = dataset.sym_emb_len
 
     train_idx = list(range(len(dataset)))
 
@@ -96,8 +96,8 @@ def main(
             print(f"using independent test set: {test_path}")
             test_set = WyckoffData(
                 data_path=test_path,
-                fea_path=fea_path,
-                sym_path=sym_path,
+                elem_emb=elem_emb,
+                sym_emb=sym_emb,
                 task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
@@ -115,8 +115,8 @@ def main(
             print(f"using independent validation set: {val_path}")
             val_set = WyckoffData(
                 data_path=val_path,
-                fea_path=fea_path,
-                sym_path=sym_path,
+                elem_emb=elem_emb,
+                sym_emb=sym_emb,
                 task_dict=task_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
@@ -277,18 +277,18 @@ def input_parser():
 
     # data embeddings
     parser.add_argument(
-        "--fea-path",
+        "--elem-emb",
         type=str,
-        default="data/el-embeddings/matscholar-embedding.json",
-        metavar="PATH",
-        help="Element embedding feature path",
+        default="matscholar200",
+        metavar="STR/PATH",
+        help="Preset embedding name or path to JSON file",
     )
     parser.add_argument(
-        "--sym-path",
+        "--sym-emb",
         type=str,
-        default="data/wp-embeddings/bra-alg-off.json",
-        metavar="PATH",
-        help="Element embedding feature path",
+        default="bra-alg-off",
+        metavar="STR/PATH",
+        help="Preset embedding name or path to JSON file",
     )
 
     # dataloader inputs

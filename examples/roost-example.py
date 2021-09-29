@@ -12,11 +12,11 @@ from aviary.utils import results_multitask, train_ensemble
 
 def main(
     data_path,
-    fea_path,
     targets,
     tasks,
     losses,
     robust,
+    elem_emb="matscholar200",
     model_name="roost",
     elem_fea_len=64,
     n_graph=3,
@@ -76,7 +76,7 @@ def main(
 
     dataset = CompositionData(
         data_path=data_path,
-        fea_path=fea_path,
+        elem_emb=elem_emb,
         task_dict=task_dict
     )
     n_targets = dataset.n_targets
@@ -89,7 +89,7 @@ def main(
             print(f"using independent test set: {test_path}")
             test_set = CompositionData(
                 data_path=test_path,
-                fea_path=fea_path,
+                elem_emb=elem_emb,
                 task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
@@ -107,7 +107,7 @@ def main(
             print(f"using independent validation set: {val_path}")
             val_set = CompositionData(
                 data_path=val_path,
-                fea_path=fea_path,
+                elem_emb=elem_emb,
                 task_dict=task_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
@@ -271,11 +271,11 @@ def input_parser():
 
     # data embeddings
     parser.add_argument(
-        "--fea-path",
+        "--elem-emb",
         type=str,
-        default="data/el-embeddings/matscholar-embedding.json",
-        metavar="PATH",
-        help="Element embedding feature path",
+        default="matscholar200",
+        metavar="STR/PATH",
+        help="Preset embedding name or path to JSON file",
     )
 
     # dataloader inputs

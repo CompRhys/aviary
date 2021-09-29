@@ -12,7 +12,7 @@ from aviary.utils import results_multitask, train_ensemble
 
 def main(
     data_path,
-    fea_path,
+    elem_emb,
     targets,
     tasks,
     losses,
@@ -89,10 +89,10 @@ def main(
     }
 
     dataset = CrystalGraphData(
-        data_path=data_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
+        data_path=data_path, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_fea_dim
+    elem_emb_len = dataset.elem_emb_len
     nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
@@ -101,7 +101,7 @@ def main(
         if test_path:
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                data_path=test_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
+                data_path=test_path, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -117,7 +117,7 @@ def main(
         if val_path:
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                data_path=val_path, fea_path=fea_path, task_dict=task_dict, **dist_dict
+                data_path=val_path, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -270,11 +270,11 @@ def input_parser():
 
     # data embeddings
     parser.add_argument(
-        "--fea-path",
+        "--elem-emb",
         type=str,
-        default="data/el-embeddings/cgcnn-embedding.json",
-        metavar="PATH",
-        help="Element embedding feature path",
+        default="matscholar200",
+        metavar="STR/PATH",
+        help="Preset embedding name or path to JSON file",
     )
 
     # dataloader inputs
