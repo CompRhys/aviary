@@ -10,11 +10,9 @@ from pymatgen.core.composition import Composition
 from pymatgen.io.vasp import Poscar
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-mult_file = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "allowed-wp-mult.json"
-)
+mult_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-mult.json")
 param_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-params.json")
-relab_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relab.json")
+relab_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-relab.json")
 
 with open(mult_file) as f:
     mult_dict = json.load(f)
