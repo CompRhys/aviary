@@ -13,7 +13,7 @@ from aviary.cgcnn.utils import get_cgcnn_input
 from tqdm.autonotebook import tqdm
 tqdm.pandas()  # prime progress_apply functionality
 
-final_dir = "data/datasets/examples"
+final_dir = "data/examples"
 
 idx_list = []
 structs = []
