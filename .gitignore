@@ -119,3 +119,4 @@ csd3/
 # exclude local data and cached graphs
 *.csv
 *.pkl
+*.pdf
