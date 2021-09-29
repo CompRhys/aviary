@@ -13,8 +13,7 @@ torch.manual_seed(0)  # ensure reproducible results
 
 
 def test_single_roost():
-
-    data_path = "tests/data/roost-regression.csv"
+    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/roost-regression.csv")
     elem_emb = "matscholar200"
     targets = ["Eg"]
     tasks = ["regression"]
@@ -135,6 +134,7 @@ def test_single_roost():
         task_dict=task_dict,
         device=device,
         eval_type="checkpoint",
+        save_results=False,
     )
 
     pred = results_dict["Eg"]["pred"]
