@@ -1,4 +1,5 @@
 import ast
+import json
 import functools
 import os
 from itertools import groupby
@@ -9,15 +10,12 @@ import torch
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset
 
-from aviary.core import Featurizer
-
-
 class CrystalGraphData(Dataset):
     def __init__(
         self,
         data_path,
-        fea_path,
         task_dict,
+        elem_emb="cgcnn92",
         inputs=["lattice", "sites"],
         identifiers=["material_id", "composition"],
         radius=5,
@@ -29,7 +27,7 @@ class CrystalGraphData(Dataset):
 
         Args:
             data_path (str): The path to the dataset
-            fea_path (str): The path to the element embedding
+            elem_emb (str): The path to the element embedding
             task_dict ({target: task}): task dict for multi-task learning
             inputs (list, optional): df columns for lattice and sites.
                 Defaults to ["lattice", "sites"].
@@ -54,9 +52,18 @@ class CrystalGraphData(Dataset):
         self.radius = radius
         self.max_num_nbr = max_num_nbr
 
-        assert os.path.exists(fea_path), f"{fea_path} does not exist!"
-        self.ari = Featurizer.from_json(fea_path)
-        self.elem_fea_dim = self.ari.embedding_size
+        if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_emb = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../embeddings/element/{elem_emb}.json"
+            )
+        else:
+            assert os.path.exists(elem_emb), f"{elem_emb} does not exist!"
+
+        with open(elem_emb) as f:
+            self.elem_features = json.load(f)
+
+        self.elem_emb_len = len(list(self.elem_features.values())[0])
 
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
@@ -148,7 +155,7 @@ class CrystalGraphData(Dataset):
         site_atoms = [atom.species.as_dict() for atom in crystal]
         atom_fea = np.vstack(
             [
-                np.sum([self.ari.get_fea(el) * amt for el, amt in site.items()], axis=0)
+                np.sum([self.elem_features[el] * amt for el, amt in site.items()], axis=0)
                 for site in site_atoms
             ]
         )
@@ -156,11 +163,11 @@ class CrystalGraphData(Dataset):
         # # # neighbours
         self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
-        assert len(self_idx), f"All atoms in {cif_id} are isolated"
-        assert len(nbr_idx), f"This should not be triggered but was for {cif_id}"
+        assert len(self_idx), f"All atoms in {cry_ids} are isolated"
+        assert len(nbr_idx), f"This should not be triggered but was for {cry_ids}"
         assert set(self_idx) == set(
             range(crystal.num_sites)
-        ), f"At least one atom in {cif_id} is isolated"
+        ), f"At least one atom in {cry_ids} is isolated"
 
         nbr_dist = self.gdf.expand(nbr_dist)
 

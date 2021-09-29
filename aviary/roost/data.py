@@ -1,14 +1,12 @@
 import functools
 import os
+import json
 
 import numpy as np
 import pandas as pd
 import torch
 from pymatgen.core.composition import Composition
 from torch.utils.data import Dataset
-
-from aviary.core import Featurizer
-
 
 class CompositionData(Dataset):
     """
@@ -19,8 +17,8 @@ class CompositionData(Dataset):
     def __init__(
         self,
         data_path,
-        fea_path,
         task_dict,
+        elem_emb="matscholar200",
         inputs=["composition"],
         identifiers=["material_id", "composition"],
     ):
@@ -28,7 +26,7 @@ class CompositionData(Dataset):
 
         Args:
             data_path (str): [description]
-            fea_path (str): [description]
+            elem_emb (str): [description]
             task_dict ({name: task}): list of tasks
             inputs (list, optional): column name for compositions.
                 Defaults to ["composition"].
@@ -48,9 +46,18 @@ class CompositionData(Dataset):
         # NOTE do not use default_na as "NaN" is a valid material
         self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-        assert os.path.exists(fea_path), f"{fea_path} does not exist!"
-        self.elem_features = Featurizer.from_json(fea_path)
-        self.elem_emb_len = self.elem_features.embedding_size
+        if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_emb = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../embeddings/element/{elem_emb}.json"
+            )
+        else:
+            assert os.path.exists(elem_emb), f"{elem_emb} does not exist!"
+
+        with open(elem_emb) as f:
+            self.elem_features = json.load(f)
+
+        self.elem_emb_len = len(list(self.elem_features.values())[0])
 
         self.n_targets = []
         for target, task in self.task_dict.items():
@@ -101,7 +108,7 @@ class CompositionData(Dataset):
 
         try:
             atom_fea = np.vstack(
-                [self.elem_features.get_fea(element) for element in elements]
+                [self.elem_features[element] for element in elements]
             )
         except AssertionError:
             raise AssertionError(

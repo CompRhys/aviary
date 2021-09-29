@@ -15,7 +15,7 @@ torch.manual_seed(0)  # ensure reproducible results
 def test_single_roost():
 
     data_path = "tests/data/roost-regression.csv"
-    fea_path = "data/el-embeddings/matscholar-embedding.json"
+    elem_emb = "matscholar200"
     targets = ["Eg"]
     tasks = ["regression"]
     losses = ["L1"]
@@ -44,7 +44,7 @@ def test_single_roost():
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
-    dataset = CompositionData(data_path=data_path, fea_path=fea_path, task_dict=task_dict)
+    dataset = CompositionData(data_path=data_path, elem_emb=elem_emb, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
