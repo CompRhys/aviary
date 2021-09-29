@@ -7,8 +7,8 @@ from pymatgen.core.composition import Composition
 
 from functools import partial
 
-from roost.wren.utils import get_aflow_label_spglib, count_wyks
-from roost.cgcnn.utils import get_cgcnn_input
+from aviary.wren.utils import get_aflow_label_spglib, count_wyks
+from aviary.cgcnn.utils import get_cgcnn_input
 
 from tqdm.autonotebook import tqdm
 tqdm.pandas()  # prime progress_apply functionality
