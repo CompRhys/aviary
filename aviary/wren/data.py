@@ -5,7 +5,6 @@ import re
 from itertools import groupby
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
@@ -20,7 +19,7 @@ class WyckoffData(Dataset):
 
     def __init__(
         self,
-        data_path,
+        df,
         task_dict,
         elem_emb="matscholar200",
         sym_emb="bra-alg-off",
@@ -43,11 +42,7 @@ class WyckoffData(Dataset):
         self.inputs = inputs
         self.task_dict = task_dict
         self.identifiers = identifiers
-
-        assert os.path.exists(data_path), f"{data_path} does not exist!"
-        # NOTE make sure to use dense datasets,
-        # NOTE do not use default_na as "NaN" is a valid material composition
-        self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+        self.df = df
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_emb = os.path.join(

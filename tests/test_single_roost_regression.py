@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import numpy as np
 import torch
 from sklearn.metrics import r2_score
@@ -43,7 +44,12 @@ def test_single_roost():
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
-    dataset = CompositionData(data_path=data_path, elem_emb=elem_emb, task_dict=task_dict)
+    assert os.path.exists(data_path), f"{data_path} does not exist!"
+    # NOTE make sure to use dense datasets,
+    # NOTE do not use default_na as "NaN" is a valid material
+    df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+
+    dataset = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 

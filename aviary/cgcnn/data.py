@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 class CrystalGraphData(Dataset):
     def __init__(
         self,
-        data_path,
+        df,
         task_dict,
         elem_emb="cgcnn92",
         inputs=["lattice", "sites"],
@@ -26,7 +26,7 @@ class CrystalGraphData(Dataset):
         """CrystalGraphData returns neighbourhood graphs
 
         Args:
-            data_path (str): The path to the dataset
+            df (Dataframe): Dataframe
             elem_emb (str): The path to the element embedding
             task_dict ({target: task}): task dict for multi-task learning
             inputs (list, optional): df columns for lattice and sites.
@@ -63,18 +63,15 @@ class CrystalGraphData(Dataset):
         with open(elem_emb) as f:
             self.elem_features = json.load(f)
 
+        for key, value in self.elem_features.items():
+            self.elem_features[key] = np.array(value, dtype=float)
+
         self.elem_emb_len = len(list(self.elem_features.values())[0])
 
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
 
-        assert os.path.exists(data_path), f"{data_path} does not exist!"
-        # NOTE make sure to use dense datasets, here do not use the default na
-        # as they can clash with "NaN" which is a valid material
-        self.df = pd.read_csv(
-            data_path, keep_default_na=False, na_values=[], comment="#"
-        )
-
+        self.df = df
         self.df["Structure_obj"] = self.df[inputs].apply(get_structure, axis=1)
 
         self._pre_check()

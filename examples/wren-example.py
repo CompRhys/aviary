@@ -1,5 +1,6 @@
 import argparse
 import os
+import pandas as pd
 import sys
 
 import torch
@@ -79,8 +80,13 @@ def main(
     task_dict = {k: v for k, v in zip(targets, tasks)}
     loss_dict = {k: v for k, v in zip(targets, losses)}
 
+    assert os.path.exists(data_path), f"{data_path} does not exist!"
+    # NOTE make sure to use dense datasets,
+    # NOTE do not use default_na as "NaN" is a valid material composition
+    df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+
     dataset = WyckoffData(
-        data_path=data_path,
+        df=df,
         elem_emb=elem_emb,
         sym_emb=sym_emb,
         task_dict=task_dict
@@ -93,9 +99,15 @@ def main(
 
     if evaluate:
         if test_path:
+
+            assert os.path.exists(test_path), f"{test_path} does not exist!"
+            # NOTE make sure to use dense datasets,
+            # NOTE do not use default_na as "NaN" is a valid material
+            df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
+
             print(f"using independent test set: {test_path}")
             test_set = WyckoffData(
-                data_path=test_path,
+                df=df,
                 elem_emb=elem_emb,
                 sym_emb=sym_emb,
                 task_dict=task_dict
@@ -112,9 +124,15 @@ def main(
 
     if train:
         if val_path:
+
+            assert os.path.exists(val_path), f"{val_path} does not exist!"
+            # NOTE make sure to use dense datasets,
+            # NOTE do not use default_na as "NaN" is a valid material
+            df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
+
             print(f"using independent validation set: {val_path}")
             val_set = WyckoffData(
-                data_path=val_path,
+                df=df,
                 elem_emb=elem_emb,
                 sym_emb=sym_emb,
                 task_dict=task_dict

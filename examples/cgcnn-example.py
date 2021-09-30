@@ -1,5 +1,6 @@
 import argparse
 import os
+import pandas as pd
 import sys
 
 import torch
@@ -12,11 +13,11 @@ from aviary.utils import results_multitask, train_ensemble
 
 def main(
     data_path,
-    elem_emb,
     targets,
     tasks,
     losses,
     robust,
+    elem_emb="cgcnn92",
     model_name="cgcnn",
     n_graph=4,
     elem_fea_len=64,
@@ -88,8 +89,13 @@ def main(
         "step": step,
     }
 
+    assert os.path.exists(data_path), f"{data_path} does not exist!"
+    # NOTE make sure to use dense datasets, here do not use the default na
+    # as they can clash with "NaN" which is a valid material
+    df = pd.read_csv(data_path, keep_default_na=False, na_values=[], comment="#")
+
     dataset = CrystalGraphData(
-        data_path=data_path, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
+        df=df, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
@@ -99,9 +105,15 @@ def main(
 
     if evaluate:
         if test_path:
+
+            assert os.path.exists(test_path), f"{test_path} does not exist!"
+            # NOTE make sure to use dense datasets,
+            # NOTE do not use default_na as "NaN" is a valid material
+            df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
+
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                data_path=test_path, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
+                df=df, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -115,9 +127,15 @@ def main(
 
     if train:
         if val_path:
+
+            assert os.path.exists(val_path), f"{val_path} does not exist!"
+            # NOTE make sure to use dense datasets,
+            # NOTE do not use default_na as "NaN" is a valid material
+            df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
+
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                data_path=val_path, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
+                df=df, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
