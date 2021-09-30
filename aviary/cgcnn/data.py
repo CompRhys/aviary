@@ -5,10 +5,10 @@ import os
 from itertools import groupby
 
 import numpy as np
-import pandas as pd
 import torch
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset
+
 
 class CrystalGraphData(Dataset):
     def __init__(
@@ -55,7 +55,7 @@ class CrystalGraphData(Dataset):
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_emb = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
-                f"../embeddings/element/{elem_emb}.json"
+                f"../embeddings/element/{elem_emb}.json",
             )
         else:
             assert os.path.exists(elem_emb), f"{elem_emb} does not exist!"
@@ -94,8 +94,7 @@ class CrystalGraphData(Dataset):
             crystal ([Structure]): pymatgen structure to get neighbours for
         """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
-            self.radius,
-            numerical_tol=1e-8,
+            self.radius, numerical_tol=1e-8,
         )
 
         if self.max_num_nbr is not None:
@@ -152,7 +151,9 @@ class CrystalGraphData(Dataset):
         site_atoms = [atom.species.as_dict() for atom in crystal]
         atom_fea = np.vstack(
             [
-                np.sum([self.elem_features[el] * amt for el, amt in site.items()], axis=0)
+                np.sum(
+                    [self.elem_features[el] * amt for el, amt in site.items()], axis=0
+                )
                 for site in site_atoms
             ]
         )
@@ -180,8 +181,11 @@ class CrystalGraphData(Dataset):
             elif self.task_dict[target] == "classification":
                 targets.append(torch.LongTensor([df_idx[target]]))
 
-        return ((atom_fea, nbr_dist, self_idx, nbr_idx), targets, *cry_ids,
-)
+        return (
+            (atom_fea, nbr_dist, self_idx, nbr_idx),
+            targets,
+            *cry_ids,
+        )
 
 
 class GaussianDistance:
