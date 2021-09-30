@@ -1,5 +1,4 @@
 import gc
-import json
 import shutil
 from abc import ABC, abstractmethod
 from itertools import chain
