@@ -3,7 +3,6 @@ import os
 import json
 
 import numpy as np
-import pandas as pd
 import torch
 from pymatgen.core.composition import Composition
 from torch.utils.data import Dataset
@@ -16,7 +15,7 @@ class CompositionData(Dataset):
 
     def __init__(
         self,
-        data_path,
+        df,
         task_dict,
         elem_emb="matscholar200",
         inputs=["composition"],
@@ -25,13 +24,11 @@ class CompositionData(Dataset):
         """[summary]
 
         Args:
-            data_path (str): [description]
-            elem_emb (str): [description]
-            task_dict ({name: task}): list of tasks
-            inputs (list, optional): column name for compositions.
-                Defaults to ["composition"].
-            identifiers (list, optional): column names for unique identifier
-                and pretty name. Defaults to ["id", "composition"].
+            df ([type]): [description]
+            task_dict ([type]): [description]
+            elem_emb (str, optional): [description]. Defaults to "matscholar200".
+            inputs (list, optional): [description]. Defaults to ["composition"].
+            identifiers (list, optional): [description]. Defaults to ["material_id", "composition"].
         """
 
         assert len(identifiers) == 2, "Two identifiers are required"
@@ -40,11 +37,7 @@ class CompositionData(Dataset):
         self.inputs = inputs
         self.task_dict = task_dict
         self.identifiers = identifiers
-
-        assert os.path.exists(data_path), f"{data_path} does not exist!"
-        # NOTE make sure to use dense datasets,
-        # NOTE do not use default_na as "NaN" is a valid material
-        self.df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+        self.df = df
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_emb = os.path.join(
