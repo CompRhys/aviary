@@ -76,9 +76,14 @@ for i, m in enumerate(markers):
         df_cgcnn = pd.concat(df_list_cgcnn)
         df_rel = pd.concat(df_list_rel)
 
-    for df, l, a, n in zip((df_wren, df_cgcnn, df_rel), ("-", "--", ":"), (1.0, 0.8, 0.8), ("Wren (This Work)", "CGCNN Pre-relax", "CGCNN Relaxed")):
+    for df, l, a, n in zip(
+        (df_wren, df_cgcnn, df_rel),
+        ("-", "--", ":"),
+        (1.0, 0.8, 0.8),
+        ("Wren (This Work)", "CGCNN Pre-relax", "CGCNN Relaxed"),
+    ):
 
-         # rare = "all"
+        # rare = "all"
 
         rare = "nla"
         df = df[
@@ -124,18 +129,11 @@ for i, m in enumerate(markers):
         print(np.min(means))
 
         ax.plot(
-            bins,
-            means,
-            linestyle=l,
-            alpha=a,
-            label=n,
+            bins, means, linestyle=l, alpha=a, label=n,
         )
 
         ax.fill_between(
-            bins,
-            means+std,
-            means-std,
-            alpha=0.3,
+            bins, means + std, means - std, alpha=0.3,
         )
 
 scalebar = AnchoredSizeBar(
@@ -195,9 +193,7 @@ ineq = "|" + r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-MP}$" + "| > MAE"
 ax.text(0, 0.13, ineq, horizontalalignment="center")
 
 ax.set_ylabel("MAE / eV per atom")
-x_lab = (
-    r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-MP}$" + " / eV per atom"
-)
+x_lab = r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-MP}$" + " / eV per atom"
 
 ax.set_xlabel(x_lab)
 

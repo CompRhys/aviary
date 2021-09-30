@@ -6,8 +6,10 @@ from pymatgen.core.composition import Composition
 
 import matplotlib.pyplot as plt
 
+
 def get_spg(num):
     return int(num.split("_")[2])
+
 
 plt.rcParams.update({"font.size": 20})
 plt.rcParams["axes.linewidth"] = 2.5
@@ -73,7 +75,9 @@ for k, el in enumerate(["Ti", "Zr", "Hf"]):
     ]
     entries_dft = [
         PDEntry(c, e * n, idx)
-        for c, e, n, idx in Hf[["comp_obj", "E_f_target", "num_atoms", "material_id"]].values
+        for c, e, n, idx in Hf[
+            ["comp_obj", "E_f_target", "num_atoms", "material_id"]
+        ].values
     ]
 
     elems = [PDEntry(c.symbol, 0) for c in Composition(f"{el}ZnN").elements]

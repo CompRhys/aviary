@@ -2,7 +2,6 @@
 # Import Libraries
 import pandas as pd
 import numpy as np
-import re
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 
@@ -12,7 +11,7 @@ from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
 
 import warnings
 
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({"font.size": 20})
 
 plt.rcParams["axes.linewidth"] = 2.5
 plt.rcParams["lines.linewidth"] = 3.5
@@ -28,42 +27,59 @@ plt.rcParams["legend.fontsize"] = 20
 
 # %%
 
+
 def get_spg(num):
     return int(num.split("_")[2])
+
 
 # %%
 # scatter plots
 
 # TAATA
-df_test = pd.read_csv("data/datasets/taata/taata-c-test.csv", comment='#', na_filter=False)
-df_test = StrToComposition(target_col_id="composition_obj").featurize_dataframe(df_test, "composition")
+df_test = pd.read_csv(
+    "data/datasets/taata/taata-c-test.csv", comment="#", na_filter=False
+)
+df_test = StrToComposition(target_col_id="composition_obj").featurize_dataframe(
+    df_test, "composition"
+)
 
-df_hull = pd.read_csv("data/datasets/taata/taata-c-train.csv", comment='#', na_filter=False)
-df_hull = StrToComposition(target_col_id="composition_obj").featurize_dataframe(df_hull, "composition")
+df_hull = pd.read_csv(
+    "data/datasets/taata/taata-c-train.csv", comment="#", na_filter=False
+)
+df_hull = StrToComposition(target_col_id="composition_obj").featurize_dataframe(
+    df_hull, "composition"
+)
 
-entries = [PDEntry(c, e*c.num_atoms) for c, e in df_hull[["composition_obj", "E_f"]].values]
+entries = [
+    PDEntry(c, e * c.num_atoms) for c, e in df_hull[["composition_obj", "E_f"]].values
+]
 el_entries = [PDEntry(c, 0) for c in ["N", "Zn", "Zr", "Ti", "Hf"]]
 
-ppd = PhaseDiagram(entries+el_entries)
+ppd = PhaseDiagram(entries + el_entries)
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    e_hull_dict = {c: ppd.get_hull_energy(c) / c.num_atoms for c in df_test["composition_obj"].values}
+    e_hull_dict = {
+        c: ppd.get_hull_energy(c) / c.num_atoms
+        for c in df_test["composition_obj"].values
+    }
 
 
 # %%
 # get colourmap
-df_test["spacegroup"] = df_test['wyckoff'].apply(get_spg)
+df_test["spacegroup"] = df_test["wyckoff"].apply(get_spg)
 spg = df_test["spacegroup"].values
 sort = np.argsort(spg)
 
-fig, ax_scatter = plt.subplots(
-    2, 2,
-    figsize=(20, 15),
-)
+fig, ax_scatter = plt.subplots(2, 2, figsize=(20, 15),)
 
-tits = ["Roost", "Wren\ (This\ Work)", "CGCNN", "CGCNN"]
-reps = ["Composition", "Wyckoff\ Representation", "Pre \u2212 relaxation\ Structures", "Relaxed\ Structures"]
+titles = ["Roost", "Wren\ (This\ Work)", "CGCNN", "CGCNN"]
+reps = [
+    "Composition",
+    "Wyckoff\ Representation",
+    "Pre \u2212 relaxation\ Structures",
+    "Relaxed\ Structures",
+]
 fs = [
     "results/manuscript/multi_results_roost-taata-c_s-0_t-1.csv",
     "results/manuscript/multi_results_wren-taata-c_s-0_t-1.csv",
@@ -71,17 +87,15 @@ fs = [
     "results/manuscript/multi_results_cgcnn-taata-c_s-0_t-1.csv",
 ]
 
-for i, (title, rep, f) in enumerate(zip(tits, reps, fs)):
+for i, (title, rep, f) in enumerate(zip(titles, reps, fs)):
     j, k = divmod(i, 2)
-    df = pd.read_csv(f, comment='#', na_filter=False)
-    e_hull = np.array(
-        [e_hull_dict[Composition(c)] for c in df["composition"]]
-    )
+    df = pd.read_csv(f, comment="#", na_filter=False)
+    e_hull = np.array([e_hull_dict[Composition(c)] for c in df["composition"]])
 
-    tar_cols = [col for col in df.columns if 'target' in col]
+    tar_cols = [col for col in df.columns if "target" in col]
     tar = df[tar_cols].to_numpy().ravel() - e_hull
 
-    pred_cols = [col for col in df.columns if 'pred' in col]
+    pred_cols = [col for col in df.columns if "pred" in col]
     pred = df[pred_cols].to_numpy().T
     mean = np.average(pred, axis=0) - e_hull
 
@@ -91,30 +105,42 @@ for i, (title, rep, f) in enumerate(zip(tits, reps, fs)):
     ales = df[ale_cols].to_numpy().T
     ale = np.mean(np.square(ales), axis=0)
 
-    res = mean-tar
+    res = mean - tar
     mae = np.abs(res).mean()
     rmse = np.sqrt(np.square(res).mean())
     r2 = r2_score(tar, mean)
 
-    ax_scatter[j, k].tick_params(direction='out')
+    ax_scatter[j, k].tick_params(direction="out")
 
-    im = ax_scatter[j, k].scatter(tar[sort], mean[sort], c=spg[sort], cmap=plt.get_cmap('turbo_r', 230), s=16, alpha=0.8, rasterized=True)# vmax=230, vmin=1)
+    im = ax_scatter[j, k].scatter(
+        tar[sort],
+        mean[sort],
+        c=spg[sort],
+        cmap=plt.get_cmap("turbo_r", 230),
+        s=16,
+        alpha=0.8,
+        rasterized=True,
+    )  # vmax=230, vmin=1)
 
     if j == 1:
-        ax_scatter[j, k].set_xlabel(r"$\it{E}$" + r"$_{Hull-TAATA}$" + " / eV per atom", labelpad=8)
+        ax_scatter[j, k].set_xlabel(
+            r"$\it{E}$" + r"$_{Hull-TAATA}$" + " / eV per atom", labelpad=8
+        )
 
     if k == 0:
-        ax_scatter[j, k].set_ylabel(r"$\it{E}$" + r"$_{Hull-ML}$" + " / eV per atom", labelpad=6)
+        ax_scatter[j, k].set_ylabel(
+            r"$\it{E}$" + r"$_{Hull-ML}$" + " / eV per atom", labelpad=6
+        )
 
     # now determine nice limits by hand:
     binwidth = 0.05
     top = 3.5
-    bottom = -.5
+    bottom = -0.5
 
     x_lims = np.array((bottom, top))
     y_lims = np.array((bottom, top))
 
-    ax_scatter[j, k].plot(x_lims, y_lims, color='grey', linestyle='--', alpha=0.3)
+    ax_scatter[j, k].plot(x_lims, y_lims, color="grey", linestyle="--", alpha=0.3)
 
     ax_scatter[j, k].set_xlim((x_lims))
     ax_scatter[j, k].set_ylim((y_lims))
@@ -122,8 +148,16 @@ for i, (title, rep, f) in enumerate(zip(tits, reps, fs)):
     ax_scatter[j, k].set_xticks((0, 1, 2, 3))
     ax_scatter[j, k].set_yticks((0, 1, 2, 3))
 
-    ax_scatter[j, k].annotate(r"$\bf{Input: {%s}}$"%(rep) + "\n" + r"$\bf{Model: {%s}}$"%(title) + "\n" + r"$R^2$" + f" = {r2:.2f}\nMAE = {mae:.2f}\nRMSE = {rmse:.2f}",
-                        (0.05, 0.72), xycoords="axes fraction")
+    ax_scatter[j, k].annotate(
+        r"$\bf{Input: {%s}}$" % (rep)
+        + "\n"
+        + r"$\bf{Model: {%s}}$" % (title)
+        + "\n"
+        + r"$R^2$"
+        + f" = {r2:.2f}\nMAE = {mae:.2f}\nRMSE = {rmse:.2f}",
+        (0.05, 0.72),
+        xycoords="axes fraction",
+    )
 
     ax_scatter[j, k].set_aspect(1.0 / ax_scatter[j, k].get_data_ratio())
 

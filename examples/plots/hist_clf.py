@@ -25,7 +25,11 @@ for i in range(0, 6):
 
     if i < 5:
         title = r"$\bf{{{}}}$".format(f"Batch-{i+offsets}")
-        df = pd.read_csv(f"results/manuscript/step_{i+offsets}_wren_org.csv", comment="#", na_filter=False)
+        df = pd.read_csv(
+            f"results/manuscript/step_{i+offsets}_wren_org.csv",
+            comment="#",
+            na_filter=False,
+        )
 
         print(len(df))
         df["is_el"] = df.composition.apply(lambda x: Composition(x).is_element)
@@ -35,10 +39,14 @@ for i in range(0, 6):
 
         df_list.append(df)
 
-        df_hull = pd.read_csv(f"data/datasets/wbm-ehull/step-{i+offsets}-e_hull.csv", comment="#", na_filter=False)
-        mapping = dict(df_hull[['material_id', 'E_hull']].values)
+        df_hull = pd.read_csv(
+            f"data/datasets/wbm-ehull/step-{i+offsets}-e_hull.csv",
+            comment="#",
+            na_filter=False,
+        )
+        mapping = dict(df_hull[["material_id", "E_hull"]].values)
         df["E_hull"] = pd.to_numeric(df["id"].map(mapping))
-        df = df.dropna(axis=0, subset=['E_hull'])
+        df = df.dropna(axis=0, subset=["E_hull"])
         tar = df["E_hull"].to_numpy().ravel()
 
         ylim = (0, 3000)
@@ -57,7 +65,11 @@ for i in range(0, 6):
     # rare = "all"
 
     rare = "nla"
-    df = df[~df["composition"].apply(lambda x: any(el.is_rare_earth_metal for el in Composition(x).elements))]
+    df = df[
+        ~df["composition"].apply(
+            lambda x: any(el.is_rare_earth_metal for el in Composition(x).elements)
+        )
+    ]
 
     # print(1-len(df)/init)
 
@@ -102,7 +114,9 @@ for i in range(0, 6):
     fn = tar[(tar <= thresh) & (test > thresh)]
     fp = tar[(tar > thresh) & (test <= thresh)]
     tn = tar[(tar > thresh) & (test > thresh)]
-    xlabel = r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-MP}$" + " / eV per atom" #r"$\/(\frac{eV}{atom})$"
+    xlabel = (
+        r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-MP}$" + " / eV per atom"
+    )  # r"$\/(\frac{eV}{atom})$"
 
     # n_test = None
     # sort = np.argsort(mean)
@@ -122,7 +136,12 @@ for i in range(0, 6):
         alpha=alpha,
         color=["tab:green", "tab:orange", "tab:red", "tab:blue"],
         linestyle="none",
-        label=["True Positives", "False Negatives", "False Positives", "True Negatives"],
+        label=[
+            "True Positives",
+            "False Negatives",
+            "False Positives",
+            "True Negatives",
+        ],
         stacked=True,
     )
 
@@ -132,14 +151,14 @@ for i in range(0, 6):
     null = (tp + fn) / (tp + tn + fp + fn)
     ppv = tp / (tp + fp)
     tpr = tp / (tp + fn)
-    f1 = 2 * ppv*tpr / (ppv + tpr)
+    f1 = 2 * ppv * tpr / (ppv + tpr)
 
     print(f"PPV: {ppv}")
     print(f"TPR: {tpr}")
     print(f"F1: {f1}")
     print(f"Enrich: {ppv/null}")
 
-    xpos, ypos = 0.45 * xlim[1],  0.96 * ylim[1]
+    xpos, ypos = 0.45 * xlim[1], 0.96 * ylim[1]
     fontsize = 20
 
     ax.text(
@@ -152,7 +171,7 @@ for i in range(0, 6):
         horizontalalignment="left",
     )
 
-    xpos, ypos = 0.90 * xlim[0],  0.96 * ylim[1]
+    xpos, ypos = 0.90 * xlim[0], 0.96 * ylim[1]
 
     ax.set_xticks(xticks)
     ax.set_yticks(yticks)
@@ -161,7 +180,7 @@ for i in range(0, 6):
 
     ax.set_ylabel("Number of Compounds")
     # else:
-        # ax.get_yaxis().set_ticklabels([])
+    # ax.get_yaxis().set_ticklabels([])
 
     ax.set_ylim(ylim)
     ax.set_xlim(xlim)
