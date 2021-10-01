@@ -1,9 +1,9 @@
-import setuptools
+from setuptools import find_namespace_packages, setup
 
 with open("README.md") as fh:
     long_description = fh.read()
 
-setuptools.setup(
+setup(
     name="aviary",
     version="0.0.2",
     author="Rhys Goodall",
@@ -11,8 +11,7 @@ setuptools.setup(
     description="A Collection of Machine Learning Models for Materials Discovery",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=['aviary'],
-    package_dir={'aviary': 'aviary'},
+    packages=find_namespace_packages(include=["aviary*"]),
     classifiers=[
         "Programming Language :: Python :: 3.7.10",
         "License :: OSI Approved :: MIT License",
