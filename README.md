@@ -9,7 +9,7 @@
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CompRhys/aviary/main.svg)](https://results.pre-commit.ci/latest/github/CompRhys/aviary/main)
 
 </h4>
-  
+
 The aviary contains `roost`, `wren` and `cgcnn`. The aim is to contain multiple models for materials discovery under a common interface
 
 ## Environment Setup

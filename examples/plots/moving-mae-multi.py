@@ -1,9 +1,8 @@
 #%%
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-
 from pymatgen.core.composition import Composition
 from scipy.stats import sem
 
