@@ -1,10 +1,9 @@
 # %%
-import pandas as pd
-import numpy as np
-from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
-from pymatgen.core.composition import Composition
-
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
+from pymatgen.core.composition import Composition
 
 
 def get_spg(num):

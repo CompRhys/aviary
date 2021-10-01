@@ -1,15 +1,14 @@
 #%%
 # Import Libraries
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import r2_score
-
-from matminer.featurizers.conversions import StrToComposition
-from pymatgen.core.composition import Composition
-from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
-
 import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matminer.featurizers.conversions import StrToComposition
+from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
+from pymatgen.core.composition import Composition
+from sklearn.metrics import r2_score
 
 plt.rcParams.update({"font.size": 20})
 
@@ -73,12 +72,12 @@ sort = np.argsort(spg)
 
 fig, ax_scatter = plt.subplots(2, 2, figsize=(20, 15),)
 
-titles = ["Roost", "Wren\ (This\ Work)", "CGCNN", "CGCNN"]
+titles = ["Roost", r"Wren\ (This\ Work)", "CGCNN", "CGCNN"]
 reps = [
     "Composition",
-    "Wyckoff\ Representation",
-    "Pre \u2212 relaxation\ Structures",
-    "Relaxed\ Structures",
+    r"Wyckoff\ Representation",
+    "Pre \u2212 relaxation\\ Structures",
+    r"Relaxed\ Structures",
 ]
 fs = [
     "results/manuscript/multi_results_roost-taata-c_s-0_t-1.csv",
@@ -142,8 +141,8 @@ for i, (title, rep, f) in enumerate(zip(titles, reps, fs)):
 
     ax_scatter[j, k].plot(x_lims, y_lims, color="grey", linestyle="--", alpha=0.3)
 
-    ax_scatter[j, k].set_xlim((x_lims))
-    ax_scatter[j, k].set_ylim((y_lims))
+    ax_scatter[j, k].set_xlim(x_lims)
+    ax_scatter[j, k].set_ylim(y_lims)
 
     ax_scatter[j, k].set_xticks((0, 1, 2, 3))
     ax_scatter[j, k].set_yticks((0, 1, 2, 3))

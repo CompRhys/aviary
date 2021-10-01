@@ -1,11 +1,12 @@
 import functools
-import os
 import json
+import os
 
 import numpy as np
 import torch
 from pymatgen.core.composition import Composition
 from torch.utils.data import Dataset
+
 
 class CompositionData(Dataset):
     """

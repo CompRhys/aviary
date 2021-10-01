@@ -1,16 +1,15 @@
 # %%
 import glob
-import pandas as pd
-
-from pymatgen.core.structure import Structure
-from pymatgen.core.composition import Composition
-
 from functools import partial
 
-from aviary.wren.utils import get_aflow_label_spglib, count_wyks
-from aviary.cgcnn.utils import get_cgcnn_input
-
+import pandas as pd
+from pymatgen.core.composition import Composition
+from pymatgen.core.structure import Structure
 from tqdm.autonotebook import tqdm
+
+from aviary.cgcnn.utils import get_cgcnn_input
+from aviary.wren.utils import count_wyks, get_aflow_label_spglib
+
 tqdm.pandas()  # prime progress_apply functionality
 
 final_dir = "data/examples"
@@ -31,7 +30,7 @@ for f in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
         lines = s.split("\n")
 
         num = lines[6].split()
-        E_vasp_per_atom = float(lines[0].split()[0]) / sum([int(a) for a in num])
+        E_vasp_per_atom = float(lines[0].split()[0]) / sum(int(a) for a in num)
 
         ht_path = lines[0].split()[1]
         meta_data = "[" + lines[0].split("[")[-1]
@@ -89,7 +88,7 @@ def get_formation_energy(args, el_refs):
     comp, energy = args
     c = Composition(comp)
     # NOTE our references use energies_per_atom for energy
-    ref_e = sum([c[el] * el_refs[el] for el in c.elements])
+    ref_e = sum(c[el] * el_refs[el] for el in c.elements)
     return energy - ref_e / c.num_atoms
 
 
