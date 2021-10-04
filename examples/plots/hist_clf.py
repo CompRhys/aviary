@@ -127,7 +127,9 @@ for i in range(0, 6):
     # fn = mean[(tar[sort][:n_test] <= thresh) & (test[sort][:n_test] > thresh)]
     # fp = mean[(tar[sort][:n_test] > thresh) & (test[sort][:n_test] <= thresh)]
     # tn = mean[(tar[sort][:n_test] > thresh) & (test[sort][:n_test] > thresh)]
-    # xlabel = r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-Pred}$" + " / eV per atom" #r"$\/(\frac{eV}{atom})$"
+    # xlabel = (
+    #     r"$\Delta$" + r"$\it{E}$" + r"$_{Hull-Pred}$" + " / eV per atom"
+    # )  # r"$\/(\frac{eV}{atom})$"
 
     ax.hist(
         [tp, fn, fp, tn],
@@ -194,4 +196,3 @@ fig.tight_layout()
 plt.savefig(f"examples/plots/pdf/hist-{e_type}-{crit}-{rare}.pdf")
 
 plt.show()
-#%%
