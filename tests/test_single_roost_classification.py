@@ -14,7 +14,10 @@ torch.manual_seed(0)  # ensure reproducible results
 
 
 def test_single_roost_clf():
-    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/roost-classification.csv")
+    data_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "data/roost-classification.csv"
+    )
     elem_emb = "matscholar200"
     targets = ["non_metal"]
     tasks = ["classification"]
