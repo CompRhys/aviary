@@ -1,8 +1,5 @@
 from setuptools import find_namespace_packages, setup
 
-with open("README.md") as fh:
-    long_description = fh.read()
-
 setup(
     name="aviary",
     version="0.0.2",
@@ -10,7 +7,7 @@ setup(
     author_email="rhys.goodall@outlook.com",
     url="https://github.com/CompRhys/aviary",
     description="A Collection of Machine Learning Models for Materials Discovery",
-    long_description=long_description,
+    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     packages=find_namespace_packages(include=["aviary*"]),
     classifiers=[
@@ -21,6 +18,11 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    keywords=["materials science, machine learning,  crystal structure"],
+    keywords=[
+        "materials science",
+        "machine learning",
+        "wyckoff positions",
+        "crystal structure",
+    ],
     package_data={"": ["**/*.json"]},
 )
