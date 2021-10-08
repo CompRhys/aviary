@@ -94,7 +94,7 @@ class CrystalGraphData(Dataset):
             crystal ([Structure]): pymatgen structure to get neighbours for
         """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
-            self.radius, numerical_tol=1e-8,
+            self.radius, numerical_tol=1e-8
         )
 
         if self.max_num_nbr is not None:
@@ -113,32 +113,29 @@ class CrystalGraphData(Dataset):
         return self_idx, nbr_idx, nbr_dist
 
     def _pre_check(self):
-        """Check that none of the structures have isolated atoms.
+        """Check that none of the structures have isolated atoms."""
 
-        Raises:
-            ValueError: if isolated structures are present
-        """
         print("Precheck that all structures are valid")
-        all_iso = []
-        some_iso = []
+        all_isolated = []
+        some_isolated = []
 
         for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
             self_idx, nbr_idx, _ = self._get_nbr_data(crystal)
 
             if len(self_idx) == 0:
-                all_iso.append(cif_id)
+                all_isolated.append(cif_id)
             elif len(nbr_idx) == 0:
-                all_iso.append(cif_id)
+                all_isolated.append(cif_id)
             elif set(self_idx) != set(range(crystal.num_sites)):
-                some_iso.append(cif_id)
+                some_isolated.append(cif_id)
 
-        if (len(all_iso) > 0) or (len(some_iso) > 0):
+        if not (all_isolated == some_isolated == []):
             # drop the data points that do not give rise to dense crystal graphs
-            self.df = self.df.drop(self.df[self.df["material_id"].isin(all_iso)].index)
-            self.df = self.df.drop(self.df[self.df["material_id"].isin(some_iso)].index)
+            isolated = {*all_isolated, *some_isolated}  # set union
+            self.df = self.df[~self.df["material_id"].isin(isolated)]
 
-            print(all_iso)
-            print(some_iso)
+            print(f"all atoms in these structure are isolated: {all_isolated}")
+            print(f"these structure have some isolated atoms: {some_isolated}")
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
