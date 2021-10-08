@@ -23,6 +23,10 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.0.1
     hooks:
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: destroyed-symlinks
       - id: end-of-file-fixer
-      - id: trailing-whitespace
       - id: mixed-line-ending
+      - id: trailing-whitespace
