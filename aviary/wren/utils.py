@@ -178,11 +178,11 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
 
 
 def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
-    """Given an element ordering canonicalise the associated wyckoff positions
+    """Given an element ordering, canonicalise the associated Wyckoff positions
     based on the alphabetical weight of equivalent choices of origin.
 
     Args:
-        elem_wyks (str): Legacy Wren Wyckoff string encoding element types at Wyckoff
+        elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff
         positions
         spg_no (int): International space group number.
 
