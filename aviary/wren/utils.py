@@ -1,18 +1,20 @@
 import json
-import os
 import re
 import subprocess
 from itertools import groupby
+from os.path import abspath, dirname, join
 from string import ascii_uppercase, digits
 
 from monty.fractions import gcd
-from pymatgen.core.composition import Composition
+from pymatgen.core import Composition, Structure
 from pymatgen.io.vasp import Poscar
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-mult_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-mult.json")
-param_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-params.json")
-relab_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp-relab.json")
+module_dir = dirname(abspath(__file__))
+
+mult_file = join(module_dir, "wp-mult.json")
+param_file = join(module_dir, "wp-params.json")
+relab_file = join(module_dir, "wp-relab.json")
 
 with open(mult_file) as f:
     mult_dict = json.load(f)
@@ -52,8 +54,9 @@ remove_digits = str.maketrans("", "", digits)
 AFLOW_EXECUTABLE = "~/bin/aflow"
 
 
-# %%
-def get_aflow_label_aflow(struct, aflow_executable=AFLOW_EXECUTABLE) -> str:
+def get_aflow_label_aflow(
+    struct: Structure, aflow_executable: str = AFLOW_EXECUTABLE
+) -> str:
     """get aflow prototype label for pymatgen structure
 
     args:
@@ -75,9 +78,8 @@ def get_aflow_label_aflow(struct, aflow_executable=AFLOW_EXECUTABLE) -> str:
 
     aflow_label = aflow_proto["aflow_label"]
 
-    aflow_label = aflow_label.replace(
-        "alpha", "A"
-    )  # to be consistent with spglib and wren embeddings
+    # to be consistent with spglib and wren embeddings
+    aflow_label = aflow_label.replace("alpha", "A")
 
     # check that multiplicities satisfy original composition
     symm = aflow_label.split("_")
@@ -103,7 +105,7 @@ def get_aflow_label_aflow(struct, aflow_executable=AFLOW_EXECUTABLE) -> str:
     return aflow_label
 
 
-def get_aflow_label_spglib(struct) -> str:
+def get_aflow_label_spglib(struct: Structure) -> str:
     """get aflow prototype label for pymatgen structure
 
     args:
@@ -126,7 +128,7 @@ def get_aflow_label_spglib(struct) -> str:
     return aflow
 
 
-def get_aflow_label_from_spga(spga):
+def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
     spg_no = spga.get_space_group_number()
     sym_struct = spga.get_symmetrized_structure()
 
@@ -175,10 +177,17 @@ def get_aflow_label_from_spga(spga):
     return aflow_label
 
 
-def canonicalise_elem_wyks(elem_wyks, spg_no):
-    """
-    Given an element ordering canonicalise the associated wyckoff positions
+def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
+    """Given an element ordering canonicalise the associated wyckoff positions
     based on the alphabetical weight of equivalent choices of origin.
+
+    Args:
+        elem_wyks (str): Legacy Wren Wyckoff string encoding element types at Wyckoff
+        positions
+        spg_no (int): International space group number.
+
+    Returns:
+        str: Canonicalised Wren Wyckoff encoding.
     """
 
     isopointial = []
@@ -213,12 +222,12 @@ def canonicalise_elem_wyks(elem_wyks, spg_no):
         scores.append(score)
         sorted_iso.append("_".join(sorted_el_wyks))
 
-    cannonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))[0][1]
+    canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))[0][1]
 
-    return cannonical
+    return canonical
 
 
-def prototype_formula(composition) -> str:
+def prototype_formula(composition: Composition) -> str:
     """
     An anonymized formula. Unique species are arranged in alphabetical order
     and assigned ascending alphabets. This format is used in the aflow structure
@@ -242,7 +251,7 @@ def prototype_formula(composition) -> str:
     return anon
 
 
-def count_wyks(aflow_label):
+def count_wyks(aflow_label: str) -> int:
     num_wyk = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -261,7 +270,7 @@ def count_wyks(aflow_label):
     return num_wyk
 
 
-def count_params(aflow_label):
+def count_params(aflow_label: str) -> int:
     num_params = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -283,6 +292,7 @@ def count_params(aflow_label):
             raise
 
     return int(num_params)
+
 
 # TODO add mapping between aflow canonicalisation (alphabetical chemsys) and canonicalisation
 # scheme based on quantities of different elements. The second scheme allows for equivalent
