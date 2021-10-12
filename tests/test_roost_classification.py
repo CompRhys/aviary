@@ -13,7 +13,7 @@ from aviary.utils import results_multitask, train_ensemble
 torch.manual_seed(0)  # ensure reproducible results
 
 
-def test_single_roost_clf():
+def test_roost_clf():
     data_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "data/roost-classification.csv"
@@ -163,4 +163,4 @@ def test_single_roost_clf():
 
 
 if __name__ == "__main__":
-    test_single_roost_clf()
+    test_roost_clf()

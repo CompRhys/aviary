@@ -13,7 +13,7 @@ from aviary.utils import results_multitask, train_ensemble
 torch.manual_seed(0)  # ensure reproducible results
 
 
-def test_single_roost():
+def test_roost_regression():
     data_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "data/roost-regression.csv"
@@ -162,4 +162,4 @@ def test_single_roost():
 
 
 if __name__ == "__main__":
-    test_single_roost()
+    test_roost_regression()
