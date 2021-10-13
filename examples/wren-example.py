@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 import pandas as pd
 import torch
@@ -51,9 +50,9 @@ def main(
 
     assert len(targets) == len(tasks) == len(losses)
 
-    assert evaluate or train, (
-        "No action given - At least one of 'train' or 'evaluate' cli flags required"
-    )
+    assert (
+        evaluate or train
+    ), "No action given - At least one of 'train' or 'evaluate' cli flags required"
 
     if test_path:
         test_size = 0.0
@@ -86,10 +85,7 @@ def main(
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
     dataset = WyckoffData(
-        df=df,
-        elem_emb=elem_emb,
-        sym_emb=sym_emb,
-        task_dict=task_dict
+        df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
@@ -107,10 +103,7 @@ def main(
 
             print(f"using independent test set: {test_path}")
             test_set = WyckoffData(
-                df=df,
-                elem_emb=elem_emb,
-                sym_emb=sym_emb,
-                task_dict=task_dict
+                df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -132,10 +125,7 @@ def main(
 
             print(f"using independent validation set: {val_path}")
             val_set = WyckoffData(
-                df=df,
-                elem_emb=elem_emb,
-                sym_emb=sym_emb,
-                task_dict=task_dict
+                df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -150,8 +140,9 @@ def main(
                 val_set = None
             else:
                 print(f"using {val_size} of training set as validation set")
+                test_size = val_size / (1 - test_size)
                 train_idx, val_idx = split(
-                    train_idx, random_state=data_seed, test_size=val_size / (1 - test_size),
+                    train_idx, random_state=data_seed, test_size=test_size
                 )
                 val_set = torch.utils.data.Subset(dataset, val_idx)
 
@@ -237,17 +228,17 @@ def main(
         data_params.update(data_reset)
 
         results_multitask(
-                model_class=Wren,
-                model_name=model_name,
-                run_id=run_id,
-                ensemble_folds=ensemble,
-                test_set=test_set,
-                data_params=data_params,
-                robust=robust,
-                task_dict=task_dict,
-                device=device,
-                eval_type="checkpoint",
-            )
+            model_class=Wren,
+            model_name=model_name,
+            run_id=run_id,
+            ensemble_folds=ensemble,
+            test_set=test_set,
+            data_params=data_params,
+            robust=robust,
+            task_dict=task_dict,
+            device=device,
+            eval_type="checkpoint",
+        )
 
 
 def input_parser():
@@ -259,17 +250,13 @@ def input_parser():
     # data inputs
     parser.add_argument(
         "--data-path",
-        type=str,
         default="/home/reag2/PhD/roost/data/datasets/wren/taata-c-spglib-test.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
     valid_group = parser.add_mutually_exclusive_group()
     valid_group.add_argument(
-        "--val-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent validation set",
+        "--val-path", metavar="PATH", help="Path to independent validation set"
     )
     valid_group.add_argument(
         "--val-size",
@@ -280,10 +267,7 @@ def input_parser():
     )
     test_group = parser.add_mutually_exclusive_group()
     test_group.add_argument(
-        "--test-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent test set"
+        "--test-path", metavar="PATH", help="Path to independent test set"
     )
     test_group.add_argument(
         "--test-size",
@@ -296,14 +280,12 @@ def input_parser():
     # data embeddings
     parser.add_argument(
         "--elem-emb",
-        type=str,
         default="matscholar200",
         metavar="STR/PATH",
         help="Preset embedding name or path to JSON file",
     )
     parser.add_argument(
         "--sym-emb",
-        type=str,
         default="bra-alg-off",
         metavar="STR/PATH",
         help="Preset embedding name or path to JSON file",
@@ -342,25 +324,21 @@ def input_parser():
 
     # task inputs
     parser.add_argument(
-        "--targets",
-        nargs="*",
-        type=str,
-        metavar="STR",
-        help="Task types for targets",
+        "--targets", nargs="+", metavar="STR", help="Task types for targets"
     )
     parser.add_argument(
         "--tasks",
         nargs="*",
-        default=["regression"],
-        type=str,
+        choices=("regression", "classification"),
+        default=("regression"),
         metavar="STR",
         help="Task types for targets",
     )
     parser.add_argument(
         "--losses",
         nargs="*",
-        default=["L1"],
-        type=str,
+        choices=("L1", "L2", "CSE"),
+        default=("L1"),
         metavar="STR",
         help="Loss function if regression (default: 'L1')",
     )
@@ -381,7 +359,6 @@ def input_parser():
     parser.add_argument(
         "--optim",
         default="AdamW",
-        type=str,
         metavar="STR",
         help="Optimizer used for training (default: 'AdamW')",
     )
@@ -442,7 +419,6 @@ def input_parser():
     name_group = parser.add_mutually_exclusive_group()
     name_group.add_argument(
         "--model-name",
-        type=str,
         default=None,
         metavar="STR",
         help="Name for sub-directory where models will be stored",
@@ -450,7 +426,6 @@ def input_parser():
     name_group.add_argument(
         "--data-id",
         default="wren",
-        type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
     )
@@ -465,52 +440,28 @@ def input_parser():
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--fine-tune",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for fine tuning"
+        "--fine-tune", metavar="PATH", help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
-        "--transfer",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for transfer learning",
+        "--transfer", metavar="PATH", help="Checkpoint path for transfer learning"
     )
     use_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from previous checkpoint"
+        "--resume", action="store_true", help="Resume from previous checkpoint"
     )
 
     # task type
     parser.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Evaluate the model/ensemble",
+        "--evaluate", action="store_true", help="Evaluate the model/ensemble"
     )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train the model/ensemble"
-    )
+    parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
 
     # misc
+    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--disable-cuda",
-        action="store_true",
-        help="Disable CUDA"
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="Log training metrics to tensorboard"
+        "--log", action="store_true", help="Log training metrics to tensorboard"
     )
 
-    args = parser.parse_args(sys.argv[1:])
-
-    assert all([i in ["regression", "classification"] for i in args.tasks]), (
-        "Only `regression` and `classification` are allowed as tasks"
-    )
+    args = parser.parse_args()
 
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
@@ -529,4 +480,4 @@ if __name__ == "__main__":
 
     print(f"The model will run on the {args.device} device")
 
-    main(**vars(args))
+    raise SystemExit(main(**vars(args)))
