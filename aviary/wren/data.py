@@ -47,7 +47,7 @@ class WyckoffData(Dataset):
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_emb = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
-                f"../embeddings/element/{elem_emb}.json"
+                f"../embeddings/element/{elem_emb}.json",
             )
         else:
             assert os.path.exists(elem_emb), f"{elem_emb} does not exist!"
@@ -60,7 +60,7 @@ class WyckoffData(Dataset):
         if sym_emb in ["bra-alg-off", "spg-alg-off"]:
             sym_emb = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
-                f"../embeddings/wyckoff/{sym_emb}.json"
+                f"../embeddings/wyckoff/{sym_emb}.json",
             )
         else:
             assert os.path.exists(sym_emb), f"{sym_emb} does not exist!"
@@ -97,9 +97,9 @@ class WyckoffData(Dataset):
             atom_fea: torch.Tensor shape (M, n_fea)
                 features of atoms in the material
             self_fea_idx: torch.Tensor shape (M*M, 1)
-                list of self indicies
+                list of self indices
             nbr_fea_idx: torch.Tensor shape (M*M, 1)
-                list of neighbour indicies
+                list of neighbour indices
             target: torch.Tensor shape (1,)
                 target value for material
             cry_id: torch.Tensor shape (1,)
