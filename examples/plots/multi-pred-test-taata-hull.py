@@ -70,7 +70,7 @@ df_test["spacegroup"] = df_test["wyckoff"].apply(get_spg)
 spg = df_test["spacegroup"].values
 sort = np.argsort(spg)
 
-fig, ax_scatter = plt.subplots(2, 2, figsize=(20, 15),)
+fig, ax_scatter = plt.subplots(2, 2, figsize=(20, 15))
 
 titles = ["Roost", r"Wren\ (This\ Work)", "CGCNN", "CGCNN"]
 reps = [
@@ -148,12 +148,8 @@ for i, (title, rep, f) in enumerate(zip(titles, reps, fs)):
     ax_scatter[j, k].set_yticks((0, 1, 2, 3))
 
     ax_scatter[j, k].annotate(
-        r"$\bf{Input: {%s}}$" % (rep)
-        + "\n"
-        + r"$\bf{Model: {%s}}$" % (title)
-        + "\n"
-        + r"$R^2$"
-        + f" = {r2:.2f}\nMAE = {mae:.2f}\nRMSE = {rmse:.2f}",
+        f"$\\bf{{Input: {rep}}}$\n$\\bf{{Model: {title}}}$\n "
+        f"$R^2$ = {r2:.2f}\n MAE = {mae:.2f}\n RMSE = {rmse:.2f}",
         (0.05, 0.72),
         xycoords="axes fraction",
     )
@@ -165,4 +161,3 @@ plt.subplots_adjust(wspace=-0.4)
 plt.savefig("examples/plots/pdf/taata-c-hull-all.pdf")
 
 plt.show()
-# %%

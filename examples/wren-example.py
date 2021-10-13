@@ -66,7 +66,7 @@ def main(
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
-            "If training an ensemble with fine tuning or transfering"
+            "If training an ensemble with fine tuning or transferring"
             " options the models must be trained one by one using the"
             " run-id flag."
         )
