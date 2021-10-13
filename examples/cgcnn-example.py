@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 import pandas as pd
 import torch
@@ -252,17 +251,13 @@ def input_parser():
     # data inputs
     parser.add_argument(
         "--data-path",
-        type=str,
         default="data/datasets/tests/cgcnn-regression.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
     valid_group = parser.add_mutually_exclusive_group()
     valid_group.add_argument(
-        "--val-path",
-        type=str,
-        metavar="PATH",
-        help="Path to independent validation set",
+        "--val-path", metavar="PATH", help="Path to independent validation set"
     )
     valid_group.add_argument(
         "--val-size",
@@ -273,7 +268,7 @@ def input_parser():
     )
     test_group = parser.add_mutually_exclusive_group()
     test_group.add_argument(
-        "--test-path", type=str, metavar="PATH", help="Path to independent test set"
+        "--test-path", metavar="PATH", help="Path to independent test set"
     )
     test_group.add_argument(
         "--test-size",
@@ -286,7 +281,6 @@ def input_parser():
     # data embeddings
     parser.add_argument(
         "--elem-emb",
-        type=str,
         default="matscholar200",
         metavar="STR/PATH",
         help="Preset embedding name or path to JSON file",
@@ -325,25 +319,21 @@ def input_parser():
 
     # task inputs
     parser.add_argument(
-        "--targets",
-        nargs="*",
-        type=str,
-        metavar="STR",
-        help="Task types for targets",
+        "--targets", nargs="+", metavar="STR", help="Task types for targets"
     )
     parser.add_argument(
         "--tasks",
         nargs="*",
-        default=["regression"],
-        type=str,
+        choices=("regression", "classification"),
+        default=("regression"),
         metavar="STR",
         help="Task types for targets",
     )
     parser.add_argument(
         "--losses",
         nargs="*",
-        default=["L1"],
-        type=str,
+        choices=("L1", "L2", "CSE"),
+        default=("L1"),
         metavar="STR",
         help="Loss function if regression (default: 'L1')",
     )
@@ -364,7 +354,6 @@ def input_parser():
     parser.add_argument(
         "--optim",
         default="AdamW",
-        type=str,
         metavar="STR",
         help="Optimizer used for training (default: 'AdamW')",
     )
@@ -460,7 +449,6 @@ def input_parser():
     name_group = parser.add_mutually_exclusive_group()
     name_group.add_argument(
         "--model-name",
-        type=str,
         default=None,
         metavar="STR",
         help="Name for sub-directory where models will be stored",
@@ -468,7 +456,6 @@ def input_parser():
     name_group.add_argument(
         "--data-id",
         default="cgcnn",
-        type=str,
         metavar="STR",
         help="Partial identifier for sub-directory where models will be stored",
     )
@@ -483,13 +470,10 @@ def input_parser():
     # restart inputs
     use_group = parser.add_mutually_exclusive_group()
     use_group.add_argument(
-        "--fine-tune", type=str, metavar="PATH", help="Checkpoint path for fine tuning"
+        "--fine-tune", metavar="PATH", help="Checkpoint path for fine tuning"
     )
     use_group.add_argument(
-        "--transfer",
-        type=str,
-        metavar="PATH",
-        help="Checkpoint path for transfer learning",
+        "--transfer", metavar="PATH", help="Checkpoint path for transfer learning"
     )
     use_group.add_argument(
         "--resume", action="store_true", help="Resume from previous checkpoint"
@@ -497,9 +481,7 @@ def input_parser():
 
     # task type
     parser.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Evaluate the model/ensemble",
+        "--evaluate", action="store_true", help="Evaluate the model/ensemble"
     )
     parser.add_argument("--train", action="store_true", help="Train the model/ensemble")
 
@@ -509,14 +491,10 @@ def input_parser():
         "--log", action="store_true", help="Log training metrics to tensorboard"
     )
 
-    args = parser.parse_args(sys.argv[1:])
+    args = parser.parse_args()
 
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
-
-    assert all(
-        [i in ["regression", "classification"] for i in args.tasks]
-    ), "Only `regression` and `classification` are allowed as tasks"
 
     args.device = (
         torch.device("cuda")
@@ -532,4 +510,4 @@ if __name__ == "__main__":
 
     print(f"The model will run on the {args.device} device")
 
-    main(**vars(args))
+    raise SystemExit(main(**vars(args)))
