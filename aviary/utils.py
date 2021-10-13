@@ -513,7 +513,7 @@ def print_metrics_regression(target, pred, **kwargs):
         print(f"RMSE : {rmse_ens:.4f}")
 
 
-def print_metrics_classification(target, logits, average="micro", **kwargs):
+def print_metrics_classification(target, logits, average="macro", **kwargs):
     """print out metrics for a classification task
 
     Args:
