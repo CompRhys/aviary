@@ -148,7 +148,7 @@ for i, (title, rep, f) in enumerate(zip(titles, reps, fs)):
     ax_scatter[j, k].set_yticks((0, 1, 2, 3))
 
     ax_scatter[j, k].annotate(
-        f"$\bf{{Input: {rep}}}$\n$\bf{{Model: {title}}}$\n "
+        f"$\\bf{{Input: {rep}}}$\n$\\bf{{Model: {title}}}$\n "
         f"$R^2$ = {r2:.2f}\n MAE = {mae:.2f}\n RMSE = {rmse:.2f}",
         (0.05, 0.72),
         xycoords="axes fraction",
