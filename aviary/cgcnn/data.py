@@ -139,7 +139,7 @@ class CrystalGraphData(Dataset):
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
-        # NOTE sites must be given in fractional co-ordinates
+        # NOTE sites must be given in fractional coordinates
         df_idx = self.df.iloc[idx]
         crystal = df_idx["Structure_obj"]
         cry_ids = df_idx[self.identifiers]
@@ -304,8 +304,8 @@ def get_structure(cols):
     """Return pymatgen structure from lattice and sites cols"""
     cell, sites = cols
     cell, elems, coords = parse_cgcnn(cell, sites)
-    # NOTE getting primative structure before constructing graph
-    # significantly harms the performnace of this model.
+    # NOTE getting primitive structure before constructing graph
+    # significantly harms the performance of this model.
     return Structure(lattice=cell, species=elems, coords=coords, to_unit_cell=True)
 
 

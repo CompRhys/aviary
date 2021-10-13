@@ -154,7 +154,7 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
 
     # cannonicalise the possible wyckoff letter sequences
     elem_wyks = "_".join(elem_wyks)
-    cannonical = canonicalise_elem_wyks(elem_wyks, spg_no)
+    canonical = canonicalise_elem_wyks(elem_wyks, spg_no)
 
     # get pearson symbol
     cry_sys = spga.get_crystal_system()
@@ -166,7 +166,7 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
     prototype_form = prototype_formula(spga._structure.composition)
 
     aflow_label = (
-        f"{prototype_form}_{pearson}_{spg_no}_{cannonical}:"
+        f"{prototype_form}_{pearson}_{spg_no}_{canonical}:"
         f"{spga._structure.composition.chemical_system}"
     )
 
