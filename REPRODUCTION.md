@@ -81,7 +81,7 @@ In order to apply the model to your own data the easiest approach will be to edi
 After generating a test file and correctly placing the pre-trained models you can produce predictions using:
 
 ```sh
-python examples/wren-example.py --data-id pre-trained/comb --ensemble 10 --evaluate --data-path data/datasets/examples/examples.csv --test-path <path/to/your/input.csv> --targets E_f --tasks regression --losses L1 --robust
+python examples/wren.py --data-id pre-trained/comb --ensemble 10 --evaluate --data-path data/datasets/examples/examples.csv --test-path <path/to/your/input.csv> --targets E_f --tasks regression --losses L1 --robust
 ```
 
 The `data-path` to `data/datasets/examples/examples.csv` is used as a placeholder that is needed given the current structure of the code.
