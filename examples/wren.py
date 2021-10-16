@@ -330,7 +330,7 @@ def input_parser():
         "--tasks",
         nargs="*",
         choices=("regression", "classification"),
-        default=("regression"),
+        default=["regression"],
         metavar="STR",
         help="Task types for targets",
     )
@@ -338,7 +338,7 @@ def input_parser():
         "--losses",
         nargs="*",
         choices=("L1", "L2", "CSE"),
-        default=("L1"),
+        default=["L1"],
         metavar="STR",
         help="Loss function if regression (default: 'L1')",
     )

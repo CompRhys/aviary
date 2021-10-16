@@ -235,7 +235,7 @@ def train_ensemble(
     model_params,
     loss_dict,
     patience=None,
-):
+) -> None:
     """
     Train multiple models
     """
@@ -514,11 +514,11 @@ def print_metrics_regression(target, pred, **kwargs):
 
 
 def print_metrics_classification(target, logits, average="macro", **kwargs):
-    """print out metrics for a classification task
+    """Print out metrics for a classification task.
 
     Args:
         target (ndarray(n_test)): categorical encoding of the tasks
-        logits (ndarray(n_test, n_targets)): logits predicted by the model
+        logits (list[n_ens * ndarray(n_targets, n_test)]): logits predicted by the model
         kwargs: unused entries from the results dictionary
     """
     acc = np.zeros(len(logits))
@@ -532,11 +532,13 @@ def print_metrics_classification(target, logits, average="macro", **kwargs):
 
     for j, y_logit in enumerate(logits):
 
-        acc[j] = accuracy_score(target, np.argmax(y_logit, axis=1))
+        y_pred = np.argmax(y_logit, axis=1)
+
+        acc[j] = accuracy_score(target, y_pred)
         roc_auc[j] = roc_auc_score(target_ohe, y_logit, average=average)
-        precision[j], recall[j], fscore[j] = precision_recall_fscore_support(
-            target, np.argmax(logits[j], axis=1), average=average
-        )[:3]
+        precision[j], recall[j], fscore[j], _ = precision_recall_fscore_support(
+            target, y_pred, average=average
+        )
 
     if len(logits) == 1:
         print("\nModel Performance Metrics:")
@@ -571,11 +573,13 @@ def print_metrics_classification(target, logits, average="macro", **kwargs):
         # calculate metrics and errors with associated errors for ensembles
         ens_logits = np.mean(logits, axis=0)
 
-        ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
+        y_pred = np.argmax(ens_logits, axis=1)
+
+        ens_acc = accuracy_score(target, y_pred)
         ens_roc_auc = roc_auc_score(target_ohe, ens_logits, average=average)
-        ens_prec, ens_recall, ens_fscore = precision_recall_fscore_support(
-            target, np.argmax(ens_logits, axis=1), average=average
-        )[:3]
+        ens_prec, ens_recall, ens_fscore, _ = precision_recall_fscore_support(
+            target, y_pred, average=average
+        )
 
         print("\nEnsemble Performance Metrics:")
         print(f"Accuracy : {ens_acc:.4f} ")
