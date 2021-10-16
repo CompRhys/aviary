@@ -59,7 +59,7 @@ for i, m in enumerate(markers):
             na_filter=False,
         )
         df_hull = pd.read_csv(
-            f"data/datasets/wbm-ehull/step-{i+offsets}-e_hull.csv",
+            f"datasets/wbm-ehull/step-{i+offsets}-e_hull.csv",
             comment="#",
             na_filter=False,
         )

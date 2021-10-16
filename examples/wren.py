@@ -250,7 +250,7 @@ def input_parser():
     # data inputs
     parser.add_argument(
         "--data-path",
-        default="/home/reag2/PhD/roost/data/datasets/wren/taata-c-spglib-test.csv",
+        default="/home/reag2/PhD/roost/datasets/wren/taata-c-spglib-test.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )

@@ -40,7 +40,7 @@ for i in range(0, 6):
         df_list.append(df)
 
         df_hull = pd.read_csv(
-            f"data/datasets/wbm-ehull/step-{i+offsets}-e_hull.csv",
+            f"datasets/wbm-ehull/step-{i+offsets}-e_hull.csv",
             comment="#",
             na_filter=False,
         )

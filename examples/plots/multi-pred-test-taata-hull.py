@@ -36,14 +36,14 @@ def get_spg(num):
 
 # TAATA
 df_test = pd.read_csv(
-    "data/datasets/taata/taata-c-test.csv", comment="#", na_filter=False
+    "datasets/taata/taata-c-test.csv", comment="#", na_filter=False
 )
 df_test = StrToComposition(target_col_id="composition_obj").featurize_dataframe(
     df_test, "composition"
 )
 
 df_hull = pd.read_csv(
-    "data/datasets/taata/taata-c-train.csv", comment="#", na_filter=False
+    "datasets/taata/taata-c-train.csv", comment="#", na_filter=False
 )
 df_hull = StrToComposition(target_col_id="composition_obj").featurize_dataframe(
     df_hull, "composition"

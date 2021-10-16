@@ -46,7 +46,7 @@ To test the input files generation and cleaning/canonicalization please run:
 python examples/inputs/poscar2df.py
 ```
 
-This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `data/datasets/examples/examples.csv` file used for the next example.
+This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` file used for the next example.
 The raw files have been selected to ensure that the subset contains all the correct endpoints for the 5 elemental species in the `Hf-N-Ti-Zr-Zn` chemical system.
 All the models used share can be run on the input file produced by this example code. To test each of the three models provided please run:
 
