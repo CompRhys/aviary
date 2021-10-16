@@ -450,7 +450,7 @@ def results_multitask(  # noqa: C901
 
     if print_results:
         for name, task in task_dict.items():
-            print(f"\nTask: '{name}' on Test Set")
+            print(f"\nTask: '{name}' on test set")
             if task == "regression":
                 print_metrics_regression(**results_dict[name])
             elif task == "classification":
@@ -460,7 +460,7 @@ def results_multitask(  # noqa: C901
 
 
 def print_metrics_regression(target, pred, **kwargs):
-    """print out metrics for a regression task
+    """Print out metrics for a regression task.
 
     Args:
         target (ndarray(n_test)): targets for regression task
@@ -589,19 +589,19 @@ def print_metrics_classification(target, logits, average="macro", **kwargs):
         print(f"Weighted F-score   : {ens_fscore:.4f}")
 
 
-def save_results_dict(ids, results_dict, model_name):
+def save_results_dict(ids: dict, results_dict: dict, model_name: str) -> None:
     """save the results to a file after model evaluation
 
     Args:
-        idx ([str]): list of unique identifiers
-        comp ([str]): list of compositions
+        idx (dict[str, list[str, int]]): Each key is the name of an identifier (e.g.
+            material ID, composition, ...) and its value a list of IDs.
         results_dict ({name: {col: data}}): nested dictionary of results
-        model_name (str): [description]
+        model_name (str): The name given the model via the --model-name flag.
     """
     results = {}
 
-    for name in results_dict:
-        for col, data in results_dict[name].items():
+    for target_name in results_dict:
+        for col, data in results_dict[target_name].items():
 
             # NOTE we save pre_logits rather than logits due to fact
             # that with the hetroskedastic setup we want to be able to
@@ -610,14 +610,14 @@ def save_results_dict(ids, results_dict, model_name):
                 for n_ens, y_pre_logit in enumerate(data):
                     results.update(
                         {
-                            f"{name}_{col}_c{lab}_n{n_ens}": val.ravel()
+                            f"{target_name}_{col}_c{lab}_n{n_ens}": val.ravel()
                             for lab, val in enumerate(y_pre_logit.T)
                         }
                     )
 
             elif "pred" in col:
                 preds = {
-                    f"{name}_{col}_n{n_ens}": val.ravel()
+                    f"{target_name}_{col}_n{n_ens}": val.ravel()
                     for (n_ens, val) in enumerate(data)
                 }
                 results.update(preds)
@@ -625,13 +625,13 @@ def save_results_dict(ids, results_dict, model_name):
             elif "ale" in col:  # elif so that pre-logit-ale doesn't trigger
                 results.update(
                     {
-                        f"{name}_{col}_n{n_ens}": val.ravel()
+                        f"{target_name}_{col}_n{n_ens}": val.ravel()
                         for (n_ens, val) in enumerate(data)
                     }
                 )
 
             elif col == "target":
-                results.update({f"{name}_{col}": data})
+                results.update({f"{target_name}_target": data})
 
     df = pd.DataFrame({**ids, **results})
 

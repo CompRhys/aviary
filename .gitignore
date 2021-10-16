@@ -14,14 +14,12 @@ runs/
 results/
 models/
 
-# exclude local data and cached graphs
+# exclude data files and cached graphs
 *.csv
 *.pkl
 *.pdf
+*.json.gz
 
 # HPC
 slurm-*.out
 csd3/
-
-# data files
-*.json.gz
