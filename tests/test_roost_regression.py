@@ -44,8 +44,8 @@ def test_roost_regression():
     workers = 0
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    task_dict = {k: v for k, v in zip(targets, tasks)}
-    loss_dict = {k: v for k, v in zip(targets, losses)}
+    task_dict = dict(zip(targets, tasks))
+    loss_dict = dict(zip(targets, losses))
 
     assert os.path.exists(data_path), f"{data_path} does not exist!"
     # NOTE make sure to use dense datasets,

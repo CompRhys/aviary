@@ -76,8 +76,8 @@ def main(
 
     # TODO CLI controls for loss dict.
 
-    task_dict = {k: v for k, v in zip(targets, tasks)}
-    loss_dict = {k: v for k, v in zip(targets, losses)}
+    task_dict = dict(zip(targets, tasks))
+    loss_dict = dict(zip(targets, losses))
 
     assert os.path.exists(data_path), f"{data_path} does not exist!"
     # NOTE make sure to use dense datasets,
@@ -250,7 +250,7 @@ def input_parser():
     # data inputs
     parser.add_argument(
         "--data-path",
-        default="/home/reag2/PhD/roost/datasets/wren/taata-c-spglib-test.csv",
+        default="datasets/examples/examples.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
