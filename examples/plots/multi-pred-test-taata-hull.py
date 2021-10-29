@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from matminer.featurizers.conversions import StrToComposition
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
-from pymatgen.core.composition import Composition
+from pymatgen.core import Composition
 from sklearn.metrics import r2_score
 
 plt.rcParams.update({"font.size": 20})
@@ -35,16 +35,12 @@ def get_spg(num):
 # scatter plots
 
 # TAATA
-df_test = pd.read_csv(
-    "datasets/taata/taata-c-test.csv", comment="#", na_filter=False
-)
+df_test = pd.read_csv("datasets/taata/taata-c-test.csv", comment="#", na_filter=False)
 df_test = StrToComposition(target_col_id="composition_obj").featurize_dataframe(
     df_test, "composition"
 )
 
-df_hull = pd.read_csv(
-    "datasets/taata/taata-c-train.csv", comment="#", na_filter=False
-)
+df_hull = pd.read_csv("datasets/taata/taata-c-train.csv", comment="#", na_filter=False)
 df_hull = StrToComposition(target_col_id="composition_obj").featurize_dataframe(
     df_hull, "composition"
 )

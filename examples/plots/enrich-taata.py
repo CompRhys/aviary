@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
-from pymatgen.core.composition import Composition
+from pymatgen.core import Composition
 
 
 def get_spg(num):

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-from pymatgen.core.composition import Composition
+from pymatgen.core import Composition
 from scipy.stats import sem
 
 plt.rcParams.update({"font.size": 20})
@@ -127,13 +127,9 @@ for i, m in enumerate(markers):
 
         print(np.min(means))
 
-        ax.plot(
-            bins, means, linestyle=l, alpha=a, label=n,
-        )
+        ax.plot(bins, means, linestyle=l, alpha=a, label=n)
 
-        ax.fill_between(
-            bins, means + std, means - std, alpha=0.3,
-        )
+        ax.fill_between(bins, means + std, means - std, alpha=0.3)
 
 scalebar = AnchoredSizeBar(
     ax.transData,

@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 import torch
-from pymatgen.core.composition import Composition
+from pymatgen.core import Composition
 from torch.utils.data import Dataset
 
 
