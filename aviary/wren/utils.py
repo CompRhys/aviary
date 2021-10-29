@@ -152,7 +152,7 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
             wyks += f"{len(w)}{wyk}"
         elem_wyks.append(wyks)
 
-    # cannonicalise the possible wyckoff letter sequences
+    # canonicalise the possible wyckoff letter sequences
     elem_wyks = "_".join(elem_wyks)
     canonical = canonicalise_elem_wyks(elem_wyks, spg_no)
 

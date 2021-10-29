@@ -3,8 +3,7 @@ import glob
 from functools import partial
 
 import pandas as pd
-from pymatgen.core.composition import Composition
-from pymatgen.core.structure import Structure
+from pymatgen.core import Composition, Structure
 from tqdm.autonotebook import tqdm
 
 from aviary.cgcnn.utils import get_cgcnn_input
@@ -135,18 +134,9 @@ vol_lim = 500
 df_wyk = df_wyk[df_wyk["volume"] / df_wyk["nsites"] < vol_lim]
 print(f"Less than {vol_lim} A^3 per site: {len(df_wyk)}")
 
-fields = [
-    "material_id",
-    "composition",
-    "E_f",
-    "wyckoff",
-    "lattice",
-    "sites"
-]
+fields = ["material_id", "composition", "E_f", "wyckoff", "lattice", "sites"]
 
 df_wyk[fields].to_csv(
     final_dir + "/examples.csv",
     index=False,
 )
-
-# %%
