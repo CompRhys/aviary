@@ -3,7 +3,7 @@ import json
 import re
 from itertools import groupby
 from os.path import abspath, dirname, exists, join
-from typing import Sequence
+from typing import Dict, Sequence
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ class WyckoffData(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        task_dict: dict[str, str],
+        task_dict: Dict[str, str],
         elem_emb: str = "matscholar200",
         sym_emb: str = "bra-alg-off",
         inputs: Sequence[str] = ["wyckoff"],
