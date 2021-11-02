@@ -391,9 +391,11 @@ def results_multitask(  # noqa: C901
             checkpoint["model_params"]["robust"] == robust
         ), f"robustness of checkpoint '{resume}' is not {robust}"
 
-        assert (
-            checkpoint["model_params"]["task_dict"] == task_dict
-        ), f"task_dict of checkpoint '{resume}' does not match current task_dict"
+        chkpt_task_dict = checkpoint["model_params"]["task_dict"]
+        assert chkpt_task_dict == task_dict, (
+            f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
+            f"task_dict {task_dict}"
+        )
 
         model = model_class(**checkpoint["model_params"], device=device)
         model.to(device)
