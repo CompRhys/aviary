@@ -515,14 +515,27 @@ def print_metrics_regression(target, pred, **kwargs):
         print(f"RMSE : {rmse_ens:.4f}")
 
 
-def print_metrics_classification(target, logits, average="macro", **kwargs):
+def print_metrics_classification(target, logits, average="micro", **kwargs):
     """Print out metrics for a classification task.
+
+    TODO make less janky, first index is for ensembles, second data, third classes.
+    always calculate metrics in the multi-class setting. How to convert binary labels
+    to multi-task automatically?
 
     Args:
         target (ndarray(n_test)): categorical encoding of the tasks
         logits (list[n_ens * ndarray(n_targets, n_test)]): logits predicted by the model
+        average ("micro" | "macro" | "samples" | "weighted"): Determines the type of
+            data averaging. Defaults to 'micro' which calculates metrics globally by
+            considering each element of the label indicator matrix as a label.
         kwargs: unused entries from the results dictionary
     """
+    logits = np.asarray(logits)
+    if len(logits.shape) != 3:
+        raise ValueError(
+            "please insure that the logits are of the form (n_ens, n_data, n_classes)"
+        )
+
     acc = np.zeros(len(logits))
     roc_auc = np.zeros(len(logits))
     precision = np.zeros(len(logits))

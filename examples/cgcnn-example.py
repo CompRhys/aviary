@@ -428,14 +428,14 @@ def input_parser():
         default=0.0,
         type=float,
         metavar="FLOAT",
-        help="Minimum distance of smeared gaussian basis (default 0.0)",
+        help="Minimum distance of smeared Gaussian basis (default 0.0)",
     )
     parser.add_argument(
         "--step",
         default=0.2,
         type=float,
         metavar="FLOAT",
-        help="Step size of smeared gaussian basis (default: 0.2)",
+        help="Step size of smeared Gaussian basis (default: 0.2)",
     )
 
     # ensemble inputs
