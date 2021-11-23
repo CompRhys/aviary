@@ -190,17 +190,17 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
         str: Canonicalised Wren Wyckoff encoding.
     """
 
-    isopointial = []
+    isopointal = []
 
     for trans in relab_dict[str(spg_no)]:
         t = str.maketrans(trans)
-        isopointial.append(elem_wyks.translate(t))
+        isopointal.append(elem_wyks.translate(t))
 
-    isopointial = list(set(isopointial))
+    isopointal = list(set(isopointal))
 
     scores = []
     sorted_iso = []
-    for wyks in isopointial:
+    for wyks in isopointal:
         score = 0
         sorted_el_wyks = []
         for el_wyks in wyks.split("_"):
