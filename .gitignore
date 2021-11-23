@@ -15,7 +15,6 @@ results/
 models/
 
 # exclude data files and cached graphs
-*.csv
 *.pkl
 *.pdf
 *.json.gz
