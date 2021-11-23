@@ -25,4 +25,16 @@ setup(
         "crystal structure",
     ],
     package_data={"": ["**/*.json"]},
+    install_requires=[
+        "scipy",
+        "tqdm",
+        "torch",
+        "numpy",
+        "pymatgen",
+        "torch_scatter",
+        "pandas",
+        "scikit_learn",
+        "pytest",
+        "tensorboard",
+    ],
 )
