@@ -1,35 +1,36 @@
 import functools
 import json
-import os
+from os.path import abspath, dirname, exists, join
+from typing import Dict, Sequence
 
 import numpy as np
+import pandas as pd
 import torch
-from pymatgen.core.composition import Composition
+from pymatgen.core import Composition
 from torch.utils.data import Dataset
 
 
 class CompositionData(Dataset):
-    """
-    The CompositionData dataset is a wrapper for a dataset data points are
-    automatically constructed from composition strings.
-    """
-
     def __init__(
         self,
-        df,
-        task_dict,
-        elem_emb="matscholar200",
-        inputs=["composition"],
-        identifiers=["material_id", "composition"],
+        df: pd.DataFrame,
+        task_dict: Dict[str, str],
+        elem_emb: str = "matscholar200",
+        inputs: Sequence[str] = ["composition"],
+        identifiers: Sequence[str] = ["material_id", "composition"],
     ):
-        """[summary]
+        """Data class for Roost models.
 
         Args:
-            df ([type]): [description]
-            task_dict ([type]): [description]
-            elem_emb (str, optional): [description]. Defaults to "matscholar200".
-            inputs (list, optional): [description]. Defaults to ["composition"].
-            identifiers (list, optional): [description]. Defaults to ["material_id", "composition"].
+            df (pd.DataFrame): Pandas dataframe holding input and target values.
+            task_dict (dict[str, "regression" | "classification"]): Map from target names to task
+                type.
+            elem_emb (str, optional): One of "matscholar200", "cgcnn92", "megnet16", "onehot112" or
+                path to a file with custom embeddings. Defaults to "matscholar200".
+            inputs (list[str], optional): df column name holding material compositions.
+                Defaults to ["composition"].
+            identifiers (list, optional): df columns for distinguishing data points. Will be
+                copied over into the model's output CSV. Defaults to ["material_id", "composition"].
         """
 
         assert len(identifiers) == 2, "Two identifiers are required"
@@ -41,12 +42,11 @@ class CompositionData(Dataset):
         self.df = df
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
-            elem_emb = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                f"../embeddings/element/{elem_emb}.json"
+            elem_emb = join(
+                dirname(abspath(__file__)), f"../embeddings/element/{elem_emb}.json"
             )
         else:
-            assert os.path.exists(elem_emb), f"{elem_emb} does not exist!"
+            assert exists(elem_emb), f"{elem_emb} does not exist!"
 
         with open(elem_emb) as f:
             self.elem_features = json.load(f)
@@ -101,9 +101,7 @@ class CompositionData(Dataset):
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
-            atom_fea = np.vstack(
-                [self.elem_features[element] for element in elements]
-            )
+            atom_fea = np.vstack([self.elem_features[element] for element in elements])
         except AssertionError:
             raise AssertionError(
                 f"cry-id {cry_ids[0]} [{composition}] contains element types not in embedding"
