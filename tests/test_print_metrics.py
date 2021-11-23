@@ -1,17 +1,24 @@
-# %%
-
 import numpy as np
-import pandas as pd
 
 from aviary.utils import print_metrics_classification, print_metrics_regression
 
-xs, y_pred, y_true = pd.read_csv("tests/data/rand_regr.csv").to_numpy().T
+# generate random data to test print functions
+rng = np.random.RandomState(42)
 
-y_binary, y_proba, y_clf = pd.read_csv("tests/data/rand_clf.csv").to_numpy().T
-y_binary = y_binary.astype(int)
-y_clf = y_clf.astype(int)
-y_probs = np.tile(y_proba, (1, 2, 1))
-y_probs[0, 1] = 1 - y_proba
+# Generate reg data
+xs = rng.rand(100)
+y_pred = xs + 0.1 * rng.normal(size=100)
+y_true = xs + 0.1 * rng.normal(size=100)
+
+# Generate clf data
+y_binary = rng.choice([0, 1], (100))
+y_proba = np.clip(y_binary - 0.1 * rng.normal(scale=5, size=(100)), 0.1, 0.9)
+
+# NOTE binary clf is handled as a multi-class clf problem therefore we need
+# to add another prediction dimension to accommodate the negative class
+y_probs = np.expand_dims(y_proba, axis=(0, 2))
+y_probs = np.tile(y_probs, (1, 1, 2))
+y_probs[0, :, 1] = 1 - y_proba
 
 
 def test_regression_metrics(capsys):
@@ -44,10 +51,24 @@ def test_classification_metrics(capsys):
     out, err = capsys.readouterr()
     assert err == ""
     lines = out.split("\n")
-    assert len(lines) == 7
+    assert len(lines) == 8
+    assert out.startswith("\nModel Performance Metrics:\nAccuracy")
+    assert lines[3].startswith("ROC-AUC")
+    assert lines[4].startswith("Weighted Precision")
+    assert lines[5].startswith("Weighted Recall")
+    assert lines[6].startswith("Weighted F-score")
 
 
-def test_classification_metrics_ensemble():
-    y_probs = np.expand_dims(y_proba, axis=(0, 2))
-    y_probs = np.tile(y_probs, (2, 1, 1))
-    print_metrics_classification(y_binary, y_probs)
+def test_classification_metrics_ensemble(capsys):
+    y_probs_ens = np.tile(y_probs, (2, 1, 1))
+    print_metrics_classification(y_binary, y_probs_ens)
+    out, err = capsys.readouterr()
+    assert err == ""
+    lines = out.split("\n")
+    assert len(lines) == 15
+    assert out.startswith("\nModel Performance Metrics:\nAccuracy")
+    assert lines[3].startswith("ROC-AUC") and "+/-" in lines[3]
+    assert lines[4].startswith("Weighted Precision") and "+/-" in lines[4]
+    assert lines[5].startswith("Weighted Recall") and "+/-" in lines[5]
+    assert lines[6].startswith("Weighted F-score") and "+/-" in lines[6]
+    assert lines[8].startswith("Ensemble Performance Metrics:")
