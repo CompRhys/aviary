@@ -262,7 +262,7 @@ def count_wyks(aflow_label: str) -> int:
         wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
         sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
         try:
-            num_wyk += sum(float(n) for n in sep_el_wyks[0::2])
+            num_wyk += sum(int(n) for n in sep_el_wyks[0::2])
         except ValueError:
             print(sep_el_wyks)
             raise
@@ -274,7 +274,7 @@ def count_params(aflow_label: str) -> int:
     num_params = 0
 
     aflow_label, _ = aflow_label.split(":")
-    pearson, spg, wyks = aflow_label.split("_")[1:4]
+    _, pearson, spg, *wyks = aflow_label.split("_")
 
     num_params += cry_param_dict[pearson[0]]
 
