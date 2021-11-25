@@ -201,30 +201,37 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
     scores = []
     sorted_iso = []
     for wyks in isopointal:
-        score = 0
-        sorted_el_wyks = []
-        for el_wyks in wyks.split("_"):
-            sep_el_wyks = ["".join(g) for _, g in groupby(el_wyks, str.isalpha)]
-            sep_el_wyks = ["" if i == "1" else i for i in sep_el_wyks]
-            sorted_el_wyks.append(
-                "".join(
-                    [
-                        f"{n}{w}"
-                        for n, w in sorted(
-                            zip(sep_el_wyks[0::2], sep_el_wyks[1::2]),
-                            key=lambda x: x[1],
-                        )
-                    ]
-                )
-            )
-            score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks[1::2])
-
+        sorted_el_wyks, score = sort_and_score_wyks(wyks)
         scores.append(score)
-        sorted_iso.append("_".join(sorted_el_wyks))
+        sorted_iso.append(sorted_el_wyks)
 
     canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))[0][1]
 
     return canonical
+
+
+def sort_and_score_wyks(wyks):
+    score = 0
+    sorted_el_wyks = []
+    for el_wyks in wyks.split("_"):
+        sep_el_wyks = ["".join(g) for _, g in groupby(el_wyks, str.isalpha)]
+        sep_el_wyks = ["" if i == "1" else i for i in sep_el_wyks]
+        sorted_el_wyks.append(
+            "".join(
+                [
+                    f"{n}{w}"
+                    for n, w in sorted(
+                        zip(sep_el_wyks[0::2], sep_el_wyks[1::2]),
+                        key=lambda x: x[1],
+                    )
+                ]
+            )
+        )
+        score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks[1::2])
+
+    sorted_el_wyks = "_".join(sorted_el_wyks)
+
+    return sorted_el_wyks, score
 
 
 def prototype_formula(composition: Composition) -> str:
