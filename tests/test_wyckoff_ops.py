@@ -2,7 +2,12 @@ import os
 
 from pymatgen.core.structure import Structure
 
-from aviary.wren.utils import count_params, count_wyks, get_aflow_label_spglib
+from aviary.wren.utils import (
+    count_params,
+    count_wyks,
+    get_aflow_label_spglib,
+    get_isopointal_proto_from_aflow,
+)
 
 
 def test_get_aflow_label_spglib():
@@ -31,7 +36,22 @@ def test_count_params():
     assert count_params("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 18
 
 
-if __name__ == "__main__":
-    test_get_aflow_label_spglib()
-    test_count_wyks()
-    test_count_params()
+def test_get_isopointal_proto():
+    """Get a recanonicalised prototype string without chemical system
+    """
+    assert (
+        get_isopointal_proto_from_aflow("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") ==
+        "ABC2D6_mC40_15_e_e_f_3f"
+    )
+    assert (
+        get_isopointal_proto_from_aflow("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si") ==
+        "ABC2D6_mC40_15_a_e_f_3f"
+    )
+    assert (
+        get_isopointal_proto_from_aflow("A_tI8_141_ea:Ca") ==  # not ea is non-canonical
+        "A_tI8_141_ae"
+    ), "failed to handle single element materials"
+    assert (
+        get_isopointal_proto_from_aflow("A4BC20D2_oC108_41_2b_a_10b_b:B-Ca-H-N") ==
+        "AB2C4D20_oC108_41_a_b_2b_10b"
+    ), "failed to reorder elements based on int not first digit"
