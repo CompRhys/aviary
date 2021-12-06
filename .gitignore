@@ -22,3 +22,5 @@ models/
 # HPC
 slurm-*.out
 csd3/
+*-thesis/
+datasets/
