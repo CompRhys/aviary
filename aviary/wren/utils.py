@@ -342,7 +342,7 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
             for p in product(
                 *list(
                     permutations(g)
-                    for _, g in groupby(sorted(zip(s_counts, s_wyks)), key=itemgetter(0))
+                    for _, g in groupby(sorted(zip(s_counts, s_wyks)), key=lambda x: x[0])
                 )
             )
         ]
