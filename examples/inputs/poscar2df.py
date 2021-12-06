@@ -1,5 +1,6 @@
 # %%
 import glob
+import os
 from functools import partial
 
 import pandas as pd
@@ -11,7 +12,7 @@ from aviary.wren.utils import count_wyks, get_aflow_label_spglib
 
 tqdm.pandas()  # prime progress_apply functionality
 
-final_dir = "data/examples"
+final_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "raw/")
 
 idx_list = []
 structs = []
@@ -19,7 +20,7 @@ E_vasp_list = []
 meta_list = []
 ht_paths = []
 
-for f in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
+for f in glob.glob(final_dir + "*.poscar", recursive=True):
     task_id = f.split("/")[-1].split(".")[0]
 
     with open(f) as s:
@@ -137,6 +138,5 @@ print(f"Less than {vol_lim} A^3 per site: {len(df_wyk)}")
 fields = ["material_id", "composition", "E_f", "wyckoff", "lattice", "sites"]
 
 df_wyk[fields].to_csv(
-    final_dir + "/examples.csv",
-    index=False,
+    final_dir + "/examples.csv", index=False,
 )
