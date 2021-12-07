@@ -56,13 +56,13 @@ The raw files have been selected to ensure that the subset contains all the corr
 All the models used share can be run on the input file produced by this example code. To test each of the three models provided please run:
 
 ```sh
-python examples/roost-example.py --train --evaluate --data-path datasets/examples/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
+python examples/roost-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 ```sh
-python examples/wren-example.py --train --evaluate --data-path datasets/examples/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
+python examples/wren-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 ```sh
-python examples/cgcnn-example.py --train --evaluate --data-path datasets/examples/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
+python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 
 Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts have been used for all experiments conducted.

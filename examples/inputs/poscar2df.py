@@ -12,7 +12,7 @@ from aviary.wren.utils import count_wyks, get_aflow_label_spglib
 
 tqdm.pandas()  # prime progress_apply functionality
 
-final_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "raw/")
+final_dir = os.path.dirname(os.path.abspath(__file__))
 
 idx_list = []
 structs = []
@@ -20,7 +20,7 @@ E_vasp_list = []
 meta_list = []
 ht_paths = []
 
-for f in glob.glob(final_dir + "*.poscar", recursive=True):
+for f in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
     task_id = f.split("/")[-1].split(".")[0]
 
     with open(f) as s:
