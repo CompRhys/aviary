@@ -2,11 +2,9 @@ name: Tests
 
 on:
   push:
-    paths:
-      - '**/*.py' # only run workflow when source files changed
+    paths: ['**/*.py', .github/workflows/test.yml]
   pull_request:
-    paths:
-      - '**/*.py'
+    paths: ['**/*.py', .github/workflows/test.yml]
 
 jobs:
   tests:
@@ -15,7 +13,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
