@@ -241,6 +241,7 @@ def train_ensemble(
     """
 
     train_generator = DataLoader(train_set, **data_params)
+    print(f"training on {len(train_set):,} samples")
 
     if val_set is not None:
         data_params.update({"batch_size": 16 * data_params["batch_size"]})
@@ -361,6 +362,7 @@ def results_multitask(  # noqa: C901
     )
 
     test_generator = DataLoader(test_set, **data_params)
+    print(f"testing on {len(test_set):,} samples")
 
     results_dict = {n: {} for n in task_dict}
     for name, task in task_dict.items():

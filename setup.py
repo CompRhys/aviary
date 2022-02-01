@@ -21,7 +21,7 @@ setup(
     keywords=[
         "materials science",
         "machine learning",
-        "wyckoff positions",
+        "Wyckoff positions",
         "crystal structure",
     ],
     package_data={"": ["**/*.json"]},
@@ -34,7 +34,9 @@ setup(
         "torch_scatter",
         "pandas",
         "scikit_learn",
-        "pytest",
         "tensorboard",
     ],
+    extras_require={
+        "test": ["pytest"],
+    },
 )
