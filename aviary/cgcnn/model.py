@@ -112,9 +112,7 @@ class CrystalGraphConvNet(BaseModelClass):
             Atom hidden features after convolution
 
         """
-        atom_fea = self.node_nn(
-            atom_fea, nbr_fea, self_idx, nbr_idx
-        )
+        atom_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
 
@@ -133,20 +131,17 @@ class DescriptorNetwork(nn.Module):
     CrystalGraphConvNet Model.
     """
 
-    def __init__(
-        self, elem_emb_len, nbr_fea_len, elem_fea_len=64, n_graph=4,
-    ):
-        """
-        """
+    def __init__(self, elem_emb_len, nbr_fea_len, elem_fea_len=64, n_graph=4):
+        """ """
         super().__init__()
 
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
         self.convs = nn.ModuleList(
-            [CGCNNConv(
-                elem_fea_len=elem_fea_len,
-                nbr_fea_len=nbr_fea_len
-            ) for _ in range(n_graph)]
+            [
+                CGCNNConv(elem_fea_len=elem_fea_len, nbr_fea_len=nbr_fea_len)
+                for _ in range(n_graph)
+            ]
         )
 
     def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx):

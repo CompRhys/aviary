@@ -74,9 +74,9 @@ class Roost(BaseModelClass):
 
         self.trunk_nn = ResidualNetwork(elem_fea_len, out_hidden[0], trunk_hidden)
 
-        self.output_nns = nn.ModuleList([
-            ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
-        ])
+        self.output_nns = nn.ModuleList(
+            [ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets]
+        )
 
     def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
         """
@@ -113,8 +113,6 @@ class DescriptorNetwork(nn.Module):
         cry_gate=[256],
         cry_msg=[256],
     ):
-        """
-        """
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
@@ -204,8 +202,6 @@ class MessageLayer(nn.Module):
     """
 
     def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
-        """
-        """
         super().__init__()
 
         # Pooling and Output
@@ -254,9 +250,7 @@ class MessageLayer(nn.Module):
         # sum selectivity over the neighbours to get elems
         head_fea = []
         for attnhead in self.pooling:
-            head_fea.append(
-                attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights)
-            )
+            head_fea.append(attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights))
 
         # average the attention heads
         fea = torch.mean(torch.stack(head_fea), dim=0)
