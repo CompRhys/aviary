@@ -4,6 +4,7 @@ import subprocess
 from itertools import chain, groupby, permutations, product
 from operator import itemgetter
 from os.path import abspath, dirname, join
+from shutil import which
 from string import ascii_uppercase, digits
 
 from monty.fractions import gcd
@@ -52,7 +53,7 @@ cry_param_dict = {
 
 remove_digits = str.maketrans("", "", digits)
 
-AFLOW_EXECUTABLE = "~/bin/aflow"
+AFLOW_EXECUTABLE = which("aflow")
 
 
 def get_aflow_label_aflow(
