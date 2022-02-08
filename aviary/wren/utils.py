@@ -53,20 +53,24 @@ cry_param_dict = {
 
 remove_digits = str.maketrans("", "", digits)
 
-AFLOW_EXECUTABLE = which("aflow")
 
-
-def get_aflow_label_aflow(
-    struct: Structure, aflow_executable: str = AFLOW_EXECUTABLE
-) -> str:
+def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
     """get aflow prototype label for pymatgen Structure
 
     args:
         struct (Structure): pymatgen Structure object
 
     returns:
-        aflow prototype label
+        str: aflow prototype label
     """
+    if aflow_executable is None:
+        aflow_executable = which("aflow")
+
+    if which(aflow_executable or "") is None:
+        raise FileNotFoundError(
+            "aflow could not found, please specify path to its binary with "
+            "aflow_executable='...'"
+        )
 
     poscar = Poscar(struct)
 
