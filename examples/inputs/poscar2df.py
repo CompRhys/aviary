@@ -137,6 +137,4 @@ print(f"Less than {vol_lim} A^3 per site: {len(df_wyk)}")
 
 fields = ["material_id", "composition", "E_f", "wyckoff", "lattice", "sites"]
 
-df_wyk[fields].to_csv(
-    final_dir + "/examples.csv", index=False,
-)
+df_wyk[fields].to_csv(final_dir + "/examples.csv", index=False)
