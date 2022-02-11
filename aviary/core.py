@@ -211,7 +211,9 @@ class BaseModelClass(nn.Module, ABC):
 
         # we do not need batch_comp or batch_ids when training
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
-        for inputs, targets, *_ in tqdm(generator, disable=True if not verbose else None):
+        for inputs, targets, *_ in tqdm(
+            generator, disable=True if not verbose else None
+        ):
 
             # move tensors to GPU
             inputs = (tensor.to(self.device) for tensor in inputs)
@@ -329,7 +331,9 @@ class BaseModelClass(nn.Module, ABC):
         self.eval()
 
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
-        for input_, targets, *batch_ids in tqdm(generator, disable=True if not verbose else None):
+        for input_, targets, *batch_ids in tqdm(
+            generator, disable=True if not verbose else None
+        ):
 
             # move tensors to device (GPU or CPU)
             input_ = (tensor.to(self.device) for tensor in input_)
