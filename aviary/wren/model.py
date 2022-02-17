@@ -18,7 +18,7 @@ class Wren(BaseModelClass):
 
     The message passing layers are used to determine a descriptor set
     for the fully connected network. The graphs are used to represent
-    the stiochiometry of inorganic materials in a trainable manner.
+    the stoichiometry of inorganic materials in a trainable manner.
     This makes them systematically improvable with more data.
     """
 
@@ -184,11 +184,11 @@ class DescriptorNetwork(nn.Module):
 
         Args:
             elem_weights (torch.Tensor): Fractional weight of each
-                Element in its stiochiometry
+                Element in its stoichiometry
             elem_fea (torch.Tensor): Element features of each of
-                the N elems in the batch
+                the N elements in the batch
             sym_fea (torch.Tensor): Wyckoff Position features of each
-                of the N elems in the batch
+                of the N elements in the batch
             self_fea_idx (torch.Tensor): Indices of the first element in
                 each of the M pairs
             nbr_fea_idx (torch.Tensor): Indices of the second element in
@@ -236,7 +236,7 @@ class DescriptorNetwork(nn.Module):
 class MessageLayer(nn.Module):
     """
     Massage Layers are used to propagate information between nodes in
-    in the stiochiometry graph.
+    in the stoichiometry graph.
     """
 
     def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
@@ -269,7 +269,7 @@ class MessageLayer(nn.Module):
         Inputs
         ----------
         elem_weights: Variable(torch.Tensor) shape (N,)
-            The fractional weights of elems in their materials
+            The fractional weights of elements in their materials
         elem_in_fea: Variable(torch.Tensor) shape (N, elem_fea_len)
             Element hidden features before message passing
         self_fea_idx: torch.Tensor shape (M,)
@@ -288,7 +288,7 @@ class MessageLayer(nn.Module):
         elem_self_fea = elem_in_fea[self_fea_idx, :]
         fea = torch.cat([elem_self_fea, elem_nbr_fea], dim=1)
 
-        # sum selectivity over the neighbours to get elems
+        # sum selectivity over the neighbours to get elements
         head_fea = []
         for attnhead in self.pooling:
             head_fea.append(attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights))
