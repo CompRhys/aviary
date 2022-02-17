@@ -110,9 +110,6 @@ class Wren(BaseModelClass):
         # apply neural network to map from learned features to target
         return (output_nn(crys_fea) for output_nn in self.output_nns)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}"
-
 
 class DescriptorNetwork(nn.Module):
     """

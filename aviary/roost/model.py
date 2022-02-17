@@ -32,7 +32,7 @@ class Roost(BaseModelClass):
         cry_msg=[256],
         trunk_hidden=[1024, 512],
         out_hidden=[256, 128, 64],
-        **kwargs
+        **kwargs,
     ):
         if isinstance(out_hidden[0], list):
             raise ValueError("boo hiss bad user")
@@ -90,9 +90,6 @@ class Roost(BaseModelClass):
 
         # apply neural network to map from learned features to target
         return (output_nn(crys_fea) for output_nn in self.output_nns)
-
-    def __repr__(self):
-        return self.__class__.__name__
 
 
 class DescriptorNetwork(nn.Module):
