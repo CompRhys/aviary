@@ -22,5 +22,8 @@ models/
 # HPC
 slurm-*.out
 csd3/
-*-thesis/
+plots/
 datasets/
+pds/
+manuscript/
+voro-thesis/
