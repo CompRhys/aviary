@@ -4,6 +4,7 @@ import subprocess
 from itertools import chain, groupby, permutations, product
 from operator import itemgetter
 from os.path import abspath, dirname, join
+from shutil import which
 from string import ascii_uppercase, digits
 
 from monty.fractions import gcd
@@ -52,20 +53,24 @@ cry_param_dict = {
 
 remove_digits = str.maketrans("", "", digits)
 
-AFLOW_EXECUTABLE = "~/bin/aflow"
 
-
-def get_aflow_label_aflow(
-    struct: Structure, aflow_executable: str = AFLOW_EXECUTABLE
-) -> str:
+def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
     """get aflow prototype label for pymatgen Structure
 
     args:
         struct (Structure): pymatgen Structure object
 
     returns:
-        aflow prototype label
+        str: aflow prototype label
     """
+    if aflow_executable is None:
+        aflow_executable = which("aflow")
+
+    if which(aflow_executable or "") is None:
+        raise FileNotFoundError(
+            "aflow could not found, please specify path to its binary with "
+            "aflow_executable='...'"
+        )
 
     poscar = Poscar(struct)
 
@@ -230,7 +235,8 @@ def sort_and_score_wyks(wyks):
                 [
                     f"{n}{w}"
                     for n, w in sorted(
-                        zip(sep_el_wyks[0::2], sep_el_wyks[1::2]), key=lambda x: x[1],
+                        zip(sep_el_wyks[0::2], sep_el_wyks[1::2]),
+                        key=lambda x: x[1],
                     )
                 ]
             )
@@ -267,8 +273,7 @@ def prototype_formula(composition: Composition) -> str:
 
 
 def count_wyks(aflow_label: str) -> int:
-    """Count number of Wyckoff positions in Wyckoff representation
-    """
+    """Count number of Wyckoff positions in Wyckoff representation"""
     num_wyk = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -288,8 +293,7 @@ def count_wyks(aflow_label: str) -> int:
 
 
 def count_params(aflow_label: str) -> int:
-    """Count number of parameters coarse-grained in Wyckoff representation
-    """
+    """Count number of parameters coarse-grained in Wyckoff representation"""
     num_params = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -314,8 +318,7 @@ def count_params(aflow_label: str) -> int:
 
 
 def get_isopointal_proto_from_aflow(aflow: str) -> str:
-    """Get a canonicalised string for the prototype
-    """
+    """Get a canonicalised string for the prototype"""
     aflow, _ = aflow.split(":")
     anom, pearson, spg, *wyks = aflow.split("_")
 
@@ -342,7 +345,9 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
             for p in product(
                 *list(
                     permutations(g)
-                    for _, g in groupby(sorted(zip(s_counts, s_wyks)), key=lambda x: x[0])
+                    for _, g in groupby(
+                        sorted(zip(s_counts, s_wyks)), key=lambda x: x[0]
+                    )
                 )
             )
         ]
