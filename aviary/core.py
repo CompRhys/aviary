@@ -397,6 +397,11 @@ class BaseModelClass(nn.Module, ABC):
     def num_params(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+    def __repr__(self):
+        name = self._get_name()
+        n_params, n_epochs = self.num_params, self.epoch
+        return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
+
 
 class Normalizer:
     """Normalize a Tensor and restore it later."""

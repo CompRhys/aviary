@@ -132,7 +132,6 @@ class DescriptorNetwork(nn.Module):
     """
 
     def __init__(self, elem_emb_len, nbr_fea_len, elem_fea_len=64, n_graph=4):
-        """ """
         super().__init__()
 
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)

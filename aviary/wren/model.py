@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from aviary.core import BaseModelClass
 from aviary.segments import (
     MeanPooling,
+    MessageLayer,
     ResidualNetwork,
     SimpleNetwork,
     WeightedAttentionPooling,
@@ -18,7 +19,7 @@ class Wren(BaseModelClass):
 
     The message passing layers are used to determine a descriptor set
     for the fully connected network. The graphs are used to represent
-    the stiochiometry of inorganic materials in a trainable manner.
+    the stoichiometry of inorganic materials in a trainable manner.
     This makes them systematically improvable with more data.
     """
 
@@ -110,9 +111,6 @@ class Wren(BaseModelClass):
         # apply neural network to map from learned features to target
         return (output_nn(crys_fea) for output_nn in self.output_nns)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}"
-
 
 class DescriptorNetwork(nn.Module):
     """
@@ -134,7 +132,6 @@ class DescriptorNetwork(nn.Module):
         cry_gate=[256],
         cry_msg=[256],
     ):
-        """ """
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
@@ -187,11 +184,11 @@ class DescriptorNetwork(nn.Module):
 
         Args:
             elem_weights (torch.Tensor): Fractional weight of each
-                Element in its stiochiometry
+                Element in its stoichiometry
             elem_fea (torch.Tensor): Element features of each of
-                the N elems in the batch
+                the N elements in the batch
             sym_fea (torch.Tensor): Wyckoff Position features of each
-                of the N elems in the batch
+                of the N elements in the batch
             self_fea_idx (torch.Tensor): Indices of the first element in
                 each of the M pairs
             nbr_fea_idx (torch.Tensor): Indices of the second element in
@@ -231,75 +228,6 @@ class DescriptorNetwork(nn.Module):
         cry_fea = self.aug_pool(torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx)
 
         return cry_fea
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}"
-
-
-class MessageLayer(nn.Module):
-    """
-    Massage Layers are used to propagate information between nodes in
-    in the stiochiometry graph.
-    """
-
-    def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
-        """ """
-        super().__init__()
-
-        # Pooling and Output
-        self.pooling = nn.ModuleList(
-            [
-                WeightedAttentionPooling(
-                    gate_nn=SimpleNetwork(2 * elem_fea_len, 1, elem_gate),
-                    message_nn=SimpleNetwork(2 * elem_fea_len, elem_fea_len, elem_msg),
-                    # message_nn=nn.Linear(2*elem_fea_len, elem_fea_len),
-                    # message_nn=nn.Identity(),
-                )
-                for _ in range(elem_heads)
-            ]
-        )
-
-    def forward(self, elem_weights, elem_in_fea, self_fea_idx, nbr_fea_idx):
-        """
-        Forward pass
-
-        Parameters
-        ----------
-        N: Total number of elements (nodes) in the batch
-        M: Total number of pairs (edges) in the batch
-        C: Total number of crystals (graphs) in the batch
-
-        Inputs
-        ----------
-        elem_weights: Variable(torch.Tensor) shape (N,)
-            The fractional weights of elems in their materials
-        elem_in_fea: Variable(torch.Tensor) shape (N, elem_fea_len)
-            Element hidden features before message passing
-        self_fea_idx: torch.Tensor shape (M,)
-            Indices of the first element in each of the M pairs
-        nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of the second element in each of the M pairs
-
-        Returns
-        -------
-        elem_out_fea: nn.Variable shape (N, elem_fea_len)
-            Element hidden features after message passing
-        """
-        # construct the total features for passing
-        elem_nbr_weights = elem_weights[nbr_fea_idx, :]
-        elem_nbr_fea = elem_in_fea[nbr_fea_idx, :]
-        elem_self_fea = elem_in_fea[self_fea_idx, :]
-        fea = torch.cat([elem_self_fea, elem_nbr_fea], dim=1)
-
-        # sum selectivity over the neighbours to get elems
-        head_fea = []
-        for attnhead in self.pooling:
-            head_fea.append(attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights))
-
-        # average the attention heads
-        fea = torch.mean(torch.stack(head_fea), dim=0)
-
-        return fea + elem_in_fea
 
     def __repr__(self):
         return f"{self.__class__.__name__}"
