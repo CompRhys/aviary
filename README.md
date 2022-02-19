@@ -116,4 +116,4 @@ Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Pr
 
 ## Disclaimer
 
-This research code is provided as-is. We have checked for potential bugs and believe that the code is being shared in a bug-free state. As this is an archive version we will not be able to amend the code to fix bugs/edge-cases found at a later date. However, this code will likely continue to be developed at the location described in the metadata.
+This research code is provided as-is. We have checked for potential bugs and believe that the code is being shared in a bug-free state.
