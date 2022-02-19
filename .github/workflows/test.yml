@@ -27,4 +27,4 @@ jobs:
           pip install .[test]
 
       - name: Run Tests
-        run: python -m pytest --capture=no --cov
+        run: python -m pytest --capture=no --cov aviary
