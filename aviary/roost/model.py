@@ -2,8 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from aviary.core import BaseModelClass, MessageLayer
-from aviary.segments import ResidualNetwork, SimpleNetwork, WeightedAttentionPooling
+from aviary.core import BaseModelClass
+from aviary.segments import (
+    MessageLayer,
+    ResidualNetwork,
+    SimpleNetwork,
+    WeightedAttentionPooling,
+)
 
 
 class Roost(BaseModelClass):

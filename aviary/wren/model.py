@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from aviary.core import BaseModelClass, MessageLayer
+from aviary.core import BaseModelClass
 from aviary.segments import (
     MeanPooling,
+    MessageLayer,
     ResidualNetwork,
     SimpleNetwork,
     WeightedAttentionPooling,
