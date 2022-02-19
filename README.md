@@ -5,16 +5,16 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 [![GitHub Repo Size](https://img.shields.io/github/repo-size/comprhys/aviary?label=Repo+Size)](https://github.com/comprhys/aviary/graphs/contributors)
 [![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/aviary?label=Last+Commit)](https://github.com/comprhys/aviary/commits)
-[![Tests](https://github.com/CompRhys/aviary/workflows/Tests/badge.svg)](https://github.com/CompRhys/aviary/actions)
+[![Tests](https://github.com/CompRhys/aviary/actions/workflows/test.yml/badge.svg)](https://github.com/CompRhys/aviary/actions/workflows/test.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CompRhys/aviary/main.svg)](https://results.pre-commit.ci/latest/github/CompRhys/aviary/main)
-
 
 </h4>
 
 The aviary contains:
- * <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
- * <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
- * `cgcnn`.
+
+* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
+* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
+* `cgcnn`.
 
 The aim is to contain multiple models for materials discovery under a common interface
 
@@ -58,9 +58,11 @@ All the models used share can be run on the input file produced by this example 
 ```sh
 python examples/roost-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
+
 ```sh
 python examples/wren-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
+
 ```sh
 python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
