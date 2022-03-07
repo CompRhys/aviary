@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 
 def RobustL1Loss(output, log_std, target):
