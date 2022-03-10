@@ -6,9 +6,10 @@ from matminer.utils.io import load_dataframe_from_json
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split as split
 
-from aviary.roost.data import CompositionData, collate_batch
-from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
+from aviary.wren.data import WyckoffData, collate_batch
+from aviary.wren.model import Wren
+from aviary.wren.utils import get_aflow_label_spglib
 
 torch.manual_seed(0)  # ensure reproducible results
 
@@ -18,12 +19,14 @@ def test_roost_regression():
         os.path.dirname(os.path.abspath(__file__)), "data/matbench_phonons.json.gz"
     )
     elem_emb = "matscholar200"
+    sym_emb = "bra-alg-off"
     targets = ["last phdos peak"]
     tasks = ["regression"]
     losses = ["L1"]
     robust = True
-    model_name = "roost-reg-test"
-    elem_fea_len = 64
+    model_name = "wren-reg-test"
+    elem_fea_len = 32
+    sym_fea_len = 32
     n_graph = 3
     ensemble = 2
     run_id = 1
@@ -49,14 +52,18 @@ def test_roost_regression():
     assert os.path.exists(data_path), f"{data_path} does not exist!"
 
     df = load_dataframe_from_json(data_path)
+    df["wyckoff"] = df.structure.apply(get_aflow_label_spglib)
     df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
     df["composition"] = df.structure.apply(
         lambda x: x.composition.formula.replace(" ", "")
     )
 
-    dataset = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
+    dataset = WyckoffData(
+        df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+    )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
+    sym_emb_len = dataset.sym_emb_len
 
     train_idx = list(range(len(dataset)))
 
@@ -100,7 +107,9 @@ def test_roost_regression():
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
+        "sym_emb_len": sym_emb_len,
         "elem_fea_len": elem_fea_len,
+        "sym_fea_len": sym_fea_len,
         "n_graph": n_graph,
         "elem_heads": 2,
         "elem_gate": [256],
@@ -108,15 +117,15 @@ def test_roost_regression():
         "cry_heads": 2,
         "cry_gate": [256],
         "cry_msg": [256],
-        "trunk_hidden": [256, 256],
-        "out_hidden": [128, 64],
+        "out_hidden": [256],
+        "trunk_hidden": [64],
     }
 
     os.makedirs(f"models/{model_name}", exist_ok=True)
     os.makedirs(f"results/{model_name}", exist_ok=True)
 
     train_ensemble(
-        model_class=Roost,
+        model_class=Wren,
         model_name=model_name,
         run_id=run_id,
         ensemble_folds=ensemble,
@@ -135,7 +144,7 @@ def test_roost_regression():
     data_params["shuffle"] = False  # need fixed data order due to ensembling
 
     results_dict = results_multitask(
-        model_class=Roost,
+        model_class=Wren,
         model_name=model_name,
         run_id=run_id,
         ensemble_folds=ensemble,

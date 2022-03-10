@@ -37,6 +37,6 @@ setup(
         "tensorboard",
     ],
     extras_require={
-        "test": ["pytest", "pytest-cov"],
+        "test": ["pytest", "pytest-cov", "matminer"],
     },
 )
