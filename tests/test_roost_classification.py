@@ -1,8 +1,8 @@
 import os
 
 import numpy as np
-import pandas as pd
 import torch
+from matminer.utils.io import load_dataframe_from_json
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split as split
 
@@ -15,10 +15,10 @@ torch.manual_seed(0)  # ensure reproducible results
 
 def test_roost_clf():
     data_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "data/roost-classification.csv"
+        os.path.dirname(os.path.abspath(__file__)), "data/matbench_phonons.json.gz"
     )
     elem_emb = "matscholar200"
-    targets = ["non_metal"]
+    targets = ["phdos_clf"]
     tasks = ["classification"]
     losses = ["CSE"]
     robust = True
@@ -47,9 +47,13 @@ def test_roost_clf():
     loss_dict = dict(zip(targets, losses))
 
     assert os.path.exists(data_path), f"{data_path} does not exist!"
-    # NOTE make sure to use dense datasets,
-    # NOTE do not use default_na as "NaN" is a valid material
-    df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
+
+    df = load_dataframe_from_json(data_path)
+    df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
+    df["composition"] = df.structure.apply(
+        lambda x: x.composition.formula.replace(" ", "")
+    )
+    df["phdos_clf"] = np.where((df["last phdos peak"] > 450), 1, 0)
 
     dataset = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
     n_targets = dataset.n_targets
@@ -99,14 +103,14 @@ def test_roost_clf():
         "elem_emb_len": elem_emb_len,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
-        "elem_heads": 3,
+        "elem_heads": 2,
         "elem_gate": [256],
         "elem_msg": [256],
-        "cry_heads": 3,
+        "cry_heads": 2,
         "cry_gate": [256],
         "cry_msg": [256],
-        "trunk_hidden": [1024, 512],
-        "out_hidden": [256, 128, 64],
+        "trunk_hidden": [256, 256],
+        "out_hidden": [128, 64],
     }
 
     os.makedirs(f"models/{model_name}", exist_ok=True)
@@ -145,8 +149,8 @@ def test_roost_clf():
         save_results=False,
     )
 
-    logits = results_dict["non_metal"]["logits"]
-    target = results_dict["non_metal"]["target"]
+    logits = results_dict["phdos_clf"]["logits"]
+    target = results_dict["phdos_clf"]["target"]
 
     # calculate metrics and errors with associated errors for ensembles
     ens_logits = np.mean(logits, axis=0)
@@ -157,7 +161,7 @@ def test_roost_clf():
     ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
     ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
 
-    assert ens_acc > 0.75
+    assert ens_acc > 0.9
     assert ens_roc_auc > 0.9
 
 

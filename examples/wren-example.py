@@ -188,8 +188,6 @@ def main(
         "cry_heads": 1,
         "cry_gate": [256],
         "cry_msg": [256],
-        # "out_hidden": [256] * 6,
-        # "out_hidden": [1024, 512, 256, 128, 64],
         "out_hidden": [256, 256],
         "trunk_hidden": [128, 64],
     }
