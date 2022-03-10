@@ -15,7 +15,8 @@ from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from aviary.core import Normalizer, RobustL1Loss, RobustL2Loss, sampled_softmax
+from aviary.core import Normalizer, sampled_softmax
+from aviary.losses import RobustL1Loss, RobustL2Loss
 
 
 def init_model(
