@@ -2,7 +2,7 @@ from setuptools import find_namespace_packages, setup
 
 setup(
     name="aviary",
-    version="0.0.2",
+    version="0.0.3",
     author="Rhys Goodall",
     author_email="rhys.goodall@outlook.com",
     url="https://github.com/CompRhys/aviary",
@@ -11,7 +11,6 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_namespace_packages(include=["aviary*"]),
     classifiers=[
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
@@ -19,12 +18,13 @@ setup(
         "Operating System :: OS Independent",
     ],
     keywords=[
-        "materials science",
-        "machine learning",
+        "Material Science",
+        "Machine Learning",
         "Wyckoff positions",
-        "crystal structure",
+        "Crystal Structure Prediction",
     ],
     package_data={"": ["**/*.json"]},
+    python_requires=">=3.7",
     install_requires=[
         "scipy",
         "tqdm",
