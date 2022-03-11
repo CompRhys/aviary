@@ -371,7 +371,7 @@ class BaseModelClass(nn.Module, ABC):
             test_outputs.append(output)
 
         # TODO the return values should be described in doc string @janosh
-        return tuple(
+        return (
             # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
             # for multitask learning
             tuple(
