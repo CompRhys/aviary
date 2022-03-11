@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import os
 import sys
 from datetime import datetime
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
@@ -28,21 +30,21 @@ else:
 
 
 def init_model(
-    model_class,
-    model_name,
-    model_params,
-    run_id,
-    optim,
-    learning_rate,
-    weight_decay,
-    momentum,
-    device,
-    milestones=[],
-    gamma=0.3,
-    resume=None,
-    fine_tune=None,
-    transfer=None,
-):
+    model_class: type[BaseModelClass],
+    model_name: str,
+    model_params: dict[str, Any],
+    run_id: int,
+    optim: torch.optim.Optimizer,
+    learning_rate: float,
+    weight_decay: float,
+    momentum: float,
+    device: type[torch.device] | Literal["cuda", "cpu"],
+    milestones: Iterable = [],
+    gamma: float = 0.3,
+    resume: str = None,
+    fine_tune: str = None,
+    transfer: str = None,
+) -> BaseModelClass:
 
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
@@ -161,7 +163,7 @@ def init_losses(
     robust: bool = False,
 ) -> dict[str, tuple[str, type[torch.nn.Module]]]:  # noqa: C901
 
-    criterion_dict = {}
+    criterion_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
@@ -362,7 +364,7 @@ def results_multitask(  # noqa: C901
     eval_type: str = "checkpoint",
     print_results: bool = True,
     save_results: bool = True,
-) -> dict[str, dict[str, Tensor | np.ndarray]]:
+) -> dict[str, dict[str, list | np.ndarray]]:
     """
     take an ensemble of models and evaluate their performance on the test set
     """
@@ -381,7 +383,7 @@ def results_multitask(  # noqa: C901
     test_generator = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
 
-    results_dict: dict[str, dict[str, Tensor | np.ndarray]] = {n: {} for n in task_dict}
+    results_dict: dict[str, dict[str, list | np.ndarray]] = {n: {} for n in task_dict}
     for name, task in task_dict.items():
         if task == "regression":
             results_dict[name]["pred"] = np.zeros((ensemble_folds, len(test_set)))
@@ -420,7 +422,7 @@ def results_multitask(  # noqa: C901
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        normalizer_dict = {}
+        normalizer_dict: dict[str, Normalizer] = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
             if state_dict is not None:
                 normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
@@ -437,11 +439,11 @@ def results_multitask(  # noqa: C901
                     mean, log_std = pred.chunk(2, dim=1)
                     pred = normalizer_dict[name].denorm(mean.data.cpu())
                     ale_std = torch.exp(log_std).data.cpu() * normalizer_dict[name].std
-                    results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()
+                    results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()  # type: ignore
                 else:
                     pred = normalizer_dict[name].denorm(pred.data.cpu())
 
-                results_dict[name]["pred"][j, :] = pred.view(-1).numpy()
+                results_dict[name]["pred"][j, :] = pred.view(-1).numpy()  # type: ignore
 
             elif task == "classification":
                 if model.robust:
@@ -451,13 +453,13 @@ def results_multitask(  # noqa: C901
                     )
                     pre_logits = mean.data.cpu().numpy()
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
-                    results_dict[name]["pre-logits_ale"].append(pre_logits_std)
+                    results_dict[name]["pre-logits_ale"].append(pre_logits_std)  # type: ignore
                 else:
                     pre_logits = pred.data.cpu().numpy()
                     logits = softmax(pre_logits, axis=1)
 
-                results_dict[name]["pre-logits"].append(pre_logits)
-                results_dict[name]["logits"].append(logits)
+                results_dict[name]["pre-logits"].append(pre_logits)  # type: ignore
+                results_dict[name]["logits"].append(logits)  # type: ignore
 
             results_dict[name]["target"] = target
 
@@ -473,9 +475,9 @@ def results_multitask(  # noqa: C901
         for name, task in task_dict.items():
             print(f"\nTask: '{name}' on test set")
             if task == "regression":
-                print_metrics_regression(**results_dict[name])
+                print_metrics_regression(**results_dict[name])  # type: ignore
             elif task == "classification":
-                print_metrics_classification(**results_dict[name])
+                print_metrics_classification(**results_dict[name])  # type: ignore
 
     return results_dict
 
