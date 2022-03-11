@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import functools
 import json
 from os.path import abspath, dirname, exists, join
-from typing import Dict, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -14,7 +16,7 @@ class CompositionData(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        task_dict: Dict[str, str],
+        task_dict: dict[str, str],
         elem_emb: str = "matscholar200",
         inputs: Sequence[str] = ["composition"],
         identifiers: Sequence[str] = ["material_id", "composition"],
