@@ -36,7 +36,7 @@ class BaseModelClass(nn.Module, ABC):
         self,
         task_dict: dict[str, TaskType],
         robust: bool,
-        device: torch.device | Literal["cuda", "cpu"],
+        device: type[torch.device] | Literal["cuda", "cpu"],
         epoch: int = 1,
         best_val_scores: dict[str, float] = None,
     ) -> None:
@@ -69,7 +69,7 @@ class BaseModelClass(nn.Module, ABC):
         criterion_dict: dict[str, nn.Module],
         normalizer_dict: dict[str, Normalizer],
         model_name: str,
-        run_id: str,
+        run_id: int,
         checkpoint: bool = True,
         writer: SummaryWriter = None,
         verbose: bool = True,
@@ -465,7 +465,7 @@ class Normalizer:
 
 
 def save_checkpoint(
-    state: dict[str, Any], is_best: bool, model_name: str, run_id: str
+    state: dict[str, Any], is_best: bool, model_name: str, run_id: int
 ) -> None:
     """
     Saves a checkpoint and overwrites the best model when is_best = True
