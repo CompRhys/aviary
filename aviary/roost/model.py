@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import LongTensor, Tensor
 
 from aviary.core import BaseModelClass
 from aviary.segments import (
@@ -24,21 +27,21 @@ class Roost(BaseModelClass):
 
     def __init__(
         self,
-        robust,
-        n_targets,
-        elem_emb_len,
-        elem_fea_len=64,
-        n_graph=3,
-        elem_heads=3,
-        elem_gate=[256],
-        elem_msg=[256],
-        cry_heads=3,
-        cry_gate=[256],
-        cry_msg=[256],
-        trunk_hidden=[1024, 512],
-        out_hidden=[256, 128, 64],
+        robust: bool,
+        n_targets: list[int],
+        elem_emb_len: int,
+        elem_fea_len: int = 64,
+        n_graph: int = 3,
+        elem_heads: int = 3,
+        elem_gate: list[int] = [256],
+        elem_msg: list[int] = [256],
+        cry_heads: int = 3,
+        cry_gate: list[int] = [256],
+        cry_msg: list[int] = [256],
+        trunk_hidden: list[int] = [1024, 512],
+        out_hidden: list[int] = [256, 128, 64],
         **kwargs,
-    ):
+    ) -> None:
         if isinstance(out_hidden[0], list):
             raise ValueError("boo hiss bad user")
             # assert all([isinstance(x, list) for x in out_hidden]),
@@ -60,7 +63,7 @@ class Roost(BaseModelClass):
             "cry_msg": cry_msg,
         }
 
-        self.material_nn = DescriptorNetwork(**desc_dict)
+        self.material_nn = DescriptorNetwork(**desc_dict)  # type: ignore
 
         self.model_params.update(
             {
@@ -83,7 +86,14 @@ class Roost(BaseModelClass):
             [ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets]
         )
 
-    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
+    def forward(
+        self,
+        elem_weights: Tensor,
+        elem_fea: Tensor,
+        self_fea_idx: LongTensor,
+        nbr_fea_idx: LongTensor,
+        cry_elem_idx: LongTensor,
+    ) -> tuple[Tensor, ...]:
         """
         Forward pass through the material_nn and output_nn
         """
@@ -94,7 +104,7 @@ class Roost(BaseModelClass):
         crys_fea = F.relu(self.trunk_nn(crys_fea))
 
         # apply neural network to map from learned features to target
-        return (output_nn(crys_fea) for output_nn in self.output_nns)
+        return tuple(output_nn(crys_fea) for output_nn in self.output_nns)
 
 
 class DescriptorNetwork(nn.Module):
@@ -105,16 +115,16 @@ class DescriptorNetwork(nn.Module):
 
     def __init__(
         self,
-        elem_emb_len,
-        elem_fea_len=64,
-        n_graph=3,
-        elem_heads=3,
-        elem_gate=[256],
-        elem_msg=[256],
-        cry_heads=3,
-        cry_gate=[256],
-        cry_msg=[256],
-    ):
+        elem_emb_len: int,
+        elem_fea_len: int = 64,
+        n_graph: int = 3,
+        elem_heads: int = 3,
+        elem_gate: list[int] = [256],
+        elem_msg: list[int] = [256],
+        cry_heads: int = 3,
+        cry_gate: list[int] = [256],
+        cry_msg: list[int] = [256],
+    ) -> None:
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
@@ -145,7 +155,14 @@ class DescriptorNetwork(nn.Module):
             ]
         )
 
-    def forward(self, elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx):
+    def forward(
+        self,
+        elem_weights: Tensor,
+        elem_fea: Tensor,
+        self_fea_idx: LongTensor,
+        nbr_fea_idx: LongTensor,
+        cry_elem_idx: LongTensor,
+    ) -> Tensor:
         """
         Forward pass
 
@@ -193,5 +210,5 @@ class DescriptorNetwork(nn.Module):
 
         return torch.mean(torch.stack(head_fea), dim=0)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__

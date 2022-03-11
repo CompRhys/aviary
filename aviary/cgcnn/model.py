@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import LongTensor, Tensor
 
 from aviary.core import BaseModelClass
 from aviary.segments import MeanPooling, SimpleNetwork, SumPooling
@@ -19,17 +22,17 @@ class CrystalGraphConvNet(BaseModelClass):
 
     def __init__(
         self,
-        robust,
-        n_targets,
-        elem_emb_len,
-        nbr_fea_len,
-        elem_fea_len=64,
-        n_graph=4,
-        h_fea_len=128,
-        n_trunk=1,
-        n_hidden=1,
+        robust: bool,
+        n_targets: list[int],
+        elem_emb_len: int,
+        nbr_fea_len: int,
+        elem_fea_len: int = 64,
+        n_graph: int = 4,
+        h_fea_len: int = 128,
+        n_trunk: int = 1,
+        n_hidden: int = 1,
         **kwargs,
-    ):
+    ) -> None:
         """
         Initialize CrystalGraphConvNet.
 
@@ -85,7 +88,14 @@ class CrystalGraphConvNet(BaseModelClass):
             SimpleNetwork(h_fea_len, n, out_hidden) for n in n_targets
         )
 
-    def forward(self, atom_fea, nbr_fea, self_idx, nbr_idx, crystal_atom_idx):
+    def forward(
+        self,
+        atom_fea: Tensor,
+        nbr_fea: Tensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
+        crystal_atom_idx: LongTensor,
+    ) -> Tensor:
         """
         Forward pass
 
@@ -131,7 +141,13 @@ class DescriptorNetwork(nn.Module):
     CrystalGraphConvNet Model.
     """
 
-    def __init__(self, elem_emb_len, nbr_fea_len, elem_fea_len=64, n_graph=4):
+    def __init__(
+        self,
+        elem_emb_len: int,
+        nbr_fea_len: int,
+        elem_fea_len: int = 64,
+        n_graph: int = 4,
+    ) -> None:
         super().__init__()
 
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
@@ -143,7 +159,13 @@ class DescriptorNetwork(nn.Module):
             ]
         )
 
-    def forward(self, atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx):
+    def forward(
+        self,
+        atom_fea: Tensor,
+        nbr_fea: Tensor,
+        self_fea_idx: LongTensor,
+        nbr_fea_idx: LongTensor,
+    ) -> Tensor:
         """
         Forward pass
 
@@ -183,7 +205,7 @@ class CGCNNConv(nn.Module):
     Convolutional operation on graphs
     """
 
-    def __init__(self, elem_fea_len, nbr_fea_len):
+    def __init__(self, elem_fea_len: int, nbr_fea_len: int) -> None:
         """
         Initialize CGCNNConv.
 
@@ -208,7 +230,13 @@ class CGCNNConv(nn.Module):
         self.softplus2 = nn.Softplus()
         self.pooling = SumPooling()
 
-    def forward(self, atom_in_fea, nbr_fea, self_fea_idx, nbr_fea_idx):
+    def forward(
+        self,
+        atom_in_fea: Tensor,
+        nbr_fea: Tensor,
+        self_fea_idx: LongTensor,
+        nbr_fea_idx: LongTensor,
+    ) -> Tensor:
         """
         Forward pass
 
