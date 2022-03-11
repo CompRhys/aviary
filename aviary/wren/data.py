@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import functools
 import json
 import re
 from itertools import groupby
 from os.path import abspath, dirname, exists, join
-from typing import Dict, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -17,7 +19,7 @@ class WyckoffData(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        task_dict: Dict[str, str],
+        task_dict: dict[str, str],
         elem_emb: str = "matscholar200",
         sym_emb: str = "bra-alg-off",
         inputs: Sequence[str] = ["wyckoff"],
