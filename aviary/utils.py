@@ -1,5 +1,7 @@
 import os
+import sys
 from datetime import datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -11,12 +13,18 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
+from torch import LongTensor, Tensor
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
-from aviary.core import Normalizer, sampled_softmax
+from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import RobustL1Loss, RobustL2Loss
+
+if sys.version_info < (3, 8):
+    from typing_extensions import Literal
+else:
+    from typing import Literal
 
 
 def init_model(
@@ -147,7 +155,11 @@ def init_model(
     return model, optimizer, scheduler
 
 
-def init_losses(task_dict, loss_dict, robust=False):  # noqa: C901
+def init_losses(
+    task_dict: dict[str, TaskType],
+    loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
+    robust: bool = False,
+) -> dict[str, tuple[str, type[torch.nn.Module]]]:  # noqa: C901
 
     criterion_dict = {}
     for name, task in task_dict.items():
@@ -201,7 +213,11 @@ def init_losses(task_dict, loss_dict, robust=False):  # noqa: C901
     return criterion_dict
 
 
-def init_normalizers(task_dict, device, resume=False):
+def init_normalizers(
+    task_dict: dict[str, TaskType],
+    device: type[torch.device] | Literal["cuda", "cpu"],
+    resume: str = None,
+) -> dict[str, Normalizer]:
     if resume:
         checkpoint = torch.load(resume, map_location=device)
         normalizer_dict = {}
@@ -222,20 +238,20 @@ def init_normalizers(task_dict, device, resume=False):
 
 
 def train_ensemble(
-    model_class,
-    model_name,
-    run_id,
-    ensemble_folds,
-    epochs,
-    train_set,
-    val_set,
-    log,
-    data_params,
-    setup_params,
-    restart_params,
-    model_params,
-    loss_dict,
-    patience=None,
+    model_class: type[BaseModelClass],
+    model_name: str,
+    run_id: int,
+    ensemble_folds: int,
+    epochs: int,
+    train_set: Subset,
+    val_set: Subset,
+    log: bool,
+    data_params: dict[str, Any],
+    setup_params: dict[str, Any],
+    restart_params: dict[str, Any],
+    model_params: dict[str, Any],
+    loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
+    patience: int = None,
 ) -> None:
     """
     Train multiple models
@@ -334,19 +350,19 @@ def train_ensemble(
 
 @torch.no_grad()
 def results_multitask(  # noqa: C901
-    model_class,
-    model_name,
-    run_id,
-    ensemble_folds,
-    test_set,
-    data_params,
-    robust,
-    task_dict,
-    device,
-    eval_type="checkpoint",
-    print_results=True,
-    save_results=True,
-):
+    model_class: type[BaseModelClass],
+    model_name: str,
+    run_id: int,
+    ensemble_folds: int,
+    test_set: Subset,
+    data_params: dict[str, Any],
+    robust: bool,
+    task_dict: dict[str, TaskType],
+    device: type[torch.device] | Literal["cuda", "cpu"],
+    eval_type: str = "checkpoint",
+    print_results: bool = True,
+    save_results: bool = True,
+) -> dict[str, dict[str, Tensor | np.ndarray]]:
     """
     take an ensemble of models and evaluate their performance on the test set
     """
@@ -365,7 +381,7 @@ def results_multitask(  # noqa: C901
     test_generator = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
 
-    results_dict = {n: {} for n in task_dict}
+    results_dict: dict[str, dict[str, Tensor | np.ndarray]] = {n: {} for n in task_dict}
     for name, task in task_dict.items():
         if task == "regression":
             results_dict[name]["pred"] = np.zeros((ensemble_folds, len(test_set)))
@@ -464,7 +480,7 @@ def results_multitask(  # noqa: C901
     return results_dict
 
 
-def print_metrics_regression(target, pred, **kwargs):
+def print_metrics_regression(target: Tensor, pred: Tensor, **kwargs) -> None:
     """Print out metrics for a regression task.
 
     Args:
@@ -518,7 +534,12 @@ def print_metrics_regression(target, pred, **kwargs):
         print(f"RMSE : {rmse_ens:.4f}")
 
 
-def print_metrics_classification(target, logits, average="micro", **kwargs):
+def print_metrics_classification(
+    target: LongTensor,
+    logits: Tensor,
+    average: Literal["micro", "macro", "samples", "weighted"] = "micro",
+    **kwargs,
+) -> None:
     """Print out metrics for a classification task.
 
     TODO make less janky, first index is for ensembles, second data, third classes.
@@ -607,11 +628,13 @@ def print_metrics_classification(target, logits, average="micro", **kwargs):
         print(f"Weighted F-score   : {ens_fscore:.4f}")
 
 
-def save_results_dict(ids: dict, results_dict: dict, model_name: str) -> None:
+def save_results_dict(
+    ids: dict[str, list[str | int]], results_dict: dict[str, Any], model_name: str
+) -> None:
     """save the results to a file after model evaluation
 
     Args:
-        idx (dict[str, list[str, int]]): Each key is the name of an identifier (e.g.
+        idx (dict[str, list[str | int]]): Each key is the name of an identifier (e.g.
             material ID, composition, ...) and its value a list of IDs.
         results_dict ({name: {col: data}}): nested dictionary of results
         model_name (str): The name given the model via the --model-name flag.
@@ -623,7 +646,7 @@ def save_results_dict(ids: dict, results_dict: dict, model_name: str) -> None:
 
             # NOTE we save pre_logits rather than logits due to fact
             # that with the hetroskedastic setup we want to be able to
-            # sample from the gaussian distributed pre_logits we parameterise.
+            # sample from the Gaussian distributed pre_logits we parameterise.
             if "pre-logits" in col:
                 for n_ens, y_pre_logit in enumerate(data):
                     results.update(
