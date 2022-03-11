@@ -28,9 +28,7 @@ TaskType = Literal["regression", "classification"]
 
 
 class BaseModelClass(nn.Module, ABC):
-    """
-    A base class for models.
-    """
+    """A base class for models."""
 
     def __init__(
         self,
@@ -40,13 +38,15 @@ class BaseModelClass(nn.Module, ABC):
         epoch: int = 1,
         best_val_scores: dict[str, float] = None,
     ) -> None:
-        """
+        """_summary_
+
         Args:
-            task (str): "regression" or "classification"
-            robust (bool): whether an aleatoric loss function is being used
-            device (pytorch.device): the device the model will be run on
-            epoch (int): the epoch model training will begin/resume from
-            best_val_score (float): validation score to use for early stopping
+            task_dict (dict[str, TaskType]): Map of names to "regression" or "classification".
+            robust (bool): Whether to use aleatoric loss function.
+            device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
+            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
+            best_val_scores (dict[str, float], optional): Validation score to use for early
+                stopping. Defaults to None.
         """
         super().__init__()
         self.task_dict = task_dict

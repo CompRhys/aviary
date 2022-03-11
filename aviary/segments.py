@@ -33,15 +33,14 @@ class SumPooling(nn.Module):
 
 
 class AttentionPooling(nn.Module):
-    """
-    softmax attention layer
-    """
+    """Softmax attention layer"""
 
     def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
-        """
+        """Initialize softmax attention layer.
+
         Args:
-            gate_nn: Variable(nn.Module)
-            message_nn
+            gate_nn (nn.Module): _description_
+            message_nn (nn.Module): _description_
         """
         super().__init__()
         self.gate_nn = gate_nn
@@ -135,30 +134,24 @@ class MessageLayer(nn.Module):
         self_fea_idx: LongTensor,
         nbr_fea_idx: LongTensor,
     ) -> Tensor:
-        """
-        Forward pass
+        """Forward pass
 
-        Parameters
-        ----------
+        Args:
+            elem_weights (Tensor): Variable(torch.Tensor) shape (N,)
+                The fractional weights of elements in their materials
+            elem_in_fea (Tensor): Variable(torch.Tensor) shape (N, elem_fea_len)
+                Element hidden features before message passing
+            self_fea_idx (LongTensor): torch.Tensor shape (M,)
+                Indices of the first element in each of the M pairs
+            nbr_fea_idx (LongTensor): torch.Tensor shape (M,)
+                Indices of the second element in each of the M pairs
+
         N: Total number of elements (nodes) in the batch
         M: Total number of pairs (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
-        Inputs
-        ----------
-        elem_weights: Variable(torch.Tensor) shape (N,)
-            The fractional weights of elements in their materials
-        elem_in_fea: Variable(torch.Tensor) shape (N, elem_fea_len)
-            Element hidden features before message passing
-        self_fea_idx: torch.Tensor shape (M,)
-            Indices of the first element in each of the M pairs
-        nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of the second element in each of the M pairs
-
-        Returns
-        -------
-        elem_out_fea: nn.Variable shape (N, elem_fea_len)
-            Element hidden features after message passing
+        Returns:
+            Tensor: shape (N, elem_fea_len) Element hidden features after message passing
         """
         # construct the total features for passing
         elem_nbr_weights = elem_weights[nbr_fea_idx, :]
@@ -193,13 +186,14 @@ class SimpleNetwork(nn.Module):
         activation: type[nn.Module] = nn.LeakyReLU,
         batchnorm: bool = False,
     ) -> None:
-        """
-        Inputs
-        ----------
-        input_dim: int
-        output_dim: int
-        hidden_layer_dims: list(int)
+        """_summary_
 
+        Args:
+            input_dim (int): _description_
+            output_dim (int): _description_
+            hidden_layer_dims (list[int]): _description_
+            activation (type[nn.Module], optional): _description_. Defaults to nn.LeakyReLU.
+            batchnorm (bool, optional): _description_. Defaults to False.
         """
         super().__init__()
 
@@ -237,9 +231,7 @@ class SimpleNetwork(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    """
-    Feed forward Residual Neural Network
-    """
+    """Feed forward Residual Neural Network"""
 
     def __init__(
         self,
@@ -250,13 +242,15 @@ class ResidualNetwork(nn.Module):
         batchnorm: bool = False,
         return_features: bool = False,
     ) -> None:
-        """
-        Inputs
-        ----------
-        input_dim: int
-        output_dim: int
-        hidden_layer_dims: list(int)
+        """_summary_
 
+        Args:
+            input_dim (int): _description_
+            output_dim (int): _description_
+            hidden_layer_dims (list[int]): _description_
+            activation (type[nn.Module], optional): _description_. Defaults to nn.ReLU.
+            batchnorm (bool, optional): _description_. Defaults to False.
+            return_features (bool, optional): _description_. Defaults to False.
         """
         super().__init__()
 
