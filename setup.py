@@ -35,6 +35,7 @@ setup(
         "pandas",
         "scikit_learn",
         "tensorboard",
+        "typing_extensions;python_version<'3.8'",
     ],
     extras_require={
         "test": ["pytest", "pytest-cov", "matminer"],
