@@ -1,14 +1,30 @@
+from __future__ import annotations
+
 import gc
 import shutil
+import sys
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from itertools import chain
+from typing import Any
 
 import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, f1_score
+from torch import Tensor
 from torch.nn.functional import softmax
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from tqdm.autonotebook import tqdm
+
+if sys.version_info < (3, 8):
+    from typing_extensions import Literal
+else:
+    from typing import Literal
+
+
+TaskType = Literal["regression", "classification"]
 
 
 class BaseModelClass(nn.Module, ABC):
@@ -16,7 +32,14 @@ class BaseModelClass(nn.Module, ABC):
     A base class for models.
     """
 
-    def __init__(self, task_dict, robust, device, epoch=1, best_val_scores=None):
+    def __init__(
+        self,
+        task_dict: dict[str, TaskType],
+        robust: bool,
+        device: torch.device | Literal["cuda", "cpu"],
+        epoch: int = 1,
+        best_val_scores: dict[str, float] = None,
+    ) -> None:
         """
         Args:
             task (str): "regression" or "classification"
@@ -31,27 +54,27 @@ class BaseModelClass(nn.Module, ABC):
         self.robust = robust
         self.device = device
         self.epoch = epoch
-        self.best_val_scores = best_val_scores
+        self.best_val_scores = best_val_scores or {}
         self.es_patience = 0
 
         self.model_params = {"task_dict": task_dict}
 
     def fit(  # noqa: C901
         self,
-        train_generator,
-        val_generator,
-        optimizer,
-        scheduler,
-        epochs,
-        criterion_dict,
-        normalizer_dict,
-        model_name,
-        run_id,
-        checkpoint=True,
-        writer=None,
-        verbose=True,
-        patience=None,
-    ):
+        train_generator: DataLoader,
+        val_generator: DataLoader,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler._LRScheduler,
+        epochs: int,
+        criterion_dict: dict[str, nn.Module],
+        normalizer_dict: dict[str, Normalizer],
+        model_name: str,
+        run_id: str,
+        checkpoint: bool = True,
+        writer: SummaryWriter = None,
+        verbose: bool = True,
+        patience: int = None,
+    ) -> None:
         """
         Args:
 
@@ -91,7 +114,6 @@ class BaseModelClass(nn.Module, ABC):
                         )
 
                 # Validation
-                is_best = False
                 if val_generator is not None:
                     with torch.no_grad():
                         # evaluate on validation set
@@ -127,7 +149,7 @@ class BaseModelClass(nn.Module, ABC):
                     # TODO what are the costs of this approach.
                     # It could involve saving a lot of models?
 
-                    is_best = []
+                    is_best: list[bool] = []
 
                     for name in self.best_val_scores:
                         if self.task_dict[name] == "regression":
@@ -186,12 +208,12 @@ class BaseModelClass(nn.Module, ABC):
 
     def evaluate(
         self,
-        generator,
-        criterion_dict,
-        optimizer,
-        normalizer_dict,
-        action="train",
-        verbose=False,
+        generator: DataLoader,
+        criterion_dict: dict[str, tuple[TaskType, nn.Module]],
+        optimizer: torch.optim.Optimizer,
+        normalizer_dict: dict[str, Normalizer],
+        action: Literal["train", "val"] = "train",
+        verbose: bool = False,
     ):
         """
         evaluate the model
@@ -204,9 +226,8 @@ class BaseModelClass(nn.Module, ABC):
         else:
             raise NameError("Only train or val allowed as action")
 
-        metrics = {
-            key: {k: [] for k in ["Loss", "MAE", "RMSE", "Acc", "F1"]}
-            for key in self.task_dict
+        metrics: dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], list]] = {
+            key: defaultdict(list) for key in self.task_dict
         }
 
         # we do not need batch_comp or batch_ids when training
@@ -228,7 +249,7 @@ class BaseModelClass(nn.Module, ABC):
             # compute output
             outputs = self(*inputs)
 
-            mixed_loss = 0
+            mixed_loss: Tensor = 0
 
             for name, output, target in zip(self.target_names, outputs, targets):
                 task, criterion = criterion_dict[name]
@@ -319,7 +340,9 @@ class BaseModelClass(nn.Module, ABC):
         return metrics
 
     @torch.no_grad()
-    def predict(self, generator, verbose=False):
+    def predict(
+        self, generator: DataLoader, verbose: bool = False
+    ) -> tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]:
         """
         evaluate the model
         """
@@ -347,20 +370,21 @@ class BaseModelClass(nn.Module, ABC):
             test_targets.append(targets)
             test_outputs.append(output)
 
-        return (
+        # TODO the return values should be described in doc string @janosh
+        return tuple(
             # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
             # for multitask learning
-            (
+            tuple(
                 torch.cat(test_t, dim=0).view(-1).numpy()
                 for test_t in zip(*test_targets)
             ),
-            (torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
+            tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
             # return identifier columns
             *(list(chain(*x)) for x in list(zip(*test_ids))),
-        )
+        )  # type: ignore
 
     @torch.no_grad()
-    def featurise(self, generator):
+    def featurise(self, generator: DataLoader) -> np.ndarray:
         """Generate features for a list of composition strings. When using Roost,
         this runs only the message-passing part of the model without the ResNet.
 
@@ -394,10 +418,10 @@ class BaseModelClass(nn.Module, ABC):
         raise NotImplementedError("forward() is not defined!")
 
     @property
-    def num_params(self):
+    def num_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         name = self._get_name()
         n_params, n_epochs = self.num_params, self.epoch
         return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
@@ -406,31 +430,33 @@ class BaseModelClass(nn.Module, ABC):
 class Normalizer:
     """Normalize a Tensor and restore it later."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.tensor(0)
         self.std = torch.tensor(1)
 
-    def fit(self, tensor, dim=0, keepdim=False):
+    def fit(self, tensor: Tensor, dim: int = 0, keepdim: bool = False) -> None:
         """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.mean(tensor, dim, keepdim)
         self.std = torch.std(tensor, dim, keepdim)
 
-    def norm(self, tensor):
+    def norm(self, tensor: Tensor) -> Tensor:
         return (tensor - self.mean) / self.std
 
-    def denorm(self, normed_tensor):
+    def denorm(self, normed_tensor: Tensor) -> Tensor:
         return normed_tensor * self.std + self.mean
 
-    def state_dict(self):
+    def state_dict(self) -> dict[str, Tensor]:
         return {"mean": self.mean, "std": self.std}
 
-    def load_state_dict(self, state_dict):
+    def load_state_dict(self, state_dict: dict[str, Tensor]) -> None:
+        self.mean = state_dict["mean"]
+        self.std = state_dict["std"]
         self.mean = state_dict["mean"].cpu()
         self.std = state_dict["std"].cpu()
 
     @classmethod
-    def from_state_dict(cls, state_dict):
+    def from_state_dict(cls, state_dict: dict[str, Tensor]) -> Normalizer:
         instance = cls()
         instance.mean = state_dict["mean"].cpu()
         instance.std = state_dict["std"].cpu()
@@ -438,7 +464,9 @@ class Normalizer:
         return instance
 
 
-def save_checkpoint(state, is_best, model_name, run_id):
+def save_checkpoint(
+    state: dict[str, Any], is_best: bool, model_name: str, run_id: str
+) -> None:
     """
     Saves a checkpoint and overwrites the best model when is_best = True
     """
@@ -450,9 +478,9 @@ def save_checkpoint(state, is_best, model_name, run_id):
         shutil.copyfile(checkpoint, best)
 
 
-def sampled_softmax(pre_logits, log_std, samples=10):
+def sampled_softmax(pre_logits: Tensor, log_std: Tensor, samples: int = 10) -> Tensor:
     """
-    Draw samples from gaussian distributed pre-logits and use these to estimate
+    Draw samples from Gaussian distributed pre-logits and use these to estimate
     a mean and aleatoric uncertainty.
     """
     # NOTE here as we do not risk dividing by zero should we really be
