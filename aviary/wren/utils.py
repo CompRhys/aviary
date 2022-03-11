@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import re
 import subprocess
@@ -156,19 +158,18 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
     elem_dict = {}
     elem_wyks = []
     for el, g in groupby(equivs, key=lambda x: x[1]):  # sort alphabetically by element
-        g = list(g)
-        elem_dict[el] = sum(float(mult_dict[str(spg_no)][e[2]]) for e in g)
+        lg = list(g)
+        elem_dict[el] = sum(float(mult_dict[str(spg_no)][e[2]]) for e in lg)
         wyks = ""
         for wyk, w in groupby(
-            g, key=lambda x: x[2]
+            lg, key=lambda x: x[2]
         ):  # sort alphabetically by wyckoff letter
-            w = list(w)
-            wyks += f"{len(w)}{wyk}"
+            lw = list(w)
+            wyks += f"{len(lw)}{wyk}"
         elem_wyks.append(wyks)
 
     # canonicalise the possible wyckoff letter sequences
-    elem_wyks = "_".join(elem_wyks)
-    canonical = canonicalise_elem_wyks(elem_wyks, spg_no)
+    canonical = canonicalise_elem_wyks("_".join(elem_wyks), spg_no)
 
     # get pearson symbol
     cry_sys = spga.get_crystal_system()
@@ -224,7 +225,7 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
     return canonical
 
 
-def sort_and_score_wyks(wyks):
+def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
     score = 0
     sorted_el_wyks = []
     for el_wyks in wyks.split("_"):
@@ -243,9 +244,7 @@ def sort_and_score_wyks(wyks):
         )
         score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks[1::2])
 
-    sorted_el_wyks = "_".join(sorted_el_wyks)
-
-    return sorted_el_wyks, score
+    return "_".join(sorted_el_wyks), score
 
 
 def prototype_formula(composition: Composition) -> str:
@@ -320,25 +319,26 @@ def count_params(aflow_label: str) -> int:
 def get_isopointal_proto_from_aflow(aflow: str) -> str:
     """Get a canonicalised string for the prototype"""
     aflow, _ = aflow.split(":")
-    anom, pearson, spg, *wyks = aflow.split("_")
+    anom, pearson, spg, *wyckoffs = aflow.split("_")
 
+    # TODO: this really needs some comments to explain what's going on - @janosh
     subst = r"\g<1>1"
     anom = re.sub(r"([A-z](?![0-9]))", subst, anom)
-    anom = ["".join(g) for _, g in groupby(anom, str.isalpha)]
-    counts = [int(x) for x in anom[1::2]]
-    dummy = anom[0::2]
+    anom_list = ["".join(g) for _, g in groupby(anom, str.isalpha)]
+    counts = [int(x) for x in anom_list[1::2]]
+    dummy = anom_list[0::2]
 
-    s_counts, s_wyks = list(zip(*[(x, y) for x, y in sorted(zip(counts, wyks))]))
+    s_counts, s_wyks_tup = list(
+        zip(*[(x, y) for x, y in sorted(zip(counts, wyckoffs))])
+    )
     subst = r"1\g<1>"
-    s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks))
+    s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks_tup))
     c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])
 
     if len(s_counts) == len(set(s_counts)):
         cs_wyks = canonicalise_elem_wyks(s_wyks, int(spg))
         return "_".join((c_anom, pearson, spg, cs_wyks))
     else:
-        s_wyks = s_wyks.split("_")
-
         # credit Stef: https://stackoverflow.com/a/70126643/5517459
         valid_permutations = [
             list(map(itemgetter(1), chain.from_iterable(p)))
@@ -346,18 +346,18 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
                 *list(
                     permutations(g)
                     for _, g in groupby(
-                        sorted(zip(s_counts, s_wyks)), key=lambda x: x[0]
+                        sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
                     )
                 )
             )
         ]
 
-        isopointal = []
+        isopointal: list[str] = []
 
-        for wyks in valid_permutations:
+        for wyks_list in valid_permutations:
             for trans in relab_dict[str(spg)]:
                 t = str.maketrans(trans)
-                isopointal.append("_".join(wyks).translate(t))
+                isopointal.append("_".join(wyks_list).translate(t))
 
         isopointal = list(set(isopointal))
 

@@ -1,31 +1,34 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
+from torch import LongTensor, Tensor
 from torch_scatter import scatter_add, scatter_max, scatter_mean
 
 
 class MeanPooling(nn.Module):
     """Mean pooling"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, x, index):
+    def forward(self, x: Tensor, index: Tensor) -> Tensor:
         return scatter_mean(x, index, dim=0)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
 
 class SumPooling(nn.Module):
     """Sum pooling"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, x, index):
+    def forward(self, x: Tensor, index: Tensor) -> Tensor:
         return scatter_add(x, index, dim=0)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
 
@@ -34,7 +37,7 @@ class AttentionPooling(nn.Module):
     softmax attention layer
     """
 
-    def __init__(self, gate_nn, message_nn):
+    def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
         """
         Args:
             gate_nn: Variable(nn.Module)
@@ -44,7 +47,7 @@ class AttentionPooling(nn.Module):
         self.gate_nn = gate_nn
         self.message_nn = message_nn
 
-    def forward(self, x, index):
+    def forward(self, x: Tensor, index: Tensor) -> Tensor:
         gate = self.gate_nn(x)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
@@ -56,7 +59,7 @@ class AttentionPooling(nn.Module):
 
         return out
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
 
@@ -65,7 +68,7 @@ class WeightedAttentionPooling(nn.Module):
     Weighted softmax attention layer
     """
 
-    def __init__(self, gate_nn, message_nn):
+    def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
         """
         Inputs
         ----------
@@ -76,7 +79,7 @@ class WeightedAttentionPooling(nn.Module):
         self.message_nn = message_nn
         self.pow = torch.nn.Parameter(torch.randn(1))
 
-    def forward(self, x, index, weights):
+    def forward(self, x: Tensor, index: Tensor, weights: Tensor) -> Tensor:
         gate = self.gate_nn(x)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
@@ -90,7 +93,7 @@ class WeightedAttentionPooling(nn.Module):
 
         return out
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
 
@@ -100,7 +103,13 @@ class MessageLayer(nn.Module):
     in the stoichiometry graph.
     """
 
-    def __init__(self, elem_fea_len, elem_heads, elem_gate, elem_msg):
+    def __init__(
+        self,
+        elem_fea_len: int,
+        elem_heads: int,
+        elem_gate: list[int],
+        elem_msg: list[int],
+    ) -> None:
         super().__init__()
 
         self._repr = (
@@ -119,7 +128,13 @@ class MessageLayer(nn.Module):
             ]
         )
 
-    def forward(self, elem_weights, elem_in_fea, self_fea_idx, nbr_fea_idx):
+    def forward(
+        self,
+        elem_weights: Tensor,
+        elem_in_fea: Tensor,
+        self_fea_idx: LongTensor,
+        nbr_fea_idx: LongTensor,
+    ) -> Tensor:
         """
         Forward pass
 
@@ -161,7 +176,7 @@ class MessageLayer(nn.Module):
 
         return fea + elem_in_fea
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self._repr
 
 
@@ -172,12 +187,12 @@ class SimpleNetwork(nn.Module):
 
     def __init__(
         self,
-        input_dim,
-        output_dim,
-        hidden_layer_dims,
-        activation=nn.LeakyReLU,
-        batchnorm=False,
-    ):
+        input_dim: int,
+        output_dim: int,
+        hidden_layer_dims: list[int],
+        activation: type[nn.Module] = nn.LeakyReLU,
+        batchnorm: bool = False,
+    ) -> None:
         """
         Inputs
         ----------
@@ -205,16 +220,16 @@ class SimpleNetwork(nn.Module):
 
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         for fc, bn, act in zip(self.fcs, self.bns, self.acts):
             x = act(bn(fc(x)))
 
         return self.fc_out(x)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
-    def reset_parameters(self):
+    def reset_parameters(self) -> None:
         for fc in self.fcs:
             fc.reset_parameters()
 
@@ -228,13 +243,13 @@ class ResidualNetwork(nn.Module):
 
     def __init__(
         self,
-        input_dim,
-        output_dim,
-        hidden_layer_dims,
-        activation=nn.ReLU,
-        batchnorm=False,
-        return_features=False,
-    ):
+        input_dim: int,
+        output_dim: int,
+        hidden_layer_dims: list[int],
+        activation: type[nn.Module] = nn.ReLU,
+        batchnorm: bool = False,
+        return_features: bool = False,
+    ) -> None:
         """
         Inputs
         ----------
@@ -272,7 +287,7 @@ class ResidualNetwork(nn.Module):
         if not self.return_features:
             self.fc_out = nn.Linear(dims[-1], output_dim)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
             x = act(bn(fc(x))) + res_fc(x)
 
@@ -281,5 +296,5 @@ class ResidualNetwork(nn.Module):
         else:
             return self.fc_out(x)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__

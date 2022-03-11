@@ -1,8 +1,9 @@
 import numpy as np
 import torch
+from torch import Tensor
 
 
-def RobustL1Loss(output, log_std, target):
+def RobustL1Loss(output: Tensor, log_std: Tensor, target: Tensor) -> Tensor:
     """
     Robust L1 loss using a lorentzian prior. Allows for estimation
     of an aleatoric uncertainty.
@@ -11,9 +12,9 @@ def RobustL1Loss(output, log_std, target):
     return torch.mean(loss)
 
 
-def RobustL2Loss(output, log_std, target):
+def RobustL2Loss(output: Tensor, log_std: Tensor, target: Tensor) -> Tensor:
     """
-    Robust L2 loss using a gaussian prior. Allows for estimation
+    Robust L2 loss using a Gaussian prior. Allows for estimation
     of an aleatoric uncertainty.
     """
     # NOTE can we scale log_std by something sensible to improve the OOD behaviour?

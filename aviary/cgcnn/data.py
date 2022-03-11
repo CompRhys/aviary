@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import ast
 import functools
 import json
 from itertools import groupby
 from os.path import abspath, dirname, exists, join
-from typing import Dict, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -16,7 +18,7 @@ class CrystalGraphData(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        task_dict: Dict[str, str],
+        task_dict: dict[str, str],
         elem_emb: str = "cgcnn92",
         inputs: Sequence[str] = ["lattice", "sites"],
         identifiers: Sequence[str] = ["material_id", "composition"],
@@ -40,7 +42,7 @@ class CrystalGraphData(Dataset):
             radius (float, optional): Cut-off radius for neighbourhood. Defaults to 5.
             max_num_nbr (int, optional): maximum number of neighbours to consider. Defaults to 12.
             dmin (float, optional): minimum distance in Gaussian basis. Defaults to 0.
-            step (float, optional): increment size of gaussian basis. Defaults to 0.2.
+            step (float, optional): increment size of Gaussian basis. Defaults to 0.2.
         """
         assert len(identifiers) == 2, "Two identifiers are required"
         assert len(inputs) == 2, "One input column required are required"

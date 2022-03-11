@@ -1,11 +1,18 @@
-def get_cgcnn_input(struct):
-    """return a csv friendly encoding of lattice and sites given a pymatgen structure
+from __future__ import annotations
+
+import numpy as np
+from pymatgen.core import Structure
+
+
+def get_cgcnn_input(struct: Structure) -> tuple[np.ndarray, list[str]]:
+    """return a CSV friendly encoding of lattice and sites given a pymatgen structure.
 
     Args:
-        struct (Structure): input structure to get inputs for
+        struct (Structure): Pymatgen structure to get inputs for.
 
     Returns:
-        cgcnn inputs as a lattice matrix and list of sites of the form [f"{el} @ {x,y,z}", ]
+        tuple[np.ndarray, list[str]]: CGCCN inputs as a lattice matrix and list of sites
+            of the form [f"{el} @ {x,y,z}", ...]
     """
     elems = [atom.specie.symbol for atom in struct]
     cell = struct.lattice.matrix.tolist()
