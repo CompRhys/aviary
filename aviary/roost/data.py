@@ -13,6 +13,8 @@ from torch.utils.data import Dataset
 
 
 class CompositionData(Dataset):
+    """Dataset class for the Roost composition model."""
+
     def __init__(
         self,
         df: pd.DataFrame,
@@ -34,7 +36,6 @@ class CompositionData(Dataset):
             identifiers (list, optional): df columns for distinguishing data points. Will be
                 copied over into the model's output CSV. Defaults to ["material_id", "composition"].
         """
-
         assert len(identifiers) == 2, "Two identifiers are required"
         assert len(inputs) == 1, "One input column required are required"
 
@@ -68,29 +69,23 @@ class CompositionData(Dataset):
 
     @functools.lru_cache(maxsize=None)  # Cache data for faster training
     def __getitem__(self, idx):
-        """[summary]
+        """_summary_
 
         Args:
-            idx (int): dataset index
+            idx (_type_): dataset index
 
         Raises:
-            AssertionError: [description]
-            ValueError: [description]
+            AssertionError: _description_
+            ValueError: _description_
 
         Returns:
-            atom_weights: torch.Tensor shape (M, 1)
-                weights of atoms in the material
-            atom_fea: torch.Tensor shape (M, n_fea)
-                features of atoms in the material
-            self_fea_idx: torch.Tensor shape (M*M, 1)
-                list of self indices
-            nbr_fea_idx: torch.Tensor shape (M*M, 1)
-                list of neighbor indices
-            target: torch.Tensor shape (1,)
-                target value for material
-            cry_id: torch.Tensor shape (1,)
-                input id for the material
-
+            tuple: containing
+            - atom_weights: torch.Tensor shape (M, 1) weights of atoms in the material
+            - atom_fea: torch.Tensor shape (M, n_fea) features of atoms in the material
+            - self_fea_idx: torch.Tensor shape (M*M, 1) list of self indices
+            - nbr_fea_idx: torch.Tensor shape (M*M, 1) list of neighbor indices
+            - target: torch.Tensor shape (1,) target value for material
+            - cry_id: torch.Tensor shape (1,) input id for the material
         """
         df_idx = self.df.iloc[idx]
         composition = df_idx[self.inputs][0]
@@ -141,40 +136,30 @@ class CompositionData(Dataset):
 
 
 def collate_batch(dataset_list):
-    """
-    Collate a list of data and return a batch for predicting crystal
-    properties.
+    """Collate a list of data and return a batch for predicting crystal properties.
 
-    Parameters
-    ----------
+    Args:
+        dataset_list (list): list of tuples for each data point: (atom_fea, nbr_fea, nbr_fea_idx, target)
+            - atom_fea: torch.Tensor shape (n_i, atom_fea_len)
+            - nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
+            - self_fea_idx: torch.LongTensor shape (n_i, M)
+            - nbr_fea_idx: torch.LongTensor shape (n_i, M)
+            - target: torch.Tensor shape (1, )
+            - cif_id: str or int
 
-    dataset_list: list of tuples for each data point.
-      (atom_fea, nbr_fea, nbr_fea_idx, target)
-
-      atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-      nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
-      self_fea_idx: torch.LongTensor shape (n_i, M)
-      nbr_fea_idx: torch.LongTensor shape (n_i, M)
-      target: torch.Tensor shape (1, )
-      cif_id: str or int
-
-    Returns
-    -------
-    N = sum(n_i); N0 = sum(i)
-
-    batch_atom_weights: torch.Tensor shape (N, 1)
-    batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
-        Atom features from atom type
-    batch_self_fea_idx: torch.LongTensor shape (N, M)
-        Indices of mapping atom to copies of itself
-    batch_nbr_fea_idx: torch.LongTensor shape (N, M)
-        Indices of M neighbors of each atom
-    crystal_atom_idx: list of torch.LongTensor of length N0
-        Mapping from the crystal idx to atom idx
-    target: torch.Tensor shape (N, 1)
-        Target value for prediction
-    batch_comps: list
-    batch_ids: list
+    Returns:
+        tuple: containing
+        - batch_atom_weights: torch.Tensor shape (N, 1)
+        - batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len) Atom features from atom type
+        - batch_self_fea_idx: torch.LongTensor shape (N, M) Indices of mapping atom to copies
+            of itself
+        - batch_nbr_fea_idx: torch.LongTensor shape (N, M) Indices of M neighbors of each atom
+        - crystal_atom_idx: list of torch.LongTensor of length N0 Mapping from the crystal idx
+            to atom idx
+        - target: torch.Tensor shape (N, 1) Target value for prediction
+        - batch_comps: list
+        - batch_ids: list
+        where N = sum(n_i); N0 = sum(i)
     """
     # define the lists
     batch_atom_weights = []
