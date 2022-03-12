@@ -45,7 +45,30 @@ def init_model(
     fine_tune: str = None,
     transfer: str = None,
 ) -> BaseModelClass:
+    """_summary_
 
+    Args:
+        model_class (type[BaseModelClass]): _description_
+        model_name (str): _description_
+        model_params (dict[str, Any]): _description_
+        run_id (int): _description_
+        optim (torch.optim.Optimizer): _description_
+        learning_rate (float): _description_
+        weight_decay (float): _description_
+        momentum (float): _description_
+        device (type[torch.device] | Literal[&quot;cuda&quot;, &quot;cpu&quot;]): _description_
+        milestones (Iterable, optional): _description_. Defaults to [].
+        gamma (float, optional): _description_. Defaults to 0.3.
+        resume (str, optional): _description_. Defaults to None.
+        fine_tune (str, optional): _description_. Defaults to None.
+        transfer (str, optional): _description_. Defaults to None.
+
+    Raises:
+        NameError: _description_
+
+    Returns:
+        BaseModelClass: _description_
+    """
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
 
@@ -161,8 +184,20 @@ def init_losses(
     task_dict: dict[str, TaskType],
     loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
     robust: bool = False,
-) -> dict[str, tuple[str, type[torch.nn.Module]]]:  # noqa: C901
+) -> dict[str, tuple[str, type[torch.nn.Module]]]:
+    """_summary_
 
+    Args:
+        task_dict (dict[str, TaskType]): _description_
+        loss_dict (dict[str, Literal[&quot;L1&quot;, &quot;L2&quot;, &quot;CSE&quot;, &quot;Brier&quot;]]): _description_
+        robust (bool, optional): _description_. Defaults to False.
+
+    Raises:
+        NameError: _description_
+
+    Returns:
+        dict[str, tuple[str, type[torch.nn.Module]]]: _description_
+    """
     criterion_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
@@ -220,6 +255,16 @@ def init_normalizers(
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
 ) -> dict[str, Normalizer]:
+    """_summary_
+
+    Args:
+        task_dict (dict[str, TaskType]): _description_
+        device (type[torch.device] | Literal[&quot;cuda&quot;, &quot;cpu&quot;]): _description_
+        resume (str, optional): _description_. Defaults to None.
+
+    Returns:
+        dict[str, Normalizer]: _description_
+    """
     if resume:
         checkpoint = torch.load(resume, map_location=device)
         normalizer_dict = {}
@@ -255,10 +300,24 @@ def train_ensemble(
     loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
     patience: int = None,
 ) -> None:
-    """
-    Train multiple models
-    """
+    """Train multiple models.
 
+    Args:
+        model_class (type[BaseModelClass]): _description_
+        model_name (str): _description_
+        run_id (int): _description_
+        ensemble_folds (int): _description_
+        epochs (int): _description_
+        train_set (Subset): _description_
+        val_set (Subset): _description_
+        log (bool): _description_
+        data_params (dict[str, Any]): _description_
+        setup_params (dict[str, Any]): _description_
+        restart_params (dict[str, Any]): _description_
+        model_params (dict[str, Any]): _description_
+        loss_dict (dict[str, Literal[&quot;L1&quot;, &quot;L2&quot;, &quot;CSE&quot;, &quot;Brier&quot;]]): _description_
+        patience (int, optional): _description_. Defaults to None.
+    """
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
@@ -351,7 +410,7 @@ def train_ensemble(
 
 
 @torch.no_grad()
-def results_multitask(  # noqa: C901
+def results_multitask(  # TODO find a better name for this function @janosh
     model_class: type[BaseModelClass],
     model_name: str,
     run_id: int,
@@ -365,10 +424,24 @@ def results_multitask(  # noqa: C901
     print_results: bool = True,
     save_results: bool = True,
 ) -> dict[str, dict[str, list | np.ndarray]]:
-    """
-    take an ensemble of models and evaluate their performance on the test set
-    """
+    """Take an ensemble of models and evaluate their performance on the test set.
 
+    Args:
+        model_name (str): _description_
+        run_id (int): _description_
+        ensemble_folds (int): _description_
+        test_set (Subset): _description_
+        data_params (dict[str, Any]): _description_
+        robust (bool): _description_
+        task_dict (dict[str, TaskType]): _description_
+        device (type[torch.device] | Literal[&quot;cuda&quot;, &quot;cpu&quot;]): _description_
+        eval_type (str, optional): _description_. Defaults to "checkpoint".
+        print_results (bool, optional): _description_. Defaults to True.
+        save_results (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        dict[str, dict[str, list | np.ndarray]]: _description_
+    """
     assert print_results or save_results, (
         "Evaluating Model pointless if both 'print_results' and "
         "'save_results' are False."
@@ -633,13 +706,13 @@ def print_metrics_classification(
 def save_results_dict(
     ids: dict[str, list[str | int]], results_dict: dict[str, Any], model_name: str
 ) -> None:
-    """save the results to a file after model evaluation
+    """Save the results to a file after model evaluation.
 
     Args:
-        idx (dict[str, list[str | int]]): Each key is the name of an identifier (e.g.
+        ids (dict[str, list[str  |  int]]): ): Each key is the name of an identifier (e.g.
             material ID, composition, ...) and its value a list of IDs.
-        results_dict ({name: {col: data}}): nested dictionary of results
-        model_name (str): The name given the model via the --model-name flag.
+        results_dict (dict[str, Any]): ): nested dictionary of results {name: {col: data}}
+        model_name (str): ): The name given the model via the --model-name flag.
     """
     results = {}
 
