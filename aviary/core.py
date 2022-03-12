@@ -75,9 +75,22 @@ class BaseModelClass(nn.Module, ABC):
         verbose: bool = True,
         patience: int = None,
     ) -> None:
-        """
-        Args:
+        """_summary_
 
+        Args:
+            train_generator (DataLoader): _description_
+            val_generator (DataLoader): _description_
+            optimizer (torch.optim.Optimizer): _description_
+            scheduler (torch.optim.lr_scheduler._LRScheduler): _description_
+            epochs (int): _description_
+            criterion_dict (dict[str, nn.Module]): _description_
+            normalizer_dict (dict[str, Normalizer]): _description_
+            model_name (str): _description_
+            run_id (int): _description_
+            checkpoint (bool, optional): _description_. Defaults to True.
+            writer (SummaryWriter, optional): _description_. Defaults to None.
+            verbose (bool, optional): _description_. Defaults to True.
+            patience (int, optional): _description_. Defaults to None.
         """
         start_epoch = self.epoch
 
@@ -215,10 +228,23 @@ class BaseModelClass(nn.Module, ABC):
         action: Literal["train", "val"] = "train",
         verbose: bool = False,
     ):
-        """
-        evaluate the model
-        """
+        """Evaluate the model.
 
+        Args:
+            generator (DataLoader): _description_
+            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): _description_
+            optimizer (torch.optim.Optimizer): _description_
+            normalizer_dict (dict[str, Normalizer]): _description_
+            action (Literal[&quot;train&quot;, &quot;val&quot;], optional): _description_. Defaults to "train".
+            verbose (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            NameError: _description_
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
+        """
         if action == "val":
             self.eval()
         elif action == "train":
@@ -343,10 +369,15 @@ class BaseModelClass(nn.Module, ABC):
     def predict(
         self, generator: DataLoader, verbose: bool = False
     ) -> tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]:
-        """
-        evaluate the model
-        """
+        """Make model predictions.
 
+        Args:
+            generator (DataLoader): _description_
+            verbose (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]: _description_
+        """
         test_ids = []
         test_targets = []
         test_outputs = []
@@ -411,45 +442,88 @@ class BaseModelClass(nn.Module, ABC):
 
     @abstractmethod
     def forward(self, *x):
-        """
-        Forward pass through the model. Needs to be implemented in any derived
-        model class.
+        """Forward pass through the model. Needs to be implemented in any derived model class.
+
+        Raises:
+            NotImplementedError: _description_
         """
         raise NotImplementedError("forward() is not defined!")
 
     @property
     def num_params(self) -> int:
+        """_summary_
+
+        Returns:
+            int: _description_
+        """
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def __repr__(self) -> str:
+        """_summary_
+
+        Returns:
+            str: _description_
+        """
         name = self._get_name()
         n_params, n_epochs = self.num_params, self.epoch
         return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
 
 
+# TODO: not sure how much docs the normalizer needs, @CompRhys feel free to delete some
 class Normalizer:
     """Normalize a Tensor and restore it later."""
 
     def __init__(self) -> None:
-        """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.tensor(0)
         self.std = torch.tensor(1)
 
     def fit(self, tensor: Tensor, dim: int = 0, keepdim: bool = False) -> None:
-        """tensor is taken as a sample to calculate the mean and std"""
+        """Compute the mean and standard deviation of the given tensor.
+
+        Args:
+            tensor (Tensor): _description_
+            dim (int, optional): _description_. Defaults to 0.
+            keepdim (bool, optional): _description_. Defaults to False.
+        """
         self.mean = torch.mean(tensor, dim, keepdim)
         self.std = torch.std(tensor, dim, keepdim)
 
     def norm(self, tensor: Tensor) -> Tensor:
+        """_summary_
+
+        Args:
+            tensor (Tensor): _description_
+
+        Returns:
+            Tensor: _description_
+        """
         return (tensor - self.mean) / self.std
 
     def denorm(self, normed_tensor: Tensor) -> Tensor:
+        """_summary_
+
+        Args:
+            tensor (Tensor): _description_
+
+        Returns:
+            Tensor: _description_
+        """
         return normed_tensor * self.std + self.mean
 
     def state_dict(self) -> dict[str, Tensor]:
+        """_summary_
+
+        Returns:
+            dict[str, Tensor]: _description_
+        """
         return {"mean": self.mean, "std": self.std}
 
     def load_state_dict(self, state_dict: dict[str, Tensor]) -> None:
+        """_summary_
+
+        Args:
+            state_dict (dict[str, Tensor]): _description_
+        """
         self.mean = state_dict["mean"]
         self.std = state_dict["std"]
         self.mean = state_dict["mean"].cpu()
@@ -457,6 +531,14 @@ class Normalizer:
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Tensor]) -> Normalizer:
+        """_summary_
+
+        Args:
+            state_dict (dict[str, Tensor]): _description_
+
+        Returns:
+            Normalizer: _description_
+        """
         instance = cls()
         instance.mean = state_dict["mean"].cpu()
         instance.std = state_dict["std"].cpu()
@@ -467,8 +549,13 @@ class Normalizer:
 def save_checkpoint(
     state: dict[str, Any], is_best: bool, model_name: str, run_id: int
 ) -> None:
-    """
-    Saves a checkpoint and overwrites the best model when is_best = True
+    """Saves a checkpoint and overwrites the best model when is_best = True.
+
+    Args:
+        state (dict[str, Any]): _description_
+        is_best (bool): _description_
+        model_name (str): _description_
+        run_id (int): _description_
     """
     checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
     best = f"models/{model_name}/best-r{run_id}.pth.tar"
@@ -479,9 +566,16 @@ def save_checkpoint(
 
 
 def sampled_softmax(pre_logits: Tensor, log_std: Tensor, samples: int = 10) -> Tensor:
-    """
-    Draw samples from Gaussian distributed pre-logits and use these to estimate
+    """Draw samples from Gaussian distributed pre-logits and use these to estimate
     a mean and aleatoric uncertainty.
+
+    Args:
+        pre_logits (Tensor): _description_
+        log_std (Tensor): _description_
+        samples (int, optional): _description_. Defaults to 10.
+
+    Returns:
+        Tensor: _description_
     """
     # NOTE here as we do not risk dividing by zero should we really be
     # predicting log_std or is there another way to deal with negative numbers?
