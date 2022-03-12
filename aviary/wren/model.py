@@ -16,8 +16,7 @@ from aviary.segments import (
 
 
 class Wren(BaseModelClass):
-    """
-    The Roost model is comprised of a fully connected network
+    """The Roost model is comprised of a fully connected network
     and message passing graph layers.
 
     The message passing layers are used to determine a descriptor set
@@ -45,6 +44,25 @@ class Wren(BaseModelClass):
         out_hidden: list[int] = [256, 128, 64],
         **kwargs,
     ) -> None:
+        """_summary_
+
+        Args:
+            robust (bool): _description_
+            n_targets (list[int]): _description_
+            elem_emb_len (int): _description_
+            sym_emb_len (int): _description_
+            elem_fea_len (int, optional): _description_. Defaults to 32.
+            sym_fea_len (int, optional): _description_. Defaults to 32.
+            n_graph (int, optional): _description_. Defaults to 3.
+            elem_heads (int, optional): _description_. Defaults to 1.
+            elem_gate (list[int], optional): _description_. Defaults to [256].
+            elem_msg (list[int], optional): _description_. Defaults to [256].
+            cry_heads (int, optional): _description_. Defaults to 1.
+            cry_gate (list[int], optional): _description_. Defaults to [256].
+            cry_msg (list[int], optional): _description_. Defaults to [256].
+            trunk_hidden (list[int], optional): _description_. Defaults to [1024, 512].
+            out_hidden (list[int], optional): _description_. Defaults to [256, 128, 64].
+        """
         super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
@@ -96,8 +114,19 @@ class Wren(BaseModelClass):
         cry_elem_idx: LongTensor,
         aug_cry_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
-        """
-        Forward pass through the material_nn and output_nn
+        """Forward pass through the material_nn and output_nn.
+
+        Args:
+            elem_weights (Tensor): _description_
+            elem_fea (Tensor): _description_
+            sym_fea (Tensor): _description_
+            self_fea_idx (LongTensor): _description_
+            nbr_fea_idx (LongTensor): _description_
+            cry_elem_idx (LongTensor): _description_
+            aug_cry_idx (LongTensor): _description_
+
+        Returns:
+            tuple[Tensor, ...]: _description_
         """
         crys_fea = self.material_nn(
             elem_weights,
@@ -116,10 +145,7 @@ class Wren(BaseModelClass):
 
 
 class DescriptorNetwork(nn.Module):
-    """
-    The Descriptor Network is the message passing section of the
-    Roost Model.
-    """
+    """The Descriptor Network is the message passing section of the Roost Model."""
 
     def __init__(
         self,
@@ -135,6 +161,21 @@ class DescriptorNetwork(nn.Module):
         cry_gate: list[int] = [256],
         cry_msg: list[int] = [256],
     ):
+        """_summary_
+
+        Args:
+            elem_emb_len (int): _description_
+            sym_emb_len (int): _description_
+            elem_fea_len (int, optional): _description_. Defaults to 32.
+            sym_fea_len (int, optional): _description_. Defaults to 32.
+            n_graph (int, optional): _description_. Defaults to 3.
+            elem_heads (int, optional): _description_. Defaults to 1.
+            elem_gate (list[int], optional): _description_. Defaults to [256].
+            elem_msg (list[int], optional): _description_. Defaults to [256].
+            cry_heads (int, optional): _description_. Defaults to 1.
+            cry_gate (list[int], optional): _description_. Defaults to [256].
+            cry_msg (list[int], optional): _description_. Defaults to [256].
+        """
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
@@ -205,7 +246,6 @@ class DescriptorNetwork(nn.Module):
             torch.Tensor: returns the crystal features of the materials
                 in the batch
         """
-
         # embed the original features into the graph layer description
         elem_fea = self.elem_embed(elem_fea)
         sym_fea = self.sym_embed(torch.cat([sym_fea, elem_weights], dim=1))
@@ -233,4 +273,4 @@ class DescriptorNetwork(nn.Module):
         return cry_fea
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}"
+        return self.__class__.__name__
