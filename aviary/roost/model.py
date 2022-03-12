@@ -15,8 +15,7 @@ from aviary.segments import (
 
 
 class Roost(BaseModelClass):
-    """
-    The Roost model is comprised of a fully connected network
+    """The Roost model is comprised of a fully connected network
     and message passing graph layers.
 
     The message passing layers are used to determine a descriptor set
@@ -42,6 +41,26 @@ class Roost(BaseModelClass):
         out_hidden: list[int] = [256, 128, 64],
         **kwargs,
     ) -> None:
+        """_summary_
+
+        Args:
+            robust (bool): _description_
+            n_targets (list[int]): _description_
+            elem_emb_len (int): _description_
+            elem_fea_len (int, optional): _description_. Defaults to 64.
+            n_graph (int, optional): _description_. Defaults to 3.
+            elem_heads (int, optional): _description_. Defaults to 3.
+            elem_gate (list[int], optional): _description_. Defaults to [256].
+            elem_msg (list[int], optional): _description_. Defaults to [256].
+            cry_heads (int, optional): _description_. Defaults to 3.
+            cry_gate (list[int], optional): _description_. Defaults to [256].
+            cry_msg (list[int], optional): _description_. Defaults to [256].
+            trunk_hidden (list[int], optional): _description_. Defaults to [1024, 512].
+            out_hidden (list[int], optional): _description_. Defaults to [256, 128, 64].
+
+        Raises:
+            ValueError: _description_
+        """
         if isinstance(out_hidden[0], list):
             raise ValueError("boo hiss bad user")
             # assert all([isinstance(x, list) for x in out_hidden]),
@@ -94,8 +113,17 @@ class Roost(BaseModelClass):
         nbr_fea_idx: LongTensor,
         cry_elem_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
-        """
-        Forward pass through the material_nn and output_nn
+        """Forward pass through the material_nn and output_nn.
+
+        Args:
+            elem_weights (Tensor): _description_
+            elem_fea (Tensor): _description_
+            self_fea_idx (LongTensor): _description_
+            nbr_fea_idx (LongTensor): _description_
+            cry_elem_idx (LongTensor): _description_
+
+        Returns:
+            tuple[Tensor, ...]: _description_
         """
         crys_fea = self.material_nn(
             elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
@@ -108,10 +136,7 @@ class Roost(BaseModelClass):
 
 
 class DescriptorNetwork(nn.Module):
-    """
-    The Descriptor Network is the message passing section of the
-    Roost Model.
-    """
+    """The Descriptor Network is the message passing section of the Roost Model."""
 
     def __init__(
         self,
@@ -125,6 +150,19 @@ class DescriptorNetwork(nn.Module):
         cry_gate: list[int] = [256],
         cry_msg: list[int] = [256],
     ) -> None:
+        """_summary_
+
+        Args:
+            elem_emb_len (int): _description_
+            elem_fea_len (int, optional): _description_. Defaults to 64.
+            n_graph (int, optional): _description_. Defaults to 3.
+            elem_heads (int, optional): _description_. Defaults to 3.
+            elem_gate (list[int], optional): _description_. Defaults to [256].
+            elem_msg (list[int], optional): _description_. Defaults to [256].
+            cry_heads (int, optional): _description_. Defaults to 3.
+            cry_gate (list[int], optional): _description_. Defaults to [256].
+            cry_msg (list[int], optional): _description_. Defaults to [256].
+        """
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding
@@ -163,34 +201,27 @@ class DescriptorNetwork(nn.Module):
         nbr_fea_idx: LongTensor,
         cry_elem_idx: LongTensor,
     ) -> Tensor:
-        """
-        Forward pass
+        """Forward pass through the DescriptorNetwork.
 
-        Parameters
-        ----------
+        Args:
+            elem_weights (Tensor): Variable(torch.Tensor) shape (N)
+                Fractional weight of each Element in its stoichiometry
+            elem_fea (Tensor): Variable(torch.Tensor) shape (N, orig_elem_fea_len)
+                Element features of each of the N elems in the batch
+            self_fea_idx (LongTensor): torch.Tensor shape (M,)
+                Indices of the first element in each of the M pairs
+            nbr_fea_idx (LongTensor): torch.Tensor shape (M,)
+                Indices of the second element in each of the M pairs
+            cry_elem_idx (LongTensor): list of torch.LongTensor of length C
+                Mapping from the elem idx to crystal idx
+
         N: Total number of elements (nodes) in the batch
         M: Total number of pairs (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
-        Inputs
-        ----------
-        elem_weights: Variable(torch.Tensor) shape (N)
-            Fractional weight of each Element in its stoichiometry
-        elem_fea: Variable(torch.Tensor) shape (N, orig_elem_fea_len)
-            Element features of each of the N elems in the batch
-        self_fea_idx: torch.Tensor shape (M,)
-            Indices of the first element in each of the M pairs
-        nbr_fea_idx: torch.Tensor shape (M,)
-            Indices of the second element in each of the M pairs
-        cry_elem_idx: list of torch.LongTensor of length C
-            Mapping from the elem idx to crystal idx
-
-        Returns
-        -------
-        cry_fea: nn.Variable shape (C,)
-            Material representation after message passing
+        Returns:
+            Tensor: Composition representation/features after message passing with shape (C,)
         """
-
         # embed the original features into a trainable embedding space
         elem_fea = self.embedding(elem_fea)
 
