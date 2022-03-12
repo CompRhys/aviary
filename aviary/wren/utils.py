@@ -57,12 +57,12 @@ remove_digits = str.maketrans("", "", digits)
 
 
 def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
-    """get aflow prototype label for pymatgen Structure
+    """Get aflow prototype label for pymatgen Structure
 
-    args:
-        struct (Structure): pymatgen Structure object
+    Raises:
+        FileNotFoundError: pymatgen Structure object
 
-    returns:
+    Returns:
         str: aflow prototype label
     """
     if aflow_executable is None:
@@ -114,13 +114,13 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
 
 
 def get_aflow_label_spglib(struct: Structure) -> str:
-    """get aflow prototype label for pymatgen Structure
+    """Get aflow prototype label for pymatgen Structure.
 
-    args:
+    Args:
         struct (Structure): pymatgen Structure object
 
-    returns:
-        aflow prototype label
+    Returns:
+        str: aflow prototype label
     """
     spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
     aflow = get_aflow_label_from_spga(spga)
@@ -137,13 +137,13 @@ def get_aflow_label_spglib(struct: Structure) -> str:
 
 
 def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
-    """get aflow prototype label for pymatgen SpacegroupAnalyzer
+    """Get aflow prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
         spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object
 
     Returns:
-        aflow prototype labels
+        str: aflow prototype labels
     """
     spg_no = spga.get_space_group_number()
     sym_struct = spga.get_symmetrized_structure()
@@ -204,7 +204,6 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
     Returns:
         str: Canonicalised Wren Wyckoff encoding.
     """
-
     isopointal = []
 
     for trans in relab_dict[str(spg_no)]:
@@ -226,6 +225,14 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
 
 
 def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
+    """_summary_
+
+    Args:
+        wyks (str): _description_
+
+    Returns:
+        tuple[str, int]: _description_
+    """
     score = 0
     sorted_el_wyks = []
     for el_wyks in wyks.split("_"):
@@ -248,10 +255,15 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
 
 
 def prototype_formula(composition: Composition) -> str:
-    """
-    An anonymized formula. Unique species are arranged in alphabetical order
+    """An anonymized formula. Unique species are arranged in alphabetical order
     and assigned ascending alphabets. This format is used in the aflow structure
     prototype labelling scheme.
+
+    Args:
+        composition (Composition): _description_
+
+    Returns:
+        str: _description_
     """
     reduced = composition.element_composition
     if all(x == int(x) for x in composition.values()):
@@ -272,7 +284,14 @@ def prototype_formula(composition: Composition) -> str:
 
 
 def count_wyks(aflow_label: str) -> int:
-    """Count number of Wyckoff positions in Wyckoff representation"""
+    """Count number of Wyckoff positions in Wyckoff representation.
+
+    Args:
+        aflow_label (str): _description_
+
+    Returns:
+        int: _description_
+    """
     num_wyk = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -292,7 +311,14 @@ def count_wyks(aflow_label: str) -> int:
 
 
 def count_params(aflow_label: str) -> int:
-    """Count number of parameters coarse-grained in Wyckoff representation"""
+    """Count number of parameters coarse-grained in Wyckoff representation.
+
+    Args:
+        aflow_label (str): _description_
+
+    Returns:
+        int: _description_
+    """
     num_params = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -317,7 +343,14 @@ def count_params(aflow_label: str) -> int:
 
 
 def get_isopointal_proto_from_aflow(aflow: str) -> str:
-    """Get a canonicalised string for the prototype"""
+    """Get a canonicalised string for the prototype.
+
+    Args:
+        aflow (str): _description_
+
+    Returns:
+        str: _description_
+    """
     aflow, _ = aflow.split(":")
     anom, pearson, spg, *wyckoffs = aflow.split("_")
 
