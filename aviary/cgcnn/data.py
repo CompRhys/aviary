@@ -15,6 +15,8 @@ from torch.utils.data import Dataset
 
 
 class CrystalGraphData(Dataset):
+    """Dataset class for the CGCNN structure model."""
+
     def __init__(
         self,
         df: pd.DataFrame,
@@ -88,11 +90,16 @@ class CrystalGraphData(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def _get_nbr_data(self, crystal):
-        """get neighbours for every site
+    def _get_nbr_data(
+        self, crystal: Structure
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get neighbours for every site.
 
         Args:
-            crystal ([Structure]): pymatgen structure to get neighbours for
+            crystal (Structure): pymatgen structure to get neighbours for
+
+        Returns:
+            tuple[np.ndarray]: _description_
         """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
             self.radius, numerical_tol=1e-8
@@ -115,7 +122,6 @@ class CrystalGraphData(Dataset):
 
     def _pre_check(self):
         """Check that none of the structures have isolated atoms."""
-
         print("Precheck that all structures are valid")
         all_isolated = []
         some_isolated = []
@@ -187,19 +193,19 @@ class CrystalGraphData(Dataset):
 
 
 class GaussianDistance:
-    """
-    Expands the distance by Gaussian basis.
+    """Expands the distance by Gaussian basis. Unit: angstrom."""
 
-    Unit: angstrom
-    """
+    def __init__(
+        self, dmin: float, dmax: float, step: float, var: float = None
+    ) -> None:
+        """_summary_
 
-    def __init__(self, dmin, dmax, step, var=None):
-        """
         Args:
             dmin (float): Minimum interatomic distance
             dmax (float): Maximum interatomic distance
             step (float): Step size for the Gaussian filter
-            var (float, optional): Variance of Gaussian basis. Defaults to step if not given
+            var (float, optional): Variance of Gaussian basis. Defaults to step if not given.
+                Defaults to None.
         """
         assert dmin < dmax
         assert dmax - dmin > step
@@ -212,15 +218,14 @@ class GaussianDistance:
 
         self.var = var
 
-    def expand(self, distances):
+    def expand(self, distances: np.ndarray) -> np.ndarray:
         """Apply Gaussian distance filter to a numpy distance array
 
         Args:
-            distances (ArrayLike): A distance matrix of any shape
+            distances (ArrayLike): A distance matrix of any shape.
 
         Returns:
-            Expanded distance matrix with the last dimension of length
-            len(self.filter)
+            np.ndarray: Expanded distance matrix with the last dimension of length len(self.filter)
         """
         distances = np.array(distances)
 
@@ -230,37 +235,25 @@ class GaussianDistance:
 
 
 def collate_batch(dataset_list):
-    """
-    Collate a list of data and return a batch for predicting crystal
-    properties.
+    """Collate a list of data and return a batch for predicting crystal properties.
 
-    Parameters
-    ----------
+    Args:
+        dataset_list (list): list of tuples for each data point: (atom_fea, nbr_dist, nbr_idx, target)
+            - atom_fea: torch.Tensor shape (n_i, atom_fea_len)
+            - nbr_dist: torch.Tensor shape (n_i, M, nbr_dist_len)
+            - nbr_idx: torch.LongTensor shape (n_i, M)
+            - target: torch.Tensor shape (1, )
+            - cif_id: str or int
 
-    dataset_list: list of tuples for each data point.
-        (atom_fea, nbr_dist, nbr_idx, target)
-
-        atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-        nbr_dist: torch.Tensor shape (n_i, M, nbr_dist_len)
-        nbr_idx: torch.LongTensor shape (n_i, M)
-        target: torch.Tensor shape (1, )
-        cif_id: str or int
-
-    Returns
-    -------
-    N = sum(n_i); N0 = sum(i)
-
-    batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
-        Atom features from atom type
-    batch_nbr_dist: torch.Tensor shape (N, M, nbr_dist_len)
-        Bond features of each atom's M neighbors
-    batch_nbr_idx: torch.LongTensor shape (N, M)
-        Indices of M neighbors of each atom
-    crystal_atom_idx: list of torch.LongTensor of length N0
-        Mapping from the crystal idx to atom idx
-    target: torch.Tensor shape (N, 1)
-        Target value for prediction
-    batch_cif_ids: list
+    Returns:
+        tuple: containing
+        - batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len) Atom features from atom type
+        - batch_nbr_dist: torch.Tensor shape (N, M, nbr_dist_len) Bond features of each atom's M neighbors
+        - batch_nbr_idx: torch.LongTensor shape (N, M) Indices of M neighbors of each atom
+        - crystal_atom_idx: list of torch.LongTensor of length N0 Mapping from the crystal idx to atom idx
+        - target: torch.Tensor shape (N, 1) Target value for prediction
+        - batch_cif_ids: list
+        where N = sum(n_i); N0 = sum(i)
     """
     batch_atom_fea = []
     batch_nbr_dist = []
@@ -301,6 +294,7 @@ def collate_batch(dataset_list):
     )
 
 
+# TODO do we still need these functions? @CompRhys
 def get_structure(cols):
     """Return pymatgen structure from lattice and sites cols"""
     cell, sites = cols
