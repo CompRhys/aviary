@@ -80,10 +80,10 @@ class CrystalGraphData(Dataset):
         self._pre_check()
 
         self.n_targets = []
-        for target in self.task_dict:
-            if self.task_dict[target] == "regression":
+        for target, task_type in self.task_dict.items():
+            if task_type == "regression":
                 self.n_targets.append(1)
-            elif self.task == "classification":
+            elif task_type == "classification":
                 n_classes = np.max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
 
