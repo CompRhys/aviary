@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from pymatgen.core import Composition
+from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 
@@ -80,12 +81,12 @@ class CompositionData(Dataset):
 
         Returns:
             tuple: containing
-            - atom_weights: torch.Tensor shape (M, 1) weights of atoms in the material
-            - atom_fea: torch.Tensor shape (M, n_fea) features of atoms in the material
-            - self_fea_idx: torch.Tensor shape (M*M, 1) list of self indices
-            - nbr_fea_idx: torch.Tensor shape (M*M, 1) list of neighbor indices
-            - target: torch.Tensor shape (1,) target value for material
-            - cry_id: torch.Tensor shape (1,) input id for the material
+            - atom_weights (Tensor): shape (M, 1) weights of atoms in the material
+            - atom_fea (Tensor): shape (M, n_fea) features of atoms in the material
+            - self_fea_idx (Tensor): shape (M*M, 1) list of self indices
+            - nbr_fea_idx (Tensor): shape (M*M, 1) list of neighbor indices
+            - target (Tensor): shape (1,) target value for material
+            - cry_id (Tensor): shape (1,) input id for the material
         """
         df_idx = self.df.iloc[idx]
         composition = df_idx[self.inputs][0]
@@ -116,17 +117,17 @@ class CompositionData(Dataset):
             nbr_fea_idx += list(range(nele))
 
         # convert all data to tensors
-        atom_weights = torch.Tensor(weights)
-        atom_fea = torch.Tensor(atom_fea)
-        self_fea_idx = torch.LongTensor(self_fea_idx)
-        nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
+        atom_weights = Tensor(weights)
+        atom_fea = Tensor(atom_fea)
+        self_fea_idx = LongTensor(self_fea_idx)
+        nbr_fea_idx = LongTensor(nbr_fea_idx)
 
         targets = []
         for target in self.task_dict:
             if self.task_dict[target] == "regression":
-                targets.append(torch.Tensor([df_idx[target]]))
+                targets.append(Tensor([df_idx[target]]))
             elif self.task_dict[target] == "classification":
-                targets.append(torch.LongTensor([df_idx[target]]))
+                targets.append(LongTensor([df_idx[target]]))
 
         return (
             (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
@@ -140,23 +141,23 @@ def collate_batch(dataset_list):
 
     Args:
         dataset_list (list): list of tuples for each data point: (atom_fea, nbr_fea, nbr_fea_idx, target)
-            - atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-            - nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
-            - self_fea_idx: torch.LongTensor shape (n_i, M)
-            - nbr_fea_idx: torch.LongTensor shape (n_i, M)
-            - target: torch.Tensor shape (1, )
+            - atom_fea (Tensor): shape (n_i, atom_fea_len)
+            - nbr_fea (Tensor): shape (n_i, M, nbr_fea_len)
+            - self_fea_idx (LongTensor): shape (n_i, M)
+            - nbr_fea_idx (LongTensor): shape (n_i, M)
+            - target (Tensor): shape (1, )
             - cif_id: str or int
 
     Returns:
         tuple: containing
-        - batch_atom_weights: torch.Tensor shape (N, 1)
-        - batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len) Atom features from atom type
-        - batch_self_fea_idx: torch.LongTensor shape (N, M) Indices of mapping atom to copies
+        - batch_atom_weights (Tensor): shape (N, 1)
+        - batch_atom_fea (Tensor): shape (N, orig_atom_fea_len) Atom features from atom type
+        - batch_self_fea_idx (LongTensor): shape (N, M) Indices of mapping atom to copies
             of itself
-        - batch_nbr_fea_idx: torch.LongTensor shape (N, M) Indices of M neighbors of each atom
-        - crystal_atom_idx: list of torch.LongTensor of length N0 Mapping from the crystal idx
+        - batch_nbr_fea_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
+        - crystal_atom_idx (list[LongTensor]): of length N0 Mapping from the crystal idx
             to atom idx
-        - target: torch.Tensor shape (N, 1) Target value for prediction
+        - target (Tensor): shape (N, 1) Target value for prediction
         - batch_comps: list
         - batch_ids: list
         where N = sum(n_i); N0 = sum(i)

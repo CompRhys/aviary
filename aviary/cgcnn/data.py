@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 from pymatgen.core import Structure
+from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 
@@ -87,7 +88,7 @@ class CrystalGraphData(Dataset):
                 n_classes = np.max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
 
     def _get_nbr_data(
@@ -120,7 +121,7 @@ class CrystalGraphData(Dataset):
 
         return self_idx, nbr_idx, nbr_dist
 
-    def _pre_check(self):
+    def _pre_check(self) -> None:
         """Check that none of the structures have isolated atoms."""
         print("Precheck that all structures are valid")
         all_isolated = []
@@ -145,7 +146,21 @@ class CrystalGraphData(Dataset):
             print(f"these structure have some isolated atoms: {some_isolated}")
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
-    def __getitem__(self, idx):
+    def __getitem__(  # type: ignore
+        self, idx: int
+    ) -> tuple[
+        tuple[Tensor, Tensor, LongTensor, LongTensor],
+        list[Tensor | LongTensor],
+        list[str | int],
+    ]:
+        """_summary_
+
+        Returns:
+            tuple: containing
+            - tuple[Tensor, Tensor, LongTensor, LongTensor]: CGCNN inputs
+            - list[Tensor | LongTensor]: regression or classification targets
+            - list[str | int]: identifiers like material_id, composition
+        """
         # NOTE sites must be given in fractional coordinates
         df_idx = self.df.iloc[idx]
         crystal = df_idx["Structure_obj"]
@@ -173,20 +188,20 @@ class CrystalGraphData(Dataset):
 
         nbr_dist = self.gdf.expand(nbr_dist)
 
-        atom_fea = torch.Tensor(atom_fea)
-        nbr_dist = torch.Tensor(nbr_dist)
-        self_idx = torch.LongTensor(self_idx)
-        nbr_idx = torch.LongTensor(nbr_idx)
+        atom_fea_t = Tensor(atom_fea)
+        nbr_dist_t = Tensor(nbr_dist)
+        self_idx_t = LongTensor(self_idx)
+        nbr_idx_t = LongTensor(nbr_idx)
 
-        targets = []
-        for target in self.task_dict:
-            if self.task_dict[target] == "regression":
-                targets.append(torch.Tensor([df_idx[target]]))
-            elif self.task_dict[target] == "classification":
-                targets.append(torch.LongTensor([df_idx[target]]))
+        targets: list[Tensor | LongTensor] = []
+        for target, task_type in self.task_dict.items():
+            if task_type == "regression":
+                targets.append(Tensor([df_idx[target]]))
+            elif task_type == "classification":
+                targets.append(LongTensor([df_idx[target]]))
 
         return (
-            (atom_fea, nbr_dist, self_idx, nbr_idx),
+            (atom_fea_t, nbr_dist_t, self_idx_t, nbr_idx_t),
             targets,
             *cry_ids,
         )
@@ -239,19 +254,19 @@ def collate_batch(dataset_list):
 
     Args:
         dataset_list (list): list of tuples for each data point: (atom_fea, nbr_dist, nbr_idx, target)
-            - atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-            - nbr_dist: torch.Tensor shape (n_i, M, nbr_dist_len)
-            - nbr_idx: torch.LongTensor shape (n_i, M)
-            - target: torch.Tensor shape (1, )
+            - atom_fea (Tensor): shape (n_i, atom_fea_len)
+            - nbr_dist (Tensor): shape (n_i, M, nbr_dist_len)
+            - nbr_idx (LongTensor): shape (n_i, M)
+            - target (Tensor): shape (1, )
             - cif_id: str or int
 
     Returns:
         tuple: containing
-        - batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len) Atom features from atom type
-        - batch_nbr_dist: torch.Tensor shape (N, M, nbr_dist_len) Bond features of each atom's M neighbors
-        - batch_nbr_idx: torch.LongTensor shape (N, M) Indices of M neighbors of each atom
-        - crystal_atom_idx: list of torch.LongTensor of length N0 Mapping from the crystal idx to atom idx
-        - target: torch.Tensor shape (N, 1) Target value for prediction
+        - batch_atom_fea (Tensor): shape (N, orig_atom_fea_len) Atom features from atom type
+        - batch_nbr_dist (Tensor): shape (N, M, nbr_dist_len) Bond features of each atom's M neighbors
+        - batch_nbr_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
+        - crystal_atom_idx (list[LongTensor]): of length N0 Mapping from the crystal idx to atom idx
+        - target (Tensor): shape (N, 1) Target value for prediction
         - batch_cif_ids: list
         where N = sum(n_i); N0 = sum(i)
     """
@@ -284,7 +299,7 @@ def collate_batch(dataset_list):
     nbr_dist = torch.cat(batch_nbr_dist, dim=0)
     self_idx = torch.cat(batch_self_idx, dim=0)
     nbr_idx = torch.cat(batch_nbr_idx, dim=0)
-    cry_idx = torch.LongTensor(crystal_atom_idx)
+    cry_idx = LongTensor(crystal_atom_idx)
 
     return (
         (atom_fea, nbr_dist, self_idx, nbr_idx, cry_idx),

@@ -137,14 +137,11 @@ class MessageLayer(nn.Module):
         """Forward pass
 
         Args:
-            elem_weights (Tensor): Variable(torch.Tensor) shape (N,)
-                The fractional weights of elements in their materials
-            elem_in_fea (Tensor): Variable(torch.Tensor) shape (N, elem_fea_len)
-                Element hidden features before message passing
-            self_fea_idx (LongTensor): torch.Tensor shape (M,)
-                Indices of the first element in each of the M pairs
-            nbr_fea_idx (LongTensor): torch.Tensor shape (M,)
-                Indices of the second element in each of the M pairs
+            elem_weights (Tensor): shape (N,) The fractional weights of elements in their materials
+            elem_in_fea (Tensor): shape (N, elem_fea_len) Element hidden features before message
+                passing
+            self_fea_idx (LongTensor): shape (M,) Indices of the 1st element in each of the M pairs
+            nbr_fea_idx (LongTensor): shape (M,) Indices of the 2nd element in each of the M pairs
 
         N: Total number of elements (nodes) in the batch
         M: Total number of pairs (edges) in the batch

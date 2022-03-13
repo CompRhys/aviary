@@ -204,16 +204,12 @@ class DescriptorNetwork(nn.Module):
         """Forward pass through the DescriptorNetwork.
 
         Args:
-            elem_weights (Tensor): Variable(torch.Tensor) shape (N)
-                Fractional weight of each Element in its stoichiometry
-            elem_fea (Tensor): Variable(torch.Tensor) shape (N, orig_elem_fea_len)
+            elem_weights (Tensor): shape (N) Fractional weight of each Element in its stoichiometry
+            elem_fea (Tensor): shape (N, orig_elem_fea_len)
                 Element features of each of the N elems in the batch
-            self_fea_idx (LongTensor): torch.Tensor shape (M,)
-                Indices of the first element in each of the M pairs
-            nbr_fea_idx (LongTensor): torch.Tensor shape (M,)
-                Indices of the second element in each of the M pairs
-            cry_elem_idx (LongTensor): list of torch.LongTensor of length C
-                Mapping from the elem idx to crystal idx
+            self_fea_idx (LongTensor): shape (M,) indices of the 1st element in each of the M pairs
+            nbr_fea_idx (LongTensor): shape (M,) indices of the 2nd element in each of the M pairs
+            cry_elem_idx (list[LongTensor]): of length C Mapping from the elem idx to crystal idx
 
         N: Total number of elements (nodes) in the batch
         M: Total number of pairs (edges) in the batch

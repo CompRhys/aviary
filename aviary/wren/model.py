@@ -227,24 +227,16 @@ class DescriptorNetwork(nn.Module):
         """Forward pass
 
         Args:
-            elem_weights (torch.Tensor): Fractional weight of each
-                Element in its stoichiometry
-            elem_fea (torch.Tensor): Element features of each of
-                the N elements in the batch
-            sym_fea (torch.Tensor): Wyckoff Position features of each
-                of the N elements in the batch
-            self_fea_idx (torch.Tensor): Indices of the first element in
-                each of the M pairs
-            nbr_fea_idx (torch.Tensor): Indices of the second element in
-                each of the M pairs
-            cry_elem_idx (torch.Tensor): Mapping from the elem idx to
-                crystal idx
-            aug_cry_idx (torch.Tensor): Mapping from the crystal idx to
-                augmentation idx
+            elem_weights (Tensor): Fractional weight of each Element in its stoichiometry
+            elem_fea (Tensor): Element features of each of the N elements in the batch
+            sym_fea (Tensor): Wyckoff Position features of each of the N elements in the batch
+            self_fea_idx (Tensor): Indices of the first element in each of the M pairs
+            nbr_fea_idx (Tensor): Indices of the second element in each of the M pairs
+            cry_elem_idx (Tensor): Mapping from the elem idx to crystal idx
+            aug_cry_idx (Tensor): Mapping from the crystal idx to augmentation idx
 
         Returns:
-            torch.Tensor: returns the crystal features of the materials
-                in the batch
+            Tensor: returns the crystal features of the materials in the batch
         """
         # embed the original features into the graph layer description
         elem_fea = self.elem_embed(elem_fea)

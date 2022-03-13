@@ -349,7 +349,7 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                sample_target = torch.Tensor(
+                sample_target = Tensor(
                     train_set.dataset.df[target].iloc[train_set.indices].values
                 )
                 if not restart_params["resume"]:
