@@ -4,10 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import LongTensor, Tensor
+from torch_scatter import scatter_mean
 
 from aviary.core import BaseModelClass
 from aviary.segments import (
-    MeanPooling,
     MessageLayer,
     ResidualNetwork,
     SimpleNetwork,
@@ -212,8 +212,6 @@ class DescriptorNetwork(nn.Module):
             ]
         )
 
-        self.aug_pool = MeanPooling()
-
     def forward(
         self,
         elem_weights: Tensor,
@@ -260,7 +258,9 @@ class DescriptorNetwork(nn.Module):
                 attnhead(elem_fea, index=cry_elem_idx, weights=elem_weights)
             )
 
-        cry_fea = self.aug_pool(torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx)
+        cry_fea = scatter_mean(
+            torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0
+        )
 
         return cry_fea
 

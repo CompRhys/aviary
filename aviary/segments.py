@@ -3,33 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 from torch import LongTensor, Tensor
-from torch_scatter import scatter_add, scatter_max, scatter_mean
-
-
-class MeanPooling(nn.Module):
-    """Mean pooling"""
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, x: Tensor, index: Tensor) -> Tensor:
-        return scatter_mean(x, index, dim=0)
-
-    def __repr__(self) -> str:
-        return self.__class__.__name__
-
-
-class SumPooling(nn.Module):
-    """Sum pooling"""
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, x: Tensor, index: Tensor) -> Tensor:
-        return scatter_add(x, index, dim=0)
-
-    def __repr__(self) -> str:
-        return self.__class__.__name__
+from torch_scatter import scatter_add, scatter_max
 
 
 class AttentionPooling(nn.Module):

@@ -4,9 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import LongTensor, Tensor
+from torch_scatter import scatter_add, scatter_mean
 
 from aviary.core import BaseModelClass
-from aviary.segments import MeanPooling, SimpleNetwork, SumPooling
+from aviary.segments import SimpleNetwork
 
 
 class CrystalGraphConvNet(BaseModelClass):
@@ -67,8 +68,6 @@ class CrystalGraphConvNet(BaseModelClass):
 
         self.model_params.update(desc_dict)
 
-        self.pooling = MeanPooling()
-
         # define an output neural network
         if self.robust:
             n_targets = [2 * n for n in n_targets]
@@ -107,7 +106,7 @@ class CrystalGraphConvNet(BaseModelClass):
         """
         atom_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
-        crys_fea = self.pooling(atom_fea, crystal_atom_idx)
+        crys_fea = scatter_mean(atom_fea, crystal_atom_idx, dim=0)
 
         # NOTE required to match the reference implementation
         crys_fea = nn.functional.softplus(crys_fea)
@@ -190,7 +189,6 @@ class CGCNNConv(nn.Module):
         self.bn1 = nn.BatchNorm1d(2 * self.elem_fea_len)
         self.bn2 = nn.BatchNorm1d(self.elem_fea_len)
         self.softplus2 = nn.Softplus()
-        self.pooling = SumPooling()
 
     def forward(
         self,
@@ -228,9 +226,9 @@ class CGCNNConv(nn.Module):
 
         # take the elementwise product of the filter and core
         nbr_msg = filter_fea * core_fea
-        nbr_sumed = self.pooling(nbr_msg, self_fea_idx)
+        nbr_summed = scatter_add(nbr_msg, self_fea_idx, dim=0)
 
-        nbr_sumed = self.bn2(nbr_sumed)
-        out = self.softplus2(atom_in_fea + nbr_sumed)
+        nbr_summed = self.bn2(nbr_summed)
+        out = self.softplus2(atom_in_fea + nbr_summed)
 
         return out
