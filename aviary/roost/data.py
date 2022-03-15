@@ -40,9 +40,9 @@ class CompositionData(Dataset):
         assert len(identifiers) == 2, "Two identifiers are required"
         assert len(inputs) == 1, "One input column required are required"
 
-        self.inputs = inputs
+        self.inputs = list(inputs)
         self.task_dict = task_dict
-        self.identifiers = identifiers
+        self.identifiers = list(identifiers)
         self.df = df
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
@@ -69,15 +69,11 @@ class CompositionData(Dataset):
         return len(self.df)
 
     @functools.lru_cache(maxsize=None)  # Cache data for faster training
-    def __getitem__(self, idx):
-        """_summary_
+    def __getitem__(self, idx: int):
+        """Get an entry out of the Dataset
 
         Args:
-            idx (_type_): dataset index
-
-        Raises:
-            AssertionError: _description_
-            ValueError: _description_
+            idx (int): index of entry in Dataset
 
         Returns:
             tuple: containing

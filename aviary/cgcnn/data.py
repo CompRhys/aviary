@@ -50,9 +50,9 @@ class CrystalGraphData(Dataset):
         assert len(identifiers) == 2, "Two identifiers are required"
         assert len(inputs) == 2, "One input column required are required"
 
-        self.inputs = inputs
+        self.inputs = list(inputs)
         self.task_dict = task_dict
-        self.identifiers = identifiers
+        self.identifiers = list(identifiers)
 
         self.radius = radius
         self.max_num_nbr = max_num_nbr
@@ -97,10 +97,13 @@ class CrystalGraphData(Dataset):
         """Get neighbours for every site.
 
         Args:
-            crystal (Structure): pymatgen structure to get neighbours for
+            crystal (Structure): pymatgen Structure to get neighbours for
 
         Returns:
-            tuple[np.ndarray]: _description_
+            tuple containing:
+            - np.ndarray: Site indices
+            - np.ndarray: Neighbour indices
+            - np.ndarray: Distances between sites and neighbours
         """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
             self.radius, numerical_tol=1e-8
@@ -147,7 +150,10 @@ class CrystalGraphData(Dataset):
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx: int):
-        """_summary_
+        """Get an entry out of the Dataset
+
+        Args:
+            idx (int): index of entry in Dataset
 
         Returns:
             tuple: containing

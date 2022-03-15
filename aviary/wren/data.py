@@ -45,9 +45,9 @@ class WyckoffData(Dataset):
         assert len(identifiers) >= 2, "Two identifiers are required"
         assert len(inputs) == 1, "One input column required"
 
-        self.inputs = inputs
+        self.inputs = list(inputs)
         self.task_dict = task_dict
-        self.identifiers = identifiers
+        self.identifiers = list(identifiers)
         self.df = df
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
@@ -86,22 +86,20 @@ class WyckoffData(Dataset):
         return len(self.df)
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
-    def __getitem__(self, idx):
-        """[summary]
+    def __getitem__(self, idx: int):
+        """Get an entry out of the Dataset
 
         Args:
-            idx ([type]): [description]
-
-        Raises:
-            AssertionError: [description]
+            idx (int): index of entry in Dataset
 
         Returns:
-            atom_weights (Tensor): shape (M, 1) weights of atoms in the material
-            atom_fea (Tensor): shape (M, n_fea) features of atoms in the material
-            self_fea_idx (Tensor): shape (M*M, 1) list of self indices
-            nbr_fea_idx (Tensor): shape (M*M, 1) list of neighbour indices
-            target (Tensor): shape (1,) target value for material
-            cry_id (Tensor): shape (1,) input id for the material
+            tuple: containing
+            - atom_weights (Tensor): shape (M, 1) weights of atoms in the material
+            - atom_fea (Tensor): shape (M, n_fea) features of atoms in the material
+            - self_fea_idx (Tensor): shape (M*M, 1) list of self indices
+            - nbr_fea_idx (Tensor): shape (M*M, 1) list of neighbour indices
+            - target (Tensor): shape (1,) target value for material
+            - cry_id (Tensor): shape (1,) input id for the material
         """
         df_idx = self.df.iloc[idx]
         swyks = df_idx[self.inputs][0]
@@ -112,11 +110,18 @@ class WyckoffData(Dataset):
 
         try:
             atom_fea = np.vstack([self.elem_features[el] for el in elements])
+        except AssertionError:
+            print(f"Failed to process elements in {cry_ids[0]}: {cry_ids[1]}-{swyks}")
+            raise
+
+        try:
             sym_fea = np.vstack(
                 [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
             )
         except AssertionError:
-            print(f"failed to process {cry_ids[0]}: {cry_ids[1]}-{swyks}")
+            print(
+                f"Failed to process Wyckoff positions in {cry_ids[0]}: {cry_ids[1]}-{swyks}"
+            )
             raise
 
         n_wyks = len(elements)
