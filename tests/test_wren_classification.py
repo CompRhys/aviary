@@ -169,7 +169,7 @@ def test_wren_clf():
     ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
     ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
 
-    assert ens_acc > 0.9
+    assert ens_acc > 0.85
     assert ens_roc_auc > 0.9
 
 
