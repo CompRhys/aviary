@@ -38,7 +38,7 @@ class BaseModelClass(nn.Module, ABC):
         epoch: int = 1,
         best_val_scores: dict[str, float] = None,
     ) -> None:
-        """_summary_
+        """Store core model parameters.
 
         Args:
             task_dict (dict[str, TaskType]): Map of names to "regression" or "classification".
@@ -75,25 +75,24 @@ class BaseModelClass(nn.Module, ABC):
         verbose: bool = True,
         patience: int = None,
     ) -> None:
-        """_summary_
+        """Convenience class to carry out training loop.
 
         Args:
-            train_generator (DataLoader): _description_
-            val_generator (DataLoader): _description_
-            optimizer (torch.optim.Optimizer): _description_
-            scheduler (torch.optim.lr_scheduler._LRScheduler): _description_
-            epochs (int): _description_
-            criterion_dict (dict[str, nn.Module]): _description_
-            normalizer_dict (dict[str, Normalizer]): _description_
-            model_name (str): _description_
-            run_id (int): _description_
-            checkpoint (bool, optional): _description_. Defaults to True.
-            writer (SummaryWriter, optional): _description_. Defaults to None.
-            verbose (bool, optional): _description_. Defaults to True.
-            patience (int, optional): _description_. Defaults to None.
+            train_generator (DataLoader): Pytorch Dataloader containing training data.
+            val_generator (DataLoader): Pytorch Dataloader containing validation data.
+            optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
+            scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust Optimizer during training.
+            epochs (int): Number of epochs to train for.
+            criterion_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
+            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply to each task.
+            model_name (str): String describing the model.
+            run_id (int): Unique identifier of the model run.
+            checkpoint (bool, optional): Whether to save model checkpoints. Defaults to True.
+            writer (SummaryWriter, optional): TensorBoard writer to save logs in. Defaults to None.
+            verbose (bool, optional): Whether to print out intermediate results. Defaults to True.
+            patience (int, optional): Patience for early stopping. Defaults to None.
         """
         start_epoch = self.epoch
-
 
         try:
             for epoch in range(start_epoch, start_epoch + epochs):
@@ -116,12 +115,10 @@ class BaseModelClass(nn.Module, ABC):
                 if verbose:
                     print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
                     for task, metrics in t_metrics.items():
-                        print(
-                            f"Train \t\t: {task} - "
-                            + "".join(
-                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
-                            )
+                        metrics_str = "".join(
+                            [f"{key} {val:.3f}\t" for key, val in metrics.items()]
                         )
+                        print(f"Train \t\t: {task} - {metrics_str}")
 
                 # Validation
                 if val_generator is not None:
@@ -144,15 +141,10 @@ class BaseModelClass(nn.Module, ABC):
 
                     if verbose:
                         for task, metrics in v_metrics.items():
-                            print(
-                                f"Validation \t: {task} - "
-                                + "".join(
-                                    [
-                                        f"{key} {val:.3f}\t"
-                                        for key, val in metrics.items()
-                                    ]
-                                )
+                            metrics_str = "".join(
+                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
                             )
+                            print(f"Validation \t: {task} - {metrics_str}")
 
                     # TODO test all tasks to see if they are best,
                     # save a best model if any is best.
@@ -227,19 +219,19 @@ class BaseModelClass(nn.Module, ABC):
         """Evaluate the model.
 
         Args:
-            generator (DataLoader): _description_
-            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): _description_
-            optimizer (torch.optim.Optimizer): _description_
-            normalizer_dict (dict[str, Normalizer]): _description_
-            action (Literal["train", "val"], optional): _description_. Defaults to "train".
-            verbose (bool, optional): _description_. Defaults to False.
+            generator (DataLoader): PyTorch Dataloader with the same data format used in fit().
+            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses to apply for each task.
+            optimizer (torch.optim.Optimizer): PyTorch Optimizer
+            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply to each task.
+            action (Literal["train", "val"], optional): Whether to track gradients depending on whether we are carrying out a training or validation pass. Defaults to "train".
+            verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Raises:
-            NameError: _description_
-            ValueError: _description_
+            NameError: If action not in ["train", "val"]
+            ValueError: If task_dict contains values not in ["regression", "classification", "dist", "mask"]
 
         Returns:
-            _type_: _description_
+            dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], np.ndarray]]: nested dictionary of metrics for each task.
         """
         if action == "val":
             self.eval()
@@ -368,8 +360,8 @@ class BaseModelClass(nn.Module, ABC):
         """Make model predictions.
 
         Args:
-            generator (DataLoader): _description_
-            verbose (bool, optional): _description_. Defaults to False.
+            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
             tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]: _description_
@@ -416,7 +408,7 @@ class BaseModelClass(nn.Module, ABC):
         this runs only the message-passing part of the model without the ResNet.
 
         Args:
-            generator (DataLoader): PyTorch loader with the same data format used in fit()
+            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
 
         Returns:
             np.array: 2d array of features
@@ -442,31 +434,22 @@ class BaseModelClass(nn.Module, ABC):
         """Forward pass through the model. Needs to be implemented in any derived model class.
 
         Raises:
-            NotImplementedError: _description_
+            NotImplementedError: Raise error if child class doesn't implement forward
         """
         raise NotImplementedError("forward() is not defined!")
 
     @property
     def num_params(self) -> int:
-        """_summary_
-
-        Returns:
-            int: _description_
-        """
+        """Return number of trainable parameters in model."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def __repr__(self) -> str:
-        """_summary_
-
-        Returns:
-            str: _description_
-        """
+        """Return unambiguous string representation of model."""
         name = self._get_name()
         n_params, n_epochs = self.num_params, self.epoch
         return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
 
 
-# TODO: not sure how much docs the normalizer needs, @CompRhys feel free to delete some
 class Normalizer:
     """Normalize a Tensor and restore it later."""
 
@@ -478,63 +461,61 @@ class Normalizer:
         """Compute the mean and standard deviation of the given tensor.
 
         Args:
-            tensor (Tensor): _description_
-            dim (int, optional): _description_. Defaults to 0.
-            keepdim (bool, optional): _description_. Defaults to False.
+            tensor (Tensor): Tensor to determine the mean and standard deviation over.
+            dim (int, optional): Which dimension to take mean and standard deviation over. Defaults to 0.
+            keepdim (bool, optional): Whether to keep the reduced dimension in Tensor. Defaults to False.
         """
         self.mean = torch.mean(tensor, dim, keepdim)
         self.std = torch.std(tensor, dim, keepdim)
 
     def norm(self, tensor: Tensor) -> Tensor:
-        """_summary_
+        """Normalize a Tensor
 
         Args:
-            tensor (Tensor): _description_
+            tensor (Tensor): Tensor to be Normalized
 
         Returns:
-            Tensor: _description_
+            Tensor: Normalized Tensor
         """
         return (tensor - self.mean) / self.std
 
     def denorm(self, normed_tensor: Tensor) -> Tensor:
-        """_summary_
+        """Restore normalizes Tensor
 
         Args:
-            tensor (Tensor): _description_
+            tensor (Tensor): Tensor to be restored
 
         Returns:
-            Tensor: _description_
+            Tensor: Restored Tensor
         """
         return normed_tensor * self.std + self.mean
 
     def state_dict(self) -> dict[str, Tensor]:
-        """_summary_
+        """Dictionary storing Normalizer parameters
 
         Returns:
-            dict[str, Tensor]: _description_
+            dict[str, Tensor]: Dictionary storing Normalizer parameters.
         """
         return {"mean": self.mean, "std": self.std}
 
     def load_state_dict(self, state_dict: dict[str, Tensor]) -> None:
-        """_summary_
+        """Overwrite Normalizer parameters given a new state_dict
 
         Args:
-            state_dict (dict[str, Tensor]): _description_
+            state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
         """
-        self.mean = state_dict["mean"]
-        self.std = state_dict["std"]
         self.mean = state_dict["mean"].cpu()
         self.std = state_dict["std"].cpu()
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Tensor]) -> Normalizer:
-        """_summary_
+        """Create a new Normalizer given a state_dict
 
         Args:
-            state_dict (dict[str, Tensor]): _description_
+            state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
 
         Returns:
-            Normalizer: _description_
+            Normalizer
         """
         instance = cls()
         instance.mean = state_dict["mean"].cpu()
@@ -549,10 +530,10 @@ def save_checkpoint(
     """Saves a checkpoint and overwrites the best model when is_best = True.
 
     Args:
-        state (dict[str, Any]): _description_
-        is_best (bool): _description_
-        model_name (str): _description_
-        run_id (int): _description_
+        state (dict[str, Any]): Dictionary containing model parameters.
+        is_best (bool): Whether the model is the best seen according to validation set.
+        model_name (str): String describing the model.
+        run_id (int): Unique identifier of the model run.
     """
     checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
     best = f"models/{model_name}/best-r{run_id}.pth.tar"
@@ -567,12 +548,12 @@ def sampled_softmax(pre_logits: Tensor, log_std: Tensor, samples: int = 10) -> T
     a mean and aleatoric uncertainty.
 
     Args:
-        pre_logits (Tensor): _description_
-        log_std (Tensor): _description_
-        samples (int, optional): _description_. Defaults to 10.
+        pre_logits (Tensor): Expected logits before softmax.
+        log_std (Tensor): Deviation in logits before softmax.
+        samples (int, optional): Number of samples to take. Defaults to 10.
 
     Returns:
-        Tensor: _description_
+        Tensor: Averaged logits sampled from pre-logits
     """
     # NOTE here as we do not risk dividing by zero should we really be
     # predicting log_std or is there another way to deal with negative numbers?
