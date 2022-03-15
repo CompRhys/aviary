@@ -37,7 +37,7 @@ def init_model(
     weight_decay: float,
     momentum: float,
     device: type[torch.device] | Literal["cuda", "cpu"],
-    milestones: Iterable = [],
+    milestones: Iterable = (),
     gamma: float = 0.3,
     resume: str = None,
     fine_tune: str = None,

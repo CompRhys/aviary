@@ -25,8 +25,8 @@ class WyckoffData(Dataset):
         task_dict: dict[str, str],
         elem_emb: str = "matscholar200",
         sym_emb: str = "bra-alg-off",
-        inputs: Sequence[str] = ["wyckoff"],
-        identifiers: Sequence[str] = ["material_id", "composition", "wyckoff"],
+        inputs: Sequence[str] = ("wyckoff",),
+        identifiers: Sequence[str] = ("material_id", "composition", "wyckoff"),
     ):
         """Data class for Wren models.
 
@@ -262,10 +262,10 @@ def parse_aflow(
         sep_n_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
-            n = int(n)
-            ele_list.extend([el] * n)
-            wyk_list.extend([l] * n)
-            mult_list.extend([float(mult_dict[spg_no][l])] * n)
+            m = int(n)
+            ele_list.extend([el] * m)
+            wyk_list.extend([l] * m)
+            mult_list.extend([float(mult_dict[spg_no][l])] * m)
 
     aug_wyks = []
     for trans in relab_dict[spg_no]:
