@@ -85,7 +85,6 @@ def init_model(
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-
         if model.model_params["robust"] != robust:
             raise AssertionError(
                 "cannot fine-tune "
@@ -481,9 +480,7 @@ def results_multitask(  # TODO find a better name for this function @janosh
             raise AssertionError(f"no checkpoint found at '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        if (
-            checkpoint["model_params"]["robust"] != robust
-        ):
+        if checkpoint["model_params"]["robust"] != robust:
             raise AssertionError(f"robustness of checkpoint '{resume}' is not {robust}")
 
         chkpt_task_dict = checkpoint["model_params"]["task_dict"]

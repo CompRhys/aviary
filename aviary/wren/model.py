@@ -253,7 +253,6 @@ class DescriptorNetwork(nn.Module):
         for graph_func in self.graphs:
             elem_fea = graph_func(elem_weights, elem_fea, self_fea_idx, nbr_fea_idx)
 
-
         # generate crystal features by pooling the elemental features
         head_fea = []
         for attnhead in self.cry_pool:

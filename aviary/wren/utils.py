@@ -79,8 +79,13 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
     cmd = f"{aflow_executable} --prototype --print=json cat"
 
     output = subprocess.run(
-        cmd, input=poscar.get_string(), text=True, capture_output=True, shell=True, 
-    check=True)
+        cmd,
+        input=poscar.get_string(),
+        text=True,
+        capture_output=True,
+        shell=True,
+        check=True,
+    )
 
     aflow_proto = json.loads(output.stdout)
 
@@ -361,9 +366,7 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
     counts = [int(x) for x in anom_list[1::2]]
     dummy = anom_list[0::2]
 
-    s_counts, s_wyks_tup = list(
-        zip(*list(sorted(zip(counts, wyckoffs))))
-    )
+    s_counts, s_wyks_tup = list(zip(*list(sorted(zip(counts, wyckoffs)))))
     subst = r"1\g<1>"
     s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks_tup))
     c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])
@@ -375,10 +378,12 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
     valid_permutations = [
         list(map(itemgetter(1), chain.from_iterable(p)))
         for p in product(
-            *[permutations(g)
+            *[
+                permutations(g)
                 for _, g in groupby(
                     sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
-                )]
+                )
+            ]
         )
     ]
 

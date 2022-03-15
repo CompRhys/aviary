@@ -51,10 +51,10 @@ def main(
     if not len(targets) == len(tasks) == len(losses):
         raise AssertionError
 
-    if not (
-        evaluate or train
-    ):
-        raise AssertionError("No action given - At least one of 'train' or 'evaluate' cli flags required")
+    if not (evaluate or train):
+        raise AssertionError(
+            "No action given - At least one of 'train' or 'evaluate' cli flags required"
+        )
 
     if test_path:
         test_size = 0.0
@@ -73,7 +73,7 @@ def main(
             " run-id flag."
         )
 
-    if (fine_tune and transfer):
+    if fine_tune and transfer:
         raise AssertionError(
             "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
         )
