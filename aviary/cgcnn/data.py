@@ -187,9 +187,7 @@ class CrystalGraphData(Dataset):
             raise AssertionError(f"All atoms in {cry_ids} are isolated")
         if not len(nbr_idx):
             raise AssertionError(f"This should not be triggered but was for {cry_ids}")
-        if set(self_idx) != set(
-            range(crystal.num_sites)
-        ):
+        if set(self_idx) != set(range(crystal.num_sites)):
             raise AssertionError(f"At least one atom in {cry_ids} is isolated")
 
         nbr_dist = self.gdf.expand(nbr_dist)
@@ -226,12 +224,15 @@ class GaussianDistance:
             dmax (float): Maximum interatomic distance
             step (float): Step size for the Gaussian filter
             var (float, optional): Variance of Gaussian basis. Defaults to step if not given.
-                Defaults to None.
         """
         if dmin >= dmax:
-            raise AssertionError
+            raise AssertionError(
+                "Max radii must be larger than minimum radii for Gaussian basis expansion"
+            )
         if dmax - dmin <= step:
-            raise AssertionError
+            raise AssertionError(
+                "Max radii below minimum radii + step size - please increase dmax."
+            )
 
         self.filter = np.arange(dmin, dmax + step, step)
         self.embedding_size = len(self.filter)
