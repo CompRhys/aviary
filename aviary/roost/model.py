@@ -190,7 +190,6 @@ class DescriptorNetwork(nn.Module):
         cry_fea: nn.Variable shape (C,)
             Material representation after message passing
         """
-
         # embed the original features into a trainable embedding space
         elem_fea = self.embedding(elem_fea)
 

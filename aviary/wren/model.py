@@ -205,7 +205,6 @@ class DescriptorNetwork(nn.Module):
             torch.Tensor: returns the crystal features of the materials
                 in the batch
         """
-
         # embed the original features into the graph layer description
         elem_fea = self.elem_embed(elem_fea)
         sym_fea = self.sym_embed(torch.cat([sym_fea, elem_weights], dim=1))

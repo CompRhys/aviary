@@ -258,7 +258,6 @@ def train_ensemble(
     """
     Train multiple models
     """
-
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
@@ -368,7 +367,6 @@ def results_multitask(  # noqa: C901
     """
     take an ensemble of models and evaluate their performance on the test set
     """
-
     assert print_results or save_results, (
         "Evaluating Model pointless if both 'print_results' and "
         "'save_results' are False."
