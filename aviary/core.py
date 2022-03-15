@@ -218,7 +218,6 @@ class BaseModelClass(nn.Module, ABC):
         """
         evaluate the model
         """
-
         if action == "val":
             self.eval()
         elif action == "train":
@@ -346,7 +345,6 @@ class BaseModelClass(nn.Module, ABC):
         """
         evaluate the model
         """
-
         test_ids = []
         test_targets = []
         test_outputs = []

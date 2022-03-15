@@ -204,7 +204,6 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
     Returns:
         str: Canonicalised Wren Wyckoff encoding.
     """
-
     isopointal = []
 
     for trans in relab_dict[str(spg_no)]:
