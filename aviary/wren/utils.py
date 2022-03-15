@@ -79,8 +79,8 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
     cmd = f"{aflow_executable} --prototype --print=json cat"
 
     output = subprocess.run(
-        cmd, input=poscar.get_string(), text=True, capture_output=True, shell=True
-    )
+        cmd, input=poscar.get_string(), text=True, capture_output=True, shell=True, 
+    check=True)
 
     aflow_proto = json.loads(output.stdout)
 
@@ -362,7 +362,7 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
     dummy = anom_list[0::2]
 
     s_counts, s_wyks_tup = list(
-        zip(*[(x, y) for x, y in sorted(zip(counts, wyckoffs))])
+        zip(*list(sorted(zip(counts, wyckoffs))))
     )
     subst = r"1\g<1>"
     s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks_tup))
@@ -371,38 +371,35 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
     if len(s_counts) == len(set(s_counts)):
         cs_wyks = canonicalise_elem_wyks(s_wyks, int(spg))
         return "_".join((c_anom, pearson, spg, cs_wyks))
-    else:
-        # credit Stef: https://stackoverflow.com/a/70126643/5517459
-        valid_permutations = [
-            list(map(itemgetter(1), chain.from_iterable(p)))
-            for p in product(
-                *list(
-                    permutations(g)
-                    for _, g in groupby(
-                        sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
-                    )
-                )
-            )
-        ]
+    # credit Stef: https://stackoverflow.com/a/70126643/5517459
+    valid_permutations = [
+        list(map(itemgetter(1), chain.from_iterable(p)))
+        for p in product(
+            *[permutations(g)
+                for _, g in groupby(
+                    sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
+                )]
+        )
+    ]
 
-        isopointal: list[str] = []
+    isopointal: list[str] = []
 
-        for wyks_list in valid_permutations:
-            for trans in relab_dict[str(spg)]:
-                t = str.maketrans(trans)
-                isopointal.append("_".join(wyks_list).translate(t))
+    for wyks_list in valid_permutations:
+        for trans in relab_dict[str(spg)]:
+            t = str.maketrans(trans)
+            isopointal.append("_".join(wyks_list).translate(t))
 
-        isopointal = list(set(isopointal))
+    isopointal = list(set(isopointal))
 
-        scores = []
-        sorted_iso = []
-        for wyks in isopointal:
-            sorted_el_wyks, score = sort_and_score_wyks(wyks)
-            scores.append(score)
-            sorted_iso.append(sorted_el_wyks)
+    scores = []
+    sorted_iso = []
+    for wyks in isopointal:
+        sorted_el_wyks, score = sort_and_score_wyks(wyks)
+        scores.append(score)
+        sorted_iso.append(sorted_el_wyks)
 
-        canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))
+    canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))
 
-        # TODO: how to tie break when the scores are the same?
-        # currently done by alphabetical
-        return "_".join((c_anom, pearson, spg, canonical[0][1]))
+    # TODO: how to tie break when the scores are the same?
+    # currently done by alphabetical
+    return "_".join((c_anom, pearson, spg, canonical[0][1]))

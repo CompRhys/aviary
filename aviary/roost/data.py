@@ -37,8 +37,10 @@ class CompositionData(Dataset):
             identifiers (list, optional): df columns for distinguishing data points. Will be
                 copied over into the model's output CSV. Defaults to ["material_id", "composition"].
         """
-        assert len(identifiers) == 2, "Two identifiers are required"
-        assert len(inputs) == 1, "One input column required are required"
+        if len(identifiers) != 2:
+            raise AssertionError("Two identifiers are required")
+        if len(inputs) != 1:
+            raise AssertionError("One input column required are required")
 
         self.inputs = list(inputs)
         self.task_dict = task_dict
@@ -50,7 +52,8 @@ class CompositionData(Dataset):
                 dirname(abspath(__file__)), f"../embeddings/element/{elem_emb}.json"
             )
         else:
-            assert exists(elem_emb), f"{elem_emb} does not exist!"
+            if not exists(elem_emb):
+                raise AssertionError(f"{elem_emb} does not exist!")
 
         with open(elem_emb) as f:
             self.elem_features = json.load(f)

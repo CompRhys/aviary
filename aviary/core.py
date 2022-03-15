@@ -94,9 +94,6 @@ class BaseModelClass(nn.Module, ABC):
         """
         start_epoch = self.epoch
 
-        # if writer is not None:
-        #     for name, param in self.named_parameters():
-        #         writer.add_histogram(name, param.clone().cpu().data.numpy(), start_epoch)
 
         try:
             for epoch in range(start_epoch, start_epoch + epochs):
@@ -180,12 +177,11 @@ class BaseModelClass(nn.Module, ABC):
                         self.es_patience = 0
                     else:
                         self.es_patience += 1
-                        if patience:
-                            if self.es_patience > patience:
-                                print(
-                                    "Stopping early due to lack of improvement on Validation set"
-                                )
-                                break
+                        if patience and self.es_patience > patience:
+                            print(
+                                "Stopping early due to lack of improvement on Validation set"
+                            )
+                            break
 
                 if checkpoint:
                     checkpoint_dict = {
@@ -426,7 +422,8 @@ class BaseModelClass(nn.Module, ABC):
             np.array: 2d array of features
         """
         err_msg = f"{self} needs to be fitted before it can be used for featurisation"
-        assert self.epoch > 0, err_msg
+        if self.epoch <= 0:
+            raise AssertionError(err_msg)
 
         self.eval()  # ensure model is in evaluation mode
         features = []

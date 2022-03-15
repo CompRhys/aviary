@@ -214,8 +214,6 @@ class DescriptorNetwork(nn.Module):
                 WeightedAttentionPooling(
                     gate_nn=SimpleNetwork(fea_len, 1, cry_gate),
                     message_nn=SimpleNetwork(fea_len, fea_len, cry_msg),
-                    # message_nn=nn.Linear(elem_fea_len, elem_fea_len),
-                    # message_nn=nn.Identity(),
                 )
                 for _ in range(cry_heads)
             ]
@@ -249,16 +247,12 @@ class DescriptorNetwork(nn.Module):
         elem_fea = self.elem_embed(elem_fea)
         sym_fea = self.sym_embed(torch.cat([sym_fea, elem_weights], dim=1))
 
-        # # do this so that we can examine the embeddings without
-        # # influence of the weights
         elem_fea = torch.cat([elem_fea, sym_fea], dim=1)
 
         # apply the message passing functions
         for graph_func in self.graphs:
             elem_fea = graph_func(elem_weights, elem_fea, self_fea_idx, nbr_fea_idx)
 
-        # print(len(self_fea_idx), len(nbr_fea_idx), len(cry_elem_idx))
-        # print(elem_fea.size())
 
         # generate crystal features by pooling the elemental features
         head_fea = []

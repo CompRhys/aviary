@@ -47,8 +47,10 @@ class CrystalGraphData(Dataset):
             dmin (float, optional): minimum distance in Gaussian basis. Defaults to 0.
             step (float, optional): increment size of Gaussian basis. Defaults to 0.2.
         """
-        assert len(identifiers) == 2, "Two identifiers are required"
-        assert len(inputs) == 2, "One input column required are required"
+        if len(identifiers) != 2:
+            raise AssertionError("Two identifiers are required")
+        if len(inputs) != 2:
+            raise AssertionError("One input column required are required")
 
         self.inputs = list(inputs)
         self.task_dict = task_dict
@@ -62,7 +64,8 @@ class CrystalGraphData(Dataset):
                 dirname(abspath(__file__)), f"../embeddings/element/{elem_emb}.json"
             )
         else:
-            assert exists(elem_emb), f"{elem_emb} does not exist!"
+            if not exists(elem_emb):
+                raise AssertionError(f"{elem_emb} does not exist!")
 
         with open(elem_emb) as f:
             self.elem_features = json.load(f)
@@ -140,7 +143,7 @@ class CrystalGraphData(Dataset):
             elif set(self_idx) != set(range(crystal.num_sites)):
                 some_isolated.append(cif_id)
 
-        if not (all_isolated == some_isolated == []):
+        if not all_isolated == some_isolated == []:
             # drop the data points that do not give rise to dense crystal graphs
             isolated = {*all_isolated, *some_isolated}  # set union
             self.df = self.df[~self.df["material_id"].isin(isolated)]
@@ -180,11 +183,14 @@ class CrystalGraphData(Dataset):
         # # # neighbours
         self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
-        assert len(self_idx), f"All atoms in {cry_ids} are isolated"
-        assert len(nbr_idx), f"This should not be triggered but was for {cry_ids}"
-        assert set(self_idx) == set(
+        if not len(self_idx):
+            raise AssertionError(f"All atoms in {cry_ids} are isolated")
+        if not len(nbr_idx):
+            raise AssertionError(f"This should not be triggered but was for {cry_ids}")
+        if set(self_idx) != set(
             range(crystal.num_sites)
-        ), f"At least one atom in {cry_ids} is isolated"
+        ):
+            raise AssertionError(f"At least one atom in {cry_ids} is isolated")
 
         nbr_dist = self.gdf.expand(nbr_dist)
 
@@ -222,8 +228,10 @@ class GaussianDistance:
             var (float, optional): Variance of Gaussian basis. Defaults to step if not given.
                 Defaults to None.
         """
-        assert dmin < dmax
-        assert dmax - dmin > step
+        if dmin >= dmax:
+            raise AssertionError
+        if dmax - dmin <= step:
+            raise AssertionError
 
         self.filter = np.arange(dmin, dmax + step, step)
         self.embedding_size = len(self.filter)

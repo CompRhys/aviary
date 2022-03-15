@@ -48,20 +48,23 @@ def main(
     **kwargs,
 ):
 
-    assert len(targets) == len(tasks) == len(losses)
+    if not len(targets) == len(tasks) == len(losses):
+        raise AssertionError
 
-    assert (
+    if not (
         evaluate or train
-    ), "No action given - At least one of 'train' or 'evaluate' cli flags required"
+    ):
+        raise AssertionError("No action given - At least one of 'train' or 'evaluate' cli flags required")
 
     if test_path:
         test_size = 0.0
 
     if not (test_path and val_path):
-        assert test_size + val_size < 1.0, (
-            f"'test_size'({test_size}) "
-            f"plus 'val_size'({val_size}) must be less than 1"
-        )
+        if test_size + val_size >= 1.0:
+            raise AssertionError(
+                f"'test_size'({test_size}) "
+                f"plus 'val_size'({val_size}) must be less than 1"
+            )
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
@@ -70,16 +73,18 @@ def main(
             " run-id flag."
         )
 
-    assert not (fine_tune and transfer), (
-        "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
-    )
+    if (fine_tune and transfer):
+        raise AssertionError(
+            "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
+        )
 
     # TODO CLI controls for loss dict.
 
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    assert os.path.exists(data_path), f"{data_path} does not exist!"
+    if not os.path.exists(data_path):
+        raise AssertionError(f"{data_path} does not exist!")
     # NOTE make sure to use dense datasets,
     # NOTE do not use default_na as "NaN" is a valid material composition
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
@@ -96,7 +101,8 @@ def main(
     if evaluate:
         if test_path:
 
-            assert os.path.exists(test_path), f"{test_path} does not exist!"
+            if not os.path.exists(test_path):
+                raise AssertionError(f"{test_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
             df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
@@ -118,7 +124,8 @@ def main(
     if train:
         if val_path:
 
-            assert os.path.exists(val_path), f"{val_path} does not exist!"
+            if not os.path.exists(val_path):
+                raise AssertionError(f"{val_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
             df = pd.read_csv(val_path, keep_default_na=False, na_values=[])

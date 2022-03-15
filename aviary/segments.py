@@ -57,8 +57,6 @@ class WeightedAttentionPooling(nn.Module):
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
         gate = (weights**self.pow) * gate.exp()
-        # gate = weights * gate.exp()
-        # gate = gate.exp()
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-10)
 
         x = self.message_nn(x)
@@ -258,8 +256,7 @@ class ResidualNetwork(nn.Module):
 
         if self.return_features:
             return x
-        else:
-            return self.fc_out(x)
+        return self.fc_out(x)
 
     def __repr__(self) -> str:
         return self.__class__.__name__

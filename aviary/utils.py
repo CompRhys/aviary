@@ -85,20 +85,19 @@ def init_model(
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        # model.trunk_nn.reset_parameters()
-        # for m in model.output_nns:
-        #     m.reset_parameters()
 
-        assert model.model_params["robust"] == robust, (
-            "cannot fine-tune "
-            "between tasks with different numbers of outputs - use transfer "
-            "option instead"
-        )
-        assert model.model_params["n_targets"] == n_targets, (
-            "cannot fine-tune "
-            "between tasks with different numbers of outputs - use transfer "
-            "option instead"
-        )
+        if model.model_params["robust"] != robust:
+            raise AssertionError(
+                "cannot fine-tune "
+                "between tasks with different numbers of outputs - use transfer "
+                "option instead"
+            )
+        if model.model_params["n_targets"] != n_targets:
+            raise AssertionError(
+                "cannot fine-tune "
+                "between tasks with different numbers of outputs - use transfer "
+                "option instead"
+            )
 
     elif transfer is not None:
         print(
@@ -441,10 +440,11 @@ def results_multitask(  # TODO find a better name for this function @janosh
     Returns:
         dict[str, dict[str, list | np.ndarray]]: _description_
     """
-    assert print_results or save_results, (
-        "Evaluating Model pointless if both 'print_results' and "
-        "'save_results' are False."
-    )
+    if not (print_results or save_results):
+        raise AssertionError(
+            "Evaluating Model pointless if both 'print_results' and "
+            "'save_results' are False."
+        )
 
     print(
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
@@ -477,18 +477,21 @@ def results_multitask(  # TODO find a better name for this function @janosh
             resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
             print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
-        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
+        if not os.path.isfile(resume):
+            raise AssertionError(f"no checkpoint found at '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        assert (
-            checkpoint["model_params"]["robust"] == robust
-        ), f"robustness of checkpoint '{resume}' is not {robust}"
+        if (
+            checkpoint["model_params"]["robust"] != robust
+        ):
+            raise AssertionError(f"robustness of checkpoint '{resume}' is not {robust}")
 
         chkpt_task_dict = checkpoint["model_params"]["task_dict"]
-        assert chkpt_task_dict == task_dict, (
-            f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
-            f"task_dict {task_dict}"
-        )
+        if chkpt_task_dict != task_dict:
+            raise AssertionError(
+                f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
+                f"task_dict {task_dict}"
+            )
 
         model = model_class(**checkpoint["model_params"], device=device)
         model.to(device)
