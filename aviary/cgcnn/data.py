@@ -23,8 +23,8 @@ class CrystalGraphData(Dataset):
         df: pd.DataFrame,
         task_dict: dict[str, str],
         elem_emb: str = "cgcnn92",
-        inputs: Sequence[str] = ["lattice", "sites"],
-        identifiers: Sequence[str] = ["material_id", "composition"],
+        inputs: Sequence[str] = ("lattice", "sites"),
+        identifiers: Sequence[str] = ("material_id", "composition"),
         radius: float = 5,
         max_num_nbr: int = 12,
         dmin: float = 0,
@@ -146,13 +146,7 @@ class CrystalGraphData(Dataset):
             print(f"these structure have some isolated atoms: {some_isolated}")
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
-    def __getitem__(  # type: ignore
-        self, idx: int
-    ) -> tuple[
-        tuple[Tensor, Tensor, LongTensor, LongTensor],
-        list[Tensor | LongTensor],
-        list[str | int],
-    ]:
+    def __getitem__(self, idx: int):
         """_summary_
 
         Returns:
