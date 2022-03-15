@@ -31,9 +31,7 @@ else:
 
 def init_model(
     model_class: type[BaseModelClass],
-    model_name: str,
     model_params: dict[str, Any],
-    run_id: int,
     optim: torch.optim.Optimizer,
     learning_rate: float,
     weight_decay: float,
@@ -44,8 +42,9 @@ def init_model(
     resume: str = None,
     fine_tune: str = None,
     transfer: str = None,
+    **kwargs,
 ) -> BaseModelClass:
-    """_summary_
+    """Initialise a model, optimizer and scheduler
 
     Args:
         model_class (type[BaseModelClass]): _description_
@@ -56,7 +55,7 @@ def init_model(
         learning_rate (float): _description_
         weight_decay (float): _description_
         momentum (float): _description_
-        device (type[torch.device] | Literal[&quot;cuda&quot;, &quot;cpu&quot;]): _description_
+        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
         milestones (Iterable, optional): _description_. Defaults to [].
         gamma (float, optional): _description_. Defaults to 0.3.
         resume (str, optional): _description_. Defaults to None.
@@ -189,7 +188,7 @@ def init_losses(
 
     Args:
         task_dict (dict[str, TaskType]): _description_
-        loss_dict (dict[str, Literal[&quot;L1&quot;, &quot;L2&quot;, &quot;CSE&quot;, &quot;Brier&quot;]]): _description_
+        loss_dict (dict[str, Literal["L1", "L2", "CSE", "Brier"]]): _description_
         robust (bool, optional): _description_. Defaults to False.
 
     Raises:
@@ -255,11 +254,11 @@ def init_normalizers(
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
 ) -> dict[str, Normalizer]:
-    """_summary_
+    """Initialise a Normalizer to scale the output targets
 
     Args:
         task_dict (dict[str, TaskType]): _description_
-        device (type[torch.device] | Literal[&quot;cuda&quot;, &quot;cpu&quot;]): _description_
+        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
         resume (str, optional): _description_. Defaults to None.
 
     Returns:
@@ -300,7 +299,7 @@ def train_ensemble(
     loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
     patience: int = None,
 ) -> None:
-    """Train multiple models.
+    """Convenience method to train multiple models in serial.
 
     Args:
         model_class (type[BaseModelClass]): _description_
@@ -315,7 +314,7 @@ def train_ensemble(
         setup_params (dict[str, Any]): _description_
         restart_params (dict[str, Any]): _description_
         model_params (dict[str, Any]): _description_
-        loss_dict (dict[str, Literal[&quot;L1&quot;, &quot;L2&quot;, &quot;CSE&quot;, &quot;Brier&quot;]]): _description_
+        loss_dict (dict[str, Literal["L1", "L2", "CSE", "Brier"]]): _description_
         patience (int, optional): _description_. Defaults to None.
     """
     train_generator = DataLoader(train_set, **data_params)
@@ -434,7 +433,7 @@ def results_multitask(  # TODO find a better name for this function @janosh
         data_params (dict[str, Any]): _description_
         robust (bool): _description_
         task_dict (dict[str, TaskType]): _description_
-        device (type[torch.device] | Literal[&quot;cuda&quot;, &quot;cpu&quot;]): _description_
+        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
         eval_type (str, optional): _description_. Defaults to "checkpoint".
         print_results (bool, optional): _description_. Defaults to True.
         save_results (bool, optional): _description_. Defaults to True.

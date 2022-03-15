@@ -235,7 +235,7 @@ class BaseModelClass(nn.Module, ABC):
             criterion_dict (dict[str, tuple[TaskType, nn.Module]]): _description_
             optimizer (torch.optim.Optimizer): _description_
             normalizer_dict (dict[str, Normalizer]): _description_
-            action (Literal[&quot;train&quot;, &quot;val&quot;], optional): _description_. Defaults to "train".
+            action (Literal["train", "val"], optional): _description_. Defaults to "train".
             verbose (bool, optional): _description_. Defaults to False.
 
         Raises:
