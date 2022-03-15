@@ -34,7 +34,6 @@ class CompositionData(Dataset):
             identifiers (list, optional): df columns for distinguishing data points. Will be
                 copied over into the model's output CSV. Defaults to ["material_id", "composition"].
         """
-
         assert len(identifiers) == 2, "Two identifiers are required"
         assert len(inputs) == 1, "One input column required are required"
 

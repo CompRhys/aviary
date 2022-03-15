@@ -115,7 +115,6 @@ class CrystalGraphData(Dataset):
 
     def _pre_check(self):
         """Check that none of the structures have isolated atoms."""
-
         print("Precheck that all structures are valid")
         all_isolated = []
         some_isolated = []
