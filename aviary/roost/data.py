@@ -21,8 +21,8 @@ class CompositionData(Dataset):
         df: pd.DataFrame,
         task_dict: dict[str, str],
         elem_emb: str = "matscholar200",
-        inputs: Sequence[str] = ["composition"],
-        identifiers: Sequence[str] = ["material_id", "composition"],
+        inputs: Sequence[str] = ("composition",),
+        identifiers: Sequence[str] = ("material_id", "composition"),
     ):
         """Data class for Roost models.
 
