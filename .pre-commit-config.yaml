@@ -14,7 +14,7 @@ repos:
     rev: 4.0.1
     hooks:
       - id: flake8
-        args: ['--ignore=E501,W503,E203']
+        args: ['--ignore=E501,W503,E203,C901']
       # E501 let black handle all line length decisions
       # W503 black conflicts with "line break before operator" rule
       # E203 black conflicts with "whitespace before ':'" rule

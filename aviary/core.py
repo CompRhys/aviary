@@ -81,10 +81,12 @@ class BaseModelClass(nn.Module, ABC):
             train_generator (DataLoader): Pytorch Dataloader containing training data.
             val_generator (DataLoader): Pytorch Dataloader containing validation data.
             optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
-            scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust Optimizer during training.
+            scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
+                Optimizer during training.
             epochs (int): Number of epochs to train for.
             criterion_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
-            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply to each task.
+            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
+                to each task.
             model_name (str): String describing the model.
             run_id (int): Unique identifier of the model run.
             checkpoint (bool, optional): Whether to save model checkpoints. Defaults to True.
@@ -220,18 +222,22 @@ class BaseModelClass(nn.Module, ABC):
 
         Args:
             generator (DataLoader): PyTorch Dataloader with the same data format used in fit().
-            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses to apply for each task.
+            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
+                to apply for each task.
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
-            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply to each task.
-            action (Literal["train", "val"], optional): Whether to track gradients depending on whether we are carrying out a training or validation pass. Defaults to "train".
+            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
+                to each task.
+            action (Literal["train", "val"], optional): Whether to track gradients depending on
+                whether we are carrying out a training or validation pass. Defaults to "train".
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Raises:
             NameError: If action not in ["train", "val"]
-            ValueError: If task_dict contains values not in ["regression", "classification", "dist", "mask"]
+            ValueError: If task_dict contains values not in ["regression", "classification"]
 
         Returns:
-            dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], np.ndarray]]: nested dictionary of metrics for each task.
+            dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], np.ndarray]]: nested
+                dictionary of metrics for each task.
         """
         if action == "val":
             self.eval()
@@ -299,38 +305,6 @@ class BaseModelClass(nn.Module, ABC):
                     metrics[name]["F1"].append(
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
-
-                elif task == "dist":
-                    loss = criterion(output, target)
-
-                    pred = output.data.cpu()
-                    target = target.data.cpu()
-
-                    metrics[name]["MAE"].append((pred - target).abs().mean())
-                    metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
-
-                elif task == "mask":
-                    logits = softmax(output, dim=-1)
-                    loss = criterion(logits, target)
-
-                    logits = logits.data.cpu()
-                    target = target.data.cpu()
-
-                    # classification metrics from sklearn need numpy arrays
-                    # NOTE these metrics are misleading on disordered structures
-                    metrics[name]["Acc"].append(
-                        accuracy_score(
-                            np.argmax(target, axis=1), np.argmax(logits, axis=1)
-                        )
-                    )
-                    metrics[name]["F1"].append(
-                        f1_score(
-                            np.argmax(target, axis=1),
-                            np.argmax(logits, axis=1),
-                            average="weighted",
-                        )
-                    )
-
                 else:
                     raise ValueError(f"invalid task: {task}")
 
