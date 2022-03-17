@@ -17,6 +17,8 @@ from sklearn.metrics import (
 )
 from torch import LongTensor, Tensor
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
+from torch.optim import SGD, Adam, AdamW, Optimizer
+from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
 from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
@@ -32,32 +34,18 @@ else:
 def init_model(
     model_class: type[BaseModelClass],
     model_params: dict[str, Any],
-    optim: torch.optim.Optimizer,
-    learning_rate: float,
-    weight_decay: float,
-    momentum: float,
     device: type[torch.device] | Literal["cuda", "cpu"],
-    milestones: Iterable = (),
-    gamma: float = 0.3,
     resume: str = None,
     fine_tune: str = None,
     transfer: str = None,
     **kwargs,
 ) -> BaseModelClass:
-    """Initialise a model, optimizer and scheduler
+    """Initialise a model
 
     Args:
-        model_class (type[BaseModelClass]): _description_
-        model_name (str): _description_
-        model_params (dict[str, Any]): _description_
-        run_id (int): _description_
-        optim (torch.optim.Optimizer): _description_
-        learning_rate (float): _description_
-        weight_decay (float): _description_
-        momentum (float): _description_
-        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
-        milestones (Iterable, optional): _description_. Defaults to [].
-        gamma (float, optional): _description_. Defaults to 0.3.
+        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
         resume (str, optional): _description_. Defaults to None.
         fine_tune (str, optional): _description_. Defaults to None.
         transfer (str, optional): _description_. Defaults to None.
@@ -116,8 +104,6 @@ def init_model(
         model.load_state_dict(model_dict)
 
     elif resume:
-        # TODO work out how to ensure that we are using the same optimizer
-        # when resuming such that the state dictionaries do not clash.
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
@@ -135,34 +121,6 @@ def init_model(
 
         model.to(device)
 
-    # Select Optimiser
-    if optim == "SGD":
-        optimizer = torch.optim.SGD(
-            model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay,
-            momentum=momentum,
-        )
-    elif optim == "Adam":
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
-        )
-    elif optim == "AdamW":
-        optimizer = torch.optim.AdamW(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
-        )
-    else:
-        raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
-
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=milestones, gamma=gamma
-    )
-
-    if resume:
-        # NOTE the user could change the optimizer when resuming creating a bug
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        scheduler.load_state_dict(checkpoint["scheduler"])
-
     print(f"Total Number of Trainable Parameters: {model.num_params:,}")
 
     # TODO parallelise the code over multiple GPUs. Currently DataParallel
@@ -174,19 +132,82 @@ def init_model(
 
     model.to(device)
 
-    return model, optimizer, scheduler
+    return model
+
+
+def init_optim(
+    model: type[BaseModelClass],
+    optim: type[Optimizer] | Literal["SGD", "Adam", "AdamW"],
+    learning_rate: float,
+    weight_decay: float,
+    momentum: float,
+    device: type[torch.device] | Literal["cuda", "cpu"],
+    milestones: Iterable = (),
+    gamma: float = 0.3,
+    resume: str = None,
+    **kwargs,
+) -> tuple[Optimizer, _LRScheduler]:
+    """Initialize Optimizer and Scheduler.
+
+    Args:
+        model (type[BaseModelClass]): _description_
+        optim (type[Optimizer] | Literal["SGD", "Adam", "AdamW"]): _description_
+        learning_rate (float): _description_
+        weight_decay (float): _description_
+        momentum (float): _description_
+        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
+        milestones (Iterable, optional): _description_. Defaults to ().
+        gamma (float, optional): _description_. Defaults to 0.3.
+        resume (str, optional): _description_. Defaults to None.
+
+    Raises:
+        NameError: _description_
+
+    Returns:
+        tuple[Optimizer, _LRScheduler]: _description_
+    """
+    # Select Optimiser
+    if optim == "SGD":
+        optimizer = SGD(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            momentum=momentum,
+        )
+    elif optim == "Adam":
+        optimizer = Adam(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+    elif optim == "AdamW":
+        optimizer = AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+    else:
+        raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
+
+    scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+
+    if resume:
+        # TODO work out how to ensure that we are using the same optimizer
+        # when resuming such that the state dictionaries do not clash.
+        # TODO breaking the function apart means we load the checkpoint twice.
+        checkpoint = torch.load(resume, map_location=device)
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        scheduler.load_state_dict(checkpoint["scheduler"])
+
+    return optimizer, scheduler
 
 
 def init_losses(
     task_dict: dict[str, TaskType],
-    loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
+    loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
 ) -> dict[str, tuple[str, type[torch.nn.Module]]]:
     """_summary_
 
     Args:
         task_dict (dict[str, TaskType]): _description_
-        loss_dict (dict[str, Literal["L1", "L2", "CSE", "Brier"]]): _description_
+        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): _description_
         robust (bool, optional): _description_. Defaults to False.
 
     Raises:
@@ -277,7 +298,7 @@ def train_ensemble(
     setup_params: dict[str, Any],
     restart_params: dict[str, Any],
     model_params: dict[str, Any],
-    loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
+    loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
     patience: int = None,
 ) -> None:
     """Convenience method to train multiple models in serial.
@@ -295,7 +316,7 @@ def train_ensemble(
         setup_params (dict[str, Any]): _description_
         restart_params (dict[str, Any]): _description_
         model_params (dict[str, Any]): _description_
-        loss_dict (dict[str, Literal["L1", "L2", "CSE", "Brier"]]): _description_
+        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): _description_
         patience (int, optional): _description_. Defaults to None.
     """
     train_generator = DataLoader(train_set, **data_params)
@@ -313,11 +334,14 @@ def train_ensemble(
         if ensemble_folds == 1:
             j = run_id
 
-        model, optimizer, scheduler = init_model(
+        model = init_model(
             model_class=model_class,
-            model_name=model_name,
             model_params=model_params,
-            run_id=j,
+            **setup_params,
+            **restart_params,
+        )
+        optimizer, scheduler = init_optim(
+            model,
             **setup_params,
             **restart_params,
         )
@@ -389,8 +413,9 @@ def train_ensemble(
         )
 
 
+# TODO find a better name for this function @janosh
 @torch.no_grad()
-def results_multitask(  # TODO find a better name for this function @janosh
+def results_multitask(  # noqa: C901
     model_class: type[BaseModelClass],
     model_name: str,
     run_id: int,
