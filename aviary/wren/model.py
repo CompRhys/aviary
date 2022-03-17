@@ -164,11 +164,11 @@ class DescriptorNetwork(nn.Module):
         sym_fea_len: int = 32,
         n_graph: int = 3,
         elem_heads: int = 1,
-        elem_gate: list[int] = [256],
-        elem_msg: list[int] = [256],
+        elem_gate: Sequence[int] = (256,),
+        elem_msg: Sequence[int] = (256,),
         cry_heads: int = 1,
-        cry_gate: list[int] = [256],
-        cry_msg: list[int] = [256],
+        cry_gate: Sequence[int] = (256,),
+        cry_msg: Sequence[int] = (256,),
     ):
         """_summary_
 

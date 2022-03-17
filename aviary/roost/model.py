@@ -153,11 +153,11 @@ class DescriptorNetwork(nn.Module):
         elem_fea_len: int = 64,
         n_graph: int = 3,
         elem_heads: int = 3,
-        elem_gate: list[int] = [256],
-        elem_msg: list[int] = [256],
+        elem_gate: Sequence[int] = (256,),
+        elem_msg: Sequence[int] = (256,),
         cry_heads: int = 3,
-        cry_gate: list[int] = [256],
-        cry_msg: list[int] = [256],
+        cry_gate: Sequence[int] = (256,),
+        cry_msg: Sequence[int] = (256,),
     ) -> None:
         """_summary_
 
