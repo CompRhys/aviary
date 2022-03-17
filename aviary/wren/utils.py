@@ -180,18 +180,18 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
     cry_sys = spga.get_crystal_system()
     spg_sym = spga.get_space_group_symbol()
     centering = "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
-    n_conv = len(spga._space_group_data["std_types"])
-    pearson = f"{cry_sys_dict[cry_sys]}{centering}{n_conv}"
+    num_sites_conventional = len(spga.get_symmetry_dataset()["std_types"])
+    pearson = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
 
-    prototype_form = prototype_formula(spga._structure.composition)
+    prototype_form = prototype_formula(sym_struct.composition)
 
     aflow_label = (
         f"{prototype_form}_{pearson}_{spg_no}_{canonical}:"
-        f"{spga._structure.composition.chemical_system}"
+        f"{sym_struct.composition.chemical_system}"
     )
 
     eqi_comp = Composition(elem_dict)
-    if not eqi_comp.reduced_formula == spga._structure.composition.reduced_formula:
+    if not eqi_comp.reduced_formula == sym_struct.composition.reduced_formula:
         return f"Invalid WP Multiplicities - {aflow_label}"
 
     return aflow_label
