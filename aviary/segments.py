@@ -21,6 +21,15 @@ class AttentionPooling(nn.Module):
         self.message_nn = message_nn
 
     def forward(self, x: Tensor, index: Tensor) -> Tensor:
+        """_summary_
+
+        Args:
+            x (Tensor): _description_
+            index (Tensor): _description_
+
+        Returns:
+            Tensor: _description_
+        """
         gate = self.gate_nn(x)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
@@ -37,15 +46,14 @@ class AttentionPooling(nn.Module):
 
 
 class WeightedAttentionPooling(nn.Module):
-    """
-    Weighted softmax attention layer
-    """
+    """Weighted softmax attention layer"""
 
     def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
-        """
-        Inputs
-        ----------
-        gate_nn: Variable(nn.Module)
+        """_summary_
+
+        Args:
+            gate_nn (nn.Module): _description_
+            message_nn (nn.Module): _description_
         """
         super().__init__()
         self.gate_nn = gate_nn
@@ -53,6 +61,16 @@ class WeightedAttentionPooling(nn.Module):
         self.pow = torch.nn.Parameter(torch.randn(1))
 
     def forward(self, x: Tensor, index: Tensor, weights: Tensor) -> Tensor:
+        """_summary_
+
+        Args:
+            x (Tensor): _description_
+            index (Tensor): _description_
+            weights (Tensor): _description_
+
+        Returns:
+            Tensor: _description_
+        """
         gate = self.gate_nn(x)
 
         gate = gate - scatter_max(gate, index, dim=0)[0][index]
@@ -69,83 +87,90 @@ class WeightedAttentionPooling(nn.Module):
 
 
 class MessageLayer(nn.Module):
-    """
-    Massage Layers are used to propagate information between nodes in
-    in the stoichiometry graph.
-    """
+    """MessageLayer to propagate information between nodes in graph"""
 
     def __init__(
         self,
-        elem_fea_len: int,
-        elem_heads: int,
-        elem_gate: list[int],
-        elem_msg: list[int],
+        msg_fea_len: int,
+        num_msg_heads: int,
+        msg_gate_layers: list[int],
+        msg_net_layers: list[int],
     ) -> None:
+        """_summary_
+
+        Args:
+            msg_fea_len (int): _description_
+            num_msg_heads (int): _description_
+            msg_gate_layers (list[int]): _description_
+            msg_net_layers (list[int]): _description_
+        """
         super().__init__()
 
         self._repr = (
-            f"{self._get_name()}(elem_fea_len={elem_fea_len}, "
-            f"elem_heads={elem_heads}, elem_gate={elem_gate}, elem_msg={elem_msg})"
+            f"{self._get_name()}(msg_fea_len={msg_fea_len}, "
+            f"num_msg_heads={num_msg_heads}, msg_gate_layers={msg_gate_layers}, msg_net_layers={msg_net_layers})"
         )
 
         # Pooling and Output
         self.pooling = nn.ModuleList(
             [
                 WeightedAttentionPooling(
-                    gate_nn=SimpleNetwork(2 * elem_fea_len, 1, elem_gate),
-                    message_nn=SimpleNetwork(2 * elem_fea_len, elem_fea_len, elem_msg),
+                    gate_nn=SimpleNetwork(2 * msg_fea_len, 1, msg_gate_layers),
+                    message_nn=SimpleNetwork(
+                        2 * msg_fea_len, msg_fea_len, msg_net_layers
+                    ),
                 )
-                for _ in range(elem_heads)
+                for _ in range(num_msg_heads)
             ]
         )
 
     def forward(
         self,
-        elem_weights: Tensor,
-        elem_in_fea: Tensor,
+        node_weights: Tensor,
+        msg_in_fea: Tensor,
         self_fea_idx: LongTensor,
         nbr_fea_idx: LongTensor,
     ) -> Tensor:
         """Forward pass
 
         Args:
-            elem_weights (Tensor): shape (N,) The fractional weights of elements in their materials
-            elem_in_fea (Tensor): shape (N, elem_fea_len) Element hidden features before message
+            node_weights (Tensor): shape (N,) The fractional weights of elements in their materials
+            msg_in_fea (Tensor): shape (N, msg_fea_len) Node hidden features before message
                 passing
             self_fea_idx (LongTensor): shape (M,) Indices of the 1st element in each of the M pairs
             nbr_fea_idx (LongTensor): shape (M,) Indices of the 2nd element in each of the M pairs
 
-        N: Total number of elements (nodes) in the batch
+        N: Total number of nodes (elements/Wyckoff positions) in the batch
         M: Total number of pairs (edges) in the batch
         C: Total number of crystals (graphs) in the batch
 
         Returns:
-            Tensor: shape (N, elem_fea_len) Element hidden features after message passing
+            Tensor: shape (N, elem_fea_len) node hidden features after message passing
         """
         # construct the total features for passing
-        elem_nbr_weights = elem_weights[nbr_fea_idx, :]
-        elem_nbr_fea = elem_in_fea[nbr_fea_idx, :]
-        elem_self_fea = elem_in_fea[self_fea_idx, :]
-        fea = torch.cat([elem_self_fea, elem_nbr_fea], dim=1)
+        node_nbr_weights = node_weights[nbr_fea_idx, :]
+        msg_nbr_fea = msg_in_fea[nbr_fea_idx, :]
+        msg_self_fea = msg_in_fea[self_fea_idx, :]
+        fea = torch.cat([msg_self_fea, msg_nbr_fea], dim=1)
 
-        # sum selectivity over the neighbours to get elements
+        # sum selectivity over the neighbours to get node updates
         head_fea = []
-        for attnhead in self.pooling:
-            head_fea.append(attnhead(fea, index=self_fea_idx, weights=elem_nbr_weights))
+        for attn_head in self.pooling:
+            head_fea.append(
+                attn_head(fea, index=self_fea_idx, weights=node_nbr_weights)
+            )
 
         # average the attention heads
         fea = torch.mean(torch.stack(head_fea), dim=0)
 
-        return fea + elem_in_fea
+        return fea + msg_in_fea
 
     def __repr__(self) -> str:
         return self._repr
 
 
 class SimpleNetwork(nn.Module):
-    """
-    Simple Feed Forward Neural Network
-    """
+    """Simple Feed Forward Neural Network"""
 
     def __init__(
         self,
@@ -155,7 +180,7 @@ class SimpleNetwork(nn.Module):
         activation: type[nn.Module] = nn.LeakyReLU,
         batchnorm: bool = False,
     ) -> None:
-        """_summary_
+        """Create a simple feed forward neural network
 
         Args:
             input_dim (int): _description_
@@ -184,19 +209,21 @@ class SimpleNetwork(nn.Module):
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Forward pass through network"""
         for fc, bn, act in zip(self.fcs, self.bns, self.acts):
             x = act(bn(fc(x)))
 
         return self.fc_out(x)
 
-    def __repr__(self) -> str:
-        return self.__class__.__name__
-
     def reset_parameters(self) -> None:
+        """Reinitialise network weights using PyTorch defaults"""
         for fc in self.fcs:
             fc.reset_parameters()
 
         self.fc_out.reset_parameters()
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__
 
 
 class ResidualNetwork(nn.Module):
@@ -251,6 +278,7 @@ class ResidualNetwork(nn.Module):
             self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Forward pass through network"""
         for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
             x = act(bn(fc(x))) + res_fc(x)
 

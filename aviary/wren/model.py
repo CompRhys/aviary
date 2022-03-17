@@ -199,10 +199,10 @@ class DescriptorNetwork(nn.Module):
         self.graphs = nn.ModuleList(
             [
                 MessageLayer(
-                    elem_fea_len=fea_len,
-                    elem_heads=elem_heads,
-                    elem_gate=elem_gate,
-                    elem_msg=elem_msg,
+                    msg_fea_len=fea_len,
+                    num_msg_heads=elem_heads,
+                    msg_gate_layers=elem_gate,
+                    msg_net_layers=elem_msg,
                 )
                 for i in range(n_graph)
             ]
