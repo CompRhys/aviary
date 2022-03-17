@@ -41,8 +41,8 @@ class BaseModelClass(nn.Module, ABC):
         """Store core model parameters.
 
         Args:
-            task_dict (dict[str, TaskType]): Map of names to "regression" or "classification".
-            robust (bool): Whether to use aleatoric loss function.
+            task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+            robust (bool): Whether to estimate standard deviation for use in a robust loss function
             device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
             epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
             best_val_scores (dict[str, float], optional): Validation score to use for early
@@ -231,10 +231,6 @@ class BaseModelClass(nn.Module, ABC):
                 whether we are carrying out a training or validation pass. Defaults to "train".
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
-        Raises:
-            NameError: If action not in ["train", "val"]
-            ValueError: If task_dict contains values not in ["regression", "classification"]
-
         Returns:
             dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], np.ndarray]]: nested
                 dictionary of metrics for each task.
@@ -338,7 +334,10 @@ class BaseModelClass(nn.Module, ABC):
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
-            tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]: _description_
+            tuple containing:
+            - tuple[Tensor, ...]: _description_
+            - tuple[Tensor, ...]: _description_
+            - tuple[str, ...]: _description_
         """
         test_ids = []
         test_targets = []

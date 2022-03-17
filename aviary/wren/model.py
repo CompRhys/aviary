@@ -56,14 +56,14 @@ class Wren(BaseModelClass):
         """_summary_
 
         Args:
-            robust (bool): _description_
-            n_targets (list[int]): _description_
-            elem_emb_len (int): _description_
-            sym_emb_len (int): _description_
-            elem_fea_len (int, optional): _description_. Defaults to 32.
-            sym_fea_len (int, optional): _description_. Defaults to 32.
-            n_graph (int, optional): _description_. Defaults to 3.
-            elem_heads (int, optional): _description_. Defaults to 1.
+            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            n_targets (list[int]): Number of targets to train on
+            elem_emb_len (int): Number of features in initial element embedding
+            sym_emb_len (int): Number of features in initial Wyckoff letter embedding
+            elem_fea_len (int, optional): Number of hidden features to use to encode elements. Defaults to 32.
+            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters. Defaults to 32.
+            n_graph (int, optional): Number of message passing operations to carry out. Defaults to 3.
+            elem_heads (int, optional): Number of parallel attention heads per message passing operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): _description_. Defaults to 1.
@@ -118,8 +118,8 @@ class Wren(BaseModelClass):
         elem_weights: Tensor,
         elem_fea: Tensor,
         sym_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
         cry_elem_idx: LongTensor,
         aug_cry_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
@@ -129,20 +129,20 @@ class Wren(BaseModelClass):
             elem_weights (Tensor): _description_
             elem_fea (Tensor): _description_
             sym_fea (Tensor): _description_
-            self_fea_idx (LongTensor): _description_
-            nbr_fea_idx (LongTensor): _description_
+            self_idx (LongTensor): _description_
+            nbr_idx (LongTensor): _description_
             cry_elem_idx (LongTensor): _description_
             aug_cry_idx (LongTensor): _description_
 
         Returns:
-            tuple[Tensor, ...]: _description_
+            tuple[Tensor, ...]: Predicted values for each target
         """
         crys_fea = self.material_nn(
             elem_weights,
             elem_fea,
             sym_fea,
-            self_fea_idx,
-            nbr_fea_idx,
+            self_idx,
+            nbr_idx,
             cry_elem_idx,
             aug_cry_idx,
         )
@@ -173,12 +173,12 @@ class DescriptorNetwork(nn.Module):
         """_summary_
 
         Args:
-            elem_emb_len (int): _description_
-            sym_emb_len (int): _description_
-            elem_fea_len (int, optional): _description_. Defaults to 32.
-            sym_fea_len (int, optional): _description_. Defaults to 32.
-            n_graph (int, optional): _description_. Defaults to 3.
-            elem_heads (int, optional): _description_. Defaults to 1.
+            elem_emb_len (int): Number of features in initial element embedding
+            sym_emb_len (int): Number of features in initial Wyckoff letter embedding
+            elem_fea_len (int, optional): Number of hidden features to use to encode elements. Defaults to 32.
+            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters. Defaults to 32.
+            n_graph (int, optional): Number of message passing operations to carry out. Defaults to 3.
+            elem_heads (int, optional): Number of parallel attention heads per message passing operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): _description_. Defaults to 1.
@@ -224,8 +224,8 @@ class DescriptorNetwork(nn.Module):
         elem_weights: Tensor,
         elem_fea: Tensor,
         sym_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
         cry_elem_idx: LongTensor,
         aug_cry_idx: LongTensor,
     ) -> Tensor:
@@ -235,8 +235,8 @@ class DescriptorNetwork(nn.Module):
             elem_weights (Tensor): Fractional weight of each Element in its stoichiometry
             elem_fea (Tensor): Element features of each of the N elements in the batch
             sym_fea (Tensor): Wyckoff Position features of each of the N elements in the batch
-            self_fea_idx (Tensor): Indices of the first element in each of the M pairs
-            nbr_fea_idx (Tensor): Indices of the second element in each of the M pairs
+            self_idx (Tensor): Indices of the first element in each of the M pairs
+            nbr_idx (Tensor): Indices of the second element in each of the M pairs
             cry_elem_idx (Tensor): Mapping from the elem idx to crystal idx
             aug_cry_idx (Tensor): Mapping from the crystal idx to augmentation idx
 
@@ -251,7 +251,7 @@ class DescriptorNetwork(nn.Module):
 
         # apply the message passing functions
         for graph_func in self.graphs:
-            elem_fea = graph_func(elem_weights, elem_fea, self_fea_idx, nbr_fea_idx)
+            elem_fea = graph_func(elem_weights, elem_fea, self_idx, nbr_idx)
 
         # generate crystal features by pooling the elemental features
         head_fea = []

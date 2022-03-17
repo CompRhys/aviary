@@ -98,12 +98,12 @@ class WyckoffData(Dataset):
 
         Returns:
             tuple: containing
-            - atom_weights (Tensor): shape (M, 1) weights of atoms in the material
-            - atom_fea (Tensor): shape (M, n_fea) features of atoms in the material
-            - self_fea_idx (Tensor): shape (M*M, 1) list of self indices
-            - nbr_fea_idx (Tensor): shape (M*M, 1) list of neighbour indices
-            - target (Tensor): shape (1,) target value for material
-            - cry_id (Tensor): shape (1,) input id for the material
+            - atom_weights (Tensor): weights of atoms in the material
+            - atom_fea (Tensor): features of atoms in the material
+            - self_idx (Tensor): list of self indices
+            - nbr_idx (Tensor): list of neighbour indices
+            - target (Tensor): target value for material
+            - cry_id (Tensor): input id for the material
         """
         df_idx = self.df.iloc[idx]
         swyks = df_idx[self.inputs][0]
@@ -129,25 +129,25 @@ class WyckoffData(Dataset):
             raise
 
         n_wyks = len(elements)
-        self_fea_idx = []
-        nbr_fea_idx = []
+        self_idx = []
+        nbr_idx = []
         for i in range(n_wyks):
-            self_fea_idx += [i] * n_wyks
-            nbr_fea_idx += list(range(n_wyks))
+            self_idx += [i] * n_wyks
+            nbr_idx += list(range(n_wyks))
 
         self_aug_fea_idx = []
         nbr_aug_fea_idx = []
         n_aug = len(aug_wyks)
         for i in range(n_aug):
-            self_aug_fea_idx += [x + i * n_wyks for x in self_fea_idx]
-            nbr_aug_fea_idx += [x + i * n_wyks for x in nbr_fea_idx]
+            self_aug_fea_idx += [x + i * n_wyks for x in self_idx]
+            nbr_aug_fea_idx += [x + i * n_wyks for x in nbr_idx]
 
         # convert all data to tensors
         atom_weights = Tensor(weights)
         atom_fea = Tensor(atom_fea)
         sym_fea = Tensor(sym_fea)
-        self_fea_idx = LongTensor(self_aug_fea_idx)
-        nbr_fea_idx = LongTensor(nbr_aug_fea_idx)
+        self_idx = LongTensor(self_aug_fea_idx)
+        nbr_idx = LongTensor(nbr_aug_fea_idx)
 
         targets = []
         for name in self.task_dict:
@@ -157,7 +157,7 @@ class WyckoffData(Dataset):
                 targets.append(LongTensor([int(self.df.iloc[idx][name])]))
 
         return (
-            (atom_weights, atom_fea, sym_fea, self_fea_idx, nbr_fea_idx),
+            (atom_weights, atom_fea, sym_fea, self_idx, nbr_idx),
             targets,
             *cry_ids,
         )
@@ -171,28 +171,28 @@ def collate_batch(dataset_list):
 
     Args:
         dataset_list ([tuple]): list of tuples for each data point.
-            (atom_fea, nbr_fea, nbr_fea_idx, target)
+            (atom_fea, nbr_fea, nbr_idx, target)
 
-            atom_fea (Tensor): shape (n_i, atom_fea_len)
-            nbr_fea (Tensor): shape (n_i, M, nbr_fea_len)
-            nbr_fea_idx (LongTensor): shape (n_i, M)
-            target (Tensor): shape (1, )
+            atom_fea (Tensor): _description_
+            nbr_fea (Tensor):
+            nbr_idx (LongTensor):
+            target (Tensor):
             cif_id: str or int
 
     Returns:
-        batch_atom_fea (Tensor): shape (N, orig_atom_fea_len) Atom features from atom type
-        batch_nbr_fea (Tensor): shape (N, M, nbr_fea_len) Bond features of each atom"s M neighbors
-        batch_nbr_fea_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
+        batch_atom_fea (Tensor): Atom features from atom type
+        batch_nbr_fea (Tensor): Bond features of each atom"s M neighbors
+        batch_nbr_idx (LongTensor): Indices of M neighbors of each atom
         crystal_atom_idx (list[LongTensor]): of length N0 Mapping from the crystal idx to atom idx
-        target (Tensor): shape (N, 1) Target value for prediction
+        target (Tensor): Target value for prediction
         batch_cif_ids: list
     """
     # define the lists
     batch_atom_weights = []
     batch_atom_fea = []
     batch_sym_fea = []
-    batch_self_fea_idx = []
-    batch_nbr_fea_idx = []
+    batch_self_idx = []
+    batch_nbr_idx = []
     crystal_atom_idx = []
     aug_cry_idx = []
     batch_targets = []
@@ -201,7 +201,7 @@ def collate_batch(dataset_list):
     aug_count = 0
     cry_base_idx = 0
     for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
-        atom_weights, atom_fea, sym_fea, self_fea_idx, nbr_fea_idx = inputs
+        atom_weights, atom_fea, sym_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal
         n_el = atom_fea.shape[0]
@@ -214,8 +214,8 @@ def collate_batch(dataset_list):
         batch_sym_fea.append(sym_fea)
 
         # mappings from bonds to atoms
-        batch_self_fea_idx.append(self_fea_idx + cry_base_idx)
-        batch_nbr_fea_idx.append(nbr_fea_idx + cry_base_idx)
+        batch_self_idx.append(self_idx + cry_base_idx)
+        batch_nbr_idx.append(nbr_idx + cry_base_idx)
 
         # mapping from atoms to crystals
         crystal_atom_idx.append(
@@ -236,8 +236,8 @@ def collate_batch(dataset_list):
             torch.cat(batch_atom_weights, dim=0),
             torch.cat(batch_atom_fea, dim=0),
             torch.cat(batch_sym_fea, dim=0),
-            torch.cat(batch_self_fea_idx, dim=0),
-            torch.cat(batch_nbr_fea_idx, dim=0),
+            torch.cat(batch_self_idx, dim=0),
+            torch.cat(batch_nbr_idx, dim=0),
             torch.cat(crystal_atom_idx),
             torch.cat(aug_cry_idx),
         ),
@@ -249,10 +249,10 @@ def collate_batch(dataset_list):
 def parse_aflow(
     aflow_label: str,
 ) -> tuple[str, list[float], list[str], list[tuple[str, ...]]]:
-    """Parse the Wren Aflow-like Wyckoff encoding.
+    """Parse the Wren AFLOW-like Wyckoff encoding.
 
     Args:
-        aflow_label (str): _description_
+        aflow_label (str): AFLOW-style prototype string with appended chemical system
 
     Returns:
         tuple[str, list[int], list[str], list[str]]: spg_no, mult_list, ele_list, aug_wyks

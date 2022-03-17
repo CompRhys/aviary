@@ -128,37 +128,30 @@ class MessageLayer(nn.Module):
         self,
         node_weights: Tensor,
         msg_in_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
     ) -> Tensor:
         """Forward pass
 
         Args:
-            node_weights (Tensor): shape (N,) The fractional weights of elements in their materials
-            msg_in_fea (Tensor): shape (N, msg_fea_len) Node hidden features before message
-                passing
-            self_fea_idx (LongTensor): shape (M,) Indices of the 1st element in each of the M pairs
-            nbr_fea_idx (LongTensor): shape (M,) Indices of the 2nd element in each of the M pairs
-
-        N: Total number of nodes (elements/Wyckoff positions) in the batch
-        M: Total number of pairs (edges) in the batch
-        C: Total number of crystals (graphs) in the batch
+            node_weights (Tensor): The fractional weights of elements in their materials
+            msg_in_fea (Tensor): Node hidden features before message passing
+            self_idx (LongTensor): Indices of the 1st element in each of the M pairs
+            nbr_idx (LongTensor): Indices of the 2nd element in each of the M pairs
 
         Returns:
-            Tensor: shape (N, elem_fea_len) node hidden features after message passing
+            Tensor: node hidden features after message passing
         """
         # construct the total features for passing
-        node_nbr_weights = node_weights[nbr_fea_idx, :]
-        msg_nbr_fea = msg_in_fea[nbr_fea_idx, :]
-        msg_self_fea = msg_in_fea[self_fea_idx, :]
+        node_nbr_weights = node_weights[nbr_idx, :]
+        msg_nbr_fea = msg_in_fea[nbr_idx, :]
+        msg_self_fea = msg_in_fea[self_idx, :]
         fea = torch.cat([msg_self_fea, msg_nbr_fea], dim=1)
 
         # sum selectivity over the neighbours to get node updates
         head_fea = []
         for attn_head in self.pooling:
-            head_fea.append(
-                attn_head(fea, index=self_fea_idx, weights=node_nbr_weights)
-            )
+            head_fea.append(attn_head(fea, index=self_idx, weights=node_nbr_weights))
 
         # average the attention heads
         fea = torch.mean(torch.stack(head_fea), dim=0)

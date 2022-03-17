@@ -50,9 +50,6 @@ def init_model(
         fine_tune (str, optional): _description_. Defaults to None.
         transfer (str, optional): _description_. Defaults to None.
 
-    Raises:
-        NameError: _description_
-
     Returns:
         BaseModelClass: _description_
     """
@@ -160,8 +157,6 @@ def init_optim(
         gamma (float, optional): _description_. Defaults to 0.3.
         resume (str, optional): _description_. Defaults to None.
 
-    Raises:
-        NameError: _description_
 
     Returns:
         tuple[Optimizer, _LRScheduler]: _description_
@@ -206,12 +201,9 @@ def init_losses(
     """_summary_
 
     Args:
-        task_dict (dict[str, TaskType]): _description_
-        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): _description_
-        robust (bool, optional): _description_. Defaults to False.
-
-    Raises:
-        NameError: _description_
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): Map of target names to loss functions.
+        robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
 
     Returns:
         dict[str, tuple[str, type[torch.nn.Module]]]: _description_
@@ -259,7 +251,7 @@ def init_normalizers(
     """Initialise a Normalizer to scale the output targets
 
     Args:
-        task_dict (dict[str, TaskType]): _description_
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
         device (type[torch.device] | Literal["cuda", "cpu"]): _description_
         resume (str, optional): _description_. Defaults to None.
 
@@ -437,8 +429,8 @@ def results_multitask(  # noqa: C901
         ensemble_folds (int): _description_
         test_set (Subset): _description_
         data_params (dict[str, Any]): _description_
-        robust (bool): _description_
-        task_dict (dict[str, TaskType]): _description_
+        robust (bool): Whether to estimate standard deviation for use in a robust loss function
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
         device (type[torch.device] | Literal["cuda", "cpu"]): _description_
         eval_type (str, optional): _description_. Defaults to "checkpoint".
         print_results (bool, optional): _description_. Defaults to True.

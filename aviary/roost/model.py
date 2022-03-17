@@ -53,12 +53,12 @@ class Roost(BaseModelClass):
         """_summary_
 
         Args:
-            robust (bool): _description_
-            n_targets (list[int]): _description_
-            elem_emb_len (int): _description_
-            elem_fea_len (int, optional): _description_. Defaults to 64.
-            n_graph (int, optional): _description_. Defaults to 3.
-            elem_heads (int, optional): _description_. Defaults to 3.
+            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            n_targets (list[int]): Number of targets to train on
+            elem_emb_len (int): Number of features in initial element embedding
+            elem_fea_len (int, optional): Number of hidden features to use to encode elements. Defaults to 64.
+            n_graph (int, optional): Number of message passing operations to carry out. Defaults to 3.
+            elem_heads (int, optional): Number of parallel attention heads per message passing operation. Defaults to 3.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): _description_. Defaults to 3.
@@ -67,16 +67,7 @@ class Roost(BaseModelClass):
             trunk_hidden (list[int], optional): _description_. Defaults to [1024, 512].
             out_hidden (list[int], optional): _description_. Defaults to [256, 128, 64].
 
-        Raises:
-            ValueError: _description_
         """
-        if isinstance(out_hidden[0], list):
-            raise ValueError("boo hiss bad user")
-            # assert all([isinstance(x, list) for x in out_hidden]),
-            #   'all elements of out_hidden must be ints or all lists'
-            # assert len(out_hidden) == len(n_targets),
-            #   'out_hidden-n_targets length mismatch'
-
         super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
@@ -118,8 +109,8 @@ class Roost(BaseModelClass):
         self,
         elem_weights: Tensor,
         elem_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
         cry_elem_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
         """Forward pass through the material_nn and output_nn.
@@ -127,15 +118,15 @@ class Roost(BaseModelClass):
         Args:
             elem_weights (Tensor): _description_
             elem_fea (Tensor): _description_
-            self_fea_idx (LongTensor): _description_
-            nbr_fea_idx (LongTensor): _description_
+            self_idx (LongTensor): _description_
+            nbr_idx (LongTensor): _description_
             cry_elem_idx (LongTensor): _description_
 
         Returns:
             tuple[Tensor, ...]: _description_
         """
         crys_fea = self.material_nn(
-            elem_weights, elem_fea, self_fea_idx, nbr_fea_idx, cry_elem_idx
+            elem_weights, elem_fea, self_idx, nbr_idx, cry_elem_idx
         )
 
         crys_fea = F.relu(self.trunk_nn(crys_fea))
@@ -206,26 +197,21 @@ class DescriptorNetwork(nn.Module):
         self,
         elem_weights: Tensor,
         elem_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
         cry_elem_idx: LongTensor,
     ) -> Tensor:
         """Forward pass through the DescriptorNetwork.
 
         Args:
-            elem_weights (Tensor): shape (N) Fractional weight of each Element in its stoichiometry
-            elem_fea (Tensor): shape (N, orig_elem_fea_len)
-                Element features of each of the N elems in the batch
-            self_fea_idx (LongTensor): shape (M,) indices of the 1st element in each of the M pairs
-            nbr_fea_idx (LongTensor): shape (M,) indices of the 2nd element in each of the M pairs
-            cry_elem_idx (list[LongTensor]): of length C Mapping from the elem idx to crystal idx
-
-        N: Total number of elements (nodes) in the batch
-        M: Total number of pairs (edges) in the batch
-        C: Total number of crystals (graphs) in the batch
+            elem_weights (Tensor): Fractional weight of each Element in its stoichiometry
+            elem_fea (Tensor): Element features of each of the elements in the batch
+            self_idx (LongTensor): Indices of the 1st element in each of the pairs
+            nbr_idx (LongTensor): Indices of the 2nd element in each of the pairs
+            cry_elem_idx (list[LongTensor]): Mapping from the elem idx to crystal idx
 
         Returns:
-            Tensor: Composition representation/features after message passing with shape (C,)
+            Tensor: Composition representation/features after message passing
         """
         # embed the original features into a trainable embedding space
         elem_fea = self.embedding(elem_fea)
@@ -235,7 +221,7 @@ class DescriptorNetwork(nn.Module):
 
         # apply the message passing functions
         for graph_func in self.graphs:
-            elem_fea = graph_func(elem_weights, elem_fea, self_fea_idx, nbr_fea_idx)
+            elem_fea = graph_func(elem_weights, elem_fea, self_idx, nbr_idx)
 
         # generate crystal features by pooling the elemental features
         head_fea = []

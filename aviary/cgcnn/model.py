@@ -36,15 +36,15 @@ class CrystalGraphConvNet(BaseModelClass):
         """Initialize CrystalGraphConvNet.
 
         Args:
-            robust (bool): _description_
-            n_targets (list[int]): _description_
+            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of atom features in the input.
             nbr_fea_len (int): Number of bond features.
             elem_fea_len (int, optional): Number of hidden atom features in the convolutional layers. Defaults to 64.
             n_graph (int, optional): Number of convolutional layers. Defaults to 4.
             h_fea_len (int, optional): Number of hidden features after pooling. Defaults to 128.
-            n_trunk (int, optional): _description_. Defaults to 1.
-            n_hidden (int, optional): Number of hidden layers after pooling. Defaults to 1.
+            n_trunk (int, optional): Number of hidden layers in trunk after pooling. Defaults to 1.
+            n_hidden (int, optional): Number of hidden layers after trunk for each task. Defaults to 1.
         """
         super().__init__(robust=robust, **kwargs)
 
@@ -91,18 +91,14 @@ class CrystalGraphConvNet(BaseModelClass):
         """Forward pass
 
         Args:
-            atom_fea (Tensor): shape (N, orig_elem_fea_len) Atom features from atom type
-            nbr_fea (Tensor): shape (N, M, nbr_fea_len) Bond features of each atom's M neighbors
-            self_idx (LongTensor): _description_
-            nbr_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
-            crystal_atom_idx (LongTensor): of length N0 mapping from the crystal idx to atom idx
-
-        N: Total number of atoms in the batch
-        M: Max number of neighbors
-        N0: Total number of crystals in the batch
+            atom_fea (Tensor): Atom features from atom type
+            nbr_fea (Tensor): Bond features of each atom's neighbors
+            self_idx (LongTensor): Mapping of Tensor rows to each nodes
+            nbr_idx (LongTensor): Indices of the neighbors of each atom
+            crystal_atom_idx (LongTensor): Mapping from the crystal idx to atom idx
 
         Returns:
-            Tensor: shape (N,) Atom hidden features after convolution
+            Tensor: Atom hidden features after convolution
         """
         atom_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
@@ -142,28 +138,24 @@ class DescriptorNetwork(nn.Module):
         self,
         atom_fea: Tensor,
         nbr_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
     ) -> Tensor:
         """Forward pass
 
         Args:
-            atom_fea (Tensor): shape (N, orig_elem_fea_len) Atom features from atom type
-            nbr_fea (Tensor): shape (N, M, nbr_fea_len) Bond features of each atom's M neighbors
-            self_fea_idx (LongTensor): of length N0 Mapping from the crystal idx to atom idx
-            nbr_fea_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
-
-        N: Total number of atoms in the batch
-        M: Max number of neighbors
-        N0: Total number of crystals in the batch
+            atom_fea (Tensor): Atom features from atom type
+            nbr_fea (Tensor): Bond features of each atom's M neighbors
+            self_idx (LongTensor): Mapping from the crystal idx to atom idx
+            nbr_idx (LongTensor): Indices of M neighbors of each atom
 
         Returns:
-            Tensor: shape (N, ) Atom hidden features after convolution
+            Tensor: Atom hidden features after convolution
         """
         atom_fea = self.embedding(atom_fea)
 
         for conv_func in self.convs:
-            atom_fea = conv_func(atom_fea, nbr_fea, self_fea_idx, nbr_fea_idx)
+            atom_fea = conv_func(atom_fea, nbr_fea, self_idx, nbr_idx)
 
         return atom_fea
 
@@ -194,26 +186,23 @@ class CGCNNConv(nn.Module):
         self,
         atom_in_fea: Tensor,
         nbr_fea: Tensor,
-        self_fea_idx: LongTensor,
-        nbr_fea_idx: LongTensor,
+        self_idx: LongTensor,
+        nbr_idx: LongTensor,
     ) -> Tensor:
         """Forward pass
 
         Args:
-            atom_in_fea (Tensor): shape (N, elem_fea_len) Atom hidden features before convolution
-            nbr_fea (Tensor): shape (N, M, nbr_fea_len) Bond features of each atom's M neighbors
-            self_fea_idx (LongTensor): _description_
-            nbr_fea_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
-
-        N: Total number of atoms in the batch
-        M: Max number of neighbors
+            atom_in_fea (Tensor): Atom hidden features before convolution
+            nbr_fea (Tensor): Bond features of each atom's neighbors
+            self_idx (LongTensor): _description_
+            nbr_idx (LongTensor): Indices of M neighbors of each atom
 
         Returns:
-            Tensor: shape (N, elem_fea_len) Atom hidden features after convolution
+            Tensor: Atom hidden features after convolution
         """
         # convolution
-        atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
-        atom_self_fea = atom_in_fea[self_fea_idx, :]
+        atom_nbr_fea = atom_in_fea[nbr_idx, :]
+        atom_self_fea = atom_in_fea[self_idx, :]
 
         total_fea = torch.cat([atom_self_fea, atom_nbr_fea, nbr_fea], dim=1)
 
@@ -226,7 +215,7 @@ class CGCNNConv(nn.Module):
 
         # take the elementwise product of the filter and core
         nbr_msg = filter_fea * core_fea
-        nbr_summed = scatter_add(nbr_msg, self_fea_idx, dim=0)
+        nbr_summed = scatter_add(nbr_msg, self_idx, dim=0)
 
         nbr_summed = self.bn2(nbr_summed)
         out = self.softplus2(atom_in_fea + nbr_summed)

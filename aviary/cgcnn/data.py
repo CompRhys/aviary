@@ -263,21 +263,20 @@ def collate_batch(dataset_list):
 
     Args:
         dataset_list (list): list of tuples for each data point: (atom_fea, nbr_dist, nbr_idx, target)
-            - atom_fea (Tensor): shape (n_i, atom_fea_len)
-            - nbr_dist (Tensor): shape (n_i, M, nbr_dist_len)
-            - nbr_idx (LongTensor): shape (n_i, M)
-            - target (Tensor): shape (1, )
+            - atom_fea (Tensor):
+            - nbr_dist (Tensor):
+            - nbr_idx (LongTensor):
+            - target (Tensor):
             - cif_id: str or int
 
     Returns:
         tuple: containing
-        - batch_atom_fea (Tensor): shape (N, orig_atom_fea_len) Atom features from atom type
-        - batch_nbr_dist (Tensor): shape (N, M, nbr_dist_len) Bond features of each atom's M neighbors
-        - batch_nbr_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
-        - crystal_atom_idx (list[LongTensor]): of length N0 Mapping from the crystal idx to atom idx
-        - target (Tensor): shape (N, 1) Target value for prediction
+        - batch_atom_fea (Tensor): Atom features from atom type
+        - batch_nbr_dist (Tensor): Bond features of each atom's M neighbors
+        - batch_nbr_idx (LongTensor): Indices of M neighbors of each atom
+        - crystal_atom_idx (list[LongTensor]): Mapping from the crystal idx to atom idx
+        - target (Tensor): Target value for prediction
         - batch_cif_ids: list
-        where N = sum(n_i); N0 = sum(i)
     """
     batch_atom_fea = []
     batch_nbr_dist = []

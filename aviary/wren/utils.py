@@ -57,20 +57,17 @@ remove_digits = str.maketrans("", "", digits)
 
 
 def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
-    """Get aflow prototype label for pymatgen Structure
-
-    Raises:
-        FileNotFoundError: pymatgen Structure object
+    """Get AFLOW prototype label for pymatgen Structure
 
     Returns:
-        str: aflow prototype label
+        str: AFLOW prototype label
     """
     if aflow_executable is None:
         aflow_executable = which("aflow")
 
     if which(aflow_executable or "") is None:
         raise FileNotFoundError(
-            "aflow could not found, please specify path to its binary with "
+            "AFLOW could not found, please specify path to its binary with "
             "aflow_executable='...'"
         )
 
@@ -119,13 +116,13 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
 
 
 def get_aflow_label_spglib(struct: Structure) -> str:
-    """Get aflow prototype label for pymatgen Structure.
+    """Get AFLOW prototype label for pymatgen Structure.
 
     Args:
         struct (Structure): pymatgen Structure object
 
     Returns:
-        str: aflow prototype label
+        str: AFLOW prototype label
     """
     spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
     aflow = get_aflow_label_from_spga(spga)
@@ -142,13 +139,13 @@ def get_aflow_label_spglib(struct: Structure) -> str:
 
 
 def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
-    """Get aflow prototype label for pymatgen SpacegroupAnalyzer.
+    """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
         spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object
 
     Returns:
-        str: aflow prototype labels
+        str: AFLOW prototype labels
     """
     spg_no = spga.get_space_group_number()
     sym_struct = spga.get_symmetrized_structure()
@@ -202,8 +199,7 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
     based on the alphabetical weight of equivalent choices of origin.
 
     Args:
-        elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff
-            positions
+        elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff positions
         spg_no (int): International space group number.
 
     Returns:
@@ -233,10 +229,12 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
     """_summary_
 
     Args:
-        wyks (str): _description_
+        wyks (str): Wyckoff position substring from AFLOW-style prototype label
 
     Returns:
-        tuple[str, int]: _description_
+        tuple: containing
+        - str: sorted Wyckoff position substring for AFLOW-style prototype label
+        - int: integer score to rank order when canonicalising
     """
     score = 0
     sorted_el_wyks = []
@@ -265,10 +263,10 @@ def prototype_formula(composition: Composition) -> str:
     prototype labelling scheme.
 
     Args:
-        composition (Composition): _description_
+        composition (Composition): Pymatgen Composition to process
 
     Returns:
-        str: _description_
+        str: anonymized formula where the species are in alphabetical order
     """
     reduced = composition.element_composition
     if all(x == int(x) for x in composition.values()):
@@ -292,10 +290,10 @@ def count_wyks(aflow_label: str) -> int:
     """Count number of Wyckoff positions in Wyckoff representation.
 
     Args:
-        aflow_label (str): _description_
+        aflow_label (str): AFLOW-style prototype label with appended chemical system
 
     Returns:
-        int: _description_
+        int: number of distinct Wyckoff positions
     """
     num_wyk = 0
 
@@ -319,10 +317,10 @@ def count_params(aflow_label: str) -> int:
     """Count number of parameters coarse-grained in Wyckoff representation.
 
     Args:
-        aflow_label (str): _description_
+        aflow_label (str): AFLOW-style prototype label with appended chemical system
 
     Returns:
-        int: _description_
+        int: Number of free-parameters in given prototype
     """
     num_params = 0
 
@@ -347,17 +345,17 @@ def count_params(aflow_label: str) -> int:
     return int(num_params)
 
 
-def get_isopointal_proto_from_aflow(aflow: str) -> str:
+def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     """Get a canonicalised string for the prototype.
 
     Args:
-        aflow (str): _description_
+        aflow_label (str): AFLOW-style prototype label with appended chemical system
 
     Returns:
-        str: _description_
+        str: Canonicalised AFLOW-style prototype label with appended chemical system
     """
-    aflow, _ = aflow.split(":")
-    anom, pearson, spg, *wyckoffs = aflow.split("_")
+    aflow_label, _ = aflow_label.split(":")
+    anom, pearson, spg, *wyckoffs = aflow_label.split("_")
 
     # TODO: this really needs some comments to explain what's going on - @janosh
     subst = r"\g<1>1"

@@ -80,12 +80,12 @@ class CompositionData(Dataset):
 
         Returns:
             tuple: containing
-            - atom_weights (Tensor): shape (M, 1) weights of atoms in the material
-            - atom_fea (Tensor): shape (M, n_fea) features of atoms in the material
-            - self_fea_idx (Tensor): shape (M*M, 1) list of self indices
-            - nbr_fea_idx (Tensor): shape (M*M, 1) list of neighbor indices
-            - target (Tensor): shape (1,) target value for material
-            - cry_id (Tensor): shape (1,) input id for the material
+            - atom_weights (Tensor): weights of atoms in the material
+            - atom_fea (Tensor): features of atoms in the material
+            - self_idx (Tensor): list of self indices
+            - nbr_idx (Tensor): list of neighbor indices
+            - target (Tensor): target value for material
+            - cry_id (Tensor): input id for the material
         """
         df_idx = self.df.iloc[idx]
         composition = df_idx[self.inputs][0]
@@ -109,17 +109,17 @@ class CompositionData(Dataset):
             )
 
         nele = len(elements)
-        self_fea_idx = []
-        nbr_fea_idx = []
+        self_idx = []
+        nbr_idx = []
         for i, _ in enumerate(elements):
-            self_fea_idx += [i] * nele
-            nbr_fea_idx += list(range(nele))
+            self_idx += [i] * nele
+            nbr_idx += list(range(nele))
 
         # convert all data to tensors
         atom_weights = Tensor(weights)
         atom_fea = Tensor(atom_fea)
-        self_fea_idx = LongTensor(self_fea_idx)
-        nbr_fea_idx = LongTensor(nbr_fea_idx)
+        self_idx = LongTensor(self_idx)
+        nbr_idx = LongTensor(nbr_idx)
 
         targets = []
         for target in self.task_dict:
@@ -129,7 +129,7 @@ class CompositionData(Dataset):
                 targets.append(LongTensor([df_idx[target]]))
 
         return (
-            (atom_weights, atom_fea, self_fea_idx, nbr_fea_idx),
+            (atom_weights, atom_fea, self_idx, nbr_idx),
             targets,
             *cry_ids,
         )
@@ -139,40 +139,37 @@ def collate_batch(dataset_list):
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point: (atom_fea, nbr_fea, nbr_fea_idx, target)
-            - atom_fea (Tensor): shape (n_i, atom_fea_len)
-            - nbr_fea (Tensor): shape (n_i, M, nbr_fea_len)
-            - self_fea_idx (LongTensor): shape (n_i, M)
-            - nbr_fea_idx (LongTensor): shape (n_i, M)
-            - target (Tensor): shape (1, )
+        dataset_list (list): list of tuples for each data point: (atom_fea, nbr_fea, nbr_idx, target)
+            - atom_fea (Tensor):
+            - nbr_fea (Tensor):
+            - self_idx (LongTensor):
+            - nbr_idx (LongTensor):
+            - target (Tensor):
             - cif_id: str or int
 
     Returns:
         tuple: containing
-        - batch_atom_weights (Tensor): shape (N, 1)
-        - batch_atom_fea (Tensor): shape (N, orig_atom_fea_len) Atom features from atom type
-        - batch_self_fea_idx (LongTensor): shape (N, M) Indices of mapping atom to copies
-            of itself
-        - batch_nbr_fea_idx (LongTensor): shape (N, M) Indices of M neighbors of each atom
-        - crystal_atom_idx (list[LongTensor]): of length N0 Mapping from the crystal idx
-            to atom idx
-        - target (Tensor): shape (N, 1) Target value for prediction
+        - batch_atom_weights (Tensor): _description_
+        - batch_atom_fea (Tensor): Atom features from atom type
+        - batch_self_idx (LongTensor): Indices of mapping atom to copies of itself
+        - batch_nbr_idx (LongTensor): Indices of M neighbors of each atom
+        - crystal_atom_idx (list[LongTensor]): Mapping from the crystal idx to atom idx
+        - target (Tensor): Target value for prediction
         - batch_comps: list
         - batch_ids: list
-        where N = sum(n_i); N0 = sum(i)
     """
     # define the lists
     batch_atom_weights = []
     batch_atom_fea = []
-    batch_self_fea_idx = []
-    batch_nbr_fea_idx = []
+    batch_self_idx = []
+    batch_nbr_idx = []
     crystal_atom_idx = []
     batch_targets = []
     batch_cry_ids = []
 
     cry_base_idx = 0
     for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
-        atom_weights, atom_fea, self_fea_idx, nbr_fea_idx = inputs
+        atom_weights, atom_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal
         n_i = atom_fea.shape[0]
@@ -182,8 +179,8 @@ def collate_batch(dataset_list):
         batch_atom_fea.append(atom_fea)
 
         # mappings from bonds to atoms
-        batch_self_fea_idx.append(self_fea_idx + cry_base_idx)
-        batch_nbr_fea_idx.append(nbr_fea_idx + cry_base_idx)
+        batch_self_idx.append(self_idx + cry_base_idx)
+        batch_nbr_idx.append(nbr_idx + cry_base_idx)
 
         # mapping from atoms to crystals
         crystal_atom_idx.append(torch.tensor([i] * n_i))
@@ -199,8 +196,8 @@ def collate_batch(dataset_list):
         (
             torch.cat(batch_atom_weights, dim=0),
             torch.cat(batch_atom_fea, dim=0),
-            torch.cat(batch_self_fea_idx, dim=0),
-            torch.cat(batch_nbr_fea_idx, dim=0),
+            torch.cat(batch_self_idx, dim=0),
+            torch.cat(batch_nbr_idx, dim=0),
             torch.cat(crystal_atom_idx),
         ),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
