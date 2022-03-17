@@ -10,7 +10,7 @@ from aviary.wren.data import WyckoffData, collate_batch
 from aviary.wren.model import Wren
 
 
-def main(
+def main(  # noqa: C901
     data_path,
     targets,
     tasks,

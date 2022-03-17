@@ -10,7 +10,7 @@ from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
 
 
-def main(
+def main(  # noqa: C901
     data_path,
     targets,
     tasks,
