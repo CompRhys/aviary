@@ -163,21 +163,24 @@ class WyckoffData(Dataset):
         )
 
 
-def collate_batch(dataset_list):
+def collate_batch(
+    dataset_list: list[
+        tuple[Tensor, Tensor, LongTensor, Tensor | LongTensor, str | int]
+    ],
+) -> tuple[Tensor, Tensor, LongTensor, list[LongTensor], Tensor, list[str | int]]:
     """Collate a list of data and return a batch for predicting
     crystal properties.
 
     N = sum(n_i); N0 = sum(i)
 
     Args:
-        dataset_list ([tuple]): list of tuples for each data point.
-            (atom_fea, nbr_fea, nbr_idx, target)
-
-            atom_fea (Tensor): _description_
-            nbr_fea (Tensor):
-            nbr_idx (LongTensor):
-            target (Tensor):
-            cif_id: str or int
+        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_fea, nbr_idx, target)
+            - atom_fea (Tensor): _description_
+            - nbr_fea (Tensor):
+            - nbr_idx (LongTensor):
+            - target (Tensor | LongTensor): target values containing floats for regression or
+                integers as class labels for classification
+            - cif_id: str or int
 
     Returns:
         batch_atom_fea (Tensor): Atom features from atom type
@@ -200,7 +203,7 @@ def collate_batch(dataset_list):
 
     aug_count = 0
     cry_base_idx = 0
-    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
+    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
         atom_weights, atom_fea, sym_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal
@@ -221,7 +224,7 @@ def collate_batch(dataset_list):
         crystal_atom_idx.append(
             torch.tensor(range(aug_count, aug_count + n_aug)).repeat_interleave(n_el)
         )
-        aug_cry_idx.append(torch.tensor([i] * n_aug))
+        aug_cry_idx.append(torch.tensor([idx] * n_aug))
 
         # batch the targets and ids
         batch_targets.append(target)

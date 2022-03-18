@@ -258,15 +258,20 @@ class GaussianDistance:
         )
 
 
-def collate_batch(dataset_list):
+def collate_batch(
+    dataset_list: list[
+        tuple[Tensor, Tensor, LongTensor, Tensor | LongTensor, str | int]
+    ],
+) -> tuple[Tensor, Tensor, LongTensor, LongTensor, Tensor, list[str | int]]:
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point: (atom_fea, nbr_dist, nbr_idx, target)
+        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_dist, nbr_idx, target)
             - atom_fea (Tensor):
             - nbr_dist (Tensor):
             - nbr_idx (LongTensor):
-            - target (Tensor):
+            - target (Tensor | LongTensor): target values containing floats for regression or
+                integers as class labels for classification
             - cif_id: str or int
 
     Returns:
@@ -276,7 +281,7 @@ def collate_batch(dataset_list):
         - batch_nbr_idx (LongTensor): Indices of M neighbors of each atom
         - crystal_atom_idx (list[LongTensor]): Mapping from the crystal idx to atom idx
         - target (Tensor): Target value for prediction
-        - batch_cif_ids: list
+        - batch_cif_ids: list[str | int]: Identifiers like material_id, composition
     """
     batch_atom_fea = []
     batch_nbr_dist = []
@@ -288,7 +293,9 @@ def collate_batch(dataset_list):
     batch_cif_ids = []
     base_idx = 0
 
-    for i, (inputs, target, comp, cif_id) in enumerate(dataset_list):
+    # TODO: unpacking (inputs, target, comp, cif_id) doesn't appear to match the doc string
+    # for dataset_list, what about nbr_idx and comp?
+    for idx, (inputs, target, comp, cif_id) in enumerate(dataset_list):
         atom_fea, nbr_dist, self_idx, nbr_idx = inputs
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
@@ -297,7 +304,7 @@ def collate_batch(dataset_list):
         batch_self_idx.append(self_idx + base_idx)
         batch_nbr_idx.append(nbr_idx + base_idx)
 
-        crystal_atom_idx.extend([i] * n_i)
+        crystal_atom_idx.extend([idx] * n_i)
         batch_targets.append(target)
         batch_comps.append(comp)
         batch_cif_ids.append(cif_id)
