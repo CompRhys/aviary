@@ -78,8 +78,8 @@ class BaseModelClass(nn.Module, ABC):
         """Convenience class to carry out training loop.
 
         Args:
-            train_generator (DataLoader): Pytorch Dataloader containing training data.
-            val_generator (DataLoader): Pytorch Dataloader containing validation data.
+            train_generator (DataLoader): Dataloader containing training data.
+            val_generator (DataLoader): Dataloader containing validation data.
             optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
             scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
                 Optimizer during training.
@@ -335,9 +335,9 @@ class BaseModelClass(nn.Module, ABC):
 
         Returns:
             tuple containing:
-            - tuple[Tensor, ...]: _description_
-            - tuple[Tensor, ...]: _description_
-            - tuple[str, ...]: _description_
+            - tuple[Tensor, ...]: Tuple of target Tensors
+            - tuple[Tensor, ...]: Tuple of prediction Tensors
+            - tuple[str, ...]: Tuple of identifiers
         """
         test_ids = []
         test_targets = []
