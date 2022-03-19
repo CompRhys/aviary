@@ -13,22 +13,22 @@ class AttentionPooling(nn.Module):
         """Initialize softmax attention layer.
 
         Args:
-            gate_nn (nn.Module): _description_
-            message_nn (nn.Module): _description_
+            gate_nn (nn.Module): Neural network to calculate attention scalars
+            message_nn (nn.Module): Neural network to evaluate message updates
         """
         super().__init__()
         self.gate_nn = gate_nn
         self.message_nn = message_nn
 
     def forward(self, x: Tensor, index: Tensor) -> Tensor:
-        """_summary_
+        """Forward pass
 
         Args:
-            x (Tensor): _description_
-            index (Tensor): _description_
+            x (Tensor): Input features for nodes
+            index (Tensor): The indices for scatter operation over nodes
 
         Returns:
-            Tensor: _description_
+            Tensor: Output features for nodes
         """
         gate = self.gate_nn(x)
 
@@ -49,11 +49,11 @@ class WeightedAttentionPooling(nn.Module):
     """Weighted softmax attention layer"""
 
     def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
-        """_summary_
+        """Initialize softmax attention layer
 
         Args:
-            gate_nn (nn.Module): _description_
-            message_nn (nn.Module): _description_
+            gate_nn (nn.Module): Neural network to calculate attention scalars
+            message_nn (nn.Module): Neural network to evaluate message updates
         """
         super().__init__()
         self.gate_nn = gate_nn
@@ -61,15 +61,15 @@ class WeightedAttentionPooling(nn.Module):
         self.pow = torch.nn.Parameter(torch.randn(1))
 
     def forward(self, x: Tensor, index: Tensor, weights: Tensor) -> Tensor:
-        """_summary_
+        """Forward pass
 
         Args:
-            x (Tensor): _description_
-            index (Tensor): _description_
-            weights (Tensor): _description_
+            x (Tensor): Input features for nodes
+            index (Tensor): The indices for scatter operation over nodes
+            weights (Tensor): The weights to assign to nodes
 
         Returns:
-            Tensor: _description_
+            Tensor: Output features for nodes
         """
         gate = self.gate_nn(x)
 
@@ -96,13 +96,13 @@ class MessageLayer(nn.Module):
         msg_gate_layers: list[int],
         msg_net_layers: list[int],
     ) -> None:
-        """_summary_
+        """Initialise MessageLayer
 
         Args:
-            msg_fea_len (int): _description_
-            num_msg_heads (int): _description_
-            msg_gate_layers (list[int]): _description_
-            msg_net_layers (list[int]): _description_
+            msg_fea_len (int): Number of input features
+            num_msg_heads (int): Number of attention heads
+            msg_gate_layers (list[int]): List of hidden layer sizes for gate network
+            msg_net_layers (list[int]): List of hidden layer sizes for message network
         """
         super().__init__()
 
@@ -136,8 +136,8 @@ class MessageLayer(nn.Module):
         Args:
             node_weights (Tensor): The fractional weights of elements in their materials
             msg_in_fea (Tensor): Node hidden features before message passing
-            self_idx (LongTensor): Indices of the 1st element in each of the M pairs
-            nbr_idx (LongTensor): Indices of the 2nd element in each of the M pairs
+            self_idx (LongTensor): Indices of the 1st element in each of the node pairs
+            nbr_idx (LongTensor): Indices of the 2nd element in each of the node pairs
 
         Returns:
             Tensor: node hidden features after message passing
@@ -176,11 +176,11 @@ class SimpleNetwork(nn.Module):
         """Create a simple feed forward neural network
 
         Args:
-            input_dim (int): _description_
-            output_dim (int): _description_
-            hidden_layer_dims (list[int]): _description_
-            activation (type[nn.Module], optional): _description_. Defaults to nn.LeakyReLU.
-            batchnorm (bool, optional): _description_. Defaults to False.
+            input_dim (int): Number of input features
+            output_dim (int): Number of output features
+            hidden_layer_dims (list[int]): List of hidden layer sizes
+            activation (type[nn.Module], optional): Which activation function to use. Defaults to nn.LeakyReLU.
+            batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
         """
         super().__init__()
 
@@ -229,17 +229,15 @@ class ResidualNetwork(nn.Module):
         hidden_layer_dims: list[int],
         activation: type[nn.Module] = nn.ReLU,
         batchnorm: bool = False,
-        return_features: bool = False,
     ) -> None:
-        """_summary_
+        """Create a feed forward neural network with skip connections
 
         Args:
-            input_dim (int): _description_
-            output_dim (int): _description_
-            hidden_layer_dims (list[int]): _description_
-            activation (type[nn.Module], optional): _description_. Defaults to nn.ReLU.
-            batchnorm (bool, optional): _description_. Defaults to False.
-            return_features (bool, optional): _description_. Defaults to False.
+            input_dim (int): Number of input features
+            output_dim (int): Number of output features
+            hidden_layer_dims (list[int]): List of hidden layer sizes
+            activation (type[nn.Module], optional): Which activation function to use. Defaults to nn.LeakyReLU.
+            batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
         """
         super().__init__()
 
@@ -266,17 +264,13 @@ class ResidualNetwork(nn.Module):
         )
         self.acts = nn.ModuleList([activation() for _ in range(len(dims) - 1)])
 
-        self.return_features = return_features
-        if not self.return_features:
-            self.fc_out = nn.Linear(dims[-1], output_dim)
+        self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass through network"""
         for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
             x = act(bn(fc(x))) + res_fc(x)
 
-        if self.return_features:
-            return x
         return self.fc_out(x)
 
     def __repr__(self) -> str:
