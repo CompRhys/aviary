@@ -135,16 +135,23 @@ class CompositionData(Dataset):
         )
 
 
-def collate_batch(dataset_list):
+def collate_batch(
+    dataset_list: list[
+        tuple[Tensor, Tensor, LongTensor, LongTensor, Tensor | LongTensor, str | int]
+    ],
+) -> tuple[
+    Tensor, Tensor, LongTensor, LongTensor, list[LongTensor], Tensor, list[str | int]
+]:
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point: (atom_fea, nbr_fea, nbr_idx, target)
+        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_fea, nbr_idx, target)
             - atom_fea (Tensor):
             - nbr_fea (Tensor):
             - self_idx (LongTensor):
             - nbr_idx (LongTensor):
-            - target (Tensor):
+            - target (Tensor | LongTensor): target values containing floats for regression or
+                integers as class labels for classification
             - cif_id: str or int
 
     Returns:
@@ -168,7 +175,7 @@ def collate_batch(dataset_list):
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
+    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
         atom_weights, atom_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal
@@ -183,7 +190,7 @@ def collate_batch(dataset_list):
         batch_nbr_idx.append(nbr_idx + cry_base_idx)
 
         # mapping from atoms to crystals
-        crystal_atom_idx.append(torch.tensor([i] * n_i))
+        crystal_atom_idx.append(torch.tensor([idx] * n_i))
 
         # batch the targets and ids
         batch_targets.append(target)
