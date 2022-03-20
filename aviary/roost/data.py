@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import json
 from os.path import abspath, dirname, exists, join
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ class CompositionData(Dataset):
         df: pd.DataFrame,
         task_dict: dict[str, str],
         elem_emb: str = "matscholar200",
-        inputs: Sequence[str] = ("composition",),
+        inputs: str = "composition",
         identifiers: Sequence[str] = ("material_id", "composition"),
     ):
         """Data class for Roost models.
@@ -32,17 +32,15 @@ class CompositionData(Dataset):
                 type.
             elem_emb (str, optional): One of "matscholar200", "cgcnn92", "megnet16", "onehot112" or
                 path to a file with custom embeddings. Defaults to "matscholar200".
-            inputs (list[str], optional): df column name holding material compositions.
-                Defaults to ["composition"].
+            inputs (str, optional): df column name holding material compositions.
+                Defaults to "composition".
             identifiers (list, optional): df columns for distinguishing data points. Will be
                 copied over into the model's output CSV. Defaults to ["material_id", "composition"].
         """
         if len(identifiers) != 2:
             raise AssertionError("Two identifiers are required")
-        if len(inputs) != 1:
-            raise AssertionError("One input column required are required")
 
-        self.inputs = list(inputs)
+        self.inputs = inputs
         self.task_dict = task_dict
         self.identifiers = list(identifiers)
         self.df = df
@@ -80,16 +78,13 @@ class CompositionData(Dataset):
 
         Returns:
             tuple: containing
-            - atom_weights (Tensor): weights of atoms in the material
-            - atom_fea (Tensor): features of atoms in the material
-            - self_idx (Tensor): list of self indices
-            - nbr_idx (Tensor): list of neighbor indices
-            - target (Tensor): target value for material
-            - cry_id (Tensor): input id for the material
+            - tuple[Tensor, Tensor, LongTensor, LongTensor]: Roost model inputs
+            - list[Tensor | LongTensor]: regression or classification targets
+            - list[str | int]: identifiers like material_id, composition
         """
         df_idx = self.df.iloc[idx]
-        composition = df_idx[self.inputs][0]
-        cry_ids = df_idx[self.identifiers].values
+        composition = df_idx[self.inputs]
+        cry_ids = df_idx[self.identifiers].to_list()
 
         comp_dict = Composition(composition).get_el_amt_dict()
         elements = list(comp_dict.keys())
@@ -98,7 +93,7 @@ class CompositionData(Dataset):
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
-            atom_fea = np.vstack([self.elem_features[element] for element in elements])
+            elem_fea = np.vstack([self.elem_features[element] for element in elements])
         except AssertionError:
             raise AssertionError(
                 f"cry-id {cry_ids[0]} [{composition}] contains element types not in embedding"
@@ -116,8 +111,8 @@ class CompositionData(Dataset):
             nbr_idx += list(range(nele))
 
         # convert all data to tensors
-        atom_weights = Tensor(weights)
-        atom_fea = Tensor(atom_fea)
+        elem_weights = Tensor(weights)
+        elem_fea = Tensor(elem_fea)
         self_idx = LongTensor(self_idx)
         nbr_idx = LongTensor(nbr_idx)
 
@@ -129,24 +124,30 @@ class CompositionData(Dataset):
                 targets.append(LongTensor([df_idx[target]]))
 
         return (
-            (atom_weights, atom_fea, self_idx, nbr_idx),
+            (elem_weights, elem_fea, self_idx, nbr_idx),
             targets,
             *cry_ids,
         )
 
 
 def collate_batch(
-    dataset_list: list[
-        tuple[Tensor, Tensor, LongTensor, LongTensor, Tensor | LongTensor, str | int]
+    dataset_list: tuple[
+        tuple[Tensor, Tensor, LongTensor, LongTensor],
+        list[Tensor | LongTensor],
+        list[str | int],
     ],
 ) -> tuple[
-    Tensor, Tensor, LongTensor, LongTensor, list[LongTensor], Tensor, list[str | int]
+    Any,
+    ...
+    # tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor],
+    # tuple[Tensor | LongTensor],
+    # tuple[str | int],
 ]:
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_fea, nbr_idx, target)
-            - atom_fea (Tensor):
+        dataset_list (list): list of tuples for each data point: (elem_fea, nbr_fea, nbr_idx, target)
+            - elem_fea (Tensor):  _description_
             - nbr_fea (Tensor):
             - self_idx (LongTensor):
             - nbr_idx (LongTensor):
@@ -155,42 +156,39 @@ def collate_batch(
             - cif_id: str or int
 
     Returns:
-        tuple: containing
-        - batch_atom_weights (Tensor): _description_
-        - batch_atom_fea (Tensor): Atom features from atom type
-        - batch_self_idx (LongTensor): Indices of mapping atom to copies of itself
-        - batch_nbr_idx (LongTensor): Indices of M neighbors of each atom
-        - crystal_atom_idx (list[LongTensor]): Mapping from the crystal idx to atom idx
-        - target (Tensor): Target value for prediction
-        - batch_comps: list
-        - batch_ids: list
+        tuple[
+            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched Roost model inputs,
+            tuple[Tensor | LongTensor]: Target values for different tasks,
+            # TODO this last tuple is unpacked how to do type hint?
+            *tuple[str | int]: Identifiers like material_id, composition
+        ]
     """
     # define the lists
-    batch_atom_weights = []
-    batch_atom_fea = []
+    batch_elem_weights = []
+    batch_elem_fea = []
     batch_self_idx = []
     batch_nbr_idx = []
-    crystal_atom_idx = []
+    crystal_elem_idx = []
     batch_targets = []
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
-        atom_weights, atom_fea, self_idx, nbr_idx = inputs
+    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
+        elem_weights, elem_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal
-        n_i = atom_fea.shape[0]
+        n_i = elem_fea.shape[0]
 
         # batch the features together
-        batch_atom_weights.append(atom_weights)
-        batch_atom_fea.append(atom_fea)
+        batch_elem_weights.append(elem_weights)
+        batch_elem_fea.append(elem_fea)
 
         # mappings from bonds to atoms
         batch_self_idx.append(self_idx + cry_base_idx)
         batch_nbr_idx.append(nbr_idx + cry_base_idx)
 
         # mapping from atoms to crystals
-        crystal_atom_idx.append(torch.tensor([idx] * n_i))
+        crystal_elem_idx.append(torch.tensor([i] * n_i))
 
         # batch the targets and ids
         batch_targets.append(target)
@@ -201,11 +199,11 @@ def collate_batch(
 
     return (
         (
-            torch.cat(batch_atom_weights, dim=0),
-            torch.cat(batch_atom_fea, dim=0),
+            torch.cat(batch_elem_weights, dim=0),
+            torch.cat(batch_elem_fea, dim=0),
             torch.cat(batch_self_idx, dim=0),
             torch.cat(batch_nbr_idx, dim=0),
-            torch.cat(crystal_atom_idx),
+            torch.cat(crystal_elem_idx),
         ),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
         *zip(*batch_cry_ids),

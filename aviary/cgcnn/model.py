@@ -87,7 +87,7 @@ class CrystalGraphConvNet(BaseModelClass):
         self_idx: LongTensor,
         nbr_idx: LongTensor,
         crystal_atom_idx: LongTensor,
-    ) -> Tensor:
+    ) -> tuple[Tensor, ...]:
         """Forward pass
 
         Args:
@@ -98,7 +98,7 @@ class CrystalGraphConvNet(BaseModelClass):
             crystal_atom_idx (LongTensor): Mapping from the crystal idx to atom idx
 
         Returns:
-            Tensor: Atom hidden features after convolution
+            tuple[Tensor, ...]: tuple of predictions for all targets
         """
         atom_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
@@ -110,7 +110,7 @@ class CrystalGraphConvNet(BaseModelClass):
         crys_fea = F.relu(self.trunk_nn(crys_fea))
 
         # apply neural network to map from learned features to target
-        return (output_nn(crys_fea) for output_nn in self.output_nns)
+        return tuple(output_nn(crys_fea) for output_nn in self.output_nns)
 
 
 class DescriptorNetwork(nn.Module):

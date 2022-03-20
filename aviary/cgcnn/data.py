@@ -5,7 +5,7 @@ import functools
 import json
 from itertools import groupby
 from os.path import abspath, dirname, exists, join
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
@@ -159,8 +159,8 @@ class CrystalGraphData(Dataset):
             idx (int): index of entry in Dataset
 
         Returns:
-            tuple: containing
-            - tuple[Tensor, Tensor, LongTensor, LongTensor]: CGCNN inputs
+            tuple containing:
+            - tuple[Tensor, Tensor, LongTensor, LongTensor]: CGCNN model inputs
             - list[Tensor | LongTensor]: regression or classification targets
             - list[str | int]: identifiers like material_id, composition
         """
@@ -211,6 +211,109 @@ class CrystalGraphData(Dataset):
         )
 
 
+def collate_batch(
+    dataset_list: tuple[
+        tuple[Tensor, Tensor, LongTensor, LongTensor],
+        list[Tensor | LongTensor],
+        list[str | int],
+    ],
+) -> tuple[
+    Any,
+    ...
+    # tuple[Tensor, Tensor, Tensor, LongTensor, LongTensor, LongTensor, LongTensor],
+    # tuple[Tensor | LongTensor],
+    # tuple[str | int],
+]:
+    """Collate a list of data and return a batch for predicting crystal properties.
+
+    Args:
+        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_dist, nbr_idx, target)
+            - atom_fea (Tensor): _description_
+            - nbr_dist (Tensor):
+            - self_idx (LongTensor):
+            - nbr_idx (LongTensor):
+            - target (Tensor | LongTensor): target values containing floats for regression or
+                integers as class labels for classification
+            - cif_id: str or int
+
+    Returns:
+        tuple[
+            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched CGCNN model inputs,
+            tuple[Tensor | LongTensor]: Target values for different tasks,
+            # TODO this last tuple is unpacked how to do type hint?
+            *tuple[str | int]: Identifiers like material_id, composition
+        ]
+    """
+    batch_atom_fea = []
+    batch_nbr_dist = []
+    batch_self_idx = []
+    batch_nbr_idx = []
+    crystal_atom_idx = []
+    batch_targets = []
+    batch_cry_ids = []
+    base_idx = 0
+
+    # TODO: unpacking (inputs, target, comp, cif_id) doesn't appear to match the doc string
+    # for dataset_list, what about nbr_idx and comp?
+    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
+        atom_fea, nbr_dist, self_idx, nbr_idx = inputs
+        n_i = atom_fea.shape[0]  # number of atoms for this crystal
+
+        # batch the features together
+        batch_atom_fea.append(atom_fea)
+        batch_nbr_dist.append(nbr_dist)
+
+        # mappings from bonds to atoms
+        batch_self_idx.append(self_idx + base_idx)
+        batch_nbr_idx.append(nbr_idx + base_idx)
+
+        # mapping from atoms to crystals
+        crystal_atom_idx.extend([idx] * n_i)
+
+        # batch the targets and ids
+        batch_targets.append(target)
+        batch_cry_ids.append(cry_ids)
+
+        # increment the id counter
+        base_idx += n_i
+
+    atom_fea = torch.cat(batch_atom_fea, dim=0)
+    nbr_dist = torch.cat(batch_nbr_dist, dim=0)
+    self_idx = torch.cat(batch_self_idx, dim=0)
+    nbr_idx = torch.cat(batch_nbr_idx, dim=0)
+    cry_idx = LongTensor(crystal_atom_idx)
+
+    return (
+        (atom_fea, nbr_dist, self_idx, nbr_idx, cry_idx),
+        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
+        *zip(*batch_cry_ids),
+    )
+
+
+# TODO do we still need these functions? @CompRhys
+def get_structure(cols):
+    """Return pymatgen structure from lattice and sites cols"""
+    cell, sites = cols
+    cell, elems, coords = parse_cgcnn(cell, sites)
+    # NOTE getting primitive structure before constructing graph
+    # significantly harms the performance of this model.
+    return Structure(lattice=cell, species=elems, coords=coords, to_unit_cell=True)
+
+
+def parse_cgcnn(cell, sites):
+    """Parse str representation into lists"""
+    cell = np.array(ast.literal_eval(cell), dtype=float)
+    elems = []
+    coords = []
+    for site in ast.literal_eval(sites):
+        ele, pos = site.split(" @ ")
+        elems.append(ele)
+        coords.append(pos.split(" "))
+
+    coords = np.array(coords, dtype=float)
+    return cell, elems, coords
+
+
 class GaussianDistance:
     """Expands the distance by Gaussian basis. Unit: angstrom."""
 
@@ -256,93 +359,3 @@ class GaussianDistance:
         return np.exp(
             -((distances[..., np.newaxis] - self.filter) ** 2) / self.var**2
         )
-
-
-def collate_batch(
-    dataset_list: list[
-        tuple[Tensor, Tensor, LongTensor, Tensor | LongTensor, str | int]
-    ],
-) -> tuple[Tensor, Tensor, LongTensor, LongTensor, Tensor, list[str | int]]:
-    """Collate a list of data and return a batch for predicting crystal properties.
-
-    Args:
-        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_dist, nbr_idx, target)
-            - atom_fea (Tensor):
-            - nbr_dist (Tensor):
-            - nbr_idx (LongTensor):
-            - target (Tensor | LongTensor): target values containing floats for regression or
-                integers as class labels for classification
-            - cif_id: str or int
-
-    Returns:
-        tuple: containing
-        - batch_atom_fea (Tensor): Atom features from atom type
-        - batch_nbr_dist (Tensor): Bond features of each atom's M neighbors
-        - batch_nbr_idx (LongTensor): Indices of M neighbors of each atom
-        - crystal_atom_idx (list[LongTensor]): Mapping from the crystal idx to atom idx
-        - target (Tensor): Target value for prediction
-        - batch_cif_ids: list[str | int]: Identifiers like material_id, composition
-    """
-    batch_atom_fea = []
-    batch_nbr_dist = []
-    batch_self_idx = []
-    batch_nbr_idx = []
-    crystal_atom_idx = []
-    batch_targets = []
-    batch_comps = []
-    batch_cif_ids = []
-    base_idx = 0
-
-    # TODO: unpacking (inputs, target, comp, cif_id) doesn't appear to match the doc string
-    # for dataset_list, what about nbr_idx and comp?
-    for idx, (inputs, target, comp, cif_id) in enumerate(dataset_list):
-        atom_fea, nbr_dist, self_idx, nbr_idx = inputs
-        n_i = atom_fea.shape[0]  # number of atoms for this crystal
-
-        batch_atom_fea.append(atom_fea)
-        batch_nbr_dist.append(nbr_dist)
-        batch_self_idx.append(self_idx + base_idx)
-        batch_nbr_idx.append(nbr_idx + base_idx)
-
-        crystal_atom_idx.extend([idx] * n_i)
-        batch_targets.append(target)
-        batch_comps.append(comp)
-        batch_cif_ids.append(cif_id)
-        base_idx += n_i
-
-    atom_fea = torch.cat(batch_atom_fea, dim=0)
-    nbr_dist = torch.cat(batch_nbr_dist, dim=0)
-    self_idx = torch.cat(batch_self_idx, dim=0)
-    nbr_idx = torch.cat(batch_nbr_idx, dim=0)
-    cry_idx = LongTensor(crystal_atom_idx)
-
-    return (
-        (atom_fea, nbr_dist, self_idx, nbr_idx, cry_idx),
-        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        batch_comps,
-        batch_cif_ids,
-    )
-
-
-# TODO do we still need these functions? @CompRhys
-def get_structure(cols):
-    """Return pymatgen structure from lattice and sites cols"""
-    cell, sites = cols
-    cell, elems, coords = parse_cgcnn(cell, sites)
-    # NOTE getting primitive structure before constructing graph
-    # significantly harms the performance of this model.
-    return Structure(lattice=cell, species=elems, coords=coords, to_unit_cell=True)
-
-
-def parse_cgcnn(cell, sites):
-    """Parse str representation into lists"""
-    cell = np.array(ast.literal_eval(cell), dtype=float)
-    elems = []
-    coords = []
-    for site in ast.literal_eval(sites):
-        ele, pos = site.split(" @ ")
-        elems.append(ele)
-        coords.append(pos.split(" "))
-
-    coords = np.array(coords, dtype=float)
-    return cell, elems, coords
