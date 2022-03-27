@@ -39,19 +39,19 @@ def init_model(
     fine_tune: str = None,
     transfer: str = None,
     **kwargs,
-) -> BaseModelClass:
+) -> type[BaseModelClass]:
     """Initialise a model
 
     Args:
         model_class (type[BaseModelClass]): Which model class to initialize.
         model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
         device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
-        resume (str, optional): _description_. Defaults to None.
-        fine_tune (str, optional): _description_. Defaults to None.
-        transfer (str, optional): _description_. Defaults to None.
+        resume (str, optional): Path to model checkpoint to resume. Defaults to None.
+        fine_tune (str, optional): Path to model checkpoint to fine tune. Defaults to None.
+        transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
 
     Returns:
-        BaseModelClass: _description_
+        type[BaseModelClass]: An initialised model of type model_class
     """
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
@@ -84,6 +84,7 @@ def init_model(
             )
 
     elif transfer is not None:
+        # TODO rewrite/remove transfer option as it is not used/doesn't work as detailed
         print(
             f"Use material_nn from '{transfer}' as a starting point and "
             "train the output_nn from scratch"
@@ -147,19 +148,19 @@ def init_optim(
     """Initialize Optimizer and Scheduler.
 
     Args:
-        model (type[BaseModelClass]): _description_
-        optim (type[Optimizer] | Literal["SGD", "Adam", "AdamW"]): _description_
-        learning_rate (float): _description_
-        weight_decay (float): _description_
-        momentum (float): _description_
-        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
-        milestones (Iterable, optional): _description_. Defaults to ().
-        gamma (float, optional): _description_. Defaults to 0.3.
-        resume (str, optional): _description_. Defaults to None.
+        model (type[BaseModelClass]): Model to be optimized.
+        optim (type[Optimizer] | Literal["SGD", "Adam", "AdamW"]): Which optimizer to use
+        learning_rate (float): Learning rate for optimzation
+        weight_decay (float): Weight decay for optimizer
+        momentum (float): Momentum for optimizer
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        milestones (Iterable, optional): When to decay learning rate. Defaults to ().
+        gamma (float, optional): Multiplier for learning rate decay. Defaults to 0.3.
+        resume (str, optional): Path to model checkpoint to resume. Defaults to None.
 
 
     Returns:
-        tuple[Optimizer, _LRScheduler]: _description_
+        tuple[Optimizer, _LRScheduler]: Optimizer and scheduler for given model
     """
     # Select Optimiser
     if optim == "SGD":
@@ -206,7 +207,7 @@ def init_losses(
         robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
 
     Returns:
-        dict[str, tuple[str, type[torch.nn.Module]]]: _description_
+        dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
     """
     criterion_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
     for name, task in task_dict.items():
@@ -252,11 +253,11 @@ def init_normalizers(
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
-        resume (str, optional): _description_. Defaults to None.
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        resume (str, optional): Path to model checkpoint to resume. Defaults to None.
 
     Returns:
-        dict[str, Normalizer]: _description_
+        dict[str, Normalizer]: Dictionary of Normalizers for each task
     """
     if resume:
         checkpoint = torch.load(resume, map_location=device)
@@ -296,20 +297,22 @@ def train_ensemble(
     """Convenience method to train multiple models in serial.
 
     Args:
-        model_class (type[BaseModelClass]): _description_
-        model_name (str): _description_
-        run_id (int): _description_
-        ensemble_folds (int): _description_
-        epochs (int): _description_
-        train_set (Subset): _description_
-        val_set (Subset): _description_
-        log (bool): _description_
-        data_params (dict[str, Any]): _description_
-        setup_params (dict[str, Any]): _description_
-        restart_params (dict[str, Any]): _description_
-        model_params (dict[str, Any]): _description_
-        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): _description_
-        patience (int, optional): _description_. Defaults to None.
+        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_name (str): String describing the model.
+        run_id (int): Unique identifier of the model run.
+        ensemble_folds (int): Number of members in ensemble.
+        epochs (int): Number of epochs to train for.
+        train_set (Subset): Dataloader containing training data.
+        val_set (Subset): Dataloader containing validation data.
+        log (bool): Whether to log intermediate metrics to tensorboard.
+        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        setup_params (dict[str, Any]): Dictionary of setup parameters
+        restart_params (dict[str, Any]): Dictionary of restart parameters
+        model_params (dict[str, Any]): Dictionary of model parameters
+        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): Map of target names
+            to loss functions.
+        patience (int, optional): Maximum number of epochs without improvement
+            when early stopping. Defaults to None.
     """
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
@@ -424,20 +427,25 @@ def results_multitask(  # noqa: C901
     """Take an ensemble of models and evaluate their performance on the test set.
 
     Args:
-        model_name (str): _description_
-        run_id (int): _description_
-        ensemble_folds (int): _description_
-        test_set (Subset): _description_
-        data_params (dict[str, Any]): _description_
-        robust (bool): Whether to estimate standard deviation for use in a robust loss function
-        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        device (type[torch.device] | Literal["cuda", "cpu"]): _description_
-        eval_type (str, optional): _description_. Defaults to "checkpoint".
-        print_results (bool, optional): _description_. Defaults to True.
-        save_results (bool, optional): _description_. Defaults to True.
+        model_name (str): String describing the model.
+        run_id (int): Unique identifier of the model run.
+        ensemble_folds (int): Number of members in ensemble.
+        test_set (Subset): Dataloader containing testing data.
+        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        robust (bool): Whether to estimate standard deviation for use in a robust
+            loss function.
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or
+            "classification".
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        eval_type (str, optional): Whether to use final or early-stopping checkpoints.
+            Defaults to "checkpoint".
+        print_results (bool, optional): Whether to print out summary metrics.
+            Defaults to True.
+        save_results (bool, optional): Whether to save results dict. Defaults to True.
 
     Returns:
-        dict[str, dict[str, list | np.ndarray]]: _description_
+        dict[str, dict[str, list | np.ndarray]]: Dictionary of predicted results for each
+            task.
     """
     if not (print_results or save_results):
         raise AssertionError(
