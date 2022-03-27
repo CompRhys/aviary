@@ -114,7 +114,6 @@ def test_roost_clf():
     }
 
     os.makedirs(f"models/{model_name}", exist_ok=True)
-    os.makedirs(f"results/{model_name}", exist_ok=True)
 
     train_ensemble(
         model_class=Roost,

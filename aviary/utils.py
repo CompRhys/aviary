@@ -17,6 +17,8 @@ from sklearn.metrics import (
 )
 from torch import LongTensor, Tensor
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
+from torch.optim import SGD, Adam, AdamW, Optimizer
+from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
 from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
@@ -31,21 +33,26 @@ else:
 
 def init_model(
     model_class: type[BaseModelClass],
-    model_name: str,
     model_params: dict[str, Any],
-    run_id: int,
-    optim: torch.optim.Optimizer,
-    learning_rate: float,
-    weight_decay: float,
-    momentum: float,
     device: type[torch.device] | Literal["cuda", "cpu"],
-    milestones: Iterable = [],
-    gamma: float = 0.3,
     resume: str = None,
     fine_tune: str = None,
     transfer: str = None,
-) -> BaseModelClass:
+    **kwargs,
+) -> type[BaseModelClass]:
+    """Initialise a model
 
+    Args:
+        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
+        resume (str, optional): Path to model checkpoint to resume. Defaults to None.
+        fine_tune (str, optional): Path to model checkpoint to fine tune. Defaults to None.
+        transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
+
+    Returns:
+        type[BaseModelClass]: An initialised model of type model_class
+    """
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
 
@@ -63,22 +70,21 @@ def init_model(
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        # model.trunk_nn.reset_parameters()
-        # for m in model.output_nns:
-        #     m.reset_parameters()
-
-        assert model.model_params["robust"] == robust, (
-            "cannot fine-tune "
-            "between tasks with different numbers of outputs - use transfer "
-            "option instead"
-        )
-        assert model.model_params["n_targets"] == n_targets, (
-            "cannot fine-tune "
-            "between tasks with different numbers of outputs - use transfer "
-            "option instead"
-        )
+        if model.model_params["robust"] != robust:
+            raise AssertionError(
+                "cannot fine-tune "
+                "between tasks with different numbers of outputs - use transfer "
+                "option instead"
+            )
+        if model.model_params["n_targets"] != n_targets:
+            raise AssertionError(
+                "cannot fine-tune "
+                "between tasks with different numbers of outputs - use transfer "
+                "option instead"
+            )
 
     elif transfer is not None:
+        # TODO rewrite/remove transfer option as it is not used/doesn't work as detailed
         print(
             f"Use material_nn from '{transfer}' as a starting point and "
             "train the output_nn from scratch"
@@ -96,8 +102,6 @@ def init_model(
         model.load_state_dict(model_dict)
 
     elif resume:
-        # TODO work out how to ensure that we are using the same optimizer
-        # when resuming such that the state dictionaries do not clash.
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
@@ -115,34 +119,6 @@ def init_model(
 
         model.to(device)
 
-    # Select Optimiser
-    if optim == "SGD":
-        optimizer = torch.optim.SGD(
-            model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay,
-            momentum=momentum,
-        )
-    elif optim == "Adam":
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
-        )
-    elif optim == "AdamW":
-        optimizer = torch.optim.AdamW(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
-        )
-    else:
-        raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
-
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=milestones, gamma=gamma
-    )
-
-    if resume:
-        # NOTE the user could change the optimizer when resuming creating a bug
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        scheduler.load_state_dict(checkpoint["scheduler"])
-
     print(f"Total Number of Trainable Parameters: {model.num_params:,}")
 
     # TODO parallelise the code over multiple GPUs. Currently DataParallel
@@ -154,15 +130,85 @@ def init_model(
 
     model.to(device)
 
-    return model, optimizer, scheduler
+    return model
+
+
+def init_optim(
+    model: type[BaseModelClass],
+    optim: type[Optimizer] | Literal["SGD", "Adam", "AdamW"],
+    learning_rate: float,
+    weight_decay: float,
+    momentum: float,
+    device: type[torch.device] | Literal["cuda", "cpu"],
+    milestones: Iterable = (),
+    gamma: float = 0.3,
+    resume: str = None,
+    **kwargs,
+) -> tuple[Optimizer, _LRScheduler]:
+    """Initialize Optimizer and Scheduler.
+
+    Args:
+        model (type[BaseModelClass]): Model to be optimized.
+        optim (type[Optimizer] | Literal["SGD", "Adam", "AdamW"]): Which optimizer to use
+        learning_rate (float): Learning rate for optimzation
+        weight_decay (float): Weight decay for optimizer
+        momentum (float): Momentum for optimizer
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        milestones (Iterable, optional): When to decay learning rate. Defaults to ().
+        gamma (float, optional): Multiplier for learning rate decay. Defaults to 0.3.
+        resume (str, optional): Path to model checkpoint to resume. Defaults to None.
+
+
+    Returns:
+        tuple[Optimizer, _LRScheduler]: Optimizer and scheduler for given model
+    """
+    # Select Optimiser
+    if optim == "SGD":
+        optimizer = SGD(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            momentum=momentum,
+        )
+    elif optim == "Adam":
+        optimizer = Adam(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+    elif optim == "AdamW":
+        optimizer = AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+    else:
+        raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
+
+    scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+
+    if resume:
+        # TODO work out how to ensure that we are using the same optimizer
+        # when resuming such that the state dictionaries do not clash.
+        # TODO breaking the function apart means we load the checkpoint twice.
+        checkpoint = torch.load(resume, map_location=device)
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        scheduler.load_state_dict(checkpoint["scheduler"])
+
+    return optimizer, scheduler
 
 
 def init_losses(
     task_dict: dict[str, TaskType],
-    loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
+    loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
-) -> dict[str, tuple[str, type[torch.nn.Module]]]:  # noqa: C901
+) -> dict[str, tuple[str, type[torch.nn.Module]]]:
+    """_summary_
 
+    Args:
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): Map of target names to loss functions.
+        robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
+
+    Returns:
+        dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
+    """
     criterion_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
@@ -174,23 +220,6 @@ def init_losses(
                 criterion_dict[name] = (task, NLLLoss())
             else:
                 criterion_dict[name] = (task, CrossEntropyLoss())
-
-        if task == "mask":
-            if loss_dict[name] != "Brier":
-                raise NameError("Only Brier loss allowed for masking tasks")
-
-            if robust:
-                criterion_dict[name] = (task, MSELoss())
-            else:
-                criterion_dict[name] = (task, MSELoss())
-
-        elif task == "dist":
-            if loss_dict[name] == "L1":
-                criterion_dict[name] = (task, L1Loss())
-            elif loss_dict[name] == "L2":
-                criterion_dict[name] = (task, MSELoss())
-            else:
-                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
 
         elif task == "regression":
             if robust:
@@ -220,6 +249,16 @@ def init_normalizers(
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
 ) -> dict[str, Normalizer]:
+    """Initialise a Normalizer to scale the output targets
+
+    Args:
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        resume (str, optional): Path to model checkpoint to resume. Defaults to None.
+
+    Returns:
+        dict[str, Normalizer]: Dictionary of Normalizers for each task
+    """
     if resume:
         checkpoint = torch.load(resume, map_location=device)
         normalizer_dict = {}
@@ -252,11 +291,28 @@ def train_ensemble(
     setup_params: dict[str, Any],
     restart_params: dict[str, Any],
     model_params: dict[str, Any],
-    loss_dict: dict[str, Literal["L1", "L2", "CSE", "Brier"]],
+    loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
     patience: int = None,
 ) -> None:
-    """
-    Train multiple models
+    """Convenience method to train multiple models in serial.
+
+    Args:
+        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_name (str): String describing the model.
+        run_id (int): Unique identifier of the model run.
+        ensemble_folds (int): Number of members in ensemble.
+        epochs (int): Number of epochs to train for.
+        train_set (Subset): Dataloader containing training data.
+        val_set (Subset): Dataloader containing validation data.
+        log (bool): Whether to log intermediate metrics to tensorboard.
+        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        setup_params (dict[str, Any]): Dictionary of setup parameters
+        restart_params (dict[str, Any]): Dictionary of restart parameters
+        model_params (dict[str, Any]): Dictionary of model parameters
+        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): Map of target names
+            to loss functions.
+        patience (int, optional): Maximum number of epochs without improvement
+            when early stopping. Defaults to None.
     """
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
@@ -273,11 +329,14 @@ def train_ensemble(
         if ensemble_folds == 1:
             j = run_id
 
-        model, optimizer, scheduler = init_model(
+        model = init_model(
             model_class=model_class,
-            model_name=model_name,
             model_params=model_params,
-            run_id=j,
+            **setup_params,
+            **restart_params,
+        )
+        optimizer, scheduler = init_optim(
+            model,
             **setup_params,
             **restart_params,
         )
@@ -289,7 +348,7 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                sample_target = torch.Tensor(
+                sample_target = Tensor(
                     train_set.dataset.df[target].iloc[train_set.indices].values
                 )
                 if not restart_params["resume"]:
@@ -349,6 +408,7 @@ def train_ensemble(
         )
 
 
+# TODO find a better name for this function @janosh
 @torch.no_grad()
 def results_multitask(  # noqa: C901
     model_class: type[BaseModelClass],
@@ -364,13 +424,34 @@ def results_multitask(  # noqa: C901
     print_results: bool = True,
     save_results: bool = True,
 ) -> dict[str, dict[str, list | np.ndarray]]:
+    """Take an ensemble of models and evaluate their performance on the test set.
+
+    Args:
+        model_name (str): String describing the model.
+        run_id (int): Unique identifier of the model run.
+        ensemble_folds (int): Number of members in ensemble.
+        test_set (Subset): Dataloader containing testing data.
+        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        robust (bool): Whether to estimate standard deviation for use in a robust
+            loss function.
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or
+            "classification".
+        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        eval_type (str, optional): Whether to use final or early-stopping checkpoints.
+            Defaults to "checkpoint".
+        print_results (bool, optional): Whether to print out summary metrics.
+            Defaults to True.
+        save_results (bool, optional): Whether to save results dict. Defaults to True.
+
+    Returns:
+        dict[str, dict[str, list | np.ndarray]]: Dictionary of predicted results for each
+            task.
     """
-    take an ensemble of models and evaluate their performance on the test set
-    """
-    assert print_results or save_results, (
-        "Evaluating Model pointless if both 'print_results' and "
-        "'save_results' are False."
-    )
+    if not (print_results or save_results):
+        raise AssertionError(
+            "Evaluating Model pointless if both 'print_results' and "
+            "'save_results' are False."
+        )
 
     print(
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
@@ -403,18 +484,19 @@ def results_multitask(  # noqa: C901
             resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
             print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
-        assert os.path.isfile(resume), f"no checkpoint found at '{resume}'"
+        if not os.path.isfile(resume):
+            raise AssertionError(f"no checkpoint found at '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        assert (
-            checkpoint["model_params"]["robust"] == robust
-        ), f"robustness of checkpoint '{resume}' is not {robust}"
+        if checkpoint["model_params"]["robust"] != robust:
+            raise AssertionError(f"robustness of checkpoint '{resume}' is not {robust}")
 
         chkpt_task_dict = checkpoint["model_params"]["task_dict"]
-        assert chkpt_task_dict == task_dict, (
-            f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
-            f"task_dict {task_dict}"
-        )
+        if chkpt_task_dict != task_dict:
+            raise AssertionError(
+                f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
+                f"task_dict {task_dict}"
+            )
 
         model = model_class(**checkpoint["model_params"], device=device)
         model.to(device)
@@ -631,13 +713,13 @@ def print_metrics_classification(
 def save_results_dict(
     ids: dict[str, list[str | int]], results_dict: dict[str, Any], model_name: str
 ) -> None:
-    """save the results to a file after model evaluation
+    """Save the results to a file after model evaluation.
 
     Args:
-        idx (dict[str, list[str | int]]): Each key is the name of an identifier (e.g.
+        ids (dict[str, list[str  |  int]]): ): Each key is the name of an identifier (e.g.
             material ID, composition, ...) and its value a list of IDs.
-        results_dict ({name: {col: data}}): nested dictionary of results
-        model_name (str): The name given the model via the --model-name flag.
+        results_dict (dict[str, Any]): ): nested dictionary of results {name: {col: data}}
+        model_name (str): ): The name given the model via the --model-name flag.
     """
     results = {}
 
