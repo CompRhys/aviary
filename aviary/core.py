@@ -28,9 +28,7 @@ TaskType = Literal["regression", "classification"]
 
 
 class BaseModelClass(nn.Module, ABC):
-    """
-    A base class for models.
-    """
+    """A base class for models."""
 
     def __init__(
         self,
@@ -40,13 +38,15 @@ class BaseModelClass(nn.Module, ABC):
         epoch: int = 1,
         best_val_scores: dict[str, float] = None,
     ) -> None:
-        """
+        """Store core model parameters.
+
         Args:
-            task (str): "regression" or "classification"
-            robust (bool): whether an aleatoric loss function is being used
-            device (pytorch.device): the device the model will be run on
-            epoch (int): the epoch model training will begin/resume from
-            best_val_score (float): validation score to use for early stopping
+            task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
+            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
+            best_val_scores (dict[str, float], optional): Validation score to use for early
+                stopping. Defaults to None.
         """
         super().__init__()
         self.task_dict = task_dict
@@ -75,15 +75,26 @@ class BaseModelClass(nn.Module, ABC):
         verbose: bool = True,
         patience: int = None,
     ) -> None:
-        """
-        Args:
+        """Convenience class to carry out training loop.
 
+        Args:
+            train_generator (DataLoader): Dataloader containing training data.
+            val_generator (DataLoader): Dataloader containing validation data.
+            optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
+            scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
+                Optimizer during training.
+            epochs (int): Number of epochs to train for.
+            criterion_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
+            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
+                to each task.
+            model_name (str): String describing the model.
+            run_id (int): Unique identifier of the model run.
+            checkpoint (bool, optional): Whether to save model checkpoints. Defaults to True.
+            writer (SummaryWriter, optional): TensorBoard writer to save logs in. Defaults to None.
+            verbose (bool, optional): Whether to print out intermediate results. Defaults to True.
+            patience (int, optional): Patience for early stopping. Defaults to None.
         """
         start_epoch = self.epoch
-
-        # if writer is not None:
-        #     for name, param in self.named_parameters():
-        #         writer.add_histogram(name, param.clone().cpu().data.numpy(), start_epoch)
 
         try:
             for epoch in range(start_epoch, start_epoch + epochs):
@@ -106,12 +117,10 @@ class BaseModelClass(nn.Module, ABC):
                 if verbose:
                     print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
                     for task, metrics in t_metrics.items():
-                        print(
-                            f"Train \t\t: {task} - "
-                            + "".join(
-                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
-                            )
+                        metrics_str = "".join(
+                            [f"{key} {val:.3f}\t" for key, val in metrics.items()]
                         )
+                        print(f"Train \t\t: {task} - {metrics_str}")
 
                 # Validation
                 if val_generator is not None:
@@ -134,15 +143,10 @@ class BaseModelClass(nn.Module, ABC):
 
                     if verbose:
                         for task, metrics in v_metrics.items():
-                            print(
-                                f"Validation \t: {task} - "
-                                + "".join(
-                                    [
-                                        f"{key} {val:.3f}\t"
-                                        for key, val in metrics.items()
-                                    ]
-                                )
+                            metrics_str = "".join(
+                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
                             )
+                            print(f"Validation \t: {task} - {metrics_str}")
 
                     # TODO test all tasks to see if they are best,
                     # save a best model if any is best.
@@ -167,12 +171,11 @@ class BaseModelClass(nn.Module, ABC):
                         self.es_patience = 0
                     else:
                         self.es_patience += 1
-                        if patience:
-                            if self.es_patience > patience:
-                                print(
-                                    "Stopping early due to lack of improvement on Validation set"
-                                )
-                                break
+                        if patience and self.es_patience > patience:
+                            print(
+                                "Stopping early due to lack of improvement on Validation set"
+                            )
+                            break
 
                 if checkpoint:
                     checkpoint_dict = {
@@ -215,8 +218,22 @@ class BaseModelClass(nn.Module, ABC):
         action: Literal["train", "val"] = "train",
         verbose: bool = False,
     ):
-        """
-        evaluate the model
+        """Evaluate the model.
+
+        Args:
+            generator (DataLoader): PyTorch Dataloader with the same data format used in fit().
+            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
+                to apply for each task.
+            optimizer (torch.optim.Optimizer): PyTorch Optimizer
+            normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
+                to each task.
+            action (Literal["train", "val"], optional): Whether to track gradients depending on
+                whether we are carrying out a training or validation pass. Defaults to "train".
+            verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
+
+        Returns:
+            dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], np.ndarray]]: nested
+                dictionary of metrics for each task.
         """
         if action == "val":
             self.eval()
@@ -284,38 +301,6 @@ class BaseModelClass(nn.Module, ABC):
                     metrics[name]["F1"].append(
                         f1_score(target, np.argmax(logits, axis=1), average="weighted")
                     )
-
-                elif task == "dist":
-                    loss = criterion(output, target)
-
-                    pred = output.data.cpu()
-                    target = target.data.cpu()
-
-                    metrics[name]["MAE"].append((pred - target).abs().mean())
-                    metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
-
-                elif task == "mask":
-                    logits = softmax(output, dim=-1)
-                    loss = criterion(logits, target)
-
-                    logits = logits.data.cpu()
-                    target = target.data.cpu()
-
-                    # classification metrics from sklearn need numpy arrays
-                    # NOTE these metrics are misleading on disordered structures
-                    metrics[name]["Acc"].append(
-                        accuracy_score(
-                            np.argmax(target, axis=1), np.argmax(logits, axis=1)
-                        )
-                    )
-                    metrics[name]["F1"].append(
-                        f1_score(
-                            np.argmax(target, axis=1),
-                            np.argmax(logits, axis=1),
-                            average="weighted",
-                        )
-                    )
-
                 else:
                     raise ValueError(f"invalid task: {task}")
 
@@ -342,8 +327,17 @@ class BaseModelClass(nn.Module, ABC):
     def predict(
         self, generator: DataLoader, verbose: bool = False
     ) -> tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]:
-        """
-        evaluate the model
+        """Make model predictions.
+
+        Args:
+            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
+
+        Returns:
+            tuple containing:
+            - tuple[Tensor, ...]: Tuple of target Tensors
+            - tuple[Tensor, ...]: Tuple of prediction Tensors
+            - tuple[str, ...]: Tuple of identifiers
         """
         test_ids = []
         test_targets = []
@@ -387,13 +381,14 @@ class BaseModelClass(nn.Module, ABC):
         this runs only the message-passing part of the model without the ResNet.
 
         Args:
-            generator (DataLoader): PyTorch loader with the same data format used in fit()
+            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
 
         Returns:
             np.array: 2d array of features
         """
         err_msg = f"{self} needs to be fitted before it can be used for featurisation"
-        assert self.epoch > 0, err_msg
+        if self.epoch <= 0:
+            raise AssertionError(err_msg)
 
         self.eval()  # ensure model is in evaluation mode
         features = []
@@ -409,17 +404,20 @@ class BaseModelClass(nn.Module, ABC):
 
     @abstractmethod
     def forward(self, *x):
-        """
-        Forward pass through the model. Needs to be implemented in any derived
-        model class.
+        """Forward pass through the model. Needs to be implemented in any derived model class.
+
+        Raises:
+            NotImplementedError: Raise error if child class doesn't implement forward
         """
         raise NotImplementedError("forward() is not defined!")
 
     @property
     def num_params(self) -> int:
+        """Return number of trainable parameters in model."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def __repr__(self) -> str:
+        """Return unambiguous string representation of model."""
         name = self._get_name()
         n_params, n_epochs = self.num_params, self.epoch
         return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
@@ -429,32 +427,69 @@ class Normalizer:
     """Normalize a Tensor and restore it later."""
 
     def __init__(self) -> None:
-        """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.tensor(0)
         self.std = torch.tensor(1)
 
     def fit(self, tensor: Tensor, dim: int = 0, keepdim: bool = False) -> None:
-        """tensor is taken as a sample to calculate the mean and std"""
+        """Compute the mean and standard deviation of the given tensor.
+
+        Args:
+            tensor (Tensor): Tensor to determine the mean and standard deviation over.
+            dim (int, optional): Which dimension to take mean and standard deviation over. Defaults to 0.
+            keepdim (bool, optional): Whether to keep the reduced dimension in Tensor. Defaults to False.
+        """
         self.mean = torch.mean(tensor, dim, keepdim)
         self.std = torch.std(tensor, dim, keepdim)
 
     def norm(self, tensor: Tensor) -> Tensor:
+        """Normalize a Tensor
+
+        Args:
+            tensor (Tensor): Tensor to be Normalized
+
+        Returns:
+            Tensor: Normalized Tensor
+        """
         return (tensor - self.mean) / self.std
 
     def denorm(self, normed_tensor: Tensor) -> Tensor:
+        """Restore normalizes Tensor
+
+        Args:
+            tensor (Tensor): Tensor to be restored
+
+        Returns:
+            Tensor: Restored Tensor
+        """
         return normed_tensor * self.std + self.mean
 
     def state_dict(self) -> dict[str, Tensor]:
+        """Dictionary storing Normalizer parameters
+
+        Returns:
+            dict[str, Tensor]: Dictionary storing Normalizer parameters.
+        """
         return {"mean": self.mean, "std": self.std}
 
     def load_state_dict(self, state_dict: dict[str, Tensor]) -> None:
-        self.mean = state_dict["mean"]
-        self.std = state_dict["std"]
+        """Overwrite Normalizer parameters given a new state_dict
+
+        Args:
+            state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
+        """
         self.mean = state_dict["mean"].cpu()
         self.std = state_dict["std"].cpu()
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Tensor]) -> Normalizer:
+        """Create a new Normalizer given a state_dict
+
+        Args:
+            state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
+
+        Returns:
+            Normalizer
+        """
         instance = cls()
         instance.mean = state_dict["mean"].cpu()
         instance.std = state_dict["std"].cpu()
@@ -465,8 +500,13 @@ class Normalizer:
 def save_checkpoint(
     state: dict[str, Any], is_best: bool, model_name: str, run_id: int
 ) -> None:
-    """
-    Saves a checkpoint and overwrites the best model when is_best = True
+    """Saves a checkpoint and overwrites the best model when is_best = True.
+
+    Args:
+        state (dict[str, Any]): Dictionary containing model parameters.
+        is_best (bool): Whether the model is the best seen according to validation set.
+        model_name (str): String describing the model.
+        run_id (int): Unique identifier of the model run.
     """
     checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
     best = f"models/{model_name}/best-r{run_id}.pth.tar"
@@ -477,9 +517,16 @@ def save_checkpoint(
 
 
 def sampled_softmax(pre_logits: Tensor, log_std: Tensor, samples: int = 10) -> Tensor:
-    """
-    Draw samples from Gaussian distributed pre-logits and use these to estimate
+    """Draw samples from Gaussian distributed pre-logits and use these to estimate
     a mean and aleatoric uncertainty.
+
+    Args:
+        pre_logits (Tensor): Expected logits before softmax.
+        log_std (Tensor): Deviation in logits before softmax.
+        samples (int, optional): Number of samples to take. Defaults to 10.
+
+    Returns:
+        Tensor: Averaged logits sampled from pre-logits
     """
     # NOTE here as we do not risk dividing by zero should we really be
     # predicting log_std or is there another way to deal with negative numbers?

@@ -57,20 +57,17 @@ remove_digits = str.maketrans("", "", digits)
 
 
 def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
-    """get aflow prototype label for pymatgen Structure
+    """Get AFLOW prototype label for pymatgen Structure
 
-    args:
-        struct (Structure): pymatgen Structure object
-
-    returns:
-        str: aflow prototype label
+    Returns:
+        str: AFLOW prototype label
     """
     if aflow_executable is None:
         aflow_executable = which("aflow")
 
     if which(aflow_executable or "") is None:
         raise FileNotFoundError(
-            "aflow could not found, please specify path to its binary with "
+            "AFLOW could not found, please specify path to its binary with "
             "aflow_executable='...'"
         )
 
@@ -79,7 +76,12 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
     cmd = f"{aflow_executable} --prototype --print=json cat"
 
     output = subprocess.run(
-        cmd, input=poscar.get_string(), text=True, capture_output=True, shell=True
+        cmd,
+        input=poscar.get_string(),
+        text=True,
+        capture_output=True,
+        shell=True,
+        check=True,
     )
 
     aflow_proto = json.loads(output.stdout)
@@ -114,13 +116,13 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
 
 
 def get_aflow_label_spglib(struct: Structure) -> str:
-    """get aflow prototype label for pymatgen Structure
+    """Get AFLOW prototype label for pymatgen Structure.
 
-    args:
+    Args:
         struct (Structure): pymatgen Structure object
 
-    returns:
-        aflow prototype label
+    Returns:
+        str: AFLOW prototype label
     """
     spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
     aflow = get_aflow_label_from_spga(spga)
@@ -137,13 +139,13 @@ def get_aflow_label_spglib(struct: Structure) -> str:
 
 
 def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
-    """get aflow prototype label for pymatgen SpacegroupAnalyzer
+    """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
         spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object
 
     Returns:
-        aflow prototype labels
+        str: AFLOW prototype labels
     """
     spg_no = spga.get_space_group_number()
     sym_struct = spga.get_symmetrized_structure()
@@ -175,18 +177,18 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
     cry_sys = spga.get_crystal_system()
     spg_sym = spga.get_space_group_symbol()
     centering = "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
-    n_conv = len(spga._space_group_data["std_types"])
-    pearson = f"{cry_sys_dict[cry_sys]}{centering}{n_conv}"
+    num_sites_conventional = len(spga.get_symmetry_dataset()["std_types"])
+    pearson = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
 
-    prototype_form = prototype_formula(spga._structure.composition)
+    prototype_form = prototype_formula(sym_struct.composition)
 
     aflow_label = (
         f"{prototype_form}_{pearson}_{spg_no}_{canonical}:"
-        f"{spga._structure.composition.chemical_system}"
+        f"{sym_struct.composition.chemical_system}"
     )
 
     eqi_comp = Composition(elem_dict)
-    if not eqi_comp.reduced_formula == spga._structure.composition.reduced_formula:
+    if not eqi_comp.reduced_formula == sym_struct.composition.reduced_formula:
         return f"Invalid WP Multiplicities - {aflow_label}"
 
     return aflow_label
@@ -197,8 +199,7 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
     based on the alphabetical weight of equivalent choices of origin.
 
     Args:
-        elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff
-            positions
+        elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff positions
         spg_no (int): International space group number.
 
     Returns:
@@ -225,6 +226,16 @@ def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
 
 
 def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
+    """_summary_
+
+    Args:
+        wyks (str): Wyckoff position substring from AFLOW-style prototype label
+
+    Returns:
+        tuple: containing
+        - str: sorted Wyckoff position substring for AFLOW-style prototype label
+        - int: integer score to rank order when canonicalising
+    """
     score = 0
     sorted_el_wyks = []
     for el_wyks in wyks.split("_"):
@@ -247,10 +258,15 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
 
 
 def prototype_formula(composition: Composition) -> str:
-    """
-    An anonymized formula. Unique species are arranged in alphabetical order
+    """An anonymized formula. Unique species are arranged in alphabetical order
     and assigned ascending alphabets. This format is used in the aflow structure
     prototype labelling scheme.
+
+    Args:
+        composition (Composition): Pymatgen Composition to process
+
+    Returns:
+        str: anonymized formula where the species are in alphabetical order
     """
     reduced = composition.element_composition
     if all(x == int(x) for x in composition.values()):
@@ -271,7 +287,14 @@ def prototype_formula(composition: Composition) -> str:
 
 
 def count_wyks(aflow_label: str) -> int:
-    """Count number of Wyckoff positions in Wyckoff representation"""
+    """Count number of Wyckoff positions in Wyckoff representation.
+
+    Args:
+        aflow_label (str): AFLOW-style prototype label with appended chemical system
+
+    Returns:
+        int: number of distinct Wyckoff positions
+    """
     num_wyk = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -291,7 +314,14 @@ def count_wyks(aflow_label: str) -> int:
 
 
 def count_params(aflow_label: str) -> int:
-    """Count number of parameters coarse-grained in Wyckoff representation"""
+    """Count number of parameters coarse-grained in Wyckoff representation.
+
+    Args:
+        aflow_label (str): AFLOW-style prototype label with appended chemical system
+
+    Returns:
+        int: Number of free-parameters in given prototype
+    """
     num_params = 0
 
     aflow_label, _ = aflow_label.split(":")
@@ -315,10 +345,17 @@ def count_params(aflow_label: str) -> int:
     return int(num_params)
 
 
-def get_isopointal_proto_from_aflow(aflow: str) -> str:
-    """Get a canonicalised string for the prototype"""
-    aflow, _ = aflow.split(":")
-    anom, pearson, spg, *wyckoffs = aflow.split("_")
+def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
+    """Get a canonicalised string for the prototype.
+
+    Args:
+        aflow_label (str): AFLOW-style prototype label with appended chemical system
+
+    Returns:
+        str: Canonicalised AFLOW-style prototype label with appended chemical system
+    """
+    aflow_label, _ = aflow_label.split(":")
+    anom, pearson, spg, *wyckoffs = aflow_label.split("_")
 
     # TODO: this really needs some comments to explain what's going on - @janosh
     subst = r"\g<1>1"
@@ -327,9 +364,7 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
     counts = [int(x) for x in anom_list[1::2]]
     dummy = anom_list[0::2]
 
-    s_counts, s_wyks_tup = list(
-        zip(*[(x, y) for x, y in sorted(zip(counts, wyckoffs))])
-    )
+    s_counts, s_wyks_tup = list(zip(*list(sorted(zip(counts, wyckoffs)))))
     subst = r"1\g<1>"
     s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks_tup))
     c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])
@@ -337,38 +372,37 @@ def get_isopointal_proto_from_aflow(aflow: str) -> str:
     if len(s_counts) == len(set(s_counts)):
         cs_wyks = canonicalise_elem_wyks(s_wyks, int(spg))
         return "_".join((c_anom, pearson, spg, cs_wyks))
-    else:
-        # credit Stef: https://stackoverflow.com/a/70126643/5517459
-        valid_permutations = [
-            list(map(itemgetter(1), chain.from_iterable(p)))
-            for p in product(
-                *list(
-                    permutations(g)
-                    for _, g in groupby(
-                        sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
-                    )
+    # credit Stef: https://stackoverflow.com/a/70126643/5517459
+    valid_permutations = [
+        list(map(itemgetter(1), chain.from_iterable(p)))
+        for p in product(
+            *[
+                permutations(g)
+                for _, g in groupby(
+                    sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
                 )
-            )
-        ]
+            ]
+        )
+    ]
 
-        isopointal: list[str] = []
+    isopointal: list[str] = []
 
-        for wyks_list in valid_permutations:
-            for trans in relab_dict[str(spg)]:
-                t = str.maketrans(trans)
-                isopointal.append("_".join(wyks_list).translate(t))
+    for wyks_list in valid_permutations:
+        for trans in relab_dict[str(spg)]:
+            t = str.maketrans(trans)
+            isopointal.append("_".join(wyks_list).translate(t))
 
-        isopointal = list(set(isopointal))
+    isopointal = list(set(isopointal))
 
-        scores = []
-        sorted_iso = []
-        for wyks in isopointal:
-            sorted_el_wyks, score = sort_and_score_wyks(wyks)
-            scores.append(score)
-            sorted_iso.append(sorted_el_wyks)
+    scores = []
+    sorted_iso = []
+    for wyks in isopointal:
+        sorted_el_wyks, score = sort_and_score_wyks(wyks)
+        scores.append(score)
+        sorted_iso.append(sorted_el_wyks)
 
-        canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))
+    canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))
 
-        # TODO: how to tie break when the scores are the same?
-        # currently done by alphabetical
-        return "_".join((c_anom, pearson, spg, canonical[0][1]))
+    # TODO: how to tie break when the scores are the same?
+    # currently done by alphabetical
+    return "_".join((c_anom, pearson, spg, canonical[0][1]))

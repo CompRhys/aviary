@@ -5,23 +5,26 @@ import functools
 import json
 from itertools import groupby
 from os.path import abspath, dirname, exists, join
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
 import torch
 from pymatgen.core import Structure
+from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 
 class CrystalGraphData(Dataset):
+    """Dataset class for the CGCNN structure model."""
+
     def __init__(
         self,
         df: pd.DataFrame,
         task_dict: dict[str, str],
         elem_emb: str = "cgcnn92",
-        inputs: Sequence[str] = ["lattice", "sites"],
-        identifiers: Sequence[str] = ["material_id", "composition"],
+        inputs: Sequence[str] = ("lattice", "sites"),
+        identifiers: Sequence[str] = ("material_id", "composition"),
         radius: float = 5,
         max_num_nbr: int = 12,
         dmin: float = 0,
@@ -44,12 +47,14 @@ class CrystalGraphData(Dataset):
             dmin (float, optional): minimum distance in Gaussian basis. Defaults to 0.
             step (float, optional): increment size of Gaussian basis. Defaults to 0.2.
         """
-        assert len(identifiers) == 2, "Two identifiers are required"
-        assert len(inputs) == 2, "One input column required are required"
+        if len(identifiers) != 2:
+            raise AssertionError("Two identifiers are required")
+        if len(inputs) != 2:
+            raise AssertionError("One input column required are required")
 
-        self.inputs = inputs
+        self.inputs = list(inputs)
         self.task_dict = task_dict
-        self.identifiers = identifiers
+        self.identifiers = list(identifiers)
 
         self.radius = radius
         self.max_num_nbr = max_num_nbr
@@ -59,7 +64,8 @@ class CrystalGraphData(Dataset):
                 dirname(abspath(__file__)), f"../embeddings/element/{elem_emb}.json"
             )
         else:
-            assert exists(elem_emb), f"{elem_emb} does not exist!"
+            if not exists(elem_emb):
+                raise AssertionError(f"{elem_emb} does not exist!")
 
         with open(elem_emb) as f:
             self.elem_features = json.load(f)
@@ -78,21 +84,29 @@ class CrystalGraphData(Dataset):
         self._pre_check()
 
         self.n_targets = []
-        for target in self.task_dict:
-            if self.task_dict[target] == "regression":
+        for target, task_type in self.task_dict.items():
+            if task_type == "regression":
                 self.n_targets.append(1)
-            elif self.task == "classification":
+            elif task_type == "classification":
                 n_classes = np.max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
 
-    def _get_nbr_data(self, crystal):
-        """get neighbours for every site
+    def _get_nbr_data(
+        self, crystal: Structure
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get neighbours for every site.
 
         Args:
-            crystal ([Structure]): pymatgen structure to get neighbours for
+            crystal (Structure): pymatgen Structure to get neighbours for
+
+        Returns:
+            tuple containing:
+            - np.ndarray: Site indices
+            - np.ndarray: Neighbour indices
+            - np.ndarray: Distances between sites and neighbours
         """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
             self.radius, numerical_tol=1e-8
@@ -113,7 +127,7 @@ class CrystalGraphData(Dataset):
 
         return self_idx, nbr_idx, nbr_dist
 
-    def _pre_check(self):
+    def _pre_check(self) -> None:
         """Check that none of the structures have isolated atoms."""
         print("Precheck that all structures are valid")
         all_isolated = []
@@ -129,7 +143,7 @@ class CrystalGraphData(Dataset):
             elif set(self_idx) != set(range(crystal.num_sites)):
                 some_isolated.append(cif_id)
 
-        if not (all_isolated == some_isolated == []):
+        if not all_isolated == some_isolated == []:
             # drop the data points that do not give rise to dense crystal graphs
             isolated = {*all_isolated, *some_isolated}  # set union
             self.df = self.df[~self.df["material_id"].isin(isolated)]
@@ -138,7 +152,18 @@ class CrystalGraphData(Dataset):
             print(f"these structure have some isolated atoms: {some_isolated}")
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
+        """Get an entry out of the Dataset
+
+        Args:
+            idx (int): index of entry in Dataset
+
+        Returns:
+            tuple containing:
+            - tuple[Tensor, Tensor, LongTensor, LongTensor]: CGCNN model inputs
+            - list[Tensor | LongTensor]: regression or classification targets
+            - list[str | int]: identifiers like material_id, composition
+        """
         # NOTE sites must be given in fractional coordinates
         df_idx = self.df.iloc[idx]
         crystal = df_idx["Structure_obj"]
@@ -158,108 +183,60 @@ class CrystalGraphData(Dataset):
         # # # neighbours
         self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
-        assert len(self_idx), f"All atoms in {cry_ids} are isolated"
-        assert len(nbr_idx), f"This should not be triggered but was for {cry_ids}"
-        assert set(self_idx) == set(
-            range(crystal.num_sites)
-        ), f"At least one atom in {cry_ids} is isolated"
+        if not len(self_idx):
+            raise AssertionError(f"All atoms in {cry_ids} are isolated")
+        if not len(nbr_idx):
+            raise AssertionError(f"This should not be triggered but was for {cry_ids}")
+        if set(self_idx) != set(range(crystal.num_sites)):
+            raise AssertionError(f"At least one atom in {cry_ids} is isolated")
 
         nbr_dist = self.gdf.expand(nbr_dist)
 
-        atom_fea = torch.Tensor(atom_fea)
-        nbr_dist = torch.Tensor(nbr_dist)
-        self_idx = torch.LongTensor(self_idx)
-        nbr_idx = torch.LongTensor(nbr_idx)
+        atom_fea_t = Tensor(atom_fea)
+        nbr_dist_t = Tensor(nbr_dist)
+        self_idx_t = LongTensor(self_idx)
+        nbr_idx_t = LongTensor(nbr_idx)
 
-        targets = []
-        for target in self.task_dict:
-            if self.task_dict[target] == "regression":
-                targets.append(torch.Tensor([df_idx[target]]))
-            elif self.task_dict[target] == "classification":
-                targets.append(torch.LongTensor([df_idx[target]]))
+        targets: list[Tensor | LongTensor] = []
+        for target, task_type in self.task_dict.items():
+            if task_type == "regression":
+                targets.append(Tensor([df_idx[target]]))
+            elif task_type == "classification":
+                targets.append(LongTensor([df_idx[target]]))
 
         return (
-            (atom_fea, nbr_dist, self_idx, nbr_idx),
+            (atom_fea_t, nbr_dist_t, self_idx_t, nbr_idx_t),
             targets,
             *cry_ids,
         )
 
 
-class GaussianDistance:
-    """
-    Expands the distance by Gaussian basis.
+def collate_batch(
+    dataset_list: tuple[
+        tuple[Tensor, Tensor, LongTensor, LongTensor],
+        list[Tensor | LongTensor],
+        list[str | int],
+    ],
+) -> tuple[Any, ...]:
+    """Collate a list of data and return a batch for predicting crystal properties.
 
-    Unit: angstrom
-    """
+    Args:
+        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_dist, nbr_idx, target)
+            - atom_fea (Tensor): _description_
+            - nbr_dist (Tensor):
+            - self_idx (LongTensor):
+            - nbr_idx (LongTensor):
+            - target (Tensor | LongTensor): target values containing floats for regression or
+                integers as class labels for classification
+            - cif_id: str or int
 
-    def __init__(self, dmin, dmax, step, var=None):
-        """
-        Args:
-            dmin (float): Minimum interatomic distance
-            dmax (float): Maximum interatomic distance
-            step (float): Step size for the Gaussian filter
-            var (float, optional): Variance of Gaussian basis. Defaults to step if not given
-        """
-        assert dmin < dmax
-        assert dmax - dmin > step
-
-        self.filter = np.arange(dmin, dmax + step, step)
-        self.embedding_size = len(self.filter)
-
-        if var is None:
-            var = step
-
-        self.var = var
-
-    def expand(self, distances):
-        """Apply Gaussian distance filter to a numpy distance array
-
-        Args:
-            distances (ArrayLike): A distance matrix of any shape
-
-        Returns:
-            Expanded distance matrix with the last dimension of length
-            len(self.filter)
-        """
-        distances = np.array(distances)
-
-        return np.exp(
-            -((distances[..., np.newaxis] - self.filter) ** 2) / self.var**2
-        )
-
-
-def collate_batch(dataset_list):
-    """
-    Collate a list of data and return a batch for predicting crystal
-    properties.
-
-    Parameters
-    ----------
-
-    dataset_list: list of tuples for each data point.
-        (atom_fea, nbr_dist, nbr_idx, target)
-
-        atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-        nbr_dist: torch.Tensor shape (n_i, M, nbr_dist_len)
-        nbr_idx: torch.LongTensor shape (n_i, M)
-        target: torch.Tensor shape (1, )
-        cif_id: str or int
-
-    Returns
-    -------
-    N = sum(n_i); N0 = sum(i)
-
-    batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
-        Atom features from atom type
-    batch_nbr_dist: torch.Tensor shape (N, M, nbr_dist_len)
-        Bond features of each atom's M neighbors
-    batch_nbr_idx: torch.LongTensor shape (N, M)
-        Indices of M neighbors of each atom
-    crystal_atom_idx: list of torch.LongTensor of length N0
-        Mapping from the crystal idx to atom idx
-    target: torch.Tensor shape (N, 1)
-        Target value for prediction
-    batch_cif_ids: list
+    Returns:
+        tuple[
+            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched CGCNN model inputs,
+            tuple[Tensor | LongTensor]: Target values for different tasks,
+            # TODO this last tuple is unpacked how to do type hint?
+            *tuple[str | int]: Identifiers like material_id, composition
+        ]
     """
     batch_atom_fea = []
     batch_nbr_dist = []
@@ -267,39 +244,47 @@ def collate_batch(dataset_list):
     batch_nbr_idx = []
     crystal_atom_idx = []
     batch_targets = []
-    batch_comps = []
-    batch_cif_ids = []
+    batch_cry_ids = []
     base_idx = 0
 
-    for i, (inputs, target, comp, cif_id) in enumerate(dataset_list):
+    # TODO: unpacking (inputs, target, comp, cif_id) doesn't appear to match the doc string
+    # for dataset_list, what about nbr_idx and comp?
+    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
         atom_fea, nbr_dist, self_idx, nbr_idx = inputs
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
+        # batch the features together
         batch_atom_fea.append(atom_fea)
         batch_nbr_dist.append(nbr_dist)
+
+        # mappings from bonds to atoms
         batch_self_idx.append(self_idx + base_idx)
         batch_nbr_idx.append(nbr_idx + base_idx)
 
-        crystal_atom_idx.extend([i] * n_i)
+        # mapping from atoms to crystals
+        crystal_atom_idx.extend([idx] * n_i)
+
+        # batch the targets and ids
         batch_targets.append(target)
-        batch_comps.append(comp)
-        batch_cif_ids.append(cif_id)
+        batch_cry_ids.append(cry_ids)
+
+        # increment the id counter
         base_idx += n_i
 
     atom_fea = torch.cat(batch_atom_fea, dim=0)
     nbr_dist = torch.cat(batch_nbr_dist, dim=0)
     self_idx = torch.cat(batch_self_idx, dim=0)
     nbr_idx = torch.cat(batch_nbr_idx, dim=0)
-    cry_idx = torch.LongTensor(crystal_atom_idx)
+    cry_idx = LongTensor(crystal_atom_idx)
 
     return (
         (atom_fea, nbr_dist, self_idx, nbr_idx, cry_idx),
         tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        batch_comps,
-        batch_cif_ids,
+        *zip(*batch_cry_ids),
     )
 
 
+# TODO do we still need these functions? @CompRhys
 def get_structure(cols):
     """Return pymatgen structure from lattice and sites cols"""
     cell, sites = cols
@@ -321,3 +306,50 @@ def parse_cgcnn(cell, sites):
 
     coords = np.array(coords, dtype=float)
     return cell, elems, coords
+
+
+class GaussianDistance:
+    """Expands the distance by Gaussian basis. Unit: angstrom."""
+
+    def __init__(
+        self, dmin: float, dmax: float, step: float, var: float = None
+    ) -> None:
+        """_summary_
+
+        Args:
+            dmin (float): Minimum interatomic distance
+            dmax (float): Maximum interatomic distance
+            step (float): Step size for the Gaussian filter
+            var (float, optional): Variance of Gaussian basis. Defaults to step if not given.
+        """
+        if dmin >= dmax:
+            raise AssertionError(
+                "Max radii must be larger than minimum radii for Gaussian basis expansion"
+            )
+        if dmax - dmin <= step:
+            raise AssertionError(
+                "Max radii below minimum radii + step size - please increase dmax."
+            )
+
+        self.filter = np.arange(dmin, dmax + step, step)
+        self.embedding_size = len(self.filter)
+
+        if var is None:
+            var = step
+
+        self.var = var
+
+    def expand(self, distances: np.ndarray) -> np.ndarray:
+        """Apply Gaussian distance filter to a numpy distance array
+
+        Args:
+            distances (ArrayLike): A distance matrix of any shape.
+
+        Returns:
+            np.ndarray: Expanded distance matrix with the last dimension of length len(self.filter)
+        """
+        distances = np.array(distances)
+
+        return np.exp(
+            -((distances[..., np.newaxis] - self.filter) ** 2) / self.var**2
+        )

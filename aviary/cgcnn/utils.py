@@ -5,7 +5,7 @@ from pymatgen.core import Structure
 
 
 def get_cgcnn_input(struct: Structure) -> tuple[np.ndarray, list[str]]:
-    """return a CSV friendly encoding of lattice and sites given a pymatgen structure.
+    """Return a CSV friendly encoding of lattice and sites given a pymatgen structure.
 
     Args:
         struct (Structure): Pymatgen structure to get inputs for.
