@@ -164,13 +164,7 @@ def collate_batch(
         list[Tensor | LongTensor],
         list[str | int],
     ],
-) -> tuple[
-    Any,
-    ...
-    # tuple[Tensor, Tensor, Tensor, LongTensor, LongTensor, LongTensor, LongTensor],
-    # tuple[Tensor | LongTensor],
-    # tuple[str | int],
-]:
+) -> tuple[Any, ...]:
     """Collate a list of data and return a batch for predicting
     crystal properties.
 
