@@ -79,7 +79,7 @@ class CrystalGraphData(Dataset):
         self.nbr_fea_dim = self.gdf.embedding_size
 
         self.df = df
-        self.df["Structure_obj"] = self.df[inputs].apply(get_structure, axis=1)
+        self.df["Structure_obj"] = self.df[self.inputs].apply(get_structure, axis=1)
 
         self._pre_check()
 
@@ -222,10 +222,12 @@ def collate_batch(
 
     Args:
         dataset_list (list[tuple]): for each data point: (atom_fea, nbr_dist, nbr_idx, target)
-            - atom_fea (Tensor): _description_
-            - nbr_dist (Tensor):
-            - self_idx (LongTensor):
-            - nbr_idx (LongTensor):
+            tuple[
+                - atom_fea (Tensor): _description_
+                - nbr_dist (Tensor):
+                - self_idx (LongTensor):
+                - nbr_idx (LongTensor):
+            ]
             - target (Tensor | LongTensor): target values containing floats for regression or
                 integers as class labels for classification
             - cif_id: str or int
@@ -284,7 +286,6 @@ def collate_batch(
     )
 
 
-# TODO do we still need these functions? @CompRhys
 def get_structure(cols):
     """Return pymatgen structure from lattice and sites cols"""
     cell, sites = cols
@@ -296,10 +297,10 @@ def get_structure(cols):
 
 def parse_cgcnn(cell, sites):
     """Parse str representation into lists"""
-    cell = np.array(ast.literal_eval(cell), dtype=float)
+    cell = np.array(ast.literal_eval(str(cell)), dtype=float)
     elems = []
     coords = []
-    for site in ast.literal_eval(sites):
+    for site in ast.literal_eval(str(sites)):
         ele, pos = site.split(" @ ")
         elems.append(ele)
         coords.append(pos.split(" "))
