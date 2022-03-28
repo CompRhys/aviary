@@ -6,28 +6,28 @@ from matminer.utils.io import load_dataframe_from_json
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split as split
 
+from aviary.cgcnn.data import CrystalGraphData, collate_batch
+from aviary.cgcnn.model import CrystalGraphConvNet
+from aviary.cgcnn.utils import get_cgcnn_input
 from aviary.utils import results_multitask, train_ensemble
-from aviary.wren.data import WyckoffData, collate_batch
-from aviary.wren.model import Wren
-from aviary.wren.utils import get_aflow_label_spglib
 
 torch.manual_seed(0)  # ensure reproducible results
 
 
-def test_wren_regression():
+def test_cgcnn_regression():
     data_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "data/matbench_phonons.json.gz"
     )
-    elem_emb = "matscholar200"
-    sym_emb = "bra-alg-off"
+    elem_emb = "cgcnn92"
     targets = ["last phdos peak"]
     tasks = ["regression"]
     losses = ["L1"]
     robust = True
-    model_name = "wren-reg-test"
+    model_name = "cgcnn-reg-test"
     elem_fea_len = 32
-    sym_fea_len = 32
+    h_fea_len = 128
     n_graph = 3
+    n_hidden = 1
     ensemble = 2
     run_id = 1
     data_seed = 42
@@ -52,18 +52,20 @@ def test_wren_regression():
     assert os.path.exists(data_path), f"{data_path} does not exist!"
 
     df = load_dataframe_from_json(data_path)
-    df["wyckoff"] = df.structure.apply(get_aflow_label_spglib)
+    df["lattice"] = [None] * len(df)
+    df["sites"] = [None] * len(df)
+    df[["lattice", "sites"]] = df.apply(
+        lambda x: get_cgcnn_input(x.structure), axis=1, result_type="expand"
+    )
     df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
     df["composition"] = df.structure.apply(
         lambda x: x.composition.formula.replace(" ", "")
     )
 
-    dataset = WyckoffData(
-        df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
-    )
+    dataset = CrystalGraphData(df=df, elem_emb=elem_emb, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
-    sym_emb_len = dataset.sym_emb_len
+    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
 
@@ -107,24 +109,17 @@ def test_wren_regression():
         "robust": robust,
         "n_targets": n_targets,
         "elem_emb_len": elem_emb_len,
-        "sym_emb_len": sym_emb_len,
+        "nbr_fea_len": nbr_fea_len,
         "elem_fea_len": elem_fea_len,
-        "sym_fea_len": sym_fea_len,
         "n_graph": n_graph,
-        "elem_heads": 2,
-        "elem_gate": [256],
-        "elem_msg": [256],
-        "cry_heads": 2,
-        "cry_gate": [256],
-        "cry_msg": [256],
-        "out_hidden": [256],
-        "trunk_hidden": [64],
+        "h_fea_len": h_fea_len,
+        "n_hidden": n_hidden,
     }
 
     os.makedirs(f"models/{model_name}", exist_ok=True)
 
     train_ensemble(
-        model_class=Wren,
+        model_class=CrystalGraphConvNet,
         model_name=model_name,
         run_id=run_id,
         ensemble_folds=ensemble,
@@ -143,7 +138,7 @@ def test_wren_regression():
     data_params["shuffle"] = False  # need fixed data order due to ensembling
 
     results_dict = results_multitask(
-        model_class=Wren,
+        model_class=CrystalGraphConvNet,
         model_name=model_name,
         run_id=run_id,
         ensemble_folds=ensemble,
@@ -172,4 +167,4 @@ def test_wren_regression():
 
 
 if __name__ == "__main__":
-    test_wren_regression()
+    test_cgcnn_regression()
