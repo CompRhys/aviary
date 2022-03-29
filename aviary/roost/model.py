@@ -233,4 +233,7 @@ class DescriptorNetwork(nn.Module):
         return torch.mean(torch.stack(head_fea), dim=0)
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        return (
+            f"{type(self).__name__}(elem_emb_len={self.embedding.in_features}, "
+            f"elem_fea_len={self.embedding.out_features})"
+        )

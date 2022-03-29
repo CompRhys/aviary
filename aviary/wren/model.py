@@ -267,4 +267,4 @@ class DescriptorNetwork(nn.Module):
         return cry_fea
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        return f"{type(self).__name__}(elem_emb_len={self.elem_emb_len}, sym_emb_len={self.sym_emb_len})"
