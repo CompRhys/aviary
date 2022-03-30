@@ -84,8 +84,11 @@ class WyckoffData(Dataset):
                 n_classes = np.max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(df={self.df.shape}, task_dict={self.task_dict})"
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx: int):
