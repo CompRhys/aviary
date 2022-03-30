@@ -95,7 +95,8 @@ class CrystalGraphData(Dataset):
         return len(self.df)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(df={self.df.shape}, task_dict={self.task_dict})"
+        df_repr = f"cols=[{', '.join(self.df.columns)}], len={len(self.df)}"
+        return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
     def _get_nbr_data(
         self, crystal: Structure
