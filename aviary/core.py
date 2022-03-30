@@ -41,7 +41,7 @@ class BaseModelClass(nn.Module, ABC):
         """Store core model parameters.
 
         Args:
-            task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+            task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
             robust (bool): Whether to estimate standard deviation for use in a robust loss function
             device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
             epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
@@ -435,8 +435,10 @@ class Normalizer:
 
         Args:
             tensor (Tensor): Tensor to determine the mean and standard deviation over.
-            dim (int, optional): Which dimension to take mean and standard deviation over. Defaults to 0.
-            keepdim (bool, optional): Whether to keep the reduced dimension in Tensor. Defaults to False.
+            dim (int, optional): Which dimension to take mean and standard deviation over.
+                Defaults to 0.
+            keepdim (bool, optional): Whether to keep the reduced dimension in Tensor.
+                Defaults to False.
         """
         self.mean = torch.mean(tensor, dim, keepdim)
         self.std = torch.std(tensor, dim, keepdim)

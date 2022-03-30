@@ -53,12 +53,15 @@ class Roost(BaseModelClass):
         """_summary_
 
         Args:
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            robust (bool): Whether to estimate standard deviation for use in a robust loss function.
             n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of features in initial element embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode elements. Defaults to 64.
-            n_graph (int, optional): Number of message passing operations to carry out. Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message passing operation. Defaults to 3.
+            elem_fea_len (int, optional): Number of hidden features to use to encode elements.
+                Defaults to 64.
+            n_graph (int, optional): Number of message passing operations to carry out.
+                Defaults to 3.
+            elem_heads (int, optional): Number of parallel attention heads per message passing
+                operation. Defaults to 3.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): _description_. Defaults to 3.

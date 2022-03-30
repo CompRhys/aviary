@@ -109,8 +109,8 @@ class MessageLayer(nn.Module):
         super().__init__()
 
         self._repr = (
-            f"{self._get_name()}(msg_fea_len={msg_fea_len}, "
-            f"num_msg_heads={num_msg_heads}, msg_gate_layers={msg_gate_layers}, msg_net_layers={msg_net_layers})"
+            f"{self._get_name()}(msg_fea_len={msg_fea_len}, num_msg_heads={num_msg_heads}, "
+            f"msg_gate_layers={msg_gate_layers}, msg_net_layers={msg_net_layers})"
         )
 
         # Pooling and Output
@@ -181,7 +181,8 @@ class SimpleNetwork(nn.Module):
             input_dim (int): Number of input features
             output_dim (int): Number of output features
             hidden_layer_dims (list[int]): List of hidden layer sizes
-            activation (type[nn.Module], optional): Which activation function to use. Defaults to nn.LeakyReLU.
+            activation (type[nn.Module], optional): Which activation function to use.
+                Defaults to nn.LeakyReLU.
             batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
         """
         super().__init__()
@@ -241,7 +242,8 @@ class ResidualNetwork(nn.Module):
             input_dim (int): Number of input features
             output_dim (int): Number of output features
             hidden_layer_dims (list[int]): List of hidden layer sizes
-            activation (type[nn.Module], optional): Which activation function to use. Defaults to nn.LeakyReLU.
+            activation (type[nn.Module], optional): Which activation function to use.
+                Defaults to nn.LeakyReLU.
             batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
         """
         super().__init__()

@@ -186,7 +186,6 @@ def collate_batch(
             tuple[Tensor, Tensor, Tensor, LongTensor, LongTensor, LongTensor, LongTensor]:
                 batched Wren model inputs,
             tuple[Tensor | LongTensor]: Target values for different tasks,
-            # TODO this last tuple is unpacked how to do type hint? not sure I understand ... in type hints
             *tuple[str | int]]: Identifiers like material_id, composition
         ]
     """

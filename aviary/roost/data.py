@@ -143,7 +143,8 @@ def collate_batch(
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point: (elem_fea, nbr_fea, nbr_idx, target)
+        dataset_list (list): list of tuples for each data point where each tuple contains:
+            (elem_fea, nbr_fea, nbr_idx, target)
             - elem_fea (Tensor):  _description_
             - nbr_fea (Tensor):
             - self_idx (LongTensor):
