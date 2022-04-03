@@ -237,6 +237,7 @@ class DescriptorNetwork(nn.Module):
 
     def __repr__(self) -> str:
         return (
-            f"{type(self).__name__}(elem_emb_len={self.embedding.in_features}, "
+            f"{type(self).__name__}(n_graph={len(self.graphs)}, cry_heads="
+            f"{len(self.cry_pool)}, elem_emb_len={self.embedding.in_features}, "
             f"elem_fea_len={self.embedding.out_features})"
         )

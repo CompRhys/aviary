@@ -151,7 +151,7 @@ class Wren(BaseModelClass):
 
 
 class DescriptorNetwork(nn.Module):
-    """The Descriptor Network is the message passing section of the Roost Model."""
+    """The Descriptor Network is the message passing section of the Roost model."""
 
     def __init__(
         self,
@@ -167,7 +167,7 @@ class DescriptorNetwork(nn.Module):
         cry_gate: Sequence[int] = (256,),
         cry_msg: Sequence[int] = (256,),
     ):
-        """_summary_
+        """Message passing section of the Roost model.
 
         Args:
             elem_emb_len (int): Number of features in initial element embedding
@@ -182,7 +182,7 @@ class DescriptorNetwork(nn.Module):
                 operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
-            cry_heads (int, optional): _description_. Defaults to 1.
+            cry_heads (int, optional): Number of attention heads. Defaults to 1.
             cry_gate (list[int], optional): _description_. Defaults to [256].
             cry_msg (list[int], optional): _description_. Defaults to [256].
         """
@@ -269,6 +269,7 @@ class DescriptorNetwork(nn.Module):
 
     def __repr__(self) -> str:
         return (
-            f"{type(self).__name__}(elem_emb_len={self.elem_emb_len}, "
+            f"{type(self).__name__}(n_graph={len(self.graphs)}, cry_heads="
+            f"{len(self.cry_pool)}, elem_emb_len={self.elem_emb_len}, "
             f"sym_emb_len={self.sym_emb_len})"
         )
