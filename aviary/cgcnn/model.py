@@ -40,11 +40,14 @@ class CrystalGraphConvNet(BaseModelClass):
             n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of atom features in the input.
             nbr_fea_len (int): Number of bond features.
-            elem_fea_len (int, optional): Number of hidden atom features in the convolutional layers. Defaults to 64.
+            elem_fea_len (int, optional): Number of hidden atom features in the convolutional
+                layers. Defaults to 64.
             n_graph (int, optional): Number of convolutional layers. Defaults to 4.
             h_fea_len (int, optional): Number of hidden features after pooling. Defaults to 128.
-            n_trunk (int, optional): Number of hidden layers in trunk after pooling. Defaults to 1.
-            n_hidden (int, optional): Number of hidden layers after trunk for each task. Defaults to 1.
+            n_trunk (int, optional): Number of hidden layers in trunk after pooling.
+                Defaults to 1.
+            n_hidden (int, optional): Number of hidden layers after trunk for each task.
+                Defaults to 1.
         """
         super().__init__(robust=robust, **kwargs)
 

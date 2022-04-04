@@ -84,8 +84,12 @@ class WyckoffData(Dataset):
                 n_classes = np.max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
+
+    def __repr__(self) -> str:
+        df_repr = f"cols=[{', '.join(self.df.columns)}], len={len(self.df)}"
+        return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx: int):
@@ -183,7 +187,6 @@ def collate_batch(
             tuple[Tensor, Tensor, Tensor, LongTensor, LongTensor, LongTensor, LongTensor]:
                 batched Wren model inputs,
             tuple[Tensor | LongTensor]: Target values for different tasks,
-            # TODO this last tuple is unpacked how to do type hint? not sure I understand ... in type hints
             *tuple[str | int]]: Identifiers like material_id, composition
         ]
     """

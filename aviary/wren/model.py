@@ -42,15 +42,8 @@ class Wren(BaseModelClass):
         cry_heads: int = 1,
         cry_gate: Sequence[int] = (256,),
         cry_msg: Sequence[int] = (256,),
-        trunk_hidden: Sequence[int] = (
-            1024,
-            512,
-        ),
-        out_hidden: Sequence[int] = (
-            256,
-            128,
-            64,
-        ),
+        trunk_hidden: Sequence[int] = (1024, 512),
+        out_hidden: Sequence[int] = (256, 128, 64),
         **kwargs,
     ) -> None:
         """_summary_
@@ -60,10 +53,14 @@ class Wren(BaseModelClass):
             n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of features in initial element embedding
             sym_emb_len (int): Number of features in initial Wyckoff letter embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode elements. Defaults to 32.
-            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters. Defaults to 32.
-            n_graph (int, optional): Number of message passing operations to carry out. Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message passing operation. Defaults to 1.
+            elem_fea_len (int, optional): Number of hidden features to use to encode elements.
+                Defaults to 32.
+            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters.
+                Defaults to 32.
+            n_graph (int, optional): Number of message passing operations to carry out.
+                Defaults to 3.
+            elem_heads (int, optional): Number of parallel attention heads per message passing
+                operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): _description_. Defaults to 1.
@@ -154,7 +151,7 @@ class Wren(BaseModelClass):
 
 
 class DescriptorNetwork(nn.Module):
-    """The Descriptor Network is the message passing section of the Roost Model."""
+    """The Descriptor Network is the message passing section of the Roost model."""
 
     def __init__(
         self,
@@ -170,18 +167,22 @@ class DescriptorNetwork(nn.Module):
         cry_gate: Sequence[int] = (256,),
         cry_msg: Sequence[int] = (256,),
     ):
-        """_summary_
+        """Message passing section of the Roost model.
 
         Args:
             elem_emb_len (int): Number of features in initial element embedding
             sym_emb_len (int): Number of features in initial Wyckoff letter embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode elements. Defaults to 32.
-            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters. Defaults to 32.
-            n_graph (int, optional): Number of message passing operations to carry out. Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message passing operation. Defaults to 1.
+            elem_fea_len (int, optional): Number of hidden features to use to encode elements.
+                Defaults to 32.
+            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters.
+                Defaults to 32.
+            n_graph (int, optional): Number of message passing operations to carry out.
+                Defaults to 3.
+            elem_heads (int, optional): Number of parallel attention heads per message passing
+                operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
-            cry_heads (int, optional): _description_. Defaults to 1.
+            cry_heads (int, optional): Number of attention heads. Defaults to 1.
             cry_gate (list[int], optional): _description_. Defaults to [256].
             cry_msg (list[int], optional): _description_. Defaults to [256].
         """
@@ -267,4 +268,8 @@ class DescriptorNetwork(nn.Module):
         return cry_fea
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        return (
+            f"{type(self).__name__}(n_graph={len(self.graphs)}, cry_heads="
+            f"{len(self.cry_pool)}, elem_emb_len={self.elem_emb_len}, "
+            f"sym_emb_len={self.sym_emb_len})"
+        )

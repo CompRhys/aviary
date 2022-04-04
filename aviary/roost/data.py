@@ -66,8 +66,12 @@ class CompositionData(Dataset):
                 n_classes = np.max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
+
+    def __repr__(self) -> str:
+        df_repr = f"cols=[{', '.join(self.df.columns)}], len={len(self.df)}"
+        return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
     @functools.lru_cache(maxsize=None)  # Cache data for faster training
     def __getitem__(self, idx: int):
@@ -140,7 +144,8 @@ def collate_batch(
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point: (elem_fea, nbr_fea, nbr_idx, target)
+        dataset_list (list): list of tuples for each data point where each tuple contains:
+            (elem_fea, nbr_fea, nbr_idx, target)
             - elem_fea (Tensor):  _description_
             - nbr_fea (Tensor):
             - self_idx (LongTensor):

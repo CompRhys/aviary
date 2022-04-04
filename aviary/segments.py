@@ -42,7 +42,8 @@ class AttentionPooling(nn.Module):
         return out
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        gate_nn, message_nn = self.gate_nn, self.message_nn
+        return f"{type(self).__name__}(gate_nn={gate_nn}, message_nn={message_nn})"
 
 
 class WeightedAttentionPooling(nn.Module):
@@ -83,7 +84,8 @@ class WeightedAttentionPooling(nn.Module):
         return out
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        pow, gate_nn, message_nn = float(self.pow), self.gate_nn, self.message_nn
+        return f"{type(self).__name__}(pow={pow:.3}, gate_nn={gate_nn}, message_nn={message_nn})"
 
 
 class MessageLayer(nn.Module):
@@ -107,8 +109,8 @@ class MessageLayer(nn.Module):
         super().__init__()
 
         self._repr = (
-            f"{self._get_name()}(msg_fea_len={msg_fea_len}, "
-            f"num_msg_heads={num_msg_heads}, msg_gate_layers={msg_gate_layers}, msg_net_layers={msg_net_layers})"
+            f"{self._get_name()}(msg_fea_len={msg_fea_len}, num_msg_heads={num_msg_heads}, "
+            f"msg_gate_layers={msg_gate_layers}, msg_net_layers={msg_net_layers})"
         )
 
         # Pooling and Output
@@ -179,7 +181,8 @@ class SimpleNetwork(nn.Module):
             input_dim (int): Number of input features
             output_dim (int): Number of output features
             hidden_layer_dims (list[int]): List of hidden layer sizes
-            activation (type[nn.Module], optional): Which activation function to use. Defaults to nn.LeakyReLU.
+            activation (type[nn.Module], optional): Which activation function to use.
+                Defaults to nn.LeakyReLU.
             batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
         """
         super().__init__()
@@ -216,7 +219,10 @@ class SimpleNetwork(nn.Module):
         self.fc_out.reset_parameters()
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        return (
+            f"{type(self).__name__}(input_dim={self.fcs[0].in_features}, "
+            f"output_dim={self.fc_out.out_features}, activation={type(self.acts[0]).__name__})"
+        )
 
 
 class ResidualNetwork(nn.Module):
@@ -236,7 +242,8 @@ class ResidualNetwork(nn.Module):
             input_dim (int): Number of input features
             output_dim (int): Number of output features
             hidden_layer_dims (list[int]): List of hidden layer sizes
-            activation (type[nn.Module], optional): Which activation function to use. Defaults to nn.LeakyReLU.
+            activation (type[nn.Module], optional): Which activation function to use.
+                Defaults to nn.LeakyReLU.
             batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
         """
         super().__init__()
@@ -274,4 +281,7 @@ class ResidualNetwork(nn.Module):
         return self.fc_out(x)
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        return (
+            f"{type(self).__name__}(input_dim={self.fcs[0].in_features}, "
+            f"output_dim={self.fc_out.out_features}, activation={type(self.acts[0]).__name__})"
+        )
