@@ -42,7 +42,7 @@ def main(  # noqa: C901
     weight_decay=1e-6,
     batch_size=128,
     workers=0,
-    device=torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"),
+    device="cuda" if torch.cuda.is_available() else "cpu",
     **kwargs,
 ):
     if not len(targets) == len(tasks) == len(losses):
