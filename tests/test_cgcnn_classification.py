@@ -44,7 +44,7 @@ def test_cgcnn_clf():
     weight_decay = 1e-6
     batch_size = 128
     workers = 0
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))

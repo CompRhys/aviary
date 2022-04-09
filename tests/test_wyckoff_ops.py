@@ -24,7 +24,7 @@ def test_get_aflow_label_spglib():
 
 
 def test_count_wyks():
-    """Count the number of wyckoff positions in esseneite"""
+    """Count the number of Wyckoff positions in esseneite"""
     assert count_wyks("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 6
 
 
