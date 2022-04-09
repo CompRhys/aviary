@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import torch
 from matminer.datasets import load_dataset
@@ -10,9 +12,7 @@ torch.manual_seed(0)  # ensure reproducible results (applies to all tests)
 
 @pytest.fixture(scope="session")
 def df_matbench_phonons():
-    """
-    Return a pandas dataframe with the data from the Matbench phonons dataset.
-    """
+    """Return a pandas dataframe with the data from the Matbench phonons dataset."""
 
     df = load_dataset("matbench_phonons")
     df[["lattice", "sites"]] = [get_cgcnn_input(x) for x in df.structure]
@@ -26,9 +26,16 @@ def df_matbench_phonons():
 
 @pytest.fixture(scope="session")
 def df_matbench_phonons_wyckoff(df_matbench_phonons):
-
+    """Getting Aflow labels is expensive so we split into a separate fixture to avoid
+    paying for it unless needed.
+    """
     df_matbench_phonons["wyckoff"] = [
         get_aflow_label_spglib(x) for x in df_matbench_phonons.structure
     ]
 
     return df_matbench_phonons
+
+
+@pytest.fixture(scope="session")
+def tests_dir():
+    return os.path.dirname(os.path.abspath(__file__))

@@ -1,5 +1,3 @@
-import os
-
 from pymatgen.core.structure import Structure
 
 from aviary.wren.utils import (
@@ -10,15 +8,9 @@ from aviary.wren.utils import (
 )
 
 
-def test_get_aflow_label_spglib():
+def test_get_aflow_label_spglib(tests_dir):
     """Check that spglib gives correct aflow input for esseneite"""
-    f = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "data/ABC6D2_mC40_15_e_e_3f_f.cif"
-    )
-
-    with open(f) as s:
-        s = s.read()
-        struct = Structure.from_str(s, fmt="cif")
+    struct = Structure.from_file(f"{tests_dir}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
     assert get_aflow_label_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
 
