@@ -2,22 +2,15 @@ import os
 
 import numpy as np
 import torch
-from matminer.utils.io import load_dataframe_from_json
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split as split
 
 from aviary.utils import results_multitask, train_ensemble
 from aviary.wren.data import WyckoffData, collate_batch
 from aviary.wren.model import Wren
-from aviary.wren.utils import get_aflow_label_spglib
-
-torch.manual_seed(0)  # ensure reproducible results
 
 
-def test_wren_clf():
-    data_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "data/matbench_phonons.json.gz"
-    )
+def test_wren_clf(df_matbench_phonons_wyckoff):
     elem_emb = "matscholar200"
     sym_emb = "bra-alg-off"
     targets = ["phdos_clf"]
@@ -49,18 +42,11 @@ def test_wren_clf():
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    assert os.path.exists(data_path), f"{data_path} does not exist!"
-
-    df = load_dataframe_from_json(data_path)
-    df["wyckoff"] = df.structure.apply(get_aflow_label_spglib)
-    df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
-    df["composition"] = df.structure.apply(
-        lambda x: x.composition.formula.replace(" ", "")
-    )
-    df["phdos_clf"] = np.where((df["last phdos peak"] > 450), 1, 0)
-
     dataset = WyckoffData(
-        df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+        df=df_matbench_phonons_wyckoff,
+        elem_emb=elem_emb,
+        sym_emb=sym_emb,
+        task_dict=task_dict,
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
@@ -171,7 +157,3 @@ def test_wren_clf():
 
     assert ens_acc > 0.85
     assert ens_roc_auc > 0.9
-
-
-if __name__ == "__main__":
-    test_wren_clf()

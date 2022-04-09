@@ -2,22 +2,15 @@ import os
 
 import numpy as np
 import torch
-from matminer.utils.io import load_dataframe_from_json
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split as split
 
 from aviary.cgcnn.data import CrystalGraphData, collate_batch
 from aviary.cgcnn.model import CrystalGraphConvNet
-from aviary.cgcnn.utils import get_cgcnn_input
 from aviary.utils import results_multitask, train_ensemble
 
-torch.manual_seed(0)  # ensure reproducible results
 
-
-def test_cgcnn_regression():
-    data_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "data/matbench_phonons.json.gz"
-    )
+def test_cgcnn_regression(df_matbench_phonons):
     elem_emb = "cgcnn92"
     targets = ["last phdos peak"]
     tasks = ["regression"]
@@ -49,20 +42,9 @@ def test_cgcnn_regression():
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    assert os.path.exists(data_path), f"{data_path} does not exist!"
-
-    df = load_dataframe_from_json(data_path)
-    df["lattice"] = [None] * len(df)
-    df["sites"] = [None] * len(df)
-    df[["lattice", "sites"]] = df.apply(
-        lambda x: get_cgcnn_input(x.structure), axis=1, result_type="expand"
+    dataset = CrystalGraphData(
+        df=df_matbench_phonons, elem_emb=elem_emb, task_dict=task_dict
     )
-    df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
-    df["composition"] = df.structure.apply(
-        lambda x: x.composition.formula.replace(" ", "")
-    )
-
-    dataset = CrystalGraphData(df=df, elem_emb=elem_emb, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
     nbr_fea_len = dataset.nbr_fea_dim
@@ -164,7 +146,3 @@ def test_cgcnn_regression():
     assert r2 > 0.7
     assert mae < 150
     assert rmse < 300
-
-
-if __name__ == "__main__":
-    test_cgcnn_regression()

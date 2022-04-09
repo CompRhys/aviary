@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 import torch
-from matminer.utils.io import load_dataframe_from_json
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split as split
 
@@ -10,13 +9,8 @@ from aviary.roost.data import CompositionData, collate_batch
 from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
 
-torch.manual_seed(0)  # ensure reproducible results
 
-
-def test_roost_clf():
-    data_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "data/matbench_phonons.json.gz"
-    )
+def test_roost_clf(df_matbench_phonons):
     elem_emb = "matscholar200"
     targets = ["phdos_clf"]
     tasks = ["classification"]
@@ -46,16 +40,9 @@ def test_roost_clf():
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    assert os.path.exists(data_path), f"{data_path} does not exist!"
-
-    df = load_dataframe_from_json(data_path)
-    df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
-    df["composition"] = df.structure.apply(
-        lambda x: x.composition.formula.replace(" ", "")
+    dataset = CompositionData(
+        df=df_matbench_phonons, elem_emb=elem_emb, task_dict=task_dict
     )
-    df["phdos_clf"] = np.where((df["last phdos peak"] > 450), 1, 0)
-
-    dataset = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -162,7 +149,3 @@ def test_roost_clf():
 
     assert ens_acc > 0.9
     assert ens_roc_auc > 0.9
-
-
-if __name__ == "__main__":
-    test_roost_clf()
