@@ -199,8 +199,6 @@ def main(  # noqa: C901
         "trunk_hidden": [128, 64],
     }
 
-    os.makedirs(f"models/{model_name}/", exist_ok=True)
-
     if log:
         os.makedirs("runs/", exist_ok=True)
 

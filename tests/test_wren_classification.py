@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, roc_auc_score
@@ -107,8 +105,6 @@ def test_wren_clf(df_matbench_phonons_wyckoff):
         "out_hidden": [256],
         "trunk_hidden": [64],
     }
-
-    os.makedirs(f"models/{model_name}", exist_ok=True)
 
     train_ensemble(
         model_class=Wren,
