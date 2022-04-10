@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import shutil
 import sys
 from abc import ABC, abstractmethod
@@ -510,6 +511,7 @@ def save_checkpoint(
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
     """
+    os.makedirs(f"models/{model_name}", exist_ok=True)
     checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
     best = f"models/{model_name}/best-r{run_id}.pth.tar"
 

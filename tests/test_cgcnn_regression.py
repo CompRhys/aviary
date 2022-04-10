@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import torch
 from sklearn.metrics import r2_score
@@ -97,8 +95,6 @@ def test_cgcnn_regression(df_matbench_phonons):
         "h_fea_len": h_fea_len,
         "n_hidden": n_hidden,
     }
-
-    os.makedirs(f"models/{model_name}", exist_ok=True)
 
     train_ensemble(
         model_class=CrystalGraphConvNet,
