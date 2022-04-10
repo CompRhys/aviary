@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, roc_auc_score
@@ -99,8 +97,6 @@ def test_roost_clf(df_matbench_phonons):
         "trunk_hidden": [256, 256],
         "out_hidden": [128, 64],
     }
-
-    os.makedirs(f"models/{model_name}", exist_ok=True)
 
     train_ensemble(
         model_class=Roost,
