@@ -199,11 +199,6 @@ def main(  # noqa: C901
         "trunk_hidden": [128, 64],
     }
 
-    if log:
-        os.makedirs("runs/", exist_ok=True)
-
-    os.makedirs("results/", exist_ok=True)
-
     if train:
         train_ensemble(
             model_class=Wren,

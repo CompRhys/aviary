@@ -760,6 +760,8 @@ def save_results_dict(
 
     file_name = model_name.replace("/", "_")
 
+    os.makedirs("results", exist_ok=True)
+
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to '{csv_path}'")
