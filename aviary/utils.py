@@ -293,6 +293,7 @@ def train_ensemble(
     model_params: dict[str, Any],
     loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
     patience: int = None,
+    verbose: bool = False,
 ) -> None:
     """Convenience method to train multiple models in serial.
 
@@ -313,6 +314,7 @@ def train_ensemble(
             to loss functions.
         patience (int, optional): Maximum number of epochs without improvement
             when early stopping. Defaults to None.
+        verbose (bool, optional): Whether to show progress bars for each epoch.
     """
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
@@ -359,9 +361,7 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                log_dir=(
-                    f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
-                )
+                f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
         else:
             writer = None
@@ -375,7 +375,7 @@ def train_ensemble(
                     optimizer=None,
                     normalizer_dict=normalizer_dict,
                     action="val",
-                    verbose=True,
+                    verbose=verbose,
                 )
 
                 val_score = {}
@@ -727,7 +727,7 @@ def save_results_dict(
         for col, data in results_dict[target_name].items():
 
             # NOTE we save pre_logits rather than logits due to fact
-            # that with the hetroskedastic setup we want to be able to
+            # that with the heteroskedastic setup we want to be able to
             # sample from the Gaussian distributed pre_logits we parameterise.
             if "pre-logits" in col:
                 for n_ens, y_pre_logit in enumerate(data):
