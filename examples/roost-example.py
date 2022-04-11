@@ -186,11 +186,6 @@ def main(  # noqa: C901
         "out_hidden": [256, 128, 64],
     }
 
-    if log:
-        os.makedirs("runs/", exist_ok=True)
-
-    os.makedirs("results/", exist_ok=True)
-
     # TODO dump all args/kwargs to a file for reproducibility.
 
     if train:
