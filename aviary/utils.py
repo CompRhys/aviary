@@ -45,7 +45,7 @@ def init_model(
     Args:
         model_class (type[BaseModelClass]): Which model class to initialize.
         model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
-        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
+        device (type[torch.device] | "cuda" | "cpu"): Device the model will run on.
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
         fine_tune (str, optional): Path to model checkpoint to fine tune. Defaults to None.
         transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
@@ -149,11 +149,11 @@ def init_optim(
 
     Args:
         model (type[BaseModelClass]): Model to be optimized.
-        optim (type[Optimizer] | Literal["SGD", "Adam", "AdamW"]): Which optimizer to use
-        learning_rate (float): Learning rate for optimzation
+        optim (type[Optimizer] | "SGD" | "Adam" | "AdamW"): Which optimizer to use
+        learning_rate (float): Learning rate for optimization
         weight_decay (float): Weight decay for optimizer
         momentum (float): Momentum for optimizer
-        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        device (type[torch.device] | "cuda" | "cpu"): Device the model will run on
         milestones (Iterable, optional): When to decay learning rate. Defaults to ().
         gamma (float, optional): Multiplier for learning rate decay. Defaults to 0.3.
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
@@ -203,7 +203,7 @@ def init_losses(
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): Map of target names to loss functions.
+        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss functions.
         robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
 
     Returns:
@@ -253,7 +253,7 @@ def init_normalizers(
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        device (torch.device | "cuda" | "cpu"): Device the model will run on
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
 
     Returns:
@@ -310,7 +310,7 @@ def train_ensemble(
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
         model_params (dict[str, Any]): Dictionary of model parameters
-        loss_dict (dict[str, Literal["L1", "L2", "CSE"]]): Map of target names
+        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names
             to loss functions.
         patience (int, optional): Maximum number of epochs without improvement
             when early stopping. Defaults to None.
@@ -320,6 +320,7 @@ def train_ensemble(
         train_set = train_set.dataset
     if isinstance(val_set, Subset):
         val_set = val_set.dataset
+
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
@@ -438,7 +439,7 @@ def results_multitask(  # noqa: C901
             loss function.
         task_dict (dict[str, TaskType]): Map of target names to "regression" or
             "classification".
-        device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on
+        device (type[torch.device] | "cuda" | "cpu"): Device the model will run on
         eval_type (str, optional): Whether to use final or early-stopping checkpoints.
             Defaults to "checkpoint".
         print_results (bool, optional): Whether to print out summary metrics.
