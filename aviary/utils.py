@@ -19,7 +19,7 @@ from torch import LongTensor, Tensor
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.optim import SGD, Adam, AdamW, Optimizer
 from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.tensorboard import SummaryWriter
 
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
@@ -51,7 +51,7 @@ def init_model(
         transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
 
     Returns:
-        type[BaseModelClass]: An initialised model of type model_class
+        BaseModelClass: An initialised model of type model_class.
     """
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
@@ -284,8 +284,8 @@ def train_ensemble(
     run_id: int,
     ensemble_folds: int,
     epochs: int,
-    train_set: Subset,
-    val_set: Subset,
+    train_set: Dataset | Subset,
+    val_set: Dataset | Subset,
     log: bool,
     data_params: dict[str, Any],
     setup_params: dict[str, Any],
@@ -316,6 +316,10 @@ def train_ensemble(
             when early stopping. Defaults to None.
         verbose (bool, optional): Whether to show progress bars for each epoch.
     """
+    if isinstance(train_set, Subset):
+        train_set = train_set.dataset
+    if isinstance(val_set, Subset):
+        val_set = val_set.dataset
     train_generator = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
@@ -350,13 +354,11 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                sample_target = Tensor(
-                    train_set.dataset.df[target].iloc[train_set.indices].values
-                )
+                sample_target = Tensor(train_set.df[target].values)
                 if not restart_params["resume"]:
                     normalizer.fit(sample_target)
                 print(
-                    f"Dummy MAE: {torch.mean(torch.abs(sample_target-normalizer.mean)):.4f}"
+                    f"Dummy MAE: {(sample_target - normalizer.mean).abs().mean():.4f}"
                 )
 
         if log:
@@ -415,7 +417,7 @@ def results_multitask(  # noqa: C901
     model_name: str,
     run_id: int,
     ensemble_folds: int,
-    test_set: Subset,
+    test_set: Dataset | Subset,
     data_params: dict[str, Any],
     robust: bool,
     task_dict: dict[str, TaskType],
@@ -458,6 +460,9 @@ def results_multitask(  # noqa: C901
         "------------Evaluate model on Test Set------------\n"
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
     )
+
+    if isinstance(test_set, Subset):
+        test_set = test_set.dataset
 
     test_generator = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
