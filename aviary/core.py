@@ -44,7 +44,7 @@ class BaseModelClass(nn.Module, ABC):
         Args:
             task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
             robust (bool): Whether to estimate standard deviation for use in a robust loss function
-            device (type[torch.device] | Literal["cuda", "cpu"]): Device the model will run on.
+            device (torch.device | "cuda" | "cpu"): Device the model will run on.
             epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
             best_val_scores (dict[str, float], optional): Validation score to use for early
                 stopping. Defaults to None.
@@ -228,12 +228,12 @@ class BaseModelClass(nn.Module, ABC):
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
-            action (Literal["train", "val"], optional): Whether to track gradients depending on
+            action ("train" | "val"], optional): Whether to track gradients depending on
                 whether we are carrying out a training or validation pass. Defaults to "train".
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
-            dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], np.ndarray]]: nested
+            dict[str, dict["Loss" | "MAE" | "RMSE" | "Acc" | "F1", np.ndarray]]: nested
                 dictionary of metrics for each task.
         """
         if action == "val":
