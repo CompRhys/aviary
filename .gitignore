@@ -27,3 +27,7 @@ datasets/
 pds/
 manuscript/
 voro-thesis/
+
+# MatbenchBenchmark.to_file() output
+examples/matbench/benchmarks
+examples/matbench/job-logs*
