@@ -71,16 +71,15 @@ def init_model(
         model.load_state_dict(checkpoint["state_dict"])
 
         if model.model_params["robust"] != robust:
-            raise AssertionError(
-                "cannot fine-tune "
-                "between tasks with different numbers of outputs - use transfer "
-                "option instead"
+            raise ValueError(
+                "cannot fine-tune between tasks with different numbers of outputs"
+                " - use transfer option instead"
             )
-        if model.model_params["n_targets"] != n_targets:
-            raise AssertionError(
-                "cannot fine-tune "
-                "between tasks with different numbers of outputs - use transfer "
-                "option instead"
+        loaded_n_targets = model.model_params["n_targets"]
+        if loaded_n_targets != n_targets:
+            raise ValueError(
+                f"n_targets mismatch between model_params dict ({n_targets}) and loaded "
+                f"state dict ({loaded_n_targets})"
             )
 
     elif transfer is not None:
@@ -451,7 +450,7 @@ def results_multitask(  # noqa: C901
             task.
     """
     if not (print_results or save_results):
-        raise AssertionError(
+        raise ValueError(
             "Evaluating Model pointless if both 'print_results' and "
             "'save_results' are False."
         )
@@ -491,15 +490,15 @@ def results_multitask(  # noqa: C901
             print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
         if not os.path.isfile(resume):
-            raise AssertionError(f"no checkpoint found at '{resume}'")
+            raise FileNotFoundError(f"no checkpoint found at '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
         if checkpoint["model_params"]["robust"] != robust:
-            raise AssertionError(f"robustness of checkpoint '{resume}' is not {robust}")
+            raise ValueError(f"robustness of checkpoint '{resume}' is not {robust}")
 
         chkpt_task_dict = checkpoint["model_params"]["task_dict"]
         if chkpt_task_dict != task_dict:
-            raise AssertionError(
+            raise ValueError(
                 f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
                 f"task_dict {task_dict}"
             )
@@ -516,8 +515,6 @@ def results_multitask(  # noqa: C901
                 normalizer_dict[task] = None
 
         y_test, output, *ids = model.predict(generator=test_generator)
-
-        # TODO should output also be a dictionary?
 
         for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
             if task == "regression":
