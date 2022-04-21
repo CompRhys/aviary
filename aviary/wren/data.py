@@ -274,7 +274,7 @@ def parse_aflow(
         # Put 1's in front of all Wyckoff letters not preceded by numbers
         wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
 
-        # Separate our pairs of Wyckoff letters and their number of occurrences
+        # Separate out pairs of Wyckoff letters and their number of occurrences
         sep_n_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
