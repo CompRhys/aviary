@@ -283,6 +283,9 @@ def parse_aflow(
             wyk_list.extend([l] * m)
             mult_list.extend([float(mult_dict[spg_no][l])] * m)
 
+    # NOTE This on-the-fly augmentation of equivalent Wyckoff sets is potentially a source of high
+    # memory use. Can be turned off by commenting out the for loop and returning [wyk_list] instead
+    # of aug_wyks. Wren should be able to learn anyway.
     aug_wyks = []
     for trans in relab_dict[spg_no]:
         # Apply translation dictionary of allowed relabelling operations in spacegroup

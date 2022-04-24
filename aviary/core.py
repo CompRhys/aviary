@@ -335,7 +335,7 @@ class BaseModelClass(nn.Module, ABC):
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
-            tuple containing:
+            3-tuple containing:
             - tuple[Tensor, ...]: Tuple of target Tensors
             - tuple[Tensor, ...]: Tuple of prediction Tensors
             - tuple[str, ...]: Tuple of identifiers
@@ -448,7 +448,7 @@ class Normalizer:
         """Normalize a Tensor
 
         Args:
-            tensor (Tensor): Tensor to be Normalized
+            tensor (Tensor): Tensor to be normalized
 
         Returns:
             Tensor: Normalized Tensor
@@ -456,7 +456,7 @@ class Normalizer:
         return (tensor - self.mean) / self.std
 
     def denorm(self, normed_tensor: Tensor) -> Tensor:
-        """Restore normalizes Tensor
+        """Restore normalized Tensor to original.
 
         Args:
             tensor (Tensor): Tensor to be restored
