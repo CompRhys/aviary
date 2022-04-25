@@ -4,38 +4,19 @@ import plotly.express as px
 import plotly.graph_objs as go
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
+from plotly.graph_objs._figure import Figure
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
 
 
-def plot_scaled_errors(df: pd.DataFrame) -> go.Figure:
-    """Generate the Matbench scaled errors graph seen on
-    https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
+def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
+    """Scale the errors in a Matbench dataframe with columns for tasks and rows for
+    different models. Missing entries are fine.
 
-        Args:
-            df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
-                models. Missing entries are fine.
-
-        Returns:
-            go.Figure: Plotly graph objects Figure instance
+    Returns:
+        pd.DataFrame: Dataframe with scaled errors
     """
-
-    x_labels = {
-        "matbench_steels": "σᵧ Steel alloys",
-        "matbench_jdft2d": "Eˣ 2D Materials",
-        "matbench_phonons": "ωᵐᵃˣ Phonons",
-        "matbench_dielectric": "𝑛",
-        "matbench_expt_gap": "Eᵍ Experimental",
-        "matbench_expt_is_metal": "Expt. Metallicity Classification",
-        "matbench_glass": "Metallic Glass Classification",
-        "matbench_log_kvrh": "log₁₀Kᵛʳʰ",
-        "matbench_log_gvrh": "log₁₀Gᵛʳʰ",
-        "matbench_perovskites": "Eᶠ Perovskites, DFT",
-        "matbench_mp_gap": "Eᵍ DFT",
-        "matbench_mp_is_metal": "Metallicity DFT",
-        "matbench_mp_e_form": "Eᶠ DFT",
-    }
 
     # make scaled data for heatmap coloring
     # scale regression problems by mad/mae
@@ -61,23 +42,48 @@ def plot_scaled_errors(df: pd.DataFrame) -> go.Figure:
 
         scaled_df[task] = scaler(scaled_df[task], mbv01_metadata[task].mad)
 
-    scaled_df = scaled_df.T
-    scaled_df["n_samples"] = [
-        mbv01_metadata[task].num_entries for task in scaled_df.index
-    ]
-    scaled_df["Task"] = [x_labels[task] for task in scaled_df.index]
-    scaled_df = scaled_df.sort_values(by="n_samples")
-    scaled_df.index = scaled_df["Task"]
-    scaled_df = scaled_df.drop(columns=["n_samples", "Task"]).round(3)
+    return scaled_df
 
-    best_values = scaled_df.min(axis=1)
-    best_algos = scaled_df.idxmin(axis=1)
 
-    fig = px.scatter(scaled_df, log_y=True)
+x_labels = {
+    "matbench_steels": "σᵧ Steel alloys",
+    "matbench_jdft2d": "Eˣ 2D Materials",
+    "matbench_phonons": "ωᵐᵃˣ Phonons",
+    "matbench_dielectric": "𝑛",
+    "matbench_expt_gap": "Eᵍ Experimental",
+    "matbench_expt_is_metal": "Expt. Metallicity Classification",
+    "matbench_glass": "Metallic Glass Classification",
+    "matbench_log_kvrh": "log₁₀Kᵛʳʰ",
+    "matbench_log_gvrh": "log₁₀Gᵛʳʰ",
+    "matbench_perovskites": "Eᶠ Perovskites, DFT",
+    "matbench_mp_gap": "Eᵍ DFT",
+    "matbench_mp_is_metal": "Metallicity DFT",
+    "matbench_mp_e_form": "Eᶠ DFT",
+}
+
+
+def plot_leaderboard(df: pd.DataFrame) -> Figure:
+    """Generate the Matbench scaled errors graph seen on
+    https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
+
+        Args:
+            df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
+                models. Missing entries are fine.
+
+        Returns:
+            Figure: Plotly graph objects Figure instance
+    """
+    # deep copy df so we don't modify the original
+    df = df.copy(deep=True)
+
+    best_values = df.min(axis=1)
+    best_algos = df.idxmin(axis=1)
+
+    fig = px.scatter(df, log_y=True, labels=x_labels)
 
     fig.update_layout(
         title=dict(text="Scaled Errors", font_size=25, x=0.4),
-        legend=dict(font_size=15, title_font_size=15, title_text="Algorithm"),
+        legend=dict(font_size=15, title=dict(font_size=15, text="Algorithm")),
         yaxis_title="Scaled MAE (regression) or <br> (1-ROCAUC)/0.5 (classification)",
         xaxis_title="",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -98,8 +104,35 @@ def plot_scaled_errors(df: pd.DataFrame) -> go.Figure:
         )
     )
     fig.update_traces(marker_size=10)
-
     fig.update_xaxes(linecolor="grey", gridcolor="grey")
     fig.update_yaxes(linecolor="grey", gridcolor="grey")
 
-    return fig, scaled_df
+    return fig
+
+
+def scaled_error_heatmap(df: pd.DataFrame) -> Figure:
+    """Create a heatmap of the scaled errors with a column for mean scaled error added
+    on the right.
+
+    Args:
+        df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
+                models. Missing entries are fine.
+
+    Returns:
+        Figure: Plotly graph objects Figure instance
+    """
+    # deep copy df so we don't modify the original
+    df = df.copy(deep=True)
+
+    df["mean scaled error"] = df.mean(1)
+    df = df.sort_values(by="mean scaled error")
+
+    fig = px.imshow(df, width=1000, height=600, text_auto=".1f", aspect="auto")
+
+    fig.update_layout(
+        title=dict(text="<b>Matbench Scaled Errors</b>", x=0.5, font_size=20),
+        font_size=14,
+        coloraxis_colorbar_x=1.05,
+    )
+
+    return fig

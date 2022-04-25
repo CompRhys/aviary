@@ -7,7 +7,12 @@ from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
 from monty.serialization import loadfn
 
-from examples.matbench.plotting_functions import plot_scaled_errors
+from examples.matbench.plotting_functions import (
+    plot_leaderboard,
+    scale_errors,
+    scaled_error_heatmap,
+    x_labels,
+)
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
@@ -60,8 +65,16 @@ for bench_name in ["wren-4of9-2022-04-15@13-31", "roost-2022-04-15@19-21"]:
 
 # %%
 df = pd.DataFrame(all_data)
-fig, scaled_df = plot_scaled_errors(df)
+df = scale_errors(df).round(3)
+# format column names for prettier axis ticks
+df = df.rename(columns=x_labels)
+
+
+# %%
+fig = plot_leaderboard(df)
 fig.show()
+
+# %%
 html_path = "plots/matbench-scaled-errors.html"
 fig.write_html(html_path, include_plotlyjs="cdn")
 
@@ -74,3 +87,8 @@ with open(html_path, "r+") as file:
     )
     file.write(html)
     file.truncate()
+
+
+# %%
+fig = scaled_error_heatmap(df)
+fig.show()
