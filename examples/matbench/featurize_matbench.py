@@ -9,6 +9,9 @@ from tqdm import tqdm
 
 from aviary.wren.utils import get_aflow_label_spglib
 
+__author__ = "Janosh Riebesell"
+__date__ = "2022-04-11"
+
 os.makedirs(f"{os.path.dirname(__file__)}/datasets", exist_ok=True)
 
 mbbm = MatbenchBenchmark()
