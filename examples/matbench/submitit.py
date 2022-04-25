@@ -1,5 +1,3 @@
-"""Author: Janosh Riebesell. Started 2022-04-12."""
-
 # %%
 from __future__ import annotations
 
@@ -12,6 +10,9 @@ from submitit import AutoExecutor
 
 from examples.matbench import DATA_PATHS, MODULE_DIR
 from examples.matbench.run_matbench import run_matbench_task
+
+__author__ = "Janosh Riebesell"
+__date__ = "2022-04-12"
 
 # %%
 model_name = "wren"

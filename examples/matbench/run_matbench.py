@@ -1,7 +1,3 @@
-"""Author: Janosh Riebesell. Started 2022-04-11.
-Related: https://github.com/materialsproject/matbench/issues/116
-"""
-
 # %%
 from __future__ import annotations
 
@@ -18,6 +14,10 @@ from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
 from aviary.wren.model import Wren
 from examples.matbench import DATA_PATHS, MatbenchDatasets
+
+__author__ = "Janosh Riebesell"
+__date__ = "2022-04-11"
+# Related Matbench issue: https://github.com/materialsproject/matbench/issues/116
 
 # %%
 torch.manual_seed(0)  # ensure reproducible results
@@ -186,7 +186,11 @@ def run_matbench_task(
             save_results=False,
         )
 
-        predictions = results_dict[target]["pred"].ravel()
+        if task_type == "regression":
+            predictions = results_dict[target]["pred"].ravel()
+        else:  # classification
+            logits = results_dict[target]["logits"].ravel()
+            predictions = logits.argmax(axis=1)
 
         # record model predictions
         task.record(fold, predictions)
