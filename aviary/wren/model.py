@@ -107,7 +107,7 @@ class Wren(BaseModelClass):
         )
 
         self.output_nns = nn.ModuleList(
-            [ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets]
+            ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
         )
 
     def forward(
@@ -198,26 +198,22 @@ class DescriptorNetwork(nn.Module):
 
         # create a list of Message passing layers
         self.graphs = nn.ModuleList(
-            [
-                MessageLayer(
-                    msg_fea_len=fea_len,
-                    num_msg_heads=elem_heads,
-                    msg_gate_layers=elem_gate,
-                    msg_net_layers=elem_msg,
-                )
-                for i in range(n_graph)
-            ]
+            MessageLayer(
+                msg_fea_len=fea_len,
+                num_msg_heads=elem_heads,
+                msg_gate_layers=elem_gate,
+                msg_net_layers=elem_msg,
+            )
+            for i in range(n_graph)
         )
 
         # define a global pooling function for materials
         self.cry_pool = nn.ModuleList(
-            [
-                WeightedAttentionPooling(
-                    gate_nn=SimpleNetwork(fea_len, 1, cry_gate),
-                    message_nn=SimpleNetwork(fea_len, fea_len, cry_msg),
-                )
-                for _ in range(cry_heads)
-            ]
+            WeightedAttentionPooling(
+                gate_nn=SimpleNetwork(fea_len, 1, cry_gate),
+                message_nn=SimpleNetwork(fea_len, fea_len, cry_msg),
+            )
+            for _ in range(cry_heads)
         )
 
     def forward(

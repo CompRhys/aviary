@@ -115,15 +115,11 @@ class MessageLayer(nn.Module):
 
         # Pooling and Output
         self.pooling = nn.ModuleList(
-            [
-                WeightedAttentionPooling(
-                    gate_nn=SimpleNetwork(2 * msg_fea_len, 1, msg_gate_layers),
-                    message_nn=SimpleNetwork(
-                        2 * msg_fea_len, msg_fea_len, msg_net_layers
-                    ),
-                )
-                for _ in range(num_msg_heads)
-            ]
+            WeightedAttentionPooling(
+                gate_nn=SimpleNetwork(2 * msg_fea_len, 1, msg_gate_layers),
+                message_nn=SimpleNetwork(2 * msg_fea_len, msg_fea_len, msg_net_layers),
+            )
+            for _ in range(num_msg_heads)
         )
 
     def forward(
@@ -190,17 +186,17 @@ class SimpleNetwork(nn.Module):
         dims = [input_dim] + hidden_layer_dims
 
         self.fcs = nn.ModuleList(
-            [nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
+            nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
         )
 
         if batchnorm:
             self.bns = nn.ModuleList(
-                [nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)]
+                nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)
             )
         else:
-            self.bns = nn.ModuleList([nn.Identity() for i in range(len(dims) - 1)])
+            self.bns = nn.ModuleList(nn.Identity() for i in range(len(dims) - 1))
 
-        self.acts = nn.ModuleList([activation() for _ in range(len(dims) - 1)])
+        self.acts = nn.ModuleList(activation() for _ in range(len(dims) - 1))
 
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
@@ -251,25 +247,23 @@ class ResidualNetwork(nn.Module):
         dims = [input_dim] + hidden_layer_dims
 
         self.fcs = nn.ModuleList(
-            [nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
+            nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
         )
 
         if batchnorm:
             self.bns = nn.ModuleList(
-                [nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)]
+                nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)
             )
         else:
-            self.bns = nn.ModuleList([nn.Identity() for i in range(len(dims) - 1)])
+            self.bns = nn.ModuleList(nn.Identity() for i in range(len(dims) - 1))
 
         self.res_fcs = nn.ModuleList(
-            [
-                nn.Linear(dims[i], dims[i + 1], bias=False)
-                if (dims[i] != dims[i + 1])
-                else nn.Identity()
-                for i in range(len(dims) - 1)
-            ]
+            nn.Linear(dims[i], dims[i + 1], bias=False)
+            if (dims[i] != dims[i + 1])
+            else nn.Identity()
+            for i in range(len(dims) - 1)
         )
-        self.acts = nn.ModuleList([activation() for _ in range(len(dims) - 1)])
+        self.acts = nn.ModuleList(activation() for _ in range(len(dims) - 1))
 
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
