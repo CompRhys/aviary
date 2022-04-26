@@ -131,10 +131,8 @@ class DescriptorNetwork(nn.Module):
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
 
         self.convs = nn.ModuleList(
-            [
-                CGCNNConv(elem_fea_len=elem_fea_len, nbr_fea_len=nbr_fea_len)
-                for _ in range(n_graph)
-            ]
+            CGCNNConv(elem_fea_len=elem_fea_len, nbr_fea_len=nbr_fea_len)
+            for _ in range(n_graph)
         )
 
     def forward(
