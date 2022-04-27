@@ -28,6 +28,6 @@ pds/
 manuscript/
 voro-thesis/
 
-# MatbenchBenchmark.to_file() output
-examples/matbench/benchmarks
-examples/matbench/job-logs*
+# MatbenchBenchmark.to_file() output and slurm job logs
+examples/mat_bench/benchmarks
+examples/mat_bench/job-logs*
