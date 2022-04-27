@@ -258,26 +258,30 @@ class BaseModelClass(nn.Module, ABC):
             # move tensors to GPU
             inputs = (tensor.to(self.device) for tensor in inputs)
 
-            targets = (
+            normed_targets = (
                 n.norm(tar) if n is not None else tar
                 for tar, n in zip(targets, normalizer_dict.values())
             )
 
-            targets = [target.to(self.device) for target in targets]
+            normed_targets = [target.to(self.device) for target in normed_targets]
 
             # compute output
             outputs = self(*inputs)
 
             mixed_loss: Tensor = 0
 
-            for name, output, target in zip(self.target_names, outputs, targets):
+            for name, output, target in zip(
+                self.target_names, outputs, normed_targets, strict=True
+            ):
                 task, criterion = criterion_dict[name]
 
                 if task == "regression":
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
+                        output = output.squeeze()
                         loss = criterion(output, log_std, target)
                     else:
+                        output = output.squeeze()
                         loss = criterion(output, target)
 
                     pred = normalizer_dict[name].denorm(output.data.cpu())
