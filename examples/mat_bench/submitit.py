@@ -8,8 +8,8 @@ from os.path import basename
 from matbench.metadata import mbv01_metadata
 from submitit import AutoExecutor
 
-from examples.matbench import DATA_PATHS, MODULE_DIR
-from examples.matbench.run_matbench import run_matbench_task
+from examples.mat_bench import DATA_PATHS, MODULE_DIR
+from examples.mat_bench.run_matbench import run_matbench_task
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-12"

@@ -7,7 +7,7 @@ from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
 from monty.serialization import loadfn
 
-from examples.matbench.plotting_functions import (
+from examples.mat_bench.plotting_functions import (
     plot_leaderboard,
     scale_errors,
     scaled_error_heatmap,

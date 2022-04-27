@@ -4,7 +4,7 @@ from datetime import datetime
 
 from matbench.metadata import mbv01_metadata
 
-from examples.matbench import DATA_PATHS, MODULE_DIR
+from examples.mat_bench import DATA_PATHS, MODULE_DIR
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
@@ -29,7 +29,7 @@ job_name = f"matbench-{model_name}-{len(datasets)}jobs"
 
 python_cmd = f"""import os
 
-from examples.matbench.run_matbench import run_matbench_task
+from examples.mat_bench.run_matbench import run_matbench_task
 
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")

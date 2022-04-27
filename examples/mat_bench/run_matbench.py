@@ -13,7 +13,7 @@ from matbench import MatbenchBenchmark
 from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
 from aviary.wren.model import Wren
-from examples.matbench import DATA_PATHS, MatbenchDatasets
+from examples.mat_bench import DATA_PATHS, MatbenchDatasets
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
