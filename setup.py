@@ -1,4 +1,4 @@
-from setuptools import find_namespace_packages, setup
+from setuptools import find_packages, setup
 
 setup(
     name="aviary",
@@ -9,7 +9,7 @@ setup(
     description="A Collection of Machine Learning Models for Materials Discovery",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    packages=find_namespace_packages(include=["aviary*"]),
+    packages=find_packages(include=["aviary*"]),
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
@@ -23,7 +23,7 @@ setup(
         "Wyckoff positions",
         "Crystal Structure Prediction",
     ],
-    package_data={"": ["**/*.json"]},
+    package_data={"": ["embeddings/**/*.json"]},
     python_requires=">=3.7",
     install_requires=[
         "scipy",
