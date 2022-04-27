@@ -35,7 +35,7 @@ class BaseModelClass(nn.Module, ABC):
         self,
         task_dict: dict[str, TaskType],
         robust: bool,
-        device: type[torch.device] | Literal["cuda", "cpu"],
+        device: type[torch.device] | Literal["cuda", "cpu"] | None = None,
         epoch: int = 1,
         best_val_scores: dict[str, float] = None,
     ) -> None:
@@ -53,6 +53,8 @@ class BaseModelClass(nn.Module, ABC):
         self.task_dict = task_dict
         self.target_names = list(task_dict.keys())
         self.robust = robust
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.epoch = epoch
         self.best_val_scores = best_val_scores or {}
