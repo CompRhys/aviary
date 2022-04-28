@@ -111,13 +111,11 @@ def run_matbench_task(
 
         train_set = DataClass(train_df, task_dict, id_cols=["mbid"])
 
+        # n_features = element + wyckoff embedding lengths + element weights in composition
         model = ModelClass(
-            robust=False,
-            n_targets=[1],
-            device="cpu",
-            n_features=200 + 444 + 1,
-            task_dict=task_dict,
+            robust=False, n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict
         )
+        model.to("cuda" if torch.cuda.is_available() else "cpu")
         optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(

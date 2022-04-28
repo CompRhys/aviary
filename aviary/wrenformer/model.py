@@ -72,9 +72,8 @@ class Wren(BaseModelClass):
         # aggregate all node representations into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
         embedding_masked = embedding * ~mask[..., None]
-        aggregated_embedding = torch.sum(embedding_masked, dim=1) / torch.sum(
-            ~mask, dim=1, keepdim=True
-        )
+        seq_lens = torch.sum(~mask, dim=1, keepdim=True)
+        aggregated_embedding = torch.sum(embedding_masked, dim=1) / seq_lens
 
         # main body of the FNN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embedding))

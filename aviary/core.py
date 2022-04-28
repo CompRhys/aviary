@@ -55,6 +55,7 @@ class BaseModelClass(nn.Module, ABC):
         self.robust = robust
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"Pytorch running on {device=}")
         self.device = device
         self.epoch = epoch
         self.best_val_scores = best_val_scores or {}
@@ -256,7 +257,7 @@ class BaseModelClass(nn.Module, ABC):
         ):
 
             # move tensors to GPU
-            inputs = (tensor.to(self.device) for tensor in inputs)
+            inputs = [tensor.to(self.device) for tensor in inputs]
 
             normed_targets = [
                 n.norm(tar) if n is not None else tar
