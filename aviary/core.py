@@ -258,10 +258,10 @@ class BaseModelClass(nn.Module, ABC):
             # move tensors to GPU
             inputs = (tensor.to(self.device) for tensor in inputs)
 
-            normed_targets = (
+            normed_targets = [
                 n.norm(tar) if n is not None else tar
                 for tar, n in zip(targets, normalizer_dict.values())
-            )
+            ]
 
             normed_targets = [target.to(self.device) for target in normed_targets]
 
@@ -270,9 +270,7 @@ class BaseModelClass(nn.Module, ABC):
 
             mixed_loss: Tensor = 0
 
-            for name, output, target in zip(
-                self.target_names, outputs, normed_targets, strict=True
-            ):
+            for name, output, target in zip(self.target_names, outputs, normed_targets):
                 task, criterion = criterion_dict[name]
 
                 if task == "regression":
@@ -369,7 +367,6 @@ class BaseModelClass(nn.Module, ABC):
             test_targets.append(targets)
             test_outputs.append(output)
 
-        # TODO the return values should be described in doc string @janosh
         return (
             # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
             # for multitask learning
