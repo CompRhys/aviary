@@ -47,14 +47,13 @@ submit_script = f"{log_dir}/{job_name}-{datetime.now():%Y-%m-%d@%H-%M}.py"
 
 slurm_setup = [  # prepend into sbatch script to load GPU env before actual command
     ". /etc/profile.d/modules.sh",  # source module command
-    "module purge",  # clear existing modules
     "module load rhel8/default-amp",  # load default env for ampere partition
 ]
 
 # %%
 slurm_cmd = f"""sbatch \
   --partition ampere \
-  --account LEE-SL3-GPU \
+  --account LEE-JR769-SL2-GPU \
   --time 4:0:0 \
   --nodes 1 \
   --gpus-per-node 1 \
@@ -70,7 +69,6 @@ with open(submit_script, "w") as file:
 
 
 # %% uncomment to submit
-# slurm_msg = !{slurm_cmd}
+# !{slurm_cmd}
 
 # print(slurm_msg)
-# >>> ['Submitted batch job 59462152']
