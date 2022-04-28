@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import BoolTensor, Tensor
@@ -69,9 +70,13 @@ class Wren(BaseModelClass):
         embedding = self.transformer_encoder(features, src_key_padding_mask=mask)
 
         # aggregate all node representations into a single vector Wyckoff embedding
-        embedding = embedding.mean(dim=1)
+        # careful to ignore padded values when taking the mean
+        embedding_masked = embedding * ~mask[..., None]
+        aggregated_embedding = torch.sum(embedding_masked, dim=1) / torch.sum(
+            ~mask, dim=1, keepdim=True
+        )
 
         # main body of the FNN jointly used by all multitask objectives
-        predictions = F.relu(self.trunk_nn(embedding))
+        predictions = F.relu(self.trunk_nn(aggregated_embedding))
 
         return tuple(output_nn(predictions) for output_nn in self.output_nns)
