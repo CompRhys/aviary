@@ -6,12 +6,12 @@ from matbench.metadata import mbv01_metadata
 
 from examples.mat_bench import DATA_PATHS, MODULE_DIR
 
-__author__ = "Janosh Riebesell"
+__author__ = "Janosh Riebesell, Rokas Elijosius"
 __date__ = "2022-04-25"
 
 
 # %% write Python submission file and sbatch it
-model_name = "roost"
+model_name = "wrenformer"
 epochs = 100
 
 if "roost" in model_name.lower():
@@ -29,7 +29,7 @@ job_name = f"matbench-{model_name}-{len(datasets)}jobs"
 
 python_cmd = f"""import os
 
-from examples.mat_bench.run_matbench import run_matbench_task
+from examples.mat_bench.run_wrenformer import run_matbench_task
 
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
