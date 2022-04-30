@@ -169,9 +169,9 @@ class CrystalGraphData(Dataset):
             - list[str | int]: identifiers like material_id, composition
         """
         # NOTE sites must be given in fractional coordinates
-        df_idx = self.df.iloc[idx]
-        crystal = df_idx["Structure_obj"]
-        cry_ids = df_idx[self.identifiers]
+        row = self.df.iloc[idx]
+        crystal = row["Structure_obj"]
+        material_ids = row[self.identifiers]
 
         # atom features for disordered sites
         site_atoms = [atom.species.as_dict() for atom in crystal]
@@ -188,11 +188,13 @@ class CrystalGraphData(Dataset):
         self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
         if not len(self_idx):
-            raise AssertionError(f"All atoms in {cry_ids} are isolated")
+            raise AssertionError(f"All atoms in {material_ids} are isolated")
         if not len(nbr_idx):
-            raise AssertionError(f"This should not be triggered but was for {cry_ids}")
+            raise AssertionError(
+                f"This should not be triggered but was for {material_ids}"
+            )
         if set(self_idx) != set(range(crystal.num_sites)):
-            raise AssertionError(f"At least one atom in {cry_ids} is isolated")
+            raise AssertionError(f"At least one atom in {material_ids} is isolated")
 
         nbr_dist = self.gdf.expand(nbr_dist)
 
@@ -204,14 +206,14 @@ class CrystalGraphData(Dataset):
         targets: list[Tensor | LongTensor] = []
         for target, task_type in self.task_dict.items():
             if task_type == "regression":
-                targets.append(Tensor([df_idx[target]]))
+                targets.append(Tensor([row[target]]))
             elif task_type == "classification":
-                targets.append(LongTensor([df_idx[target]]))
+                targets.append(LongTensor([row[target]]))
 
         return (
             (atom_fea_t, nbr_dist_t, self_idx_t, nbr_idx_t),
             targets,
-            *cry_ids,
+            *material_ids,
         )
 
 
