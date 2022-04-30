@@ -127,7 +127,7 @@ def scaled_error_heatmap(df: pd.DataFrame) -> Figure:
     df["mean scaled error"] = df.mean(1)
     df = df.sort_values(by="mean scaled error")
 
-    fig = px.imshow(df, width=1000, height=600, text_auto=".1f", aspect="auto")
+    fig = px.imshow(df, width=1000, height=600, text_auto=".2f", aspect="auto")
 
     fig.update_layout(
         title=dict(text="<b>Matbench Scaled Errors</b>", x=0.5, font_size=20),
