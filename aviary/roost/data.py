@@ -86,9 +86,9 @@ class CompositionData(Dataset):
             - list[Tensor | LongTensor]: regression or classification targets
             - list[str | int]: identifiers like material_id, composition
         """
-        df_idx = self.df.iloc[idx]
-        composition = df_idx[self.inputs]
-        cry_ids = df_idx[self.identifiers].to_list()
+        row = self.df.iloc[idx]
+        composition = row[self.inputs]
+        material_ids = row[self.identifiers].to_list()
 
         comp_dict = Composition(composition).get_el_amt_dict()
         elements = list(comp_dict.keys())
@@ -100,11 +100,11 @@ class CompositionData(Dataset):
             elem_fea = np.vstack([self.elem_features[element] for element in elements])
         except AssertionError:
             raise AssertionError(
-                f"cry-id {cry_ids[0]} [{composition}] contains element types not in embedding"
+                f"{material_ids} ({composition}) contains element types not in embedding"
             )
         except ValueError:
             raise ValueError(
-                f"cry-id {cry_ids[0]} [{composition}] composition cannot be parsed into elements"
+                f"{material_ids} ({composition}) composition cannot be parsed into elements"
             )
 
         nele = len(elements)
@@ -123,14 +123,14 @@ class CompositionData(Dataset):
         targets = []
         for target in self.task_dict:
             if self.task_dict[target] == "regression":
-                targets.append(Tensor([df_idx[target]]))
+                targets.append(Tensor([row[target]]))
             elif self.task_dict[target] == "classification":
-                targets.append(LongTensor([df_idx[target]]))
+                targets.append(LongTensor([row[target]]))
 
         return (
             (elem_weights, elem_fea, self_idx, nbr_idx),
             targets,
-            *cry_ids,
+            *material_ids,
         )
 
 

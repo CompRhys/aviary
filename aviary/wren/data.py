@@ -104,17 +104,17 @@ class WyckoffData(Dataset):
             - list[Tensor | LongTensor]: regression or classification targets
             - list[str | int]: identifiers like material_id, composition
         """
-        df_idx = self.df.iloc[idx]
-        swyks = df_idx[self.inputs]
-        cry_ids = df_idx[self.identifiers].to_list()
+        row = self.df.iloc[idx]
+        wyckoff_str = row[self.inputs]
+        material_ids = row[self.identifiers].to_list()
 
-        spg_no, weights, elements, aug_wyks = parse_aflow(swyks)
+        spg_no, weights, elements, aug_wyks = parse_aflow(wyckoff_str)
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
             elem_fea = np.vstack([self.elem_features[el] for el in elements])
         except AssertionError:
-            print(f"Failed to process elements in {cry_ids[0]}: {cry_ids[1]}-{swyks}")
+            print(f"Failed to process elements for {material_ids}")
             raise
 
         try:
@@ -122,9 +122,7 @@ class WyckoffData(Dataset):
                 [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
             )
         except AssertionError:
-            print(
-                f"Failed to process Wyckoff positions in {cry_ids[0]}: {cry_ids[1]}-{swyks}"
-            )
+            print(f"Failed to process Wyckoff positions for {material_ids}")
             raise
 
         n_wyks = len(elements)
@@ -158,7 +156,7 @@ class WyckoffData(Dataset):
         return (
             (mult_weights, elem_fea, sym_fea, self_idx, nbr_idx),
             targets,
-            *cry_ids,
+            *material_ids,
         )
 
 

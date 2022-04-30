@@ -54,7 +54,7 @@ def run_matbench_task(
     if "wrenformer" in model_name.lower():
         from aviary.wrenformer.data import WyckoffData as DataClass
         from aviary.wrenformer.data import collate_batch
-        from aviary.wrenformer.model import Wren as ModelClass
+        from aviary.wrenformer.model import Wrenformer as ModelClass
     # TODO: make it work with Wren and Roost too at some point, currently the model and
     # data class kwargs are differently named
     elif "wren" in model_name.lower():
@@ -113,7 +113,7 @@ def run_matbench_task(
 
         # n_features = element + wyckoff embedding lengths + element weights in composition
         model = ModelClass(
-            robust=False, n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict
+            n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict, robust=robust
         )
         model.to("cuda" if torch.cuda.is_available() else "cpu")
         optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)

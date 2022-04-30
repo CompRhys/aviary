@@ -32,9 +32,11 @@ class WyckoffData(Dataset):
             df (pd.DataFrame): Pandas dataframe holding input and target values.
             task_dict (dict[str, "regression" | "classification"]): Map from target names to task
                 type for multi-task learning.
-            element_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16", "onehot112" or
-                path to a file with custom element embeddings. Defaults to "matscholar200".
-            symmetry_embedding (str): Symmetry embedding. One of "bra-alg-off" (default) or "spg-alg-off".
+            element_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16",
+                "onehot112" or path to a file with custom element embeddings.
+                Defaults to "matscholar200".
+            symmetry_embedding (str): Built-in options are "bra-alg-off" (default) or
+                "spg-alg-off". Can also be path to a file with custom symmetry embeddings.
             input_col (str, optional): Name of df column containing Aflow-style Wyckoff strings.
                 Defaults to "wyckoff".
             id_cols (list, optional): df columns for distinguishing data points. Will be
@@ -99,19 +101,17 @@ class WyckoffData(Dataset):
             - list[Tensor | LongTensor]: regression or classification targets
             - list[str | int]: identifiers like material_id, composition
         """
-        df_idx = self.df.iloc[idx]
-        swyks = df_idx[self.inputs]
-        material_ids = df_idx[self.identifiers].to_list()
+        row = self.df.iloc[idx]
+        wyckoff_str = row[self.inputs]
+        material_ids = row[self.identifiers].to_list()
 
-        spg_no, weights, elements, aug_wyks = parse_aflow(swyks)
+        spg_no, weights, elements, aug_wyks = parse_aflow(wyckoff_str)
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
             element_features = np.vstack([self.elem_features[el] for el in elements])
         except AssertionError:
-            print(
-                f"Failed to process elements in {material_ids[0]}: {material_ids[1]}-{swyks}"
-            )
+            print(f"Failed to process elements for {material_ids}")
             raise
 
         try:
@@ -119,9 +119,7 @@ class WyckoffData(Dataset):
                 [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
             )
         except AssertionError:
-            print(
-                f"Failed to process Wyckoff positions in {material_ids[0]}: {material_ids[1]}-{swyks}"
-            )
+            print(f"Failed to process Wyckoff positions for {material_ids}")
             raise
 
         # convert all data to tensors
@@ -144,8 +142,8 @@ class WyckoffData(Dataset):
 
 
 def collate_batch(
-    dataset_list: tuple[Tensor, list[Tensor | LongTensor], list[str | int]],
-) -> tuple[tuple[Tensor, Tensor], ...]:
+    dataset_list: tuple[Tensor, list[Tensor | LongTensor], list[str | int]]
+):
     """Collate a list of data and return a batch for predicting
     crystal properties.
 
