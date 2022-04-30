@@ -145,15 +145,15 @@ def run_matbench_task(
         targets, [predictions], *ids = model.predict(test_loader)
 
         # record model predictions
-        matbench_task.record(fold, predictions)
+        matbench_task.record(fold, predictions.cpu())
 
     # save model benchmark
     if isfile(benchmark_path):  # we checked for isfile() above but possible another
         # slurm job created it in the meantime in which case we need to merge results
         mbbm = MatbenchBenchmark.from_file(benchmark_path)
         mbbm.tasks_map[dataset_name] = matbench_task
-    else:
-        os.makedirs(dirname(benchmark_path), exist_ok=True)
+    elif benchmark_dir := dirname(benchmark_path):
+        os.makedirs(benchmark_dir, exist_ok=True)
 
     mbbm.to_file(benchmark_path)
 

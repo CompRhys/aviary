@@ -295,7 +295,10 @@ class BaseModelClass(nn.Module, ABC):
                         loss = criterion(torch.log(logits), target.squeeze(1))
                     else:
                         logits = softmax(output, dim=1)
-                        loss = criterion(output, target.squeeze(1))
+                        # TODO @janosh fix properly IndexError: Dimension out of range (expected to
+                        # be in range of [-1, 0], but got 1)
+                        # changing target.squeeze(1 -> -1) seems to fix it but not sure it's correct
+                        loss = criterion(output, target.squeeze(-1))
 
                     logits = logits.data.cpu()
                     target = target.squeeze(1).data.cpu()
@@ -368,17 +371,15 @@ class BaseModelClass(nn.Module, ABC):
             test_targets.append(targets)
             test_outputs.append(output)
 
-        return (
-            # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
-            # for multitask learning
-            tuple(
-                torch.cat(test_t, dim=0).view(-1).numpy()
-                for test_t in zip(*test_targets)
-            ),
-            tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
-            # return identifier columns
-            *(list(chain(*x)) for x in list(zip(*test_ids))),
-        )  # type: ignore
+        # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
+        # for multitask learning
+        targets = tuple(
+            torch.cat(test_t, dim=0).view(-1).numpy() for test_t in zip(*test_targets)
+        )
+        predictions = tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs))
+        # identifier columns
+        ids = [list(chain(*x)) for x in list(zip(*test_ids))]
+        return targets, predictions, *ids  # type: ignore
 
     @torch.no_grad()
     def featurise(self, generator: DataLoader) -> np.ndarray:

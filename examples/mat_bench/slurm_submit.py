@@ -70,5 +70,3 @@ with open(submit_script, "w") as file:
 
 # %% uncomment to submit
 # !{slurm_cmd}
-
-# print(slurm_msg)
