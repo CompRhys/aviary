@@ -51,7 +51,6 @@ class Wrenformer(BaseModelClass):
             transformerLayer, num_layers=n_transformer_layers
         )
 
-        # define an output neural network
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
@@ -65,7 +64,7 @@ class Wrenformer(BaseModelClass):
             ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
         )
 
-    def forward(self, features: Tensor, mask: BoolTensor) -> tuple[Tensor, ...]:
+    def forward(self, features: Tensor, mask: BoolTensor) -> tuple[Tensor, ...]:  # type: ignore
         """Forward pass through the whole Wyckoff model.
 
         Args:

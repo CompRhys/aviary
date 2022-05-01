@@ -79,7 +79,7 @@ class BaseModelClass(nn.Module, ABC):
         verbose: bool = True,
         patience: int = None,
     ) -> None:
-        """Convenience class to carry out training loop.
+        """Ctrl-C interruptible training method.
 
         Args:
             train_generator (DataLoader): Dataloader containing training data.
@@ -94,7 +94,7 @@ class BaseModelClass(nn.Module, ABC):
             model_name (str): String describing the model.
             run_id (int): Unique identifier of the model run.
             checkpoint (bool, optional): Whether to save model checkpoints. Defaults to True.
-            writer (SummaryWriter, optional): TensorBoard writer to save logs in. Defaults to None.
+            writer (SummaryWriter, optional): TensorBoard writer for saving logs. Defaults to None.
             verbose (bool, optional): Whether to print out intermediate results. Defaults to True.
             patience (int, optional): Patience for early stopping. Defaults to None.
         """
@@ -410,7 +410,7 @@ class BaseModelClass(nn.Module, ABC):
 
     @abstractmethod
     def forward(self, *x):
-        """Forward pass through the model. Needs to be implemented in any derived model class.
+        """Forward pass through the model.
 
         Raises:
             NotImplementedError: Raise error if child class doesn't implement forward
