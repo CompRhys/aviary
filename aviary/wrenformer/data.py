@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import json
 from os.path import dirname, exists, join
-from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -11,6 +10,7 @@ import torch
 from torch import LongTensor, Tensor, nn
 from torch.utils.data import Dataset
 
+from aviary import PKG_DIR
 from aviary.wren.data import parse_aflow
 
 
@@ -24,7 +24,7 @@ class WyckoffData(Dataset):
         element_embedding: str = "matscholar200",
         symmetry_embedding: str = "bra-alg-off",
         input_col: str = "wyckoff",
-        id_cols: Sequence[str] = ("material_id", "composition", "wyckoff"),
+        id_cols: list[str] = ["material_id", "composition", "wyckoff"],
     ):
         """Data class for Wren models.
 
@@ -103,31 +103,7 @@ class WyckoffData(Dataset):
         wyckoff_str = row[self.inputs]
         material_ids = row[self.identifiers].to_list()
 
-        spg_no, weights, elements, aug_wyks = parse_aflow(wyckoff_str)
-        weights = np.atleast_2d(weights).T / np.sum(weights)
-
-        try:
-            element_features = np.vstack([self.elem_features[el] for el in elements])
-        except AssertionError:
-            print(f"Failed to process elements for {material_ids}")
-            raise
-
-        try:
-            sym_fea = np.vstack(
-                [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
-            )
-        except AssertionError:
-            print(f"Failed to process Wyckoff positions for {material_ids}")
-            raise
-
-        # convert all data to tensors
-        element_ratios = torch.tensor(weights).repeat(len(aug_wyks), 1)
-        element_features = torch.tensor(element_features).repeat(len(aug_wyks), 1)
-        sym_fea = torch.tensor(sym_fea)
-
-        combined_features = torch.cat(
-            [element_ratios, element_features, sym_fea], dim=1
-        ).float()
+        features = get_initial_wyckoff_embedding(wyckoff_str)
 
         targets = []
         for name in self.task_dict:
@@ -136,11 +112,11 @@ class WyckoffData(Dataset):
             elif self.task_dict[name] == "classification":
                 targets.append(LongTensor([int(self.df[name].iloc[idx])]))
 
-        return combined_features, targets, *material_ids
+        return features, targets, *material_ids
 
 
 def collate_batch(
-    dataset_list: tuple[Tensor, list[Tensor | LongTensor], list[str | int]]
+    features: Tensor, targets: list[Tensor | LongTensor], material_ids: list[str | int]
 ):
     """Collate a list of data and return a batch for predicting
     crystal properties.
@@ -163,12 +139,51 @@ def collate_batch(
             *tuple[str | int]]: Identifiers like material_id, composition
         ]
     """
-    features, targets, *material_ids = zip(*dataset_list)
     padded_features = nn.utils.rnn.pad_sequence(features, batch_first=True)
     # padded_features.shape = (batch_size, max_seq_len, n_features), so we mask sequence items that
     # are all zero across feature dimension
     mask = (padded_features == 0).all(dim=2)
 
-    targets = torch.tensor(targets).T
+    # wrap in list for outer dimension corresponding to different multi-tasking objectives
+    targets = torch.tensor([targets])
 
-    return ((padded_features, mask), targets, *zip(*material_ids))
+    return (padded_features, mask), targets, material_ids
+
+
+with open(f"{PKG_DIR}/embeddings/wyckoff/bra-alg-off.json") as file:
+    sym_features = json.load(file)
+with open(f"{PKG_DIR}/embeddings/element/matscholar200.json") as file:
+    elem_features = json.load(file)
+
+
+def get_initial_wyckoff_embedding(wyckoff_str: str) -> Tensor:
+    """Concatenate matscholar element and Wyckoff set embeddings while handling
+    augmentation from equivalent Wyckoff sets.
+
+    Args:
+        wyckoff_str (str): Aflow-style Wyckoff string.
+
+    Returns:
+        Tensor: Shape (n_augmentations, n_features).
+    """
+    spg_num, elem_weights, elements, augmented_wyckoffs = parse_aflow(wyckoff_str)
+
+    elem_weights = np.atleast_2d(elem_weights).T / np.sum(elem_weights)
+
+    element_features = np.vstack([elem_features[el] for el in elements])
+
+    symmetry_features = np.vstack(
+        [sym_features[spg_num][wyk] for wyks in augmented_wyckoffs for wyk in wyks]
+    )
+
+    n_augments = len(augmented_wyckoffs)  # number of equivalent Wyckoff sets
+    # convert all data to tensors
+    element_ratios = torch.tensor(elem_weights).repeat(n_augments, 1)
+    element_features = torch.tensor(element_features).repeat(n_augments, 1)
+    symmetry_features = torch.tensor(symmetry_features)
+
+    combined_features = torch.cat(
+        [element_ratios, element_features, symmetry_features], dim=1
+    ).float()
+
+    return combined_features

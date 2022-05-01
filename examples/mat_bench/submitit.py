@@ -14,6 +14,13 @@ from examples.mat_bench.run_matbench import run_matbench_task
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-12"
 
+"""
+Legacy module. Tried submitit initially but preferred direct shell interaction through
+iPython shell commands in slurm_submit.py. Less deps and no file clutter from pickled
+submission and job results files.
+"""
+
+
 # %%
 model_name = "wren"
 

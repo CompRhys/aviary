@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import functools
 import os
 import sys
+import time
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import numpy as np
 import pandas as pd
@@ -768,3 +770,17 @@ def save_results_dict(
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to '{csv_path}'")
+
+
+def print_walltime(func: Callable) -> Callable:
+    """Decorator that prints the walltime of a function call."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        value = func(*args, **kwargs)
+        run_time = time.perf_counter() - start_time
+        print(f"{func.__name__} took {run_time:.3f} sec")
+        return value
+
+    return wrapper

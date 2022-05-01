@@ -19,6 +19,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.autonotebook import tqdm
 
+from aviary.data import InMemoryDataLoader
+
 if sys.version_info < (3, 8):
     from typing_extensions import Literal
 else:
@@ -65,8 +67,8 @@ class BaseModelClass(nn.Module, ABC):
 
     def fit(  # noqa: C901
         self,
-        train_generator: DataLoader,
-        val_generator: DataLoader,
+        train_generator: DataLoader | InMemoryDataLoader,
+        val_generator: DataLoader | InMemoryDataLoader,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler._LRScheduler,
         epochs: int,

@@ -11,7 +11,9 @@ from matbench.task import MatbenchTask
 from torch import nn
 
 from aviary.core import Normalizer
+from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
+from aviary.utils import print_walltime
 from examples.mat_bench import DATA_PATHS, MatbenchDatasets
 
 __author__ = "Janosh Riebesell"
@@ -23,13 +25,14 @@ torch.manual_seed(0)  # ensure reproducible results
 
 # %%
 learning_rate = 1e-3
-warmup_steps = 60
+warmup_steps = 10
 
 
 def lr_lambda(epoch: int) -> float:
     return min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5))
 
 
+@print_walltime
 def run_matbench_task(
     model_name: str,
     benchmark_path: str,
@@ -53,17 +56,14 @@ def run_matbench_task(
         MatbenchBenchmark: Benchmark results.
     """
     if "wrenformer" in model_name.lower():
-        from aviary.wrenformer.data import WyckoffData as DataClass
-        from aviary.wrenformer.data import collate_batch
+        from aviary.wrenformer.data import collate_batch, get_initial_wyckoff_embedding
         from aviary.wrenformer.model import Wrenformer as ModelClass
     # TODO: make it work with Wren and Roost too at some point, currently the model and
     # data class kwargs are differently named
     elif "wren" in model_name.lower():
-        from aviary.wren.data import WyckoffData as DataClass
         from aviary.wren.data import collate_batch
         from aviary.wren.model import Wren as ModelClass
     elif "roost" in model_name.lower():
-        from aviary.roost.data import CompositionData as DataClass
         from aviary.roost.data import collate_batch
         from aviary.roost.model import Roost as ModelClass
     else:
@@ -83,6 +83,9 @@ def run_matbench_task(
         return None
 
     df = pd.read_json(DATA_PATHS[dataset_name])
+    # disable=None means hide pbar in non-tty but show when running interactively
+    df["features"] = [get_initial_wyckoff_embedding(wyk_str) for wyk_str in df.wyckoff]
+    matbench_task.df = df.set_index("mbid", drop=False)
 
     target, task_type = (
         str(matbench_task.metadata[x]) for x in ("target", "task_type")
@@ -98,8 +101,6 @@ def run_matbench_task(
     loss_dict = {target: (task_type, loss_func)}
     normalizer_dict = {target: Normalizer() if task_type == "regression" else None}
 
-    matbench_task.df = df.set_index("mbid", drop=False)
-
     for fold in matbench_task.folds:
         if matbench_task.is_recorded[fold]:
             print(f"{fold = } of {dataset_name} already recorded! Skipping...")
@@ -110,7 +111,16 @@ def run_matbench_task(
         train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
         test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
-        train_set = DataClass(train_df, task_dict, id_cols=["mbid"])
+        train_loader = InMemoryDataLoader(
+            [tuple(train_df[x]) for x in ["features", target, "mbid"]],
+            batch_size=32,
+            collate_fn=collate_batch,
+        )
+        test_loader = InMemoryDataLoader(
+            [tuple(test_df[x]) for x in ["features", target, "mbid"]],
+            batch_size=32,
+            collate_fn=collate_batch,
+        )
 
         # n_features = element + wyckoff embedding lengths + element weights in composition
         model = ModelClass(
@@ -121,14 +131,6 @@ def run_matbench_task(
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer, lr_lambda, verbose=True
-        )
-
-        test_set = DataClass(test_df, task_dict, id_cols=["mbid"])
-        train_loader = torch.utils.data.DataLoader(
-            train_set, batch_size=32, collate_fn=collate_batch
-        )
-        test_loader = torch.utils.data.DataLoader(
-            test_set, batch_size=32, collate_fn=collate_batch
         )
 
         model.fit(
@@ -149,14 +151,19 @@ def run_matbench_task(
         # record model predictions
         matbench_task.record(fold, predictions.cpu())
 
-    # save model benchmark
-    if isfile(benchmark_path):  # we checked for isfile() above but possible another
-        # slurm job created it in the meantime in which case we merge results
-        mbbm = MatbenchBenchmark.from_file(benchmark_path)
-        mbbm.tasks_map[dataset_name] = matbench_task
-    elif benchmark_dir := dirname(benchmark_path):
-        os.makedirs(benchmark_dir, exist_ok=True)
+        # save model benchmark
+        if isfile(benchmark_path):  # we checked for isfile() above but possible another
+            # slurm job created it in the meantime in which case we merge results
+            mbbm = MatbenchBenchmark.from_file(benchmark_path)
+            mbbm.tasks_map[dataset_name] = matbench_task
+        elif benchmark_dir := dirname(benchmark_path):
+            os.makedirs(benchmark_dir, exist_ok=True)
 
-    mbbm.to_file(benchmark_path)
+        mbbm.to_file(benchmark_path)
 
     return mbbm
+
+
+if __name__ == "__main__":
+    # for testing and debugging
+    run_matbench_task("wrenformer", "wrenformer-tmp.json", "matbench_jdft2d", 1)
