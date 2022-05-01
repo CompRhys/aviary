@@ -71,8 +71,6 @@ class WyckoffData(Dataset):
         with open(symmetry_embedding) as f:
             self.sym_features = json.load(f)
 
-        self.sym_emb_len = len(list(list(self.sym_features.values())[0].values())[0])
-
         self.n_targets = []
         for target, task in self.task_dict.items():
             if task == "regression":
@@ -167,10 +165,9 @@ def collate_batch(
     """
     features, targets, *material_ids = zip(*dataset_list)
     padded_features = nn.utils.rnn.pad_sequence(features, batch_first=True)
-    mask = padded_features == 0
     # padded_features.shape = (batch_size, max_seq_len, n_features), so we mask sequence items that
-    # are all non-zero across feature dimension
-    mask = torch.all(mask, dim=2)
+    # are all zero across feature dimension
+    mask = (padded_features == 0).all(dim=2)
 
     targets = torch.tensor(targets).T
 

@@ -7,6 +7,7 @@ from os.path import dirname, isfile
 import pandas as pd
 import torch
 from matbench import MatbenchBenchmark
+from matbench.task import MatbenchTask
 from torch import nn
 
 from aviary.core import Normalizer
@@ -75,7 +76,7 @@ def run_matbench_task(
     else:
         mbbm = MatbenchBenchmark(subset=[dataset_name])
 
-    matbench_task = mbbm.tasks_map[dataset_name]
+    matbench_task: MatbenchTask = mbbm.tasks_map[dataset_name]
 
     if matbench_task.all_folds_recorded:
         print(f"\nTask {dataset_name} already recorded! Skipping...\n")
@@ -104,7 +105,7 @@ def run_matbench_task(
             print(f"{fold = } of {dataset_name} already recorded! Skipping...")
             continue
 
-        model_name = f"roost-{dataset_name}-{fold=}"
+        fold_name = f"{model_name}-{dataset_name}-{fold=}"
 
         train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
         test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
@@ -138,8 +139,9 @@ def run_matbench_task(
             epochs=epochs,
             criterion_dict=loss_dict,
             normalizer_dict=normalizer_dict,
-            model_name=model_name,
+            model_name=fold_name,
             run_id=1,
+            checkpoint=False,
         )
 
         targets, [predictions], *ids = model.predict(test_loader)
@@ -149,7 +151,7 @@ def run_matbench_task(
 
     # save model benchmark
     if isfile(benchmark_path):  # we checked for isfile() above but possible another
-        # slurm job created it in the meantime in which case we need to merge results
+        # slurm job created it in the meantime in which case we merge results
         mbbm = MatbenchBenchmark.from_file(benchmark_path)
         mbbm.tasks_map[dataset_name] = matbench_task
     elif benchmark_dir := dirname(benchmark_path):
