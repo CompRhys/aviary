@@ -7,19 +7,21 @@ from torch import Tensor
 
 @dataclass
 class InMemoryDataLoader:
-    """In-memory DataLoader using array/tensor slicing instead to generate whole
-    batches at once instead of sample by sample.
+    """In-memory DataLoader using array/tensor slicing to generate whole batches at
+    once instead of sample-by-sample.
 
     Args:
-        *tensors: List of arrays or tensors. Must all have the same length @ dim 0.
+        *tensors: List of arrays or tensors. Must all have the same length in dimension 0.
         batch_size (int, optional): Defaults to 32.
         shuffle (bool, optional): If True, shuffle the data *in-place* whenever an
             iterator is created from this object. Defaults to False.
+        collate_fn (Callable, optional): Should accept variadic list of tensors and
+            output a minibatch of data ready for model consumption. Defaults to tuple().
     """
 
     tensors: list[Tensor]
     batch_size: int = 32
-    shuffle: bool = False
+    shuffle: bool = True
     collate_fn: Callable[[Any], tuple[Tensor]] = tuple
 
     def __post_init__(self):
@@ -44,6 +46,6 @@ class InMemoryDataLoader:
         return batch
 
     def __len__(self) -> int:
-        """Get the number of batches in this dataloader"""
+        """Get the number of batches in this dataloader."""
         n_batches, remainder = divmod(self.dataset_len, self.batch_size)
         return n_batches + bool(remainder)

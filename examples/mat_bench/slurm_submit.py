@@ -45,7 +45,7 @@ run_matbench_task({model_name=}, {benchmark_path=}, dataset_name=dataset_name, {
 submit_script = f"{log_dir}/{job_name}-{datetime.now():%Y-%m-%d@%H-%M}.py"
 
 # prepend into sbatch script to source module command and load default env
-# for ampere GPU partition before actual job command
+# for Ampere GPU partition before actual job command
 slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 
 # %%
@@ -59,7 +59,7 @@ slurm_cmd = f"""sbatch
   --array 0-{len(datasets) - 1}
   --out {job_name}-%A-%a.log
   --job-name {job_name}
-  --wrap '{slurm_setup}; python {submit_script}'
+  --wrap '{slurm_setup} python {submit_script}'
 """
 
 header = f'"""\nSlurm submission command:\n{slurm_cmd}"""'

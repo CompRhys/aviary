@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split as split
 
+from aviary import ROOT
 from aviary.cgcnn.data import CrystalGraphData, collate_batch
 from aviary.cgcnn.model import CrystalGraphConvNet
 from aviary.utils import results_multitask, train_ensemble
@@ -182,7 +183,7 @@ def main(  # noqa: C901
     }
 
     if resume:
-        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+        resume = f"{ROOT}/models/{model_name}/checkpoint-r{run_id}.pth.tar"
 
     restart_params = {
         "resume": resume,

@@ -5,11 +5,11 @@ import pandas as pd
 import torch
 from matbench.metadata import mbv01_metadata
 from torch.nn import L1Loss
-from tqdm import tqdm
 
 from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
-from aviary.wrenformer.data import collate_batch, get_initial_wyckoff_embedding
+from aviary.utils import print_walltime
+from aviary.wrenformer.data import collate_batch, wyckoff_embedding_from_aflow_str
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS
 
@@ -61,9 +61,8 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, verbose=True
 
 
 # %%
-df["features"] = [
-    get_initial_wyckoff_embedding(wyk_str) for wyk_str in tqdm(df.wyckoff)
-]
+with print_walltime("Generating Wyckoff embeedings"):
+    df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
 
 features, targets, ids = (df[x] for x in ["features", target, "mbid"])
 targets = torch.tensor(targets, device=device)

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import functools
 import os
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Callable, Iterable
+from typing import Any, Generator, Iterable
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.tensorboard import SummaryWriter
 
+from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import RobustL1Loss, RobustL2Loss
 
@@ -365,7 +366,7 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
+                f"{ROOT}/runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
         else:
             writer = None
@@ -485,10 +486,10 @@ def results_multitask(  # noqa: C901
     for j in range(ensemble_folds):
 
         if ensemble_folds == 1:
-            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
         else:
-            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{j}.pth.tar"
             print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
         if not os.path.isfile(resume):
@@ -772,15 +773,18 @@ def save_results_dict(
     print(f"\nSaved model predictions to '{csv_path}'")
 
 
-def print_walltime(func: Callable) -> Callable:
-    """Decorator that prints the walltime of a function call."""
+@contextmanager
+def print_walltime(desc: str = "Execution") -> Generator[None, None, None]:
+    """Context manager and decorator that prints the wall time of its lifetime.
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()
-        value = func(*args, **kwargs)
+    Args:
+        desc (str, optional): Description prints as f"{desc} took 1.23 sec".
+            Defaults to "Execution".
+    """
+    start_time = time.perf_counter()
+
+    try:
+        yield
+    finally:
         run_time = time.perf_counter() - start_time
-        print(f"{func.__name__} took {run_time:.2f} sec")
-        return value
-
-    return wrapper
+        print(f"{desc} took {run_time:.2f} sec")

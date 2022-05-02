@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.autonotebook import tqdm
 
+from aviary import ROOT
 from aviary.data import InMemoryDataLoader
 
 if sys.version_info < (3, 8):
@@ -502,9 +503,10 @@ def save_checkpoint(
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
     """
-    os.makedirs(f"models/{model_name}", exist_ok=True)
-    checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
-    best = f"models/{model_name}/best-r{run_id}.pth.tar"
+    model_dir = f"{ROOT}/models/{model_name}"
+    os.makedirs(model_dir, exist_ok=True)
+    checkpoint = f"{model_dir}/checkpoint-r{run_id}.pth.tar"
+    best = f"{model_dir}/best-r{run_id}.pth.tar"
 
     torch.save(state, checkpoint)
     if is_best:

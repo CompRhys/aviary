@@ -1,3 +1,4 @@
-import os
+from os.path import abspath, dirname
 
-PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+PKG_DIR = dirname(abspath(__file__))
+ROOT = dirname(PKG_DIR)

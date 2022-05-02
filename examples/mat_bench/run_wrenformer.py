@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from os.path import dirname, isfile
 
 import pandas as pd
@@ -9,7 +10,9 @@ import torch
 from matbench import MatbenchBenchmark
 from matbench.task import MatbenchTask
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 
+from aviary import ROOT
 from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
@@ -32,7 +35,7 @@ def lr_lambda(epoch: int) -> float:
     return min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5))
 
 
-@print_walltime
+@print_walltime("run_matbench_task")
 def run_matbench_task(
     model_name: str,
     benchmark_path: str,
@@ -56,7 +59,10 @@ def run_matbench_task(
         MatbenchBenchmark: Benchmark results.
     """
     if "wrenformer" in model_name.lower():
-        from aviary.wrenformer.data import collate_batch, get_initial_wyckoff_embedding
+        from aviary.wrenformer.data import (
+            collate_batch,
+            wyckoff_embedding_from_aflow_str,
+        )
         from aviary.wrenformer.model import Wrenformer as ModelClass
     # TODO: make it work with Wren and Roost too at some point, currently the model and
     # data class kwargs are differently named
@@ -86,8 +92,8 @@ def run_matbench_task(
         return None
 
     df = pd.read_json(DATA_PATHS[dataset_name])
-    # disable=None means hide pbar in non-tty but show when running interactively
-    df["features"] = [get_initial_wyckoff_embedding(wyk_str) for wyk_str in df.wyckoff]
+    with print_walltime("Generating initial wyckoff embedding"):
+        df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
     matbench_task.df = df.set_index("mbid", drop=False)
 
     target, task_type = (
@@ -119,7 +125,10 @@ def run_matbench_task(
         features = tuple(tensor.to(device) for tensor in features)
 
         train_loader = InMemoryDataLoader(
-            [features, targets, ids], batch_size=32, collate_fn=collate_batch
+            [features, targets, ids],
+            batch_size=32,
+            shuffle=True,
+            collate_fn=collate_batch,
         )
 
         features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
@@ -141,6 +150,10 @@ def run_matbench_task(
             optimizer, lr_lambda, verbose=True
         )
 
+        writer = SummaryWriter(
+            f"{ROOT}/runs/{fold_name}/{datetime.now():%Y-%m-%d@%H-%M}"
+        )
+
         model.fit(
             train_loader,
             test_loader,
@@ -152,6 +165,7 @@ def run_matbench_task(
             model_name=fold_name,
             run_id=1,
             checkpoint=False,
+            writer=writer,
         )
 
         targets, [predictions], *ids = model.predict(test_loader)

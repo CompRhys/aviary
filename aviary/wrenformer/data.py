@@ -42,7 +42,7 @@ with open(f"{PKG_DIR}/embeddings/element/matscholar200.json") as file:
     elem_features = json.load(file)
 
 
-def get_initial_wyckoff_embedding(wyckoff_str: str) -> Tensor:
+def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     """Concatenate matscholar element and Wyckoff set embeddings while handling
     augmentation from equivalent Wyckoff sets.
 
