@@ -388,12 +388,12 @@ def train_ensemble(
                     if task == "regression":
                         val_score[name] = v_metrics[name]["MAE"]
                         print(
-                            f"Validation Baseline - {name}: MAE {val_score[name]:.3f}"
+                            f"Validation Baseline - {name}: MAE {val_score[name]:.2f}"
                         )
                     elif task == "classification":
                         val_score[name] = v_metrics[name]["Acc"]
                         print(
-                            f"Validation Baseline - {name}: Acc {val_score[name]:.3f}"
+                            f"Validation Baseline - {name}: Acc {val_score[name]:.2f}"
                         )
                 model.best_val_scores = val_score
 
@@ -780,7 +780,7 @@ def print_walltime(func: Callable) -> Callable:
         start_time = time.perf_counter()
         value = func(*args, **kwargs)
         run_time = time.perf_counter() - start_time
-        print(f"{func.__name__} took {run_time:.3f} sec")
+        print(f"{func.__name__} took {run_time:.2f} sec")
         return value
 
     return wrapper

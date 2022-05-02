@@ -37,7 +37,6 @@ class BaseModelClass(nn.Module, ABC):
         self,
         task_dict: dict[str, TaskType],
         robust: bool,
-        device: type[torch.device] | Literal["cuda", "cpu"] | None = None,
         epoch: int = 1,
         best_val_scores: dict[str, float] = None,
     ) -> None:
@@ -46,7 +45,6 @@ class BaseModelClass(nn.Module, ABC):
         Args:
             task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
             robust (bool): Whether to estimate standard deviation for use in a robust loss function
-            device (torch.device | "cuda" | "cpu"): Device the model will run on.
             epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
             best_val_scores (dict[str, float], optional): Validation score to use for early
                 stopping. Defaults to None.
@@ -55,10 +53,6 @@ class BaseModelClass(nn.Module, ABC):
         self.task_dict = task_dict
         self.target_names = list(task_dict.keys())
         self.robust = robust
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Pytorch running on {device=}")
-        self.device = device
         self.epoch = epoch
         self.best_val_scores = best_val_scores or {}
         self.es_patience = 0
@@ -124,7 +118,7 @@ class BaseModelClass(nn.Module, ABC):
                     print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
                     for task, metrics in t_metrics.items():
                         metrics_str = "".join(
-                            [f"{key} {val:.3f}\t" for key, val in metrics.items()]
+                            [f"{key} {val:.2f}\t" for key, val in metrics.items()]
                         )
                         print(f"Train \t\t: {task} - {metrics_str}")
 
@@ -150,7 +144,7 @@ class BaseModelClass(nn.Module, ABC):
                     if verbose:
                         for task, metrics in v_metrics.items():
                             metrics_str = "".join(
-                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
+                                [f"{key} {val:.2f}\t" for key, val in metrics.items()]
                             )
                             print(f"Validation \t: {task} - {metrics_str}")
 
@@ -257,16 +251,10 @@ class BaseModelClass(nn.Module, ABC):
         for inputs, targets, *_ in tqdm(
             generator, disable=True if not verbose else None
         ):
-
-            # move tensors to GPU
-            inputs = [tensor.to(self.device) for tensor in inputs]
-
             normed_targets = [
                 n.norm(tar) if n is not None else tar
                 for tar, n in zip(targets, normalizer_dict.values())
             ]
-
-            normed_targets = [target.to(self.device) for target in normed_targets]
 
             # compute output
             outputs = self(*inputs)
@@ -296,7 +284,9 @@ class BaseModelClass(nn.Module, ABC):
                         logits = sampled_softmax(output, log_std)
                         loss = criterion(torch.log(logits), target.squeeze(1))
                     else:
-                        logits = softmax(output, dim=1)
+                        logits = softmax(output, dim=1, dtype=torch.LongTensor)
+                        print(f"{logits.dtype=}")
+                        print(f"{target.dtype=}")
                         # TODO @janosh fix properly IndexError: Dimension out of range (expected to
                         # be in range of [-1, 0], but got 1)
                         # changing target.squeeze(1 -> -1) seems to fix it but not sure it's correct
@@ -360,10 +350,6 @@ class BaseModelClass(nn.Module, ABC):
         for input_, targets, *batch_ids in tqdm(
             generator, disable=True if not verbose else None
         ):
-
-            # move tensors to device (GPU or CPU)
-            input_ = (tensor.to(self.device) for tensor in input_)
-
             # compute output
             output = self(*input_)
 
@@ -376,7 +362,8 @@ class BaseModelClass(nn.Module, ABC):
         # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
         # for multitask learning
         targets = tuple(
-            torch.cat(test_t, dim=0).view(-1).numpy() for test_t in zip(*test_targets)
+            torch.cat(test_t, dim=0).view(-1).cpu().numpy()
+            for test_t in zip(*test_targets)
         )
         predictions = tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs))
         # identifier columns
@@ -402,9 +389,6 @@ class BaseModelClass(nn.Module, ABC):
         features = []
 
         for input_, *_ in generator:
-
-            input_ = (tensor.to(self.device) for tensor in input_)
-
             output = self.trunk_nn(self.material_nn(*input_)).cpu().numpy()
             features.append(output)
 

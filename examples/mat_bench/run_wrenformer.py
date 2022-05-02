@@ -78,6 +78,9 @@ def run_matbench_task(
 
     matbench_task: MatbenchTask = mbbm.tasks_map[dataset_name]
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Pytorch running on {device=}")
+
     if matbench_task.all_folds_recorded:
         print(f"\nTask {dataset_name} already recorded! Skipping...\n")
         return None
@@ -111,22 +114,27 @@ def run_matbench_task(
         train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
         test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
+        features, targets, ids = (train_df[x] for x in ["features", target, "mbid"])
+        targets = torch.tensor(targets, device=device)
+        features = tuple(tensor.to(device) for tensor in features)
+
         train_loader = InMemoryDataLoader(
-            [tuple(train_df[x]) for x in ["features", target, "mbid"]],
-            batch_size=32,
-            collate_fn=collate_batch,
+            [features, targets, ids], batch_size=32, collate_fn=collate_batch
         )
+
+        features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
+        targets = torch.tensor(targets, device=device)
+        features = tuple(tensor.to(device) for tensor in features)
+
         test_loader = InMemoryDataLoader(
-            [tuple(test_df[x]) for x in ["features", target, "mbid"]],
-            batch_size=32,
-            collate_fn=collate_batch,
+            [features, targets, ids], batch_size=32, collate_fn=collate_batch
         )
 
         # n_features = element + wyckoff embedding lengths + element weights in composition
         model = ModelClass(
             n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict, robust=robust
         )
-        model.to("cuda" if torch.cuda.is_available() else "cpu")
+        model.to(device)
         optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -151,19 +159,19 @@ def run_matbench_task(
         # record model predictions
         matbench_task.record(fold, predictions.cpu())
 
-        # save model benchmark
-        if isfile(benchmark_path):  # we checked for isfile() above but possible another
-            # slurm job created it in the meantime in which case we merge results
-            mbbm = MatbenchBenchmark.from_file(benchmark_path)
-            mbbm.tasks_map[dataset_name] = matbench_task
-        elif benchmark_dir := dirname(benchmark_path):
-            os.makedirs(benchmark_dir, exist_ok=True)
+    # save model benchmark
+    if isfile(benchmark_path):  # we checked for isfile() above but possible another
+        # slurm job created it in the meantime in which case we merge results
+        mbbm = MatbenchBenchmark.from_file(benchmark_path)
+        mbbm.tasks_map[dataset_name] = matbench_task
+    elif benchmark_dir := dirname(benchmark_path):
+        os.makedirs(benchmark_dir, exist_ok=True)
 
-        mbbm.to_file(benchmark_path)
+    mbbm.to_file(benchmark_path)
 
     return mbbm
 
 
 if __name__ == "__main__":
     # for testing and debugging
-    run_matbench_task("wrenformer", "wrenformer-tmp.json", "matbench_jdft2d", 1)
+    run_matbench_task("wrenformer", "wrenformer-tmp.json", "matbench_mp_is_metal", 1)
