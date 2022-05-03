@@ -32,7 +32,7 @@ job_name = f"matbench-{model_name}-{len(datasets)}jobs"
 python_cmd = f"""import os
 from itertools import product
 
-from examples.mat_bench.run_wrenformer import run_matbench_task
+from examples.mat_bench.run_matbench import run_matbench_task
 
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
