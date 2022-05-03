@@ -1,6 +1,7 @@
 # %%
 import os
 from datetime import datetime
+from glob import glob
 
 from matbench.metadata import mbv01_metadata
 
@@ -13,6 +14,7 @@ __date__ = "2022-04-25"
 # %% write Python submission file and sbatch it
 model_name = "wrenformer"
 epochs = 100
+folds = list(range(5))
 
 if "roost" in model_name.lower():
     # deploy Roost on all tasks
@@ -28,45 +30,62 @@ benchmark_path = (
 job_name = f"matbench-{model_name}-{len(datasets)}jobs"
 
 python_cmd = f"""import os
+from itertools import product
 
-from examples.mat_bench.run_wrenformer import run_matbench_task
+from examples.mat_bench.run_matbench import run_matbench_task
 
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
 
 job_array_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
 print(f"{{job_array_id=}}")
-dataset_name = {datasets}[job_array_id]
 
-run_matbench_task({model_name=}, {benchmark_path=}, dataset_name=dataset_name, {epochs=})
+dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]
+print(f"{{dataset_name=}}\\n{{fold=}}")
+
+run_matbench_task(
+    {model_name=},
+    {benchmark_path=},
+    dataset_name=dataset_name,
+    fold=fold,
+    {epochs=}
+)
 """
 
 
 submit_script = f"{log_dir}/{job_name}-{datetime.now():%Y-%m-%d@%H-%M}.py"
 
-
-slurm_setup = [  # prepend into sbatch script to load GPU env before actual command
-    ". /etc/profile.d/modules.sh",  # source module command
-    "module load rhel8/default-amp",  # load default env for ampere partition
-]
+# prepend into sbatch script to source module command and load default env
+# for Ampere GPU partition before actual job command
+slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 
 # %%
-slurm_cmd = f"""sbatch \
-  --partition ampere \
-  --account LEE-JR769-SL2-GPU \
-  --time 4:0:0 \
-  --nodes 1 \
-  --gpus-per-node 1 \
-  --chdir {log_dir} \
-  --array 0-{len(datasets) - 1} \
-  --out {job_name}-%A-%a.log \
-  --job-name {job_name} \
-  --wrap '{"; ".join(slurm_setup)}; python {submit_script}'
+# --array 0-{len(datasets) * len(folds) - 1}
+slurm_cmd = f"""sbatch
+    --partition ampere
+    --account LEE-JR769-SL2-GPU
+    --time 4:0:0
+    --nodes 1
+    --gpus-per-node 1
+    --chdir {log_dir}
+    --array 0-5
+    --out {job_name}-%A-%a.log
+    --job-name {job_name}
+    --wrap '{slurm_setup} python {submit_script}'
 """
 
+header = f'"""\nSlurm submission command:\n{slurm_cmd}"""'
+
 with open(submit_script, "w") as file:
-    file.write(f'"""\n{slurm_cmd}"""\n\n{python_cmd}')
+    file.write(f"{header}\n\n{python_cmd}")
 
 
-# %% uncomment to submit
-# !{slurm_cmd}
+# %% submit slurm job
+# !{slurm_cmd.replace("\n    ", " ")}
+
+
+# %% clean up log files for failed jobs
+job_id = "59883449"
+n_removed = len(list(map(os.remove, glob(f"{log_dir}/*-{job_id}-*.log"))))
+
+print(f"{n_removed} log files removed for {job_id=}")

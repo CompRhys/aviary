@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
+import time
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Generator, Iterable
 
 import numpy as np
 import pandas as pd
@@ -22,6 +24,7 @@ from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.tensorboard import SummaryWriter
 
+from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import RobustL1Loss, RobustL2Loss
 
@@ -363,7 +366,7 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
+                f"{ROOT}/runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
         else:
             writer = None
@@ -386,12 +389,12 @@ def train_ensemble(
                     if task == "regression":
                         val_score[name] = v_metrics[name]["MAE"]
                         print(
-                            f"Validation Baseline - {name}: MAE {val_score[name]:.3f}"
+                            f"Validation Baseline - {name}: MAE {val_score[name]:.2f}"
                         )
                     elif task == "classification":
                         val_score[name] = v_metrics[name]["Acc"]
                         print(
-                            f"Validation Baseline - {name}: Acc {val_score[name]:.3f}"
+                            f"Validation Baseline - {name}: Acc {val_score[name]:.2f}"
                         )
                 model.best_val_scores = val_score
 
@@ -483,10 +486,10 @@ def results_multitask(  # noqa: C901
     for j in range(ensemble_folds):
 
         if ensemble_folds == 1:
-            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
         else:
-            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{j}.pth.tar"
             print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
         if not os.path.isfile(resume):
@@ -768,3 +771,20 @@ def save_results_dict(
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to '{csv_path}'")
+
+
+@contextmanager
+def print_walltime(desc: str = "Execution") -> Generator[None, None, None]:
+    """Context manager and decorator that prints the wall time of its lifetime.
+
+    Args:
+        desc (str, optional): Description prints as f"{desc} took 1.23 sec".
+            Defaults to "Execution".
+    """
+    start_time = time.perf_counter()
+
+    try:
+        yield
+    finally:
+        run_time = time.perf_counter() - start_time
+        print(f"{desc} took {run_time:.2f} sec")
