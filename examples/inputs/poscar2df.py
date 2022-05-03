@@ -57,6 +57,7 @@ print("\n~~~~ LOAD DATA ~~~~")
 df = df.sort_values(by=["material_id", "E_vasp_per_atom"], ascending=True)
 df = df[~df["material_id"].duplicated(keep="first")]
 
+
 # %%
 # Count number of datapoints
 print(f"Number of points in dataset: {len(df)}")
@@ -73,6 +74,7 @@ df["nsites"] = df["final_structure"].apply(lambda x: x.num_sites)
 
 df["lattice"] = lattice
 df["sites"] = sites
+
 
 # %%
 # Calculate Formation Enthalpy
@@ -96,6 +98,7 @@ df["E_f"] = df[["composition", "E_vasp_per_atom"]].apply(
     partial(get_formation_energy, el_refs=el_refs), axis=1
 )
 
+
 # %%
 # Remove invalid Wyckoff Sequences
 df["nwyckoff"] = df["wyckoff"].apply(count_wyks)
@@ -110,12 +113,14 @@ df = df.sort_values(by=["wyckoff", "E_vasp_per_atom"], ascending=True)
 df_wyk = df.drop_duplicates(["wyckoff"], keep="first")
 print(f"Lowest energy unique wyckoff sequences: {len(df_wyk)}")
 
+
 # %%
 # NOTE searching after having dropped wyckoff duplicates will remove
 # some scaled duplicates. This value may still contain duplicates.
 df_wyk = df_wyk.sort_values(by=["composition", "E_vasp_per_atom"], ascending=True)
 df_comp = df_wyk.drop_duplicates("composition", keep="first")
 print(f"Lowest energy polymorphs only: {len(df_comp)}")
+
 
 # %%
 # Clean the data
