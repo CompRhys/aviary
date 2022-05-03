@@ -4,7 +4,9 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from os.path import dirname, isfile
+from typing import Literal
 
+import numpy as np
 import pandas as pd
 import torch
 from matbench import MatbenchBenchmark
@@ -35,13 +37,14 @@ def lr_lambda(epoch: int) -> float:
     return min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5))
 
 
-@print_walltime("run_matbench_task")
+@print_walltime("run_matbench_task()")
 def run_matbench_task(
     model_name: str,
     benchmark_path: str,
     dataset_name: MatbenchDatasets,
+    fold: Literal[0, 1, 2, 3, 4],
     epochs: int = 100,
-) -> MatbenchBenchmark | None:
+) -> MatbenchBenchmark:
     """Run a single matbench task.
 
     Args:
@@ -84,17 +87,17 @@ def run_matbench_task(
 
     matbench_task: MatbenchTask = mbbm.tasks_map[dataset_name]
 
+    if matbench_task.is_recorded[fold]:
+        print(f"{fold = } of {dataset_name} already recorded! Skipping...")
+        return mbbm
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
 
-    if matbench_task.all_folds_recorded:
-        print(f"\nTask {dataset_name} already recorded! Skipping...\n")
-        return None
-
-    df = pd.read_json(DATA_PATHS[dataset_name])
-    with print_walltime("Generating initial wyckoff embedding"):
+    df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
+    with print_walltime("Generating initial Wyckoff embedding"):
         df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
-    matbench_task.df = df.set_index("mbid", drop=False)
+    matbench_task.df = df
 
     target, task_type = (
         str(matbench_task.metadata[x]) for x in ("target", "task_type")
@@ -110,82 +113,86 @@ def run_matbench_task(
     loss_dict = {target: (task_type, loss_func)}
     normalizer_dict = {target: Normalizer() if task_type == "regression" else None}
 
-    for fold in matbench_task.folds:
-        if matbench_task.is_recorded[fold]:
-            print(f"{fold = } of {dataset_name} already recorded! Skipping...")
-            continue
+    fold_name = f"{model_name}-{dataset_name}-{fold=}"
 
-        fold_name = f"{model_name}-{dataset_name}-{fold=}"
+    print(f"{matbench_task=}")
+    train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
+    test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
-        train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
-        test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
+    features, targets, ids = (train_df[x] for x in ["features", target, "mbid"])
+    targets = torch.tensor(targets, device=device)
+    features_arr = np.empty(len(features), dtype=object)
+    for idx, tensor in enumerate(features):
+        features_arr[idx] = tensor.to(device)
 
-        features, targets, ids = (train_df[x] for x in ["features", target, "mbid"])
-        targets = torch.tensor(targets, device=device)
-        features = tuple(tensor.to(device) for tensor in features)
+    train_loader = InMemoryDataLoader(
+        [features_arr, targets, ids],
+        batch_size=32,
+        shuffle=True,
+        collate_fn=collate_batch,
+    )
 
-        train_loader = InMemoryDataLoader(
-            [features, targets, ids],
-            batch_size=32,
-            shuffle=True,
-            collate_fn=collate_batch,
-        )
+    features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
+    targets = torch.tensor(targets, device=device)
+    features_arr = np.empty(len(features), dtype=object)
+    for idx, tensor in enumerate(features):
+        features_arr[idx] = tensor.to(device)
 
-        features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
-        targets = torch.tensor(targets, device=device)
-        features = tuple(tensor.to(device) for tensor in features)
+    test_loader = InMemoryDataLoader(
+        [features_arr, targets, ids], batch_size=1024, collate_fn=collate_batch
+    )
 
-        test_loader = InMemoryDataLoader(
-            [features, targets, ids], batch_size=32, collate_fn=collate_batch
-        )
+    # n_features = element + wyckoff embedding lengths + element weights in composition
+    model = ModelClass(
+        n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict, robust=robust
+    )
+    model.to(device)
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
 
-        # n_features = element + wyckoff embedding lengths + element weights in composition
-        model = ModelClass(
-            n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict, robust=robust
-        )
-        model.to(device)
-        optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, verbose=True)
 
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer, lr_lambda, verbose=True
-        )
+    writer = SummaryWriter(f"{ROOT}/runs/{fold_name}/{datetime.now():%Y-%m-%d@%H-%M}")
 
-        writer = SummaryWriter(
-            f"{ROOT}/runs/{fold_name}/{datetime.now():%Y-%m-%d@%H-%M}"
-        )
+    model.fit(
+        train_loader,
+        test_loader,
+        optimizer,
+        scheduler,
+        epochs=epochs,
+        criterion_dict=loss_dict,
+        normalizer_dict=normalizer_dict,
+        model_name=fold_name,
+        run_id=1,
+        checkpoint=False,
+        writer=writer,
+    )
 
-        model.fit(
-            train_loader,
-            test_loader,
-            optimizer,
-            scheduler,
-            epochs=epochs,
-            criterion_dict=loss_dict,
-            normalizer_dict=normalizer_dict,
-            model_name=fold_name,
-            run_id=1,
-            checkpoint=False,
-            writer=writer,
-        )
+    _, [predictions], *_ = model.predict(test_loader)
 
-        targets, [predictions], *ids = model.predict(test_loader)
-
-        # record model predictions
-        matbench_task.record(fold, predictions.cpu())
-
-    # save model benchmark
     if isfile(benchmark_path):  # we checked for isfile() above but possible another
-        # slurm job created it in the meantime in which case we merge results
+        # slurm job created a partial benchmark in the meantime in which case we merge results
         mbbm = MatbenchBenchmark.from_file(benchmark_path)
-        mbbm.tasks_map[dataset_name] = matbench_task
+        matbench_task = mbbm.tasks_map[dataset_name]
+        # task needs df to pass validation before fold can be recorded
+        matbench_task.df = df
     elif benchmark_dir := dirname(benchmark_path):
         os.makedirs(benchmark_dir, exist_ok=True)
 
+    # record model predictions
+    matbench_task.record(fold, predictions.cpu())
+    mbbm.tasks_map[dataset_name] = matbench_task
+
+    # save model benchmark
     mbbm.to_file(benchmark_path)
 
     return mbbm
 
 
+# %%
 if __name__ == "__main__":
     # for testing and debugging
-    run_matbench_task("wrenformer", "wrenformer-tmp.json", "matbench_mp_is_metal", 1)
+    model_name = "wrenformer"
+    benchmark_path = "wrenformer-tmp.json"
+    dataset = "matbench_jdft2d"
+    # dataset = "matbench_mp_is_metal"
+    run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)

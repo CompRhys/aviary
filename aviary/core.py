@@ -67,8 +67,8 @@ class BaseModelClass(nn.Module, ABC):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler._LRScheduler,
         epochs: int,
-        criterion_dict: dict[str, nn.Module],
-        normalizer_dict: dict[str, Normalizer],
+        criterion_dict: dict[str, tuple[TaskType, nn.Module]],
+        normalizer_dict: dict[str, Normalizer | None],
         model_name: str,
         run_id: int,
         checkpoint: bool = True,
@@ -327,7 +327,7 @@ class BaseModelClass(nn.Module, ABC):
 
     @torch.no_grad()
     def predict(
-        self, generator: DataLoader, verbose: bool = False
+        self, generator: DataLoader | InMemoryDataLoader, verbose: bool = False
     ) -> tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]:
         """Make model predictions.
 

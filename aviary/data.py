@@ -1,14 +1,17 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator
 
-import torch
+import numpy as np
 from torch import Tensor
+
+np.random.seed(0)
 
 
 @dataclass
 class InMemoryDataLoader:
     """In-memory DataLoader using array/tensor slicing to generate whole batches at
     once instead of sample-by-sample.
+    Source: https://discuss.pytorch.org/t/27014/6
 
     Args:
         *tensors: List of arrays or tensors. Must all have the same length in dimension 0.
@@ -30,16 +33,23 @@ class InMemoryDataLoader:
             raise ValueError("All tensors must have the same length in dim 0")
 
     def __iter__(self) -> Iterator[tuple[Tensor, ...]]:
-        if self.shuffle:
-            shuffle_idx = torch.randperm(self.dataset_len)
-            self.tensors = [t[shuffle_idx] for t in self.tensors]
+        # remember to set a random seed with torch.manual_seed(0)
+        self.indices = np.random.permutation(self.dataset_len) if self.shuffle else None
         self.idx = 0
         return self
 
     def __next__(self) -> tuple[Tensor, ...]:
         if self.idx >= self.dataset_len:
             raise StopIteration
-        slices = (t[self.idx : self.idx + self.batch_size] for t in self.tensors)
+
+        end_idx = self.idx + self.batch_size
+
+        if self.indices is None:
+            slices = (t[self.idx : end_idx] for t in self.tensors)
+        else:
+            idx = self.indices[self.idx : end_idx]
+            slices = (t[idx] for t in self.tensors)
+
         batch = self.collate_fn(*slices)
 
         self.idx += self.batch_size

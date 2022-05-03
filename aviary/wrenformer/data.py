@@ -25,7 +25,7 @@ def collate_batch(
     Returns:
         tuple: Tuple of padded features and mask, targets and ids.
     """
-    padded_features = nn.utils.rnn.pad_sequence(features, batch_first=True)
+    padded_features = nn.utils.rnn.pad_sequence(tuple(features), batch_first=True)
     # padded_features.shape = (batch_size, max_seq_len, n_features), so we mask sequence items that
     # are all zero across feature dimension
     mask = (padded_features == 0).all(dim=2)
