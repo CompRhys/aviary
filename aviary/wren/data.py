@@ -256,18 +256,18 @@ def parse_aflow(
         aflow_label (str): AFLOW-style prototype string with appended chemical system
 
     Returns:
-        tuple[str, list[int], list[str], list[str]]: spg_no, mult_list, ele_list, aug_wyks
+        tuple[str, list[int], list[str], list[str]]: spg_no, element_weights, elements, wyckoff_set
     """
     proto, chemsys = aflow_label.split(":")
     elems = chemsys.split("-")
-    _, _, spg_no, *wyks = proto.split("_")
+    _, _, spg_no, *wyckoff_letters = proto.split("_")
 
-    mult_list = []
-    ele_list = []
-    wyk_list = []
+    element_weights = []
+    elements = []
+    wyckoff_set = []
 
     subst = r"1\g<1>"
-    for el, wyk in zip(elems, wyks):
+    for el, wyk in zip(elems, wyckoff_letters):
 
         # Put 1's in front of all Wyckoff letters not preceded by numbers
         wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
@@ -277,19 +277,21 @@ def parse_aflow(
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
             m = int(n)
-            ele_list.extend([el] * m)
-            wyk_list.extend([l] * m)
-            mult_list.extend([float(mult_dict[spg_no][l])] * m)
+            elements.extend([el] * m)
+            wyckoff_set.extend([l] * m)
+            element_weights.extend([float(mult_dict[spg_no][l])] * m)
 
     # NOTE This on-the-fly augmentation of equivalent Wyckoff sets is potentially a source of high
-    # memory use. Can be turned off by commenting out the for loop and returning [wyk_list] instead
-    # of aug_wyks. Wren should be able to learn anyway.
-    aug_wyks = []
+    # memory use. Can be turned off by commenting out the for loop and returning
+    # [wyckoff_set] instead of [augmented_wyckoff_set]. Wren should be able to learn anyway.
+    augmented_wyckoff_set = []
     for trans in relab_dict[spg_no]:
         # Apply translation dictionary of allowed relabelling operations in spacegroup
         t = str.maketrans(trans)
-        aug_wyks.append(tuple(",".join(wyk_list).translate(t).split(",")))
+        augmented_wyckoff_set.append(
+            tuple(",".join(wyckoff_set).translate(t).split(","))
+        )
 
-    aug_wyks = list(set(aug_wyks))
+    augmented_wyckoff_set = list(set(augmented_wyckoff_set))
 
-    return spg_no, mult_list, ele_list, aug_wyks
+    return spg_no, element_weights, elements, augmented_wyckoff_set

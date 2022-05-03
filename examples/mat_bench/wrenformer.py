@@ -5,11 +5,12 @@ import pandas as pd
 import torch
 from matbench.metadata import mbv01_metadata
 from torch.nn import L1Loss
-from torch.utils.data import DataLoader
 
 from aviary.core import Normalizer
-from aviary.wrenformer.data import WyckoffData, collate_batch
-from aviary.wrenformer.model import Wren
+from aviary.data import InMemoryDataLoader
+from aviary.utils import print_walltime
+from aviary.wrenformer.data import collate_batch, wyckoff_embedding_from_aflow_str
+from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
@@ -26,29 +27,30 @@ structure_datasets = [
 
 # %%
 df = pd.read_json(DATA_PATHS["matbench_jdft2d"])
-task_dict = {"exfoliation_en": "regression"}
-dataset = WyckoffData(df, task_dict, id_cols=["mbid"])
-dataloader = DataLoader(dataset, batch_size=32, collate_fn=collate_batch)
+target = "exfoliation_en"
+task_type = "regression"
+task_dict = {target: task_type}
 
 
 # %%
-model = Wren(
+model = Wrenformer(
     robust=False,
     n_targets=[1],
-    device="cpu",
     n_features=200 + 444 + 1,
     task_dict=task_dict,
 )
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+print(f"Pytorch running on {device=}")
 
 learning_rate = 3e-4
-criterion_dict = {"exfoliation_en": ("regression", L1Loss())}
-normalizer_dict = {"exfoliation_en": Normalizer()}
+criterion_dict = {target: (task_type, L1Loss())}
+normalizer_dict = {target: Normalizer()}
 
 
 learning_rate = 1e-3
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
-warmup_steps = 60
+warmup_steps = 10
 
 
 def lr_lambda(epoch: int) -> float:
@@ -59,9 +61,23 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, verbose=True
 
 
 # %%
+with print_walltime("Generating Wyckoff embeedings"):
+    df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
+
+features, targets, ids = (df[x] for x in ["features", target, "mbid"])
+targets = torch.tensor(targets, device=device)
+features = tuple(tensor.to(device) for tensor in features)
+
+
+mem_dataloader = InMemoryDataLoader(
+    [features, targets, ids], batch_size=32, collate_fn=collate_batch
+)
+
+
+# %%
 model.fit(
-    dataloader,
-    dataloader,
+    mem_dataloader,
+    mem_dataloader,
     optimizer,
     scheduler,
     epochs=10,
