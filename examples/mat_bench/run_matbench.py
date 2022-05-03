@@ -1,6 +1,8 @@
 # %%
 from __future__ import annotations
 
+import gzip
+import json
 import os
 from datetime import datetime
 from os.path import dirname, isfile
@@ -9,7 +11,6 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import torch
-from matbench import MatbenchBenchmark
 from matbench.task import MatbenchTask
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -44,7 +45,7 @@ def run_matbench_task(
     dataset_name: MatbenchDatasets,
     fold: Literal[0, 1, 2, 3, 4],
     epochs: int = 100,
-) -> MatbenchBenchmark:
+) -> dict[str, dict[str, list[float]]]:
     """Run a single matbench task.
 
     Args:
@@ -59,7 +60,7 @@ def run_matbench_task(
         ValueError: If dataset_name or benchmark_path is invalid.
 
     Returns:
-        MatbenchBenchmark: Benchmark results.
+        MatbenchBenchmark: Dictionary mapping {dataset_name: {fold: preds}} to model predictions.
     """
     if "wrenformer" in model_name.lower():
         from aviary.wrenformer.data import (
@@ -78,16 +79,15 @@ def run_matbench_task(
     else:
         raise ValueError(f"Unexpected {model_name = }")
 
-    if not benchmark_path.endswith(".json"):
-        raise ValueError(f"{benchmark_path = } must have .json extension")
+    if not benchmark_path.endswith(".json.gz"):
+        raise ValueError(f"{benchmark_path = } must have .json.gz extension")
     if isfile(benchmark_path):
-        mbbm = MatbenchBenchmark.from_file(benchmark_path)
+        with gzip.open(benchmark_path) as file:
+            mbbm = json.loads(file.read())
     else:
-        mbbm = MatbenchBenchmark(subset=[dataset_name])
+        mbbm = {dataset_name: {}}
 
-    matbench_task: MatbenchTask = mbbm.tasks_map[dataset_name]
-
-    if matbench_task.is_recorded[fold]:
+    if dataset_name in mbbm and str(fold) in mbbm[dataset_name]:
         print(f"{fold = } of {dataset_name} already recorded! Skipping...")
         return mbbm
 
@@ -97,6 +97,8 @@ def run_matbench_task(
     df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
     with print_walltime("Generating initial Wyckoff embedding"):
         df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
+
+    matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
     target, task_type = (
@@ -115,7 +117,6 @@ def run_matbench_task(
 
     fold_name = f"{model_name}-{dataset_name}-{fold=}"
 
-    print(f"{matbench_task=}")
     train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
     test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
@@ -171,19 +172,17 @@ def run_matbench_task(
 
     if isfile(benchmark_path):  # we checked for isfile() above but possible another
         # slurm job created a partial benchmark in the meantime in which case we merge results
-        mbbm = MatbenchBenchmark.from_file(benchmark_path)
-        matbench_task = mbbm.tasks_map[dataset_name]
-        # task needs df to pass validation before fold can be recorded
-        matbench_task.df = df
+        with gzip.open(benchmark_path) as file:
+            mbbm = json.loads(file.read())
     elif benchmark_dir := dirname(benchmark_path):
         os.makedirs(benchmark_dir, exist_ok=True)
 
     # record model predictions
-    matbench_task.record(fold, predictions.cpu())
-    mbbm.tasks_map[dataset_name] = matbench_task
+    mbbm[dataset_name][fold] = predictions.cpu().tolist()
 
     # save model benchmark
-    mbbm.to_file(benchmark_path)
+    with gzip.open(benchmark_path, "w") as file:
+        file.write(json.dumps(mbbm).encode("utf-8"))
 
     return mbbm
 
@@ -192,7 +191,7 @@ def run_matbench_task(
 if __name__ == "__main__":
     # for testing and debugging
     model_name = "wrenformer"
-    benchmark_path = "wrenformer-tmp.json"
+    benchmark_path = "benchmarks/wrenformer-tmp.json.gz"
     dataset = "matbench_jdft2d"
     # dataset = "matbench_mp_is_metal"
     run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)

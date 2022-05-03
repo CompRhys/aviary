@@ -59,8 +59,8 @@ submit_script = f"{log_dir}/{job_name}-{datetime.now():%Y-%m-%d@%H-%M}.py"
 # for Ampere GPU partition before actual job command
 slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 
+
 # %%
-# --array 0-{len(datasets) * len(folds) - 1}
 slurm_cmd = f"""sbatch
     --partition ampere
     --account LEE-JR769-SL2-GPU
@@ -68,7 +68,7 @@ slurm_cmd = f"""sbatch
     --nodes 1
     --gpus-per-node 1
     --chdir {log_dir}
-    --array 0-5
+    --array 0-{len(datasets) * len(folds) - 1}
     --out {job_name}-%A-%a.log
     --job-name {job_name}
     --wrap '{slurm_setup} python {submit_script}'

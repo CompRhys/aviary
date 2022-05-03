@@ -76,3 +76,8 @@ repos:
         # D415: First line should end with ., ? or !
         args: [--convention=google, '--add-ignore=D100,D104,D105,D107,D205,D415']
         exclude: (tests|examples)
+
+  - repo: https://github.com/janosh/format-ipy-cells
+    rev: v0.1.10
+    hooks:
+      - id: format-ipy-cells

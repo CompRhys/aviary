@@ -17,12 +17,12 @@ from examples.mat_bench.plotting_functions import (
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
 
+
 # %%
 all_data: dict[str, dict[str, float]] = defaultdict(dict)
-BENCHMARKS_DIR = "/Users/janosh/dev/matbench/benchmarks"
 
 # Get all benchmark data loaded into memory
-for dir_name in glob(f"{BENCHMARKS_DIR}/*"):
+for dir_name in glob("/Users/janosh/dev/matbench/benchmarks/*"):
     print(dir_name)
 
     # results are automatically validated, no need to validate again
@@ -47,8 +47,9 @@ for dir_name in glob(f"{BENCHMARKS_DIR}/*"):
 
 
 # %%
-for bench_name in ["wren-4of9-2022-04-15@13-31", "roost-2022-04-15@19-21"]:
-    benchmark = MatbenchBenchmark.from_file(f"benchmarks/{bench_name}.json")
+for benchmark_path in glob("benchmarks/*"):
+    bench_name = benchmark_path.split("/")[-1].split(".")[0]
+    benchmark = MatbenchBenchmark.from_file(benchmark_path)
     for task in benchmark.tasks:
         task_name = task.dataset_name
         task_type = task.metadata.task_type
@@ -73,6 +74,7 @@ df = df.rename(columns=x_labels)
 # %%
 fig = plot_leaderboard(df)
 fig.show()
+
 
 # %%
 html_path = "plots/matbench-scaled-errors.html"
