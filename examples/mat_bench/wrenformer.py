@@ -52,7 +52,7 @@ matbench_task.df = df
 # %%
 model = Wrenformer(
     robust=False,
-    n_targets=[1],
+    n_targets=[1 if task_type == "regression" else 2],
     n_features=200 + 444 + 1,
     task_dict=task_dict,
 )

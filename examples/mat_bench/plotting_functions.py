@@ -110,9 +110,10 @@ def plot_leaderboard(df: pd.DataFrame) -> Figure:
     return fig
 
 
-def scaled_error_heatmap(df: pd.DataFrame) -> Figure:
-    """Create a heatmap of the scaled errors with a column for mean scaled error added
-    on the right.
+def error_heatmap(df: pd.DataFrame) -> Figure:
+    """Create a heatmap of the errors with a column for mean error across all tasks
+    added on the right. Title assumes the errors are scaled relative to dummy
+    performance but works with unscaled errors too.
 
     Args:
         df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different

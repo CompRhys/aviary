@@ -122,6 +122,8 @@ def run_matbench_task(
 
     features, targets, ids = (train_df[x] for x in ["features", target, "mbid"])
     targets = torch.tensor(targets, device=device)
+    if targets.dtype == torch.bool:
+        targets = targets.long()
     features_arr = np.empty(len(features), dtype=object)
     for idx, tensor in enumerate(features):
         features_arr[idx] = tensor.to(device)
@@ -135,6 +137,8 @@ def run_matbench_task(
 
     features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
     targets = torch.tensor(targets, device=device)
+    if targets.dtype == torch.bool:
+        targets = targets.long()
     features_arr = np.empty(len(features), dtype=object)
     for idx, tensor in enumerate(features):
         features_arr[idx] = tensor.to(device)
@@ -145,7 +149,10 @@ def run_matbench_task(
 
     # n_features = element + wyckoff embedding lengths + element weights in composition
     model = ModelClass(
-        n_targets=[1], n_features=200 + 444 + 1, task_dict=task_dict, robust=robust
+        n_targets=[1 if task_type == "regression" else 2],
+        n_features=200 + 444 + 1,
+        task_dict=task_dict,
+        robust=robust,
     )
     model.to(device)
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
@@ -195,3 +202,4 @@ if __name__ == "__main__":
     dataset = "matbench_jdft2d"
     # dataset = "matbench_mp_is_metal"
     run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)
+    os.remove(benchmark_path)

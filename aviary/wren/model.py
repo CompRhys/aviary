@@ -48,7 +48,8 @@ class Wren(BaseModelClass):
 
         Args:
             robust (bool): Whether to estimate standard deviation for use in a robust loss function
-            n_targets (list[int]): Number of targets to train on
+            n_targets (list[int]): Number of targets to train on. 1 for regression and number of
+                different class labels for classification.
             elem_emb_len (int): Number of features in initial element embedding
             sym_emb_len (int): Number of features in initial Wyckoff letter embedding
             elem_fea_len (int, optional): Number of hidden features to use to encode elements.

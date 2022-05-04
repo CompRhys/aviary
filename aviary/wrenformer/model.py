@@ -30,7 +30,8 @@ class Wrenformer(BaseModelClass):
         """Initialize the Wrenformer model.
 
         Args:
-            n_targets (list[int]): Number of targets to train on
+            n_targets (list[int]): Number of targets to train on. 1 for regression and number of
+                different class labels for classification.
             n_features (int): Number of features in the input data.
             n_transformer_layers (int): Number of transformer layers to use. Defaults to 3.
             n_attention_heads (int): Number of attention heads to use in the transformer.

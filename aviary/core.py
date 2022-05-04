@@ -285,16 +285,11 @@ class BaseModelClass(nn.Module, ABC):
                         logits = sampled_softmax(output, log_std)
                         loss = criterion(torch.log(logits), target.squeeze(1))
                     else:
-                        logits = softmax(output, dim=1, dtype=torch.LongTensor)
-                        print(f"{logits.dtype=}")
-                        print(f"{target.dtype=}")
-                        # TODO @janosh fix properly IndexError: Dimension out of range (expected to
-                        # be in range of [-1, 0], but got 1)
-                        # changing target.squeeze(1 -> -1) seems to fix it but not sure it's correct
-                        loss = criterion(output, target.squeeze(-1))
+                        logits = softmax(output, dim=1)
+                        loss = criterion(output, target.squeeze())
 
                     logits = logits.data.cpu()
-                    target = target.squeeze(1).data.cpu()
+                    target = target.squeeze().data.cpu()
 
                     # classification metrics from sklearn need numpy arrays
                     metrics[name]["Acc"].append(
