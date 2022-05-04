@@ -20,6 +20,12 @@ from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
 from aviary.utils import print_walltime
+from aviary.wrenformer.data import (
+    collate_batch,
+    get_composition_embedding,
+    wyckoff_embedding_from_aflow_str,
+)
+from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MatbenchDatasets
 
 __author__ = "Janosh Riebesell"
@@ -45,6 +51,7 @@ def run_matbench_task(
     dataset_name: MatbenchDatasets,
     fold: Literal[0, 1, 2, 3, 4],
     epochs: int = 100,
+    n_transformer_layers: int = 4,
 ) -> dict[str, dict[str, list[float]]]:
     """Run a single matbench task.
 
@@ -63,23 +70,6 @@ def run_matbench_task(
         dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
             to model predictions.
     """
-    if "wrenformer" in model_name.lower():
-        from aviary.wrenformer.data import (
-            collate_batch,
-            wyckoff_embedding_from_aflow_str,
-        )
-        from aviary.wrenformer.model import Wrenformer as ModelClass
-    # TODO: make it work with Wren and Roost too at some point, currently the model and
-    # data class kwargs are differently named
-    elif "wren" in model_name.lower():
-        from aviary.wren.data import collate_batch
-        from aviary.wren.model import Wren as ModelClass
-    elif "roost" in model_name.lower():
-        from aviary.roost.data import collate_batch
-        from aviary.roost.model import Roost as ModelClass
-    else:
-        raise ValueError(f"Unexpected {model_name = }")
-
     if not benchmark_path.endswith(".json.gz"):
         raise ValueError(f"{benchmark_path = } must have .json.gz extension")
     if isfile(benchmark_path):
@@ -96,9 +86,16 @@ def run_matbench_task(
     print(f"Pytorch running on {device=}")
 
     df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
-    with print_walltime("Generating initial Wyckoff embedding"):
-        df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
+    if "wren" in model_name.lower():
+        with print_walltime("Generating initial Wyckoff embedding"):
+            df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
+    elif "roost" in model_name.lower():
+        df["features"] = df.composition.map(get_composition_embedding)
+    else:
+        raise ValueError(f"{model_name = } must contain 'roost' or 'wren'")
 
+    n_features = df.features.iloc[0].shape[1]
+    assert n_features in (199 + 1, 200 + 1 + 444)  # Roost and Wren input dims resp.
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
@@ -149,10 +146,11 @@ def run_matbench_task(
     )
 
     # n_features = element + wyckoff embedding lengths + element weights in composition
-    model = ModelClass(
+    model = Wrenformer(
         n_targets=[1 if task_type == "regression" else 2],
-        n_features=200 + 444 + 1,
+        n_features=n_features,
         task_dict=task_dict,
+        n_transformer_layers=n_transformer_layers,
         robust=robust,
     )
     model.to(device)
@@ -201,9 +199,9 @@ def run_matbench_task(
 # %%
 if __name__ == "__main__":
     # for testing and debugging
-    model_name = "wrenformer"
+    model_name = "roost"
     benchmark_path = "benchmarks/wrenformer-tmp.json.gz"
-    dataset = "matbench_is_metal"
+    dataset = "matbench_jdft2d"
     # dataset = "matbench_mp_is_metal"
     run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)
     os.remove(benchmark_path)

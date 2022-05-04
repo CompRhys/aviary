@@ -4,6 +4,7 @@ import json
 
 import numpy as np
 import torch
+from pymatgen.core import Composition
 from torch import LongTensor, Tensor, nn
 
 from aviary import PKG_DIR
@@ -18,8 +19,8 @@ def collate_batch(
 
     Args:
         features (tuple[Tensor]): Wyckoff embeddings
-        targets (list[Tensor | LongTensor]): Float tensor for regression or integer class
-            labels for classification.
+        targets (list[Tensor | LongTensor]): For each multi-task objective, a float tensor
+            for regression or integer class labels for classification.
         ids (list[str | int]): Material identifiers. Can be anything
 
     Returns:
@@ -71,5 +72,33 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     combined_features = torch.cat(
         [element_ratios, element_features, symmetry_features], dim=1
     ).float()
+
+    return combined_features
+
+
+def get_composition_embedding(formula: str) -> Tensor:
+    """Concatenate matscholar element and Wyckoff set embeddings while handling
+    augmentation from equivalent Wyckoff sets.
+
+    Args:
+        wyckoff_str (str): Aflow-style Wyckoff string.
+
+    Returns:
+        Tensor: Shape (n_elements, n_features). Usually (2-6, 200).
+    """
+    composition_dict = Composition(formula).get_el_amt_dict()
+    elements, elem_weights = zip(*composition_dict.items())
+
+    elem_weights = np.atleast_2d(elem_weights).T / sum(elem_weights)
+
+    # cutoff last matscholar dim so embedding len is not prime, transformer needs feature
+    # len to be divisible by num_atten_heads
+    element_features = np.vstack([elem_features[el][:-1] for el in elements])
+
+    # convert all data to tensors
+    element_ratios = torch.tensor(elem_weights)
+    element_features = torch.tensor(element_features)
+
+    combined_features = torch.cat([element_ratios, element_features], dim=1).float()
 
     return combined_features
