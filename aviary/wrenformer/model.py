@@ -20,7 +20,7 @@ class Wrenformer(BaseModelClass):
         self,
         n_targets: list[int],
         n_features: int,
-        n_transformer_layers: int = 3,
+        n_transformer_layers: int = 6,
         n_attention_heads: int = 5,
         trunk_hidden: list[int] = [1024, 512],
         out_hidden: list[int] = [256, 128, 64],
@@ -40,16 +40,16 @@ class Wrenformer(BaseModelClass):
                 is shared across tasks when multitasking. Defaults to [1024, 512].
             out_hidden (list[int], optional): Number of hidden units in the output networks which
                 are task-specific. Defaults to [256, 128, 64].
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function.
-                Defaults to False.
+            robust (bool): Whether to estimate standard deviation of a prediction alongside the
+                prediction itself for use in a robust loss function. Defaults to False.
         """
         super().__init__(robust=robust, **kwargs)
 
-        transformerLayer = nn.TransformerEncoderLayer(
+        transformer_layer = nn.TransformerEncoderLayer(
             d_model=n_features, nhead=n_attention_heads, batch_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(
-            transformerLayer, num_layers=n_transformer_layers
+            transformer_layer, num_layers=n_transformer_layers
         )
 
         if self.robust:
@@ -66,11 +66,11 @@ class Wrenformer(BaseModelClass):
         )
 
     def forward(self, features: Tensor, mask: BoolTensor) -> tuple[Tensor, ...]:  # type: ignore
-        """Forward pass through the whole Wyckoff model.
+        """Forward pass through the Wrenformer.
 
         Args:
-            features (Tensor): _description_
-            mask (BoolTensor): _description_
+            features (Tensor): Padded sequences of Wyckoff embeddings.
+            mask (BoolTensor): Indicates which tensor entries are padding.
 
         Returns:
             tuple[Tensor, ...]: Predictions for each batch of multitask targets.

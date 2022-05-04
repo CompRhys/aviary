@@ -256,7 +256,8 @@ def parse_aflow(
         aflow_label (str): AFLOW-style prototype string with appended chemical system
 
     Returns:
-        tuple[str, list[int], list[str], list[str]]: spg_no, element_weights, elements, wyckoff_set
+        tuple[str, list[float], list[str], list[str]]: spacegroup number, element weights,
+            elements symbols and equivalent wyckoff sets
     """
     proto, chemsys = aflow_label.split(":")
     elems = chemsys.split("-")

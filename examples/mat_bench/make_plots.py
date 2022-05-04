@@ -9,6 +9,7 @@ from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.task import MatbenchTask
 
+from examples.mat_bench import DATA_PATHS
 from examples.mat_bench.plotting_functions import (
     error_heatmap,
     plot_leaderboard,
@@ -63,6 +64,8 @@ for benchmark_path in our_benchmarks:
             print(f"skipping partially recorded {dataset} with folds {sorted(folds)}")
             continue
         task = MatbenchTask(dataset)
+        df = pd.read_json(DATA_PATHS[dataset]).set_index("mbid", drop=False)
+        task.df = df
         task_type = task.metadata.task_type
         for fold, preds in folds.items():
             task.record(fold, preds)
