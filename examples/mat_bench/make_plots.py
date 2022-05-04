@@ -1,16 +1,18 @@
 # %%
+import gzip
+import json
 from collections import defaultdict
 from glob import glob
 
 import pandas as pd
 from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
-from monty.serialization import loadfn
+from matbench.task import MatbenchTask
 
 from examples.mat_bench.plotting_functions import (
+    error_heatmap,
     plot_leaderboard,
     scale_errors,
-    scaled_error_heatmap,
     x_labels,
 )
 
@@ -21,16 +23,15 @@ __date__ = "2022-04-25"
 # %%
 all_data: dict[str, dict[str, float]] = defaultdict(dict)
 
-# Get all benchmark data loaded into memory
-for dir_name in glob("/Users/janosh/dev/matbench/benchmarks/*"):
-    print(dir_name)
+mb_repo = "/Users/janosh/dev/matbench"  # path to clone of matbench repo
+
+# load benchmark data for other models
+for dir_name in glob(f"{mb_repo}/benchmarks/*"):
+    model_name = dir_name.split("/")[-1]
+    print(f"\n{model_name}")
 
     # results are automatically validated, no need to validate again
     mbbm = MatbenchBenchmark.from_file(f"{dir_name}/results.json.gz")
-
-    info = loadfn(f"{dir_name}/info.json")
-
-    algo = info["algorithm"]
 
     for task in mbbm.tasks:
         task_name = task.dataset_name
@@ -43,16 +44,28 @@ for dir_name in glob("/Users/janosh/dev/matbench/benchmarks/*"):
         else:
             raise ValueError(f"Unknown {task_type = }")
 
-        all_data[task_name][algo] = score
+        all_data[task_name][model_name] = score
 
 
 # %%
-for benchmark_path in glob("benchmarks/*"):
+def int_keys(d):
+    # convert digit keys to ints in JSON dicts
+    return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in d.items()}
+
+
+our_benchmarks = glob("benchmarks/*.json.gz")
+for benchmark_path in our_benchmarks:
     bench_name = benchmark_path.split("/")[-1].split(".")[0]
-    benchmark = MatbenchBenchmark.from_file(benchmark_path)
-    for task in benchmark.tasks:
-        task_name = task.dataset_name
+    with gzip.open(benchmark_path) as json_gz:
+        benchmark = json.load(json_gz, object_hook=int_keys)
+    for dataset, folds in benchmark.items():
+        if sorted(folds) != list(range(5)):
+            print(f"skipping partially recorded {dataset} with folds {sorted(folds)}")
+            continue
+        task = MatbenchTask(dataset)
         task_type = task.metadata.task_type
+        for fold, preds in folds.items():
+            task.record(fold, preds)
 
         if task_type == REG_KEY:
             score = task.scores.mae.mean
@@ -61,13 +74,14 @@ for benchmark_path in glob("benchmarks/*"):
         else:
             raise ValueError(f"Unknown {task_type = }")
 
-        all_data[task_name][bench_name] = score
+        all_data[dataset][bench_name] = score
 
 
 # %%
-df = pd.DataFrame(all_data)
-df = scale_errors(df).round(3)
-# format column names for prettier axis ticks
+df = pd.DataFrame(all_data).round(3)
+df_scaled = scale_errors(df)
+# rename column names for prettier axis ticks (must be after scale_errors() to have
+# correct dict keys)
 df = df.rename(columns=x_labels)
 
 
@@ -92,5 +106,10 @@ with open(html_path, "r+") as file:
 
 
 # %%
-fig = scaled_error_heatmap(df)
+fig = error_heatmap(df)
+fig.show()
+
+
+# %%
+fig = error_heatmap(df_scaled)
 fig.show()

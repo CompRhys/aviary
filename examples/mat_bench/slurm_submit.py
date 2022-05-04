@@ -25,7 +25,7 @@ else:
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 benchmark_path = (
-    f"{MODULE_DIR}/benchmarks/{model_name}-{datetime.now():%Y-%m-%d@%H-%M}.json"
+    f"{MODULE_DIR}/benchmarks/{model_name}-{datetime.now():%Y-%m-%d@%H-%M}.json.gz"
 )
 job_name = f"matbench-{model_name}-{len(datasets)}jobs"
 
@@ -85,7 +85,7 @@ with open(submit_script, "w") as file:
 
 
 # %% clean up log files for failed jobs
-job_id = "59883449"
+job_id = "60041076"
 n_removed = len(list(map(os.remove, glob(f"{log_dir}/*-{job_id}-*.log"))))
 
 print(f"{n_removed} log files removed for {job_id=}")

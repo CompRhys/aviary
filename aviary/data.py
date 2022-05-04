@@ -24,7 +24,7 @@ class InMemoryDataLoader:
 
     tensors: list[Tensor]
     batch_size: int = 32
-    shuffle: bool = True
+    shuffle: bool = False
     collate_fn: Callable[[Any], tuple[Tensor]] = tuple
 
     def __post_init__(self):
