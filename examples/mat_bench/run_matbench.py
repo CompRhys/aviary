@@ -60,7 +60,8 @@ def run_matbench_task(
         ValueError: If dataset_name or benchmark_path is invalid.
 
     Returns:
-        MatbenchBenchmark: Dictionary mapping {dataset_name: {fold: preds}} to model predictions.
+        dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
+            to model predictions.
     """
     if "wrenformer" in model_name.lower():
         from aviary.wrenformer.data import (
@@ -83,13 +84,13 @@ def run_matbench_task(
         raise ValueError(f"{benchmark_path = } must have .json.gz extension")
     if isfile(benchmark_path):
         with gzip.open(benchmark_path) as file:
-            mbbm = json.loads(file.read())
+            bench_dict = json.loads(file.read())
     else:
-        mbbm = {dataset_name: {}}
+        bench_dict = {dataset_name: {}}
 
-    if dataset_name in mbbm and str(fold) in mbbm[dataset_name]:
+    if dataset_name in bench_dict and str(fold) in bench_dict[dataset_name]:
         print(f"{fold = } of {dataset_name} already recorded! Skipping...")
-        return mbbm
+        return bench_dict
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
@@ -144,7 +145,7 @@ def run_matbench_task(
         features_arr[idx] = tensor.to(device)
 
     test_loader = InMemoryDataLoader(
-        [features_arr, targets, ids], batch_size=1024, collate_fn=collate_batch
+        [features_arr, targets, ids], batch_size=128, collate_fn=collate_batch
     )
 
     # n_features = element + wyckoff embedding lengths + element weights in composition
@@ -180,18 +181,21 @@ def run_matbench_task(
     if isfile(benchmark_path):  # we checked for isfile() above but possible another
         # slurm job created a partial benchmark in the meantime in which case we merge results
         with gzip.open(benchmark_path) as file:
-            mbbm = json.loads(file.read())
+            bench_dict = json.load(file)
     elif benchmark_dir := dirname(benchmark_path):
         os.makedirs(benchmark_dir, exist_ok=True)
 
+    if dataset_name not in bench_dict:
+        bench_dict[dataset_name] = {}
     # record model predictions
-    mbbm[dataset_name][fold] = predictions.cpu().tolist()
+    bench_dict[dataset_name][fold] = predictions.cpu().tolist()
 
     # save model benchmark
     with gzip.open(benchmark_path, "w") as file:
-        file.write(json.dumps(mbbm).encode("utf-8"))
+        file.write(json.dumps(bench_dict).encode("utf-8"))
+    print(f"{fold = } of {dataset_name} written to {benchmark_path=}")
 
-    return mbbm
+    return bench_dict
 
 
 # %%
@@ -199,7 +203,7 @@ if __name__ == "__main__":
     # for testing and debugging
     model_name = "wrenformer"
     benchmark_path = "benchmarks/wrenformer-tmp.json.gz"
-    dataset = "matbench_jdft2d"
+    dataset = "matbench_is_metal"
     # dataset = "matbench_mp_is_metal"
     run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)
     os.remove(benchmark_path)
