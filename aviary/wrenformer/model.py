@@ -10,10 +10,13 @@ from aviary.segments import ResidualNetwork
 
 
 class Wrenformer(BaseModelClass):
-    """Wrenformer consists of a transformer encoder which generates an information-rich
-    embedding from which the residual output network regresses or classifies the targets.
-    The transformer encodes composition and crystal symmetries (i.e. Wyckoff positions)
-    in a trainable manner which makes them systematically improvable with more data.
+    """Crabnet-inspired re-implementation of Wren as a transformer.
+    https://github.com/anthony-wang/CrabNet
+
+    Wrenformer consists of a transformer encoder who's job it is to generate an informative
+    embedding given a material's composition and Wyckoff positions (think crystal symmetries).
+    Since the embedding is trainable, it is systematically improvable with more data.
+    Using this embedding, the residual output network regresses or classifies the targets.
     """
 
     def __init__(
