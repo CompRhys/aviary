@@ -12,8 +12,9 @@ __date__ = "2022-04-25"
 
 
 # %% write Python submission file and sbatch it
-model_name = "wrenformer"
-epochs = 100
+epochs = 300
+n_transformer_layers = 6
+model_name = f"wrenformer-{epochs=}-{n_transformer_layers=}"
 folds = list(range(5))
 
 if "roost" in model_name.lower():
@@ -24,18 +25,19 @@ else:
     datasets = [k for k, v in mbv01_metadata.items() if v.input_type == "structure"]
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
-benchmark_path = (
-    f"{MODULE_DIR}/benchmarks/{model_name}-{datetime.now():%Y-%m-%d@%H-%M}.json.gz"
-)
-job_name = f"matbench-{model_name}-{len(datasets)}jobs"
+now = f"{datetime.now():%Y-%m-%d@%H-%M}"
+benchmark_path = f"{MODULE_DIR}/benchmarks/{model_name}-{now}.json.gz"
 
 python_cmd = f"""import os
+from datetime import datetime
 from itertools import product
 
 from examples.mat_bench.run_matbench import run_matbench_task
 
+print(Job started running f"{{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
+print(f"{model_name=}")
 
 job_array_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
 print(f"{{job_array_id=}}")
@@ -48,12 +50,13 @@ run_matbench_task(
     {benchmark_path=},
     dataset_name=dataset_name,
     fold=fold,
-    {epochs=}
+    {epochs=},
+    {n_transformer_layers=},
 )
 """
 
 
-submit_script = f"{log_dir}/{job_name}-{datetime.now():%Y-%m-%d@%H-%M}.py"
+submit_script = f"{log_dir}/{model_name}-{now}.py"
 
 # prepend into sbatch script to source module command and load default env
 # for Ampere GPU partition before actual job command
@@ -64,13 +67,13 @@ slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 slurm_cmd = f"""sbatch
     --partition ampere
     --account LEE-JR769-SL2-GPU
-    --time 4:0:0
+    --time 12:0:0
     --nodes 1
     --gpus-per-node 1
     --chdir {log_dir}
     --array 0-{len(datasets) * len(folds) - 1}
-    --out {job_name}-%A-%a.log
-    --job-name {job_name}
+    --out {model_name}-%A-%a.log
+    --job-name {model_name}
     --wrap '{slurm_setup} python {submit_script}'
 """
 

@@ -126,7 +126,7 @@ def error_heatmap(df: pd.DataFrame) -> Figure:
     df = df.copy(deep=True)
 
     df["mean scaled error"] = df.mean(1)
-    df = df.sort_values(by="mean scaled error")
+    df = df.sort_values(by="mean scaled error").round(3)
 
     fig = px.imshow(df, width=1000, height=600, text_auto=".2f", aspect="auto")
 

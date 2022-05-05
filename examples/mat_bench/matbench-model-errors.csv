@@ -1,0 +1,13 @@
+model,matbench_dielectric,matbench_expt_gap,matbench_expt_is_metal,matbench_glass,matbench_jdft2d,matbench_log_gvrh,matbench_log_kvrh,matbench_mp_e_form,matbench_mp_gap,matbench_mp_is_metal,matbench_perovskites,matbench_phonons,matbench_steels
+matbench_v0.1_automatminer_expressv2020,0.315,0.416,0.921,0.861,39.85,0.087,0.065,0.173,0.282,0.909,0.2,56.171,97.493
+matbench_v0.1_modnet_v0.1.10,0.297,0.347,0.916,0.811,34.537,0.073,0.055,0.045,0.22,0.78,0.091,38.752,96.214
+matbench_v0.1_dummy,0.809,1.144,0.492,0.501,67.285,0.293,0.29,1.006,1.327,0.501,0.566,323.982,229.745
+matbench_v0.1_cgcnnv2019,0.599,,,,49.244,0.09,0.071,0.034,0.297,0.952,0.045,57.763,
+matbench_v0.1_alignn,0.345,,,,43.424,0.072,0.057,0.022,0.186,0.913,0.029,29.538,
+matbench_v0.1_CrabNet,0.323,0.346,,,45.61,0.101,0.076,0.086,0.266,,0.406,55.111,107.316
+matbench_v0.1_rf,0.42,0.446,0.917,0.859,50.044,0.104,0.082,0.116,0.345,0.899,0.236,67.613,103.512
+wrenformer-epochs=100-2022-05-04@12-18,0.39,,,,42.225,0.105,0.092,0.084,0.427,,0.394,77.798,
+wrenformer-epochs=300-2022-05-04@17-54,0.37,,,,38.401,,0.089,0.081,0.37,,0.417,66.881,
+matbench_v0.1_Ax_SAASBO_CrabNet_v1.2.7,,0.331,,,,,,,,,,,
+matbench_v0.1_CrabNet_v1.2.1,,0.376,,,,,,,,,,,
+matbench_v0.1_Ax_CrabNet_v1.2.1,,0.357,,,,,,,,,,,

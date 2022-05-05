@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Iterator
+from typing import Callable, Iterator
 
 import numpy as np
 from torch import Tensor
@@ -25,7 +25,7 @@ class InMemoryDataLoader:
     tensors: list[Tensor]
     batch_size: int = 32
     shuffle: bool = False
-    collate_fn: Callable[[Any], tuple[Tensor]] = tuple
+    collate_fn: Callable = tuple
 
     def __post_init__(self):
         self.dataset_len = len(self.tensors[0])

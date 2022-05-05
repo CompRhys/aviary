@@ -215,7 +215,7 @@ class BaseModelClass(nn.Module, ABC):
         generator: DataLoader,
         criterion_dict: dict[str, tuple[TaskType, nn.Module]],
         optimizer: torch.optim.Optimizer,
-        normalizer_dict: dict[str, Normalizer],
+        normalizer_dict: dict[str, Normalizer | None],
         action: Literal["train", "val"] = "train",
         verbose: bool = False,
     ):
@@ -274,8 +274,8 @@ class BaseModelClass(nn.Module, ABC):
                         output = output.squeeze()
                         loss = criterion(output, target)
 
-                    pred = normalizer_dict[name].denorm(output.data.cpu())
-                    target = normalizer_dict[name].denorm(target.data.cpu())
+                    pred = normalizer_dict[name].denorm(output.data.cpu())  # type: ignore
+                    target = normalizer_dict[name].denorm(target.data.cpu())  # type: ignore
                     metrics[name]["MAE"].append((pred - target).abs().mean())
                     metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
 

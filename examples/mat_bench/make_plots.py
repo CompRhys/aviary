@@ -49,12 +49,23 @@ for dir_name in glob(f"{mb_repo}/benchmarks/*"):
 
 
 # %%
+# df = pd.DataFrame(all_data).round(3)
+# df.index.name = "model"
+# df.to_csv("matbench-model-errors.csv")
+df = pd.read_csv("matbench-model-errors.csv").set_index("model")
+df_scaled = scale_errors(df)
+# rename column names for prettier axis ticks (must be after scale_errors() to have
+# correct dict keys)
+df_scaled = df_scaled.rename(columns=x_labels)
+
+
+# %%
 def int_keys(d):
     # convert digit keys to ints in JSON dicts
     return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in d.items()}
 
 
-our_benchmarks = glob("benchmarks/*.json.gz")
+our_benchmarks = [x for x in glob("benchmarks/*.json.gz") if x not in df.index]
 for benchmark_path in our_benchmarks:
     bench_name = benchmark_path.split("/")[-1].split(".")[0]
     with gzip.open(benchmark_path) as json_gz:
@@ -81,14 +92,6 @@ for benchmark_path in our_benchmarks:
 
 
 # %%
-df = pd.DataFrame(all_data).round(3)
-df_scaled = scale_errors(df)
-# rename column names for prettier axis ticks (must be after scale_errors() to have
-# correct dict keys)
-df = df.rename(columns=x_labels)
-
-
-# %%
 fig = plot_leaderboard(df)
 fig.show()
 
@@ -109,10 +112,6 @@ with open(html_path, "r+") as file:
 
 
 # %%
-fig = error_heatmap(df)
-fig.show()
-
-
-# %%
 fig = error_heatmap(df_scaled)
 fig.show()
+fig.write_image("plots/matbench-scaled-errors-heatmap.png")
