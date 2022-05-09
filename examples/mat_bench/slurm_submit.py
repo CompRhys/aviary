@@ -1,5 +1,6 @@
 # %%
 import os
+import subprocess
 from datetime import datetime
 from glob import glob
 
@@ -14,7 +15,7 @@ __date__ = "2022-04-25"
 # %% write Python submission file and sbatch it
 epochs = 300
 n_transformer_layers = 6
-model_name = f"roostformer-{epochs=}-{n_transformer_layers=}"
+model_name = f"wrenformer-{epochs=}-{n_transformer_layers=}"
 folds = list(range(5))
 
 if "roost" in model_name.lower():
@@ -37,7 +38,7 @@ from examples.mat_bench.run_matbench import run_matbench_task
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
-print(f"{model_name=}")
+print("{model_name=}")
 
 job_array_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
 print(f"{{job_array_id=}}")
@@ -66,8 +67,8 @@ slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 # %%
 slurm_cmd = f"""sbatch
     --partition ampere
-    --account LEE-SL3-GPU
-    --time 12:0:0
+    --account LEE-JR769-SL2-GPU
+    --time 16:0:0
     --nodes 1
     --gpus-per-node 1
     --chdir {log_dir}
@@ -84,7 +85,7 @@ with open(submit_script, "w") as file:
 
 
 # %% submit slurm job
-# !{slurm_cmd.replace("\n    ", " ")}
+result = subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
 
 
 # %% clean up log files for failed jobs
