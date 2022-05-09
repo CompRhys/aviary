@@ -14,7 +14,7 @@ __date__ = "2022-04-25"
 # %% write Python submission file and sbatch it
 epochs = 300
 n_transformer_layers = 6
-model_name = f"wrenformer-{epochs=}-{n_transformer_layers=}"
+model_name = f"roostformer-{epochs=}-{n_transformer_layers=}"
 folds = list(range(5))
 
 if "roost" in model_name.lower():
@@ -34,7 +34,7 @@ from itertools import product
 
 from examples.mat_bench.run_matbench import run_matbench_task
 
-print(Job started running f"{{datetime.now():%Y-%m-%d@%H-%M}}")
+print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
 print(f"{model_name=}")
@@ -66,7 +66,7 @@ slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 # %%
 slurm_cmd = f"""sbatch
     --partition ampere
-    --account LEE-JR769-SL2-GPU
+    --account LEE-SL3-GPU
     --time 12:0:0
     --nodes 1
     --gpus-per-node 1

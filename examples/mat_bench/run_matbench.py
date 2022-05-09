@@ -11,6 +11,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import torch
+from matbench.data_ops import score_array
 from matbench.task import MatbenchTask
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -76,7 +77,7 @@ def run_matbench_task(
         with gzip.open(benchmark_path) as file:
             bench_dict = json.loads(file.read())
     else:
-        bench_dict = {dataset_name: {}}
+        bench_dict = {}
 
     if dataset_name in bench_dict and str(fold) in bench_dict[dataset_name]:
         print(f"{fold = } of {dataset_name} already recorded! Skipping...")
@@ -174,8 +175,9 @@ def run_matbench_task(
         writer=writer,
     )
 
-    _, [predictions], *_ = model.predict(test_loader)
+    [targets], [predictions], *_ = model.predict(test_loader)
 
+    # --- save model predictions to gzipped JSON ---
     if isfile(benchmark_path):  # we checked for isfile() above but possible another
         # slurm job created a partial benchmark in the meantime in which case we merge results
         with gzip.open(benchmark_path) as file:
@@ -193,15 +195,37 @@ def run_matbench_task(
         file.write(json.dumps(bench_dict).encode("utf-8"))
     print(f"{fold = } of {dataset_name} written to {benchmark_path=}")
 
+    # --- save model scores to JSON ---
+    # matbench.data_ops.score_array() calculates calculates [MAE, RMSE, MAPE, max error]
+    # for regression and [accuracy, balanced accuracy, F1, ROCAUC] for classification.
+    scores = score_array(predictions.squeeze(), targets, task_type)
+
+    try:
+        with open(f"benchmarks/scores-{model_name}.json") as json_file:
+            scores_dict = json.load(json_file)
+    except (FileNotFoundError, json.decoder.JSONDecodeError):  # file missing or empty
+        scores_dict = {}
+    if dataset_name not in scores_dict:
+        scores_dict[dataset_name] = {}
+    scores_dict[dataset_name][fold] = scores
+
+    with open(f"benchmarks/scores-{model_name}.json", "w") as json_file:
+        json.dump(scores_dict, json_file)
+
     return bench_dict
 
 
 # %%
 if __name__ == "__main__":
-    # for testing and debugging
-    model_name = "roost"
-    benchmark_path = "benchmarks/wrenformer-tmp.json.gz"
-    dataset = "matbench_jdft2d"
-    # dataset = "matbench_mp_is_metal"
-    run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)
-    os.remove(benchmark_path)
+    try:
+        # for testing and debugging
+        model_name = "roost"
+        benchmark_path = "benchmarks/wrenformer-tmp.json.gz"
+        dataset = "matbench_jdft2d"
+        # dataset = "matbench_mp_is_metal"
+        run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)
+    finally:  # clean up
+        try:
+            os.remove(benchmark_path)
+        except FileNotFoundError:
+            pass

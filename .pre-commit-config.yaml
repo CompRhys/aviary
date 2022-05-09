@@ -40,7 +40,8 @@ repos:
     hooks:
     - id: codespell
       exclude_types: [json]
-      args: [--ignore-words-list, 'hist,ba']
+      # mape = mean absolute percentage error
+      args: [--ignore-words-list, 'hist,ba,mape']
 
   - repo: https://github.com/psf/black
     rev: 22.3.0
