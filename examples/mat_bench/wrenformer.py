@@ -4,7 +4,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import torch
-from matbench import MatbenchBenchmark
 from matbench.metadata import mbv01_metadata
 from matbench.task import MatbenchTask
 from torch.nn import L1Loss
@@ -14,7 +13,7 @@ from aviary.data import InMemoryDataLoader
 from aviary.utils import print_walltime
 from aviary.wrenformer.data import collate_batch, wyckoff_embedding_from_aflow_str
 from aviary.wrenformer.model import Wrenformer
-from examples.mat_bench import DATA_PATHS, MODULE_DIR
+from examples.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-12"
@@ -36,16 +35,7 @@ target = "exfoliation_en"
 task_type = "regression"
 task_dict = {target: task_type}
 
-
-# %%
-benchmark_path = f"{MODULE_DIR}/benchmarks/{model_name}-2022-05-03@12-11.json"
-mbbm = MatbenchBenchmark.from_file(benchmark_path)
-for ds in structure_datasets:
-    if isinstance(mbbm.tasks_map[ds], MatbenchTask):
-        continue  # leave already recorded tasks untouched, initialize missing ones to empty tasks
-    mbbm.tasks_map[ds] = MatbenchTask(ds, autoload=False)
-
-matbench_task: MatbenchTask = mbbm.tasks_map[dataset_name]
+matbench_task = MatbenchTask(dataset_name, autoload=False)
 matbench_task.df = df
 
 
