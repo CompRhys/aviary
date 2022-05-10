@@ -1,11 +1,8 @@
 # %%
 from __future__ import annotations
 
-import gzip
-import json
 import os
 from datetime import datetime
-from os.path import dirname, isfile
 from typing import Literal
 
 import numpy as np
@@ -27,7 +24,8 @@ from aviary.wrenformer.data import (
     wyckoff_embedding_from_aflow_str,
 )
 from aviary.wrenformer.model import Wrenformer
-from examples.mat_bench import DATA_PATHS, MatbenchDatasets
+from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
+from examples.mat_bench.utils import open_json
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -48,8 +46,8 @@ def lr_lambda(epoch: int) -> float:
 @print_walltime("run_matbench_task()")
 def run_matbench_task(
     model_name: str,
-    benchmark_path: str,
     dataset_name: MatbenchDatasets,
+    timestamp: str,
     fold: Literal[0, 1, 2, 3, 4],
     epochs: int = 100,
     n_transformer_layers: int = 4,
@@ -58,30 +56,29 @@ def run_matbench_task(
 
     Args:
         model_name (str): Can be any string to describe particular Roost/Wren variants.
-        benchmark_path (str, optional): File path where to save benchmark results.
         dataset_name (str): Name of a matbench dataset like 'matbench_dielectric',
-            'matbench_perovskites', etc. Unused if benchmark_path points at an already
-            existing file.
+            'matbench_perovskites', etc.
+        timestamp (str): Timestamp to append to the names of JSON files for model predictions
+            and performance scores. If the files already exist, results from different datasets
+            or folds will be merged in.
         epochs (int): How many epochs to train for in each CV fold.
 
     Raises:
-        ValueError: If dataset_name or benchmark_path is invalid.
+        ValueError: On unknown dataset_name.
 
     Returns:
         dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
             to model predictions.
     """
-    if not benchmark_path.endswith(".json.gz"):
-        raise ValueError(f"{benchmark_path = } must have .json.gz extension")
-    if isfile(benchmark_path):
-        with gzip.open(benchmark_path) as file:
-            bench_dict = json.loads(file.read())
-    else:
-        bench_dict = {}
+    benchmark_path = f"{MODULE_DIR}/benchmarks/preds-{model_name}-{timestamp}.json.gz"
+    scores_path = f"{MODULE_DIR}/benchmarks/scores-{model_name}-{timestamp}.json"
 
-    if dataset_name in bench_dict and str(fold) in bench_dict[dataset_name]:
+    with open_json(scores_path) as json_data:
+        scores_dict = json_data
+
+    if dataset_name in scores_dict and str(fold) in scores_dict[dataset_name]:
         print(f"{fold = } of {dataset_name} already recorded! Skipping...")
-        return bench_dict
+        return scores_dict
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
@@ -96,7 +93,7 @@ def run_matbench_task(
         raise ValueError(f"{model_name = } must contain 'roost' or 'wren'")
 
     n_features = df.features.iloc[0].shape[1]
-    assert n_features in (199 + 1, 200 + 1 + 444)  # Roost and Wren input dims resp.
+    assert n_features in (199 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
@@ -175,57 +172,51 @@ def run_matbench_task(
         writer=writer,
     )
 
-    [targets], [predictions], *_ = model.predict(test_loader)
+    [targets], [predictions], *ids = model.predict(test_loader)
+    predictions = predictions.cpu().squeeze()
+
+    params = {
+        "epochs": epochs,
+        "n_transformer_layers": n_transformer_layers,
+        "learning_rate": learning_rate,
+        "robust": robust,
+        "n_features": n_features,  # embedding size
+        "losses": str(loss_dict),
+    }
 
     # --- save model predictions to gzipped JSON ---
-    if isfile(benchmark_path):  # we checked for isfile() above but possible another
-        # slurm job created a partial benchmark in the meantime in which case we merge results
-        with gzip.open(benchmark_path) as file:
-            bench_dict = json.load(file)
-    elif benchmark_dir := dirname(benchmark_path):
-        os.makedirs(benchmark_dir, exist_ok=True)
-
-    if dataset_name not in bench_dict:
-        bench_dict[dataset_name] = {}
-    # record model predictions
-    bench_dict[dataset_name][fold] = predictions.cpu().tolist()
-
-    # save model benchmark
-    with gzip.open(benchmark_path, "w") as file:
-        file.write(json.dumps(bench_dict).encode("utf-8"))
-    print(f"{fold = } of {dataset_name} written to {benchmark_path=}")
+    with open_json(benchmark_path) as bench_dict:
+        # record model predictions
+        bench_dict[dataset_name][fold] = {
+            "preds": predictions.tolist(),
+            "ids": list(ids),
+            "params": params,
+        }
 
     # --- save model scores to JSON ---
     # matbench.data_ops.score_array() calculates calculates [MAE, RMSE, MAPE, max error]
     # for regression and [accuracy, balanced accuracy, F1, ROCAUC] for classification.
-    scores = score_array(predictions.squeeze(), targets, task_type)
+    scores = score_array(predictions, targets, task_type)
 
-    try:
-        with open(f"benchmarks/scores-{model_name}.json") as json_file:
-            scores_dict = json.load(json_file)
-    except (FileNotFoundError, json.decoder.JSONDecodeError):  # file missing or empty
-        scores_dict = {}
-    if dataset_name not in scores_dict:
-        scores_dict[dataset_name] = {}
-    scores_dict[dataset_name][fold] = scores
+    with open_json(scores_path) as scores_dict:
+        scores_dict[dataset_name][fold] = scores
+        scores_dict["params"] = params
 
-    with open(f"benchmarks/scores-{model_name}.json", "w") as json_file:
-        json.dump(scores_dict, json_file)
-
+    print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
     return bench_dict
 
 
 # %%
 if __name__ == "__main__":
+    from glob import glob
+
     try:
         # for testing and debugging
-        model_name = "roost"
-        benchmark_path = "benchmarks/wrenformer-tmp.json.gz"
+        model_name = "roostformer-tmp"
+        timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
         dataset = "matbench_jdft2d"
         # dataset = "matbench_mp_is_metal"
-        run_matbench_task(model_name, benchmark_path, dataset, 4, epochs=1)
+        run_matbench_task(model_name, dataset, timestamp, 4, epochs=1)
     finally:  # clean up
-        try:
-            os.remove(benchmark_path)
-        except FileNotFoundError:
-            pass
+        for filename in glob(f"benchmarks/*{model_name}-{timestamp}*.json*"):
+            os.remove(filename)

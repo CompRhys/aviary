@@ -17,6 +17,10 @@ class Wrenformer(BaseModelClass):
     embedding given a material's composition and Wyckoff positions (think crystal symmetries).
     Since the embedding is trainable, it is systematically improvable with more data.
     Using this embedding, the residual output network regresses or classifies the targets.
+
+    Can also be used as Roostformer by generating the input features with
+    get_composition_embedding() instead of wyckoff_embedding_from_aflow_str(). Model class,
+    collate_batch function and DataLoader stay the same.
     """
 
     def __init__(

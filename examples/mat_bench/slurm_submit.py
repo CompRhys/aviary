@@ -27,7 +27,6 @@ else:
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 now = f"{datetime.now():%Y-%m-%d@%H-%M}"
-benchmark_path = f"{MODULE_DIR}/benchmarks/{model_name}-{now}.json.gz"
 
 python_cmd = f"""import os
 from datetime import datetime
@@ -48,8 +47,8 @@ print(f"{{dataset_name=}}\\n{{fold=}}")
 
 run_matbench_task(
     {model_name=},
-    {benchmark_path=},
     dataset_name=dataset_name,
+    timestamp={now},
     fold=fold,
     {epochs=},
     {n_transformer_layers=},
