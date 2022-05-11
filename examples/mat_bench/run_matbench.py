@@ -92,7 +92,7 @@ def run_matbench_task(
         raise ValueError(f"{model_name = } must contain 'roost' or 'wren'")
 
     n_features = df.features.iloc[0].shape[1]
-    assert n_features in (199 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
+    assert n_features in (200 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
@@ -119,27 +119,24 @@ def run_matbench_task(
     targets = torch.tensor(targets, device=device)
     if targets.dtype == torch.bool:
         targets = targets.long()
-    features_arr = np.empty(len(features), dtype=object)
+    inputs = np.empty(len(features), dtype=object)
     for idx, tensor in enumerate(features):
-        features_arr[idx] = tensor.to(device)
+        inputs[idx] = tensor.to(device)
 
     train_loader = InMemoryDataLoader(
-        [features_arr, targets, ids],
-        batch_size=32,
-        shuffle=True,
-        collate_fn=collate_batch,
+        [inputs, targets, ids], batch_size=32, shuffle=True, collate_fn=collate_batch
     )
 
     features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
     targets = torch.tensor(targets, device=device)
     if targets.dtype == torch.bool:
         targets = targets.long()
-    features_arr = np.empty(len(features), dtype=object)
+    inputs = np.empty(len(features), dtype=object)
     for idx, tensor in enumerate(features):
-        features_arr[idx] = tensor.to(device)
+        inputs[idx] = tensor.to(device)
 
     test_loader = InMemoryDataLoader(
-        [features_arr, targets, ids], batch_size=128, collate_fn=collate_batch
+        [inputs, targets, ids], batch_size=128, collate_fn=collate_batch
     )
 
     # n_features = element + wyckoff embedding lengths + element weights in composition

@@ -21,14 +21,17 @@ class Wrenformer(BaseModelClass):
     Can also be used as Roostformer by generating the input features with
     get_composition_embedding() instead of wyckoff_embedding_from_aflow_str(). Model class,
     collate_batch function and DataLoader stay the same.
+
+    See https://nature.com/articles/s41524-021-00545-1/tables/2 for default CrabNet hyperparams.
     """
 
     def __init__(
         self,
         n_targets: list[int],
         n_features: int,
+        d_model: int = 256,
         n_transformer_layers: int = 6,
-        n_attention_heads: int = 5,
+        n_attention_heads: int = 4,
         trunk_hidden: list[int] = [1024, 512],
         out_hidden: list[int] = [256, 128, 64],
         robust: bool = False,
@@ -39,10 +42,13 @@ class Wrenformer(BaseModelClass):
         Args:
             n_targets (list[int]): Number of targets to train on. 1 for regression and number of
                 different class labels for classification.
-            n_features (int): Number of features in the input data.
+            n_features (int): Number of features in the input data (aka embedding size).
+            d_model (int): Dimension of the transformer layers. Determines size of the learned
+                embedding passed to the output NN. d_model should be increased for large datasets.
+                Defaults to 256.
             n_transformer_layers (int): Number of transformer layers to use. Defaults to 3.
-            n_attention_heads (int): Number of attention heads to use in the transformer.
-                Defaults to 5.
+            n_attention_heads (int): Number of attention heads to use in the transformer. d_model
+                needs to be divisible by this number. Defaults to 4.
             trunk_hidden (list[int], optional): Number of hidden units in the trunk network which
                 is shared across tasks when multitasking. Defaults to [1024, 512].
             out_hidden (list[int], optional): Number of hidden units in the output networks which
@@ -52,8 +58,11 @@ class Wrenformer(BaseModelClass):
         """
         super().__init__(robust=robust, **kwargs)
 
+        # up or down size embedding dimension to chosen model dimension
+        self.resize_embedding = nn.Linear(n_features, d_model)
+
         transformer_layer = nn.TransformerEncoderLayer(
-            d_model=n_features, nhead=n_attention_heads, batch_first=True
+            d_model=d_model, nhead=n_attention_heads, batch_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(
             transformer_layer, num_layers=n_transformer_layers
@@ -63,7 +72,7 @@ class Wrenformer(BaseModelClass):
             n_targets = [2 * n for n in n_targets]
 
         self.trunk_nn = ResidualNetwork(
-            input_dim=n_features,
+            input_dim=d_model,
             output_dim=out_hidden[0],
             hidden_layer_dims=trunk_hidden,
         )
@@ -82,6 +91,7 @@ class Wrenformer(BaseModelClass):
         Returns:
             tuple[Tensor, ...]: Predictions for each batch of multitask targets.
         """
+        features = self.resize_embedding(features)
         embedding = self.transformer_encoder(features, src_key_padding_mask=mask)
 
         # aggregate all node representations into a single vector Wyckoff embedding
