@@ -20,14 +20,14 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
 
     # make scaled data for heatmap coloring
     # scale regression problems by mad/mae
-    def scale_regr_task(series, mad):
+    def scale_regr_task(series: pd.Series, mad: float) -> pd.Series:
         mask = series > 0.0
         mask_iix = np.where(mask)
         series.iloc[mask_iix] = series.iloc[mask_iix] / mad
         series.loc[~mask] = np.nan
         return series
 
-    def scale_clf_task(series, mad):
+    def scale_clf_task(series: pd.Series) -> pd.Series:
         mask = series > 0.0
         mask_iix = np.where(mask)
         series.iloc[mask_iix] = 1 - (series.iloc[mask_iix] - 0.5) / 0.5
@@ -37,10 +37,12 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
     scaled_df = df.copy(deep=True)
     for task in scaled_df:
         task_type = mbv01_metadata[task].task_type
-        assert task_type in [REG_KEY, CLF_KEY], f"Unknown {task_type = }"
-        scaler = scale_clf_task if task_type == CLF_KEY else scale_regr_task
-
-        scaled_df[task] = scaler(scaled_df[task], mbv01_metadata[task].mad)
+        assert task_type in [REG_KEY, CLF_KEY], f"Unknown {task_type = } for {task = }"
+        if task_type == REG_KEY:
+            task_mad = mbv01_metadata[task].mad
+            scaled_df[task] = scale_regr_task(scaled_df[task], task_mad)
+        elif task_type == CLF_KEY:
+            scaled_df[task] = scale_clf_task(scaled_df[task])
 
     return scaled_df
 
@@ -110,7 +112,7 @@ def plot_leaderboard(df: pd.DataFrame) -> Figure:
     return fig
 
 
-def error_heatmap(df: pd.DataFrame) -> Figure:
+def error_heatmap(df: pd.DataFrame, log: bool = False) -> Figure:
     """Create a heatmap of the errors with a column for mean error across all tasks
     added on the right. Title assumes the errors are scaled relative to dummy
     performance but works with unscaled errors too.
@@ -124,16 +126,23 @@ def error_heatmap(df: pd.DataFrame) -> Figure:
     """
     # deep copy df so we don't modify the original
     df = df.copy(deep=True)
+    if log:
+        df = np.log10(df)
 
     df["mean scaled error"] = df.mean(1)
     df = df.sort_values(by="mean scaled error").round(3)
 
-    fig = px.imshow(df, width=1000, height=600, text_auto=".2f", aspect="auto")
+    fig = px.imshow(df, width=1400, height=600, text_auto=".2f", aspect="auto")
 
     fig.update_layout(
         title=dict(text="<b>Matbench Scaled Errors</b>", x=0.5, font_size=20),
         font_size=14,
         coloraxis_colorbar_x=1.05,
     )
+
+    if log:
+        ticks = [1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01]
+        vals = np.log10(ticks)
+        fig.update_layout(coloraxis_colorbar=dict(tickvals=vals, ticktext=ticks))
 
     return fig

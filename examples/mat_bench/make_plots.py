@@ -1,9 +1,10 @@
 # %%
-import gzip
 import json
 from collections import defaultdict
+from datetime import datetime
 from glob import glob
 
+import numpy as np
 import pandas as pd
 from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
@@ -16,22 +17,22 @@ from examples.mat_bench.plotting_functions import (
     scale_errors,
     x_labels,
 )
+from examples.mat_bench.utils import open_json
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
 
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+
 
 # %%
-all_data: dict[str, dict[str, float]] = defaultdict(dict)
-
 mb_repo = "/Users/janosh/dev/matbench"  # path to clone of matbench repo
+others_data: dict[str, dict[str, float]] = defaultdict(dict)
 
-# load benchmark data for other models
+# load benchmark data for models with existing Matbench submission
 for dir_name in glob(f"{mb_repo}/benchmarks/*"):
     model_name = dir_name.split("/")[-1]
-    print(f"\n{model_name}")
 
-    # results are automatically validated, no need to validate again
     mbbm = MatbenchBenchmark.from_file(f"{dir_name}/results.json.gz")
 
     for task in mbbm.tasks:
@@ -45,40 +46,60 @@ for dir_name in glob(f"{mb_repo}/benchmarks/*"):
         else:
             raise ValueError(f"Unknown {task_type = }")
 
-        all_data[task_name][model_name] = score
+        others_data[task_name][model_name] = score
+
+df_err = pd.DataFrame(others_data).round(3)
+df_err.index.name = "model"
 
 
 # %%
-# df = pd.DataFrame(all_data).round(3)
-# df.index.name = "model"
-# df.to_csv("matbench-model-errors.csv")
-df = pd.read_csv("matbench-model-errors.csv").set_index("model")
-df_scaled = scale_errors(df)
-# rename column names for prettier axis ticks (must be after scale_errors() to have
-# correct dict keys)
-df_scaled = df_scaled.rename(columns=x_labels)
+for filename in glob("benchmarks/scores-*.json"):
+
+    with open(filename) as file:
+        data = json.load(file)["scores"]
+
+    model_name = filename.split("benchmarks/scores-")[-1].split(".json")[0]
+    df_mean_scores = pd.DataFrame(
+        {task: pd.DataFrame(data[task]).mean(1) for task in data}
+    ).T
+
+    score_name = "mae" if "mae" in df_mean_scores else "rocauc"
+    df_err.loc[model_name] = df_mean_scores[score_name]
 
 
 # %%
-def int_keys(d):
-    # convert digit keys to ints in JSON dicts
-    return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in d.items()}
+our_benchmarks = glob("benchmarks/*.json.gz")
 
+tasks = {}
 
-our_benchmarks = [x for x in glob("benchmarks/*.json.gz") if x not in df.index]
 for benchmark_path in our_benchmarks:
     bench_name = benchmark_path.split("/")[-1].split(".")[0]
-    with gzip.open(benchmark_path) as json_gz:
-        benchmark = json.load(json_gz, object_hook=int_keys)
+    if bench_name in df_err.index:
+        print(f"skipping {bench_name} since already in df_err.index")
+        continue
+    with open_json(benchmark_path) as json_data:
+        benchmark = json_data
+
     for dataset, folds in benchmark.items():
         if sorted(folds) != list(range(5)):
             print(f"skipping partially recorded {dataset} with folds {sorted(folds)}")
             continue
-        task = MatbenchTask(dataset)
-        df = pd.read_json(DATA_PATHS[dataset]).set_index("mbid", drop=False)
-        task.df = df
+
+        if dataset not in tasks:
+            # load and cache task data manually without hydrating pymatgen structures for speed
+            task = MatbenchTask(dataset, autoload=False)
+            tasks[dataset] = task
+            df = pd.read_json(DATA_PATHS[dataset]).set_index("mbid", drop=False)
+            task.df = df
+        else:
+            task = tasks[dataset]
+
         task_type = task.metadata.task_type
+
         for fold, preds in folds.items():
+            if task_type == CLF_KEY:
+                preds = np.argmax(preds, axis=1)
+
             task.record(fold, preds)
 
         if task_type == REG_KEY:
@@ -88,19 +109,26 @@ for benchmark_path in our_benchmarks:
         else:
             raise ValueError(f"Unknown {task_type = }")
 
-        all_data[dataset][bench_name] = score
+        others_data[dataset][bench_name] = score
 
 
 # %%
-fig = plot_leaderboard(df)
+df_err_scaled = scale_errors(df_err)
+# rename column names for prettier axis ticks (must be after scale_errors() to have
+# correct dict keys)
+df_err_scaled = df_err_scaled.rename(columns=x_labels)
+
+
+# %%
+fig = plot_leaderboard(df_err)
 fig.show()
 
 
 # %%
-html_path = "plots/matbench-scaled-errors.html"
-fig.write_html(html_path, include_plotlyjs="cdn")
+html_path = f"plots/matbench-scaled-errors-{timestamp}.html"
+# fig.write_html(html_path, include_plotlyjs="cdn")
 
-
+# change plot background to black since Matbench site uses dark mode
 with open(html_path, "r+") as file:
     html = file.read()
     file.seek(0)  # rewind file pointer to start of file
@@ -112,6 +140,6 @@ with open(html_path, "r+") as file:
 
 
 # %%
-fig = error_heatmap(df_scaled)
+fig = error_heatmap(df_err_scaled)
 fig.show()
-fig.write_image("plots/matbench-scaled-errors-heatmap.png")
+fig.write_image(f"plots/matbench-scaled-errors-heatmap-{timestamp}.png", scale=2)

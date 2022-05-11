@@ -314,7 +314,8 @@ def count_wyks(aflow_label: str) -> int:
 
 
 def count_params(aflow_label: str) -> int:
-    """Count number of parameters coarse-grained in Wyckoff representation.
+    """Count number of free parameters coarse-grained in Wyckoff representation: how many
+    degrees of freedom would remain to optimize during a crystal structure relaxation.
 
     Args:
         aflow_label (str): AFLOW-style prototype label with appended chemical system
@@ -324,7 +325,7 @@ def count_params(aflow_label: str) -> int:
     """
     num_params = 0
 
-    aflow_label, _ = aflow_label.split(":")
+    aflow_label, _ = aflow_label.split(":")  # chop off chemical system
     _, pearson, spg, *wyks = aflow_label.split("_")
 
     num_params += cry_param_dict[pearson[0]]

@@ -8,6 +8,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import torch
+from matbench.constants import CLF_KEY, REG_KEY
 from matbench.data_ops import score_array
 from matbench.task import MatbenchTask
 from torch import nn
@@ -70,7 +71,6 @@ def run_matbench_task(
         dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
             to model predictions.
     """
-    benchmark_path = f"{MODULE_DIR}/benchmarks/preds-{model_name}-{timestamp}.json.gz"
     scores_path = f"{MODULE_DIR}/benchmarks/scores-{model_name}-{timestamp}.json"
 
     with open_json(scores_path) as json_data:
@@ -105,11 +105,11 @@ def run_matbench_task(
     robust = False
     loss_func = (
         (RobustL1Loss if robust else nn.L1Loss())
-        if task_type == "regression"
+        if task_type == REG_KEY
         else (nn.NLLLoss() if robust else nn.CrossEntropyLoss())
     )
     loss_dict = {target: (task_type, loss_func)}
-    normalizer_dict = {target: Normalizer() if task_type == "regression" else None}
+    normalizer_dict = {target: Normalizer() if task_type == REG_KEY else None}
 
     fold_name = f"{model_name}-{dataset_name}-{fold=}"
 
@@ -145,7 +145,7 @@ def run_matbench_task(
 
     # n_features = element + wyckoff embedding lengths + element weights in composition
     model = Wrenformer(
-        n_targets=[1 if task_type == "regression" else 2],
+        n_targets=[1 if task_type == REG_KEY else 2],
         n_features=n_features,
         task_dict=task_dict,
         n_transformer_layers=n_transformer_layers,
@@ -173,18 +173,22 @@ def run_matbench_task(
     )
 
     [targets], [predictions], *ids = model.predict(test_loader)
-    predictions = predictions.cpu().squeeze()
+    predictions = predictions.cpu().squeeze().numpy()
+    if task_type == CLF_KEY:
+        predictions = np.argmax(predictions, axis=1)
 
+    # save model predictions to gzipped JSON
+    benchmark_path = f"{MODULE_DIR}/benchmarks/preds-{model_name}-{timestamp}.json.gz"
     params = {
         "epochs": epochs,
         "n_transformer_layers": n_transformer_layers,
         "learning_rate": learning_rate,
         "robust": robust,
         "n_features": n_features,  # embedding size
-        "losses": str(loss_dict),
+        "benchmark_path": benchmark_path,
+        dataset_name: {"losses": str(loss_dict)},
     }
 
-    # --- save model predictions to gzipped JSON ---
     with open_json(benchmark_path) as bench_dict:
         # record model predictions
         bench_dict[dataset_name][fold] = {
@@ -193,14 +197,16 @@ def run_matbench_task(
             "params": params,
         }
 
-    # --- save model scores to JSON ---
     # matbench.data_ops.score_array() calculates calculates [MAE, RMSE, MAPE, max error]
     # for regression and [accuracy, balanced accuracy, F1, ROCAUC] for classification.
     scores = score_array(predictions, targets, task_type)
 
+    scores = {key: round(val, 4) for key, val in scores.items()}
+
+    # save model scores to JSON
     with open_json(scores_path) as scores_dict:
-        scores_dict[dataset_name][fold] = scores
-        scores_dict["params"] = params
+        scores_dict["scores"][dataset_name][fold] = scores
+        scores_dict["params"].update(params)
 
     print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
     return bench_dict
@@ -218,5 +224,5 @@ if __name__ == "__main__":
         # dataset = "matbench_mp_is_metal"
         run_matbench_task(model_name, dataset, timestamp, 4, epochs=1)
     finally:  # clean up
-        for filename in glob(f"benchmarks/*{model_name}-{timestamp}*.json*"):
+        for filename in glob(f"benchmarks/*{model_name}-*.json*"):
             os.remove(filename)

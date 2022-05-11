@@ -33,7 +33,6 @@ class InMemoryDataLoader:
             raise ValueError("All tensors must have the same length in dim 0")
 
     def __iter__(self) -> Iterator[tuple[Tensor, ...]]:
-        # remember to set a random seed with torch.manual_seed(0)
         self.indices = np.random.permutation(self.dataset_len) if self.shuffle else None
         self.idx = 0
         return self
@@ -44,7 +43,7 @@ class InMemoryDataLoader:
 
         end_idx = self.idx + self.batch_size
 
-        if self.indices is None:
+        if self.indices is None:  # shuffle=False
             slices = (t[self.idx : end_idx] for t in self.tensors)
         else:
             idx = self.indices[self.idx : end_idx]
