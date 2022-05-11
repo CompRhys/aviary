@@ -38,7 +38,7 @@ class BaseModelClass(nn.Module, ABC):
         self,
         task_dict: dict[str, TaskType],
         robust: bool,
-        epoch: int = 1,
+        epoch: int = 0,
         best_val_scores: dict[str, float] = None,
     ) -> None:
         """Store core model parameters.
@@ -46,7 +46,7 @@ class BaseModelClass(nn.Module, ABC):
         Args:
             task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
             robust (bool): Whether to estimate standard deviation for use in a robust loss function
-            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
+            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 0.
             best_val_scores (dict[str, float], optional): Validation score to use for early
                 stopping. Defaults to None.
         """
@@ -408,7 +408,7 @@ class BaseModelClass(nn.Module, ABC):
         """Return unambiguous string representation of model."""
         name = self._get_name()
         n_params, n_epochs = self.num_params, self.epoch
-        return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
+        return f"{name} with {n_params:,} trainable params at {n_epochs:,} epochs"
 
 
 class Normalizer:
