@@ -26,7 +26,7 @@ else:
     datasets = [k for k, v in mbv01_metadata.items() if v.input_type == "structure"]
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
-now = f"{datetime.now():%Y-%m-%d@%H-%M}"
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
 
 python_cmd = f"""import os
 from datetime import datetime
@@ -48,7 +48,7 @@ print(f"{{dataset_name=}}\\n{{fold=}}")
 run_matbench_task(
     {model_name=},
     dataset_name=dataset_name,
-    timestamp={now},
+    {timestamp=},
     fold=fold,
     {epochs=},
     {n_transformer_layers=},
@@ -56,7 +56,7 @@ run_matbench_task(
 """
 
 
-submit_script = f"{log_dir}/{model_name}-{now}.py"
+submit_script = f"{log_dir}/{model_name}-{timestamp}.py"
 
 # prepend into sbatch script to source module command and load default env
 # for Ampere GPU partition before actual job command
@@ -67,7 +67,7 @@ slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 slurm_cmd = f"""sbatch
     --partition ampere
     --account LEE-JR769-SL2-GPU
-    --time 16:0:0
+    --time 8:0:0
     --nodes 1
     --gpus-per-node 1
     --chdir {log_dir}

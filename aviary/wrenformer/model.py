@@ -90,7 +90,7 @@ class Wrenformer(BaseModelClass):
         seq_lens = torch.sum(~mask, dim=1, keepdim=True)
         aggregated_embedding = torch.sum(embedding_masked, dim=1) / seq_lens
 
-        # main body of the FNN jointly used by all multitask objectives
+        # main body of the feed-forward NN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embedding))
 
         return tuple(output_nn(predictions) for output_nn in self.output_nns)

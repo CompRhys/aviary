@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from typing import Generator
 
 
-def _int_keys(d):
+def _int_keys(dct: dict) -> dict:
     # JSON annoyingly stringifies all dict keys during serialization and does not revert
-    # floats and ints back during parsing. This json.load() hook converts key strings
+    # floats and ints back during parsing. This json.load() hook converts keys
     # containing only digits to ints.
-    return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in d.items()}
+    return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in dct.items()}
 
 
 @contextmanager
@@ -26,7 +26,7 @@ def open_json(filepath: str, initial: dict = None) -> Generator[dict, None, None
             was missing or empty. Defaults to None.
 
     Yields:
-        Generator[dict[Any, Any], None, None]: _description_
+        Generator[dict[Any, Any], None, None]: Loaded JSON data.
     """
     open_fn = gzip.open if filepath.lower().endswith(".gz") else open
 
@@ -43,4 +43,5 @@ def open_json(filepath: str, initial: dict = None) -> Generator[dict, None, None
         # if user raises exception in with block, still try to save any changes they may
         # have made to data back to disk
         with open_fn(filepath, "wt") as json_file:
+            # 'wt' ensures text mode since gzip.open() defaults to binary
             json.dump(json_data, json_file)
