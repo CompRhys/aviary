@@ -10,10 +10,10 @@ from torch.nn import L1Loss
 
 from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
-from aviary.utils import print_walltime
 from aviary.wrenformer.data import collate_batch, wyckoff_embedding_from_aflow_str
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS
+from examples.mat_bench.utils import print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-12"
