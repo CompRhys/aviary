@@ -91,9 +91,7 @@ def get_composition_embedding(formula: str) -> Tensor:
 
     elem_weights = np.atleast_2d(elem_weights).T / sum(elem_weights)
 
-    # cutoff last matscholar dim so embedding len is not prime, transformer needs feature
-    # len to be divisible by num_atten_heads
-    element_features = np.vstack([elem_features[el][:-1] for el in elements])
+    element_features = np.vstack([elem_features[el] for el in elements])
 
     # convert all data to tensors
     element_ratios = torch.tensor(elem_weights)
