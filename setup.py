@@ -26,7 +26,6 @@ setup(
     package_data={"": ["embeddings/**/*.json"]},
     python_requires=">=3.7",
     install_requires=[
-        "scipy",
         "tqdm",
         "torch",
         "numpy",

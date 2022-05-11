@@ -8,7 +8,6 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 import torch
-from scipy.special import softmax
 from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
@@ -769,3 +768,33 @@ def save_results_dict(
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to '{csv_path}'")
+
+
+def softmax(arr: np.ndarray, axis: int = -1) -> np.ndarray:
+    """Compute the softmax of an array along an axis.
+
+    Args:
+        arr (np.ndarray): Arbitrary dimensional array.
+        axis (int, optional): Dimension over which to take softmax. Defaults to -1 (last).
+
+    Returns:
+        np.ndarray: Same dimension as input array, but specified axis reduced
+            to singleton.
+    """
+    exp = np.exp(arr)
+    return exp / exp.sum(axis=axis, keepdims=True)
+
+
+def one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
+    """Get a one-hot encoded version of an array of class labels.
+
+    Args:
+        targets (np.ndarray): 1d array of integer class labels.
+        n_classes (int, optional): Number of classes. Defaults to np.max(targets) + 1.
+
+    Returns:
+        np.ndarray: 2d array of 1-hot encoded class labels.
+    """
+    if n_classes is None:
+        n_classes = np.max(targets) + 1
+    return np.eye(n_classes)[targets]
