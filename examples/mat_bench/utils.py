@@ -1,5 +1,6 @@
 import gzip
 import json
+import time
 from collections import defaultdict
 from contextlib import contextmanager
 from typing import Generator
@@ -45,3 +46,20 @@ def open_json(filepath: str, initial: dict = None) -> Generator[dict, None, None
         with open_fn(filepath, "wt") as json_file:
             # 'wt' ensures text mode since gzip.open() defaults to binary
             json.dump(json_data, json_file)
+
+
+@contextmanager
+def print_walltime(desc: str = "Execution") -> Generator[None, None, None]:
+    """Context manager and decorator that prints the wall time of its lifetime.
+
+    Args:
+        desc (str, optional): Description prints as f"{desc} took 1.23 sec".
+            Defaults to "Execution".
+    """
+    start_time = time.perf_counter()
+
+    try:
+        yield
+    finally:
+        run_time = time.perf_counter() - start_time
+        print(f"{desc} took {run_time:.2f} sec")

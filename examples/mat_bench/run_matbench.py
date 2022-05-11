@@ -18,7 +18,6 @@ from aviary import ROOT
 from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
-from aviary.utils import print_walltime
 from aviary.wrenformer.data import (
     collate_batch,
     get_composition_embedding,
@@ -26,7 +25,7 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
-from examples.mat_bench.utils import open_json
+from examples.mat_bench.utils import open_json, print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"

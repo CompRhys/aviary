@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
-import time
-from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Generator, Iterable
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
@@ -771,20 +769,3 @@ def save_results_dict(
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to '{csv_path}'")
-
-
-@contextmanager
-def print_walltime(desc: str = "Execution") -> Generator[None, None, None]:
-    """Context manager and decorator that prints the wall time of its lifetime.
-
-    Args:
-        desc (str, optional): Description prints as f"{desc} took 1.23 sec".
-            Defaults to "Execution".
-    """
-    start_time = time.perf_counter()
-
-    try:
-        yield
-    finally:
-        run_time = time.perf_counter() - start_time
-        print(f"{desc} took {run_time:.2f} sec")
