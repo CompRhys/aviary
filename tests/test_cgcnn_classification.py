@@ -1,17 +1,16 @@
 import numpy as np
 import torch
-from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split as split
 
 from aviary.cgcnn.data import CrystalGraphData, collate_batch
 from aviary.cgcnn.model import CrystalGraphConvNet
-from aviary.utils import one_hot, results_multitask, train_ensemble
+from aviary.utils import get_metrics, results_multitask, train_ensemble
 
 
 def test_cgcnn_clf(df_matbench_phonons):
     elem_emb = "cgcnn92"
     targets = ["phdos_clf"]
-    tasks = ["classification"]
+    task = "classification"
     losses = ["CSE"]
     robust = True
     model_name = "cgcnn-clf-test"
@@ -37,7 +36,7 @@ def test_cgcnn_clf(df_matbench_phonons):
     workers = 0
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    task_dict = dict(zip(targets, tasks))
+    task_dict = dict(zip(targets, [task]))
     loss_dict = dict(zip(targets, losses))
 
     dataset = CrystalGraphData(
@@ -135,10 +134,7 @@ def test_cgcnn_clf(df_matbench_phonons):
     # calculate metrics and errors with associated errors for ensembles
     ens_logits = np.mean(logits, axis=0)
 
-    targets_one_hot = one_hot(targets)
-
-    ens_acc = accuracy_score(targets, np.argmax(ens_logits, axis=1))
-    ens_roc_auc = roc_auc_score(targets_one_hot, ens_logits)
+    ens_acc, *_, ens_roc_auc = get_metrics(targets, ens_logits, task).values()
 
     assert ens_acc > 0.85
     assert ens_roc_auc > 0.9

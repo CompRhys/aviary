@@ -10,6 +10,8 @@ import pandas as pd
 import torch
 from sklearn.metrics import (
     accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
     precision_recall_fscore_support,
     r2_score,
     roc_auc_score,
@@ -533,7 +535,7 @@ def results_multitask(  # noqa: C901
                     results_dict[name]["pre-logits_ale"].append(pre_logits_std)  # type: ignore
                 else:
                     pre_logits = pred.data.cpu().numpy()
-                    logits = softmax(pre_logits, axis=1)
+                    logits = pre_logits.softmax(1)
 
                 results_dict[name]["pre-logits"].append(pre_logits)  # type: ignore
                 results_dict[name]["logits"].append(logits)  # type: ignore
@@ -764,31 +766,41 @@ def save_results_dict(
     print(f"\nSaved model predictions to '{csv_path}'")
 
 
-def softmax(arr: np.ndarray, axis: int = -1) -> np.ndarray:
-    """Compute the softmax of an array along an axis.
+def get_metrics(
+    targets: np.ndarray,
+    predictions: np.ndarray,
+    type: Literal["regression", "classification"],
+    prec: int = 4,
+) -> dict:
+    """Get performance metrics for model predictions.
 
     Args:
-        arr (np.ndarray): Arbitrary dimensional array.
-        axis (int, optional): Dimension over which to take softmax. Defaults to -1 (last).
+        targets (np.ndarray): Ground truth values.
+        preds (np.ndarray): Model predictions. Should be class probabilities for classification
+            (i.e. output model after applying softmax/sigmoid). Same shape as targets for
+            regression, and [len(targets), n_classes] for classification.
+        type ('regression' | 'classification'): Task type.
+        prec (int, optional): Number of decimal places to round metrics to. Defaults to 4.
 
     Returns:
-        np.ndarray: Same dimension as input array, but specified axis reduced
-            to singleton.
+        dict[str, float]: Keys are rmse, mae, r2 for regression and accuracy, balanced_accuracy,
+            f1, rocauc for classification.
     """
-    exp = np.exp(arr)
-    return exp / exp.sum(axis=axis, keepdims=True)
+    metrics = {}
 
+    if type == "regression":
+        metrics["mae"] = np.abs(targets - predictions).mean()
+        metrics["rmse"] = ((targets - predictions) ** 2).mean() ** 0.5
+        metrics["r2"] = r2_score(targets, predictions)
+    elif type == "classification":
+        pred_labels = predictions.argmax(axis=1)
 
-def one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
-    """Get a one-hot encoded version of an array of class labels.
+        metrics["accuracy"] = accuracy_score(targets, pred_labels)
+        metrics["balanced_accuracy"] = balanced_accuracy_score(targets, pred_labels)
+        metrics["f1"] = f1_score(targets, pred_labels)
+        class1_probas = predictions[:, 1]
+        metrics["rocauc"] = roc_auc_score(targets, class1_probas)
 
-    Args:
-        targets (np.ndarray): 1d array of integer class labels.
-        n_classes (int, optional): Number of classes. Defaults to np.max(targets) + 1.
+    metrics = {key: round(val, prec) for key, val in metrics.items()}
 
-    Returns:
-        np.ndarray: 2d array of 1-hot encoded class labels.
-    """
-    if n_classes is None:
-        n_classes = np.max(targets) + 1
-    return np.eye(n_classes)[targets]
+    return metrics
