@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import torch
 from matbench.constants import CLF_KEY, REG_KEY
-from matbench.data_ops import score_array
 from matbench.task import MatbenchTask
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -18,6 +17,7 @@ from aviary import ROOT
 from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
+from aviary.utils import get_metrics
 from aviary.wrenformer.data import (
     collate_batch,
     get_composition_embedding,
@@ -168,10 +168,12 @@ def run_matbench_task(
         writer=writer,
     )
 
-    [targets], [predictions], *ids = model.predict(test_loader)
-    predictions = predictions.cpu().squeeze().numpy()
+    [targets], [preds], *ids = model.predict(test_loader)
     if task_type == CLF_KEY:
-        predictions = np.argmax(predictions, axis=1)
+        preds = preds.softmax(1)
+    predictions = preds.cpu().squeeze().numpy()
+
+    metrics = get_metrics(targets, predictions, task_type)
 
     # save model predictions to gzipped JSON
     benchmark_path = f"{MODULE_DIR}/benchmarks/preds-{model_name}-{timestamp}.json.gz"
@@ -193,15 +195,9 @@ def run_matbench_task(
             "params": params,
         }
 
-    # matbench.data_ops.score_array() calculates calculates [MAE, RMSE, MAPE, max error]
-    # for regression and [accuracy, balanced accuracy, F1, ROCAUC] for classification.
-    scores = score_array(predictions, targets, task_type)
-
-    scores = {key: round(val, 4) for key, val in scores.items()}
-
     # save model scores to JSON
     with open_json(scores_path) as scores_dict:
-        scores_dict["scores"][dataset_name][fold] = scores
+        scores_dict["scores"][dataset_name][fold] = metrics
         scores_dict["params"].update(params)
 
     print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
