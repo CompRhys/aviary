@@ -1,17 +1,16 @@
 import numpy as np
 import torch
-from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split as split
 
 from aviary.cgcnn.data import CrystalGraphData, collate_batch
 from aviary.cgcnn.model import CrystalGraphConvNet
-from aviary.utils import results_multitask, train_ensemble
+from aviary.utils import get_metrics, results_multitask, train_ensemble
 
 
 def test_cgcnn_regression(df_matbench_phonons):
     elem_emb = "cgcnn92"
     targets = ["last phdos peak"]
-    tasks = ["regression"]
+    task = "regression"
     losses = ["L1"]
     robust = True
     model_name = "cgcnn-reg-test"
@@ -37,7 +36,7 @@ def test_cgcnn_regression(df_matbench_phonons):
     workers = 0
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    task_dict = dict(zip(targets, tasks))
+    task_dict = dict(zip(targets, [task]))
     loss_dict = dict(zip(targets, losses))
 
     dataset = CrystalGraphData(
@@ -134,10 +133,7 @@ def test_cgcnn_regression(df_matbench_phonons):
 
     y_ens = np.mean(pred, axis=0)
 
-    mae = np.abs(target - y_ens).mean()
-    mse = np.square(target - y_ens).mean()
-    rmse = np.sqrt(mse)
-    r2 = r2_score(target, y_ens)
+    mae, rmse, r2 = get_metrics(target, y_ens, task).values()
 
     assert r2 > 0.7
     assert mae < 150

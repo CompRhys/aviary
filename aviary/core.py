@@ -529,3 +529,33 @@ def sampled_softmax(pre_logits: Tensor, log_std: Tensor, samples: int = 10) -> T
     )
     logits = softmax(pre_logits, dim=1).view(len(log_std), samples, -1)
     return torch.mean(logits, dim=1)
+
+
+def np_softmax(arr: np.ndarray, axis: int = -1) -> np.ndarray:
+    """Compute the softmax of an array along an axis.
+
+    Args:
+        arr (np.ndarray): Arbitrary dimensional array.
+        axis (int, optional): Dimension over which to take softmax. Defaults to -1 (last).
+
+    Returns:
+        np.ndarray: Same dimension as input array, but specified axis reduced
+            to singleton.
+    """
+    exp = np.exp(arr)
+    return exp / exp.sum(axis=axis, keepdims=True)
+
+
+def np_one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
+    """Get a one-hot encoded version of an array of class labels.
+
+    Args:
+        targets (np.ndarray): 1d array of integer class labels.
+        n_classes (int, optional): Number of classes. Defaults to np.max(targets) + 1.
+
+    Returns:
+        np.ndarray: 2d array of 1-hot encoded class labels.
+    """
+    if n_classes is None:
+        n_classes = np.max(targets) + 1
+    return np.eye(n_classes)[targets]
