@@ -361,7 +361,7 @@ class BaseModelClass(nn.Module, ABC):
         predictions = tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs))
         # identifier columns
         ids = [list(chain(*x)) for x in list(zip(*test_ids))]
-        return targets, predictions, *ids  # type: ignore
+        return (targets, predictions, *ids)  # type: ignore
 
     @torch.no_grad()
     def featurise(self, generator: DataLoader) -> np.ndarray:
