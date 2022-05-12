@@ -407,3 +407,12 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     # TODO: how to tie break when the scores are the same?
     # currently done by alphabetical
     return "_".join((c_anom, pearson, spg, canonical[0][1]))
+
+
+def count_distinct_wyckoff_letters(aflow_str: str) -> int:
+    """Count number of distinct Wyckoff letters in Wyckoff representation."""
+    aflow_str, _ = aflow_str.split(":")  # drop chemical system
+    _, _, _, wyckoff_letters = aflow_str.split("_", 3)  # drop prototype, Pearson, spg
+    wyckoff_letters = wyckoff_letters.translate(remove_digits).replace("_", "")
+    n_uniq = len(set(wyckoff_letters))
+    return n_uniq
