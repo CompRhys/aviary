@@ -63,10 +63,7 @@ def init_model(
         # update the task disk to fine tuning task
         checkpoint["model_params"]["task_dict"] = model_params["task_dict"]
 
-        model = model_class(
-            **checkpoint["model_params"],
-            device=device,
-        )
+        model = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -90,7 +87,7 @@ def init_model(
         )
         checkpoint = torch.load(transfer, map_location=device)
 
-        model = model_class(device=device, **model_params)
+        model = model_class(**model_params)
         model.to(device)
 
         model_dict = model.state_dict()
@@ -104,17 +101,14 @@ def init_model(
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        model = model_class(
-            **checkpoint["model_params"],
-            device=device,
-        )
+        model = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
         model.epoch = checkpoint["epoch"]
         model.best_val_score = checkpoint["best_val_score"]
 
     else:
-        model = model_class(device=device, **model_params)
+        model = model_class(**model_params)
 
         model.to(device)
 
@@ -503,7 +497,7 @@ def results_multitask(  # noqa: C901
                 f"task_dict {task_dict}"
             )
 
-        model = model_class(**checkpoint["model_params"], device=device)
+        model = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 

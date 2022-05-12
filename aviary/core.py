@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import f1_score
 from torch import Tensor
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
@@ -243,9 +243,9 @@ class BaseModelClass(nn.Module, ABC):
         else:
             raise NameError("Only train or val allowed as action")
 
-        metrics: dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], list]] = {
-            key: defaultdict(list) for key in self.task_dict
-        }
+        metrics: dict[
+            str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], list]
+        ] = defaultdict(lambda: defaultdict(list))
 
         # we do not need batch_comp or batch_ids when training
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
@@ -268,11 +268,9 @@ class BaseModelClass(nn.Module, ABC):
                 if task == "regression":
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
-                        output = output.squeeze()
                         loss = criterion(output, log_std, target)
                     else:
-                        output = output.squeeze()
-                        loss = criterion(output, target)
+                        loss = criterion(output, target[..., None])
 
                     pred = normalizer_dict[name].denorm(output.data.cpu())  # type: ignore
                     target = normalizer_dict[name].denorm(target.data.cpu())  # type: ignore
@@ -283,21 +281,20 @@ class BaseModelClass(nn.Module, ABC):
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
                         logits = sampled_softmax(output, log_std)
-                        loss = criterion(torch.log(logits), target.squeeze(1))
+                        loss = criterion(torch.log(logits), target.squeeze())
                     else:
                         logits = softmax(output, dim=1)
-                        loss = criterion(output, target.squeeze())
+                        loss = criterion(output, target)
 
                     logits = logits.data.cpu()
-                    target = target.squeeze().data.cpu()
+                    target = target.data.cpu()
 
-                    # classification metrics from sklearn need numpy arrays
-                    metrics[name]["Acc"].append(
-                        accuracy_score(target, np.argmax(logits, axis=1))
+                    acc = float((target == logits.argmax(dim=1)).float().mean())
+                    metrics[name]["Acc"].append(acc)
+                    f1 = float(
+                        f1_score(target, logits.argmax(dim=1), average="weighted")
                     )
-                    metrics[name]["F1"].append(
-                        f1_score(target, np.argmax(logits, axis=1), average="weighted")
-                    )
+                    metrics[name]["F1"].append(f1)
                 else:
                     raise ValueError(f"invalid task: {task}")
 
@@ -314,8 +311,8 @@ class BaseModelClass(nn.Module, ABC):
                 optimizer.step()
 
         metrics = {
-            key: {k: np.array(v).mean() for k, v in d.items() if v}
-            for key, d in metrics.items()
+            key: {k: np.array(lst).mean().squeeze() for k, lst in dct.items()}
+            for key, dct in metrics.items()
         }
 
         return metrics
@@ -343,11 +340,11 @@ class BaseModelClass(nn.Module, ABC):
         self.eval()
 
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
-        for input_, targets, *batch_ids in tqdm(
+        for inputs, targets, *batch_ids in tqdm(
             generator, disable=True if not verbose else None
         ):
             # compute output
-            output = self(*input_)
+            output = self(*inputs)
 
             # collect the model outputs
 
@@ -405,10 +402,9 @@ class BaseModelClass(nn.Module, ABC):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def __repr__(self) -> str:
-        """Return unambiguous string representation of model."""
-        name = self._get_name()
+        """Return model name with number of parameters and epochs trained."""
         n_params, n_epochs = self.num_params, self.epoch
-        return f"{name} with {n_params:,} trainable params at {n_epochs:,} epochs"
+        return f"{type(self).__name__} with {n_params:,} trainable params at {n_epochs:,} epochs"
 
 
 class Normalizer:

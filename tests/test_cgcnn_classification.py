@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split as split
 
 from aviary.cgcnn.data import CrystalGraphData, collate_batch
 from aviary.cgcnn.model import CrystalGraphConvNet
-from aviary.utils import results_multitask, train_ensemble
+from aviary.utils import one_hot, results_multitask, train_ensemble
 
 
 def test_cgcnn_clf(df_matbench_phonons):
@@ -130,16 +130,15 @@ def test_cgcnn_clf(df_matbench_phonons):
     )
 
     logits = results_dict["phdos_clf"]["logits"]
-    target = results_dict["phdos_clf"]["target"]
+    targets = results_dict["phdos_clf"]["target"]
 
     # calculate metrics and errors with associated errors for ensembles
     ens_logits = np.mean(logits, axis=0)
 
-    target_ohe = np.zeros_like(ens_logits)
-    target_ohe[np.arange(target.size), target] = 1
+    targets_one_hot = one_hot(targets)
 
-    ens_acc = accuracy_score(target, np.argmax(ens_logits, axis=1))
-    ens_roc_auc = roc_auc_score(target_ohe, ens_logits)
+    ens_acc = accuracy_score(targets, np.argmax(ens_logits, axis=1))
+    ens_roc_auc = roc_auc_score(targets_one_hot, ens_logits)
 
     assert ens_acc > 0.85
     assert ens_roc_auc > 0.9
