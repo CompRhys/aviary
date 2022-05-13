@@ -29,7 +29,7 @@ class Wrenformer(BaseModelClass):
         self,
         n_targets: list[int],
         n_features: int,
-        d_model: int = 256,
+        d_model: int = 128,
         n_transformer_layers: int = 6,
         n_attention_heads: int = 4,
         trunk_hidden: list[int] = [1024, 512],
@@ -40,8 +40,8 @@ class Wrenformer(BaseModelClass):
         """Initialize the Wrenformer model.
 
         Args:
-            n_targets (list[int]): Number of targets to train on. 1 for regression and number of
-                different class labels for classification.
+            n_targets (list[int]): Number of targets to train on. 1 for regression or number of
+                classes for classification.
             n_features (int): Number of features in the input data (aka embedding size).
             d_model (int): Dimension of the transformer layers. Determines size of the learned
                 embedding passed to the output NN. d_model should be increased for large datasets.

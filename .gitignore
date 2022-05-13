@@ -28,6 +28,7 @@ pds/
 manuscript/
 voro-thesis/
 
-# MatbenchBenchmark.to_file() output and slurm job logs
+# MatBench model preds, metrics and slurm job logs
 examples/mat_bench/benchmarks
 examples/mat_bench/job-logs*
+wandb

@@ -8,7 +8,7 @@ from pymatgen.core import Composition
 from torch import LongTensor, Tensor, nn
 
 from aviary import PKG_DIR
-from aviary.wren.data import parse_aflow
+from aviary.wren.data import parse_aflow_wyckoff_str
 
 
 def collate_batch(
@@ -53,7 +53,9 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     Returns:
         Tensor: Shape (n_augmentations, n_features).
     """
-    spg_num, elem_weights, elements, augmented_wyckoffs = parse_aflow(wyckoff_str)
+    spg_num, elem_weights, elements, augmented_wyckoffs = parse_aflow_wyckoff_str(
+        wyckoff_str
+    )
 
     elem_weights = np.atleast_2d(elem_weights).T / np.sum(elem_weights)
 

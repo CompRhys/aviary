@@ -108,7 +108,7 @@ class WyckoffData(Dataset):
         wyckoff_str = row[self.inputs]
         material_ids = row[self.identifiers].to_list()
 
-        spg_no, weights, elements, aug_wyks = parse_aflow(wyckoff_str)
+        spg_no, weights, elements, aug_wyks = parse_aflow_wyckoff_str(wyckoff_str)
         weights = np.atleast_2d(weights).T / np.sum(weights)
 
         try:
@@ -247,7 +247,7 @@ def collate_batch(
     )
 
 
-def parse_aflow(
+def parse_aflow_wyckoff_str(
     aflow_label: str,
 ) -> tuple[str, list[float], list[str], list[tuple[str, ...]]]:
     """Parse the Wren AFLOW-like Wyckoff encoding.
@@ -282,9 +282,9 @@ def parse_aflow(
             wyckoff_set.extend([l] * m)
             element_weights.extend([float(mult_dict[spg_no][l])] * m)
 
-    # NOTE This on-the-fly augmentation of equivalent Wyckoff sets is potentially a source of high
+    # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of high
     # memory use. Can be turned off by commenting out the for loop and returning
-    # [wyckoff_set] instead of [augmented_wyckoff_set]. Wren should be able to learn anyway.
+    # [wyckoff_set] instead of augmented_wyckoff_set. Wren should be able to learn anyway.
     augmented_wyckoff_set = []
     for trans in relab_dict[spg_no]:
         # Apply translation dictionary of allowed relabelling operations in spacegroup
