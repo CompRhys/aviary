@@ -26,6 +26,10 @@ if sys.version_info < (3, 8):
     from typing_extensions import Literal
 else:
     from typing import Literal
+try:
+    import wandb
+except ImportError:
+    wandb = None  # type: ignore
 
 
 TaskType = Literal["regression", "classification"]
@@ -72,7 +76,7 @@ class BaseModelClass(nn.Module, ABC):
         model_name: str,
         run_id: int,
         checkpoint: bool = True,
-        writer: SummaryWriter = None,
+        writer: Literal["wandb"] | SummaryWriter | None = None,
         verbose: bool = True,
         patience: int = None,
     ) -> None:
@@ -101,7 +105,7 @@ class BaseModelClass(nn.Module, ABC):
             for epoch in range(start_epoch, start_epoch + epochs):
                 self.epoch += 1
                 # Training
-                t_metrics = self.evaluate(
+                train_metrics = self.evaluate(
                     generator=train_generator,
                     criterion_dict=criterion_dict,
                     optimizer=optimizer,
@@ -110,14 +114,14 @@ class BaseModelClass(nn.Module, ABC):
                     verbose=verbose,
                 )
 
-                if writer is not None:
-                    for task, metrics in t_metrics.items():
+                if isinstance(writer, SummaryWriter):
+                    for task, metrics in train_metrics.items():
                         for metric, val in metrics.items():
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch)
 
                 if verbose:
                     print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
-                    for task, metrics in t_metrics.items():
+                    for task, metrics in train_metrics.items():
                         metrics_str = "".join(
                             [f"{key} {val:.2f}\t" for key, val in metrics.items()]
                         )
@@ -127,7 +131,7 @@ class BaseModelClass(nn.Module, ABC):
                 if val_generator is not None:
                     with torch.no_grad():
                         # evaluate on validation set
-                        v_metrics = self.evaluate(
+                        val_metrics = self.evaluate(
                             generator=val_generator,
                             criterion_dict=criterion_dict,
                             optimizer=None,
@@ -135,15 +139,15 @@ class BaseModelClass(nn.Module, ABC):
                             action="val",
                         )
 
-                    if writer is not None:
-                        for task, metrics in v_metrics.items():
+                    if isinstance(writer, SummaryWriter):
+                        for task, metrics in val_metrics.items():
                             for metric, val in metrics.items():
                                 writer.add_scalar(
                                     f"{task}/validation/{metric}", val, epoch
                                 )
 
                     if verbose:
-                        for task, metrics in v_metrics.items():
+                        for task, metrics in val_metrics.items():
                             metrics_str = "".join(
                                 [f"{key} {val:.2f}\t" for key, val in metrics.items()]
                             )
@@ -158,13 +162,13 @@ class BaseModelClass(nn.Module, ABC):
 
                     for name in self.best_val_scores:
                         if self.task_dict[name] == "regression":
-                            if v_metrics[name]["MAE"] < self.best_val_scores[name]:
-                                self.best_val_scores[name] = v_metrics[name]["MAE"]
+                            if val_metrics[name]["MAE"] < self.best_val_scores[name]:
+                                self.best_val_scores[name] = val_metrics[name]["MAE"]
                                 is_best.append(True)
                             is_best.append(False)
                         elif self.task_dict[name] == "classification":
-                            if v_metrics[name]["Acc"] > self.best_val_scores[name]:
-                                self.best_val_scores[name] = v_metrics[name]["Acc"]
+                            if val_metrics[name]["Acc"] > self.best_val_scores[name]:
+                                self.best_val_scores[name] = val_metrics[name]["Acc"]
                                 is_best.append(True)
                             is_best.append(False)
 
@@ -204,15 +208,20 @@ class BaseModelClass(nn.Module, ABC):
                 # catch memory leak
                 gc.collect()
 
+                if writer == "wandb":
+                    if wandb is None:
+                        raise ImportError("wandb not installed. Run pip install wandb")
+                    wandb.log({"train": train_metrics, "validation": val_metrics})
+
         except KeyboardInterrupt:
             pass
 
-        if writer is not None:
+        if isinstance(writer, SummaryWriter):
             writer.close()
 
     def evaluate(
         self,
-        generator: DataLoader,
+        generator: DataLoader | InMemoryDataLoader,
         criterion_dict: dict[str, tuple[TaskType, nn.Module]],
         optimizer: torch.optim.Optimizer,
         normalizer_dict: dict[str, Normalizer | None],

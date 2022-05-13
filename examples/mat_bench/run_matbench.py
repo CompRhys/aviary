@@ -8,12 +8,11 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.task import MatbenchTask
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
 
-from aviary import ROOT
 from aviary.core import Normalizer
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
@@ -25,6 +24,7 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
+from examples.mat_bench.plotting_functions import plotly_identity_scatter, plotly_roc
 from examples.mat_bench.utils import open_json, print_walltime
 
 __author__ = "Janosh Riebesell"
@@ -51,6 +51,7 @@ def run_matbench_task(
     fold: Literal[0, 1, 2, 3, 4],
     epochs: int = 100,
     n_transformer_layers: int = 4,
+    log_wandb: bool = True,
 ) -> dict[str, dict[str, list[float]]]:
     """Run a single matbench task.
 
@@ -62,6 +63,8 @@ def run_matbench_task(
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
         epochs (int): How many epochs to train for in each CV fold.
+        n_transformer_layers (int): Number of transformer layers to use. Default is 4.
+        wandb (bool): Whether to log this run to Weights and Biases. Defaults to True.
 
     Raises:
         ValueError: On unknown dataset_name.
@@ -152,7 +155,22 @@ def run_matbench_task(
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, verbose=True)
 
-    writer = SummaryWriter(f"{ROOT}/runs/{fold_name}/{datetime.now():%Y-%m-%d@%H-%M}")
+    if log_wandb:
+        wandb.login()
+        wandb.init(
+            # Set the project where this run will be logged
+            project="matbench",
+            name=fold_name,
+            config={
+                "model": model_name,
+                "dataset": dataset_name,
+                "fold": fold,
+                "epochs": epochs,
+                "n_transformer_layers": n_transformer_layers,
+                "learning_rate": learning_rate,
+                "warmup_steps": warmup_steps,
+            },
+        )
 
     model.fit(
         train_loader,
@@ -165,15 +183,33 @@ def run_matbench_task(
         model_name=fold_name,
         run_id=1,
         checkpoint=False,
-        writer=writer,
+        writer="wandb" if log_wandb else None,
     )
 
     [targets], [preds], *ids = model.predict(test_loader)
     if task_type == CLF_KEY:
         preds = preds.softmax(1)
     predictions = preds.cpu().squeeze().numpy()
+    ids = np.array(ids).squeeze()
+    df_preds = pd.DataFrame(
+        {"id": ids, target: targets, "prediction": predictions.tolist()}
+    )
 
     metrics = get_metrics(targets, predictions, task_type)
+
+    if log_wandb:
+        wandb.summary = {"test": metrics}
+        if task_type == REG_KEY:
+            scat_plot = plotly_identity_scatter(
+                df_preds, x_col=target, y_col="prediction", hover_data=["id"]
+            )
+            plots = {"scatter": scat_plot}
+        elif task_type == CLF_KEY:
+            roc_curve = plotly_roc(targets, predictions[:, 1])
+            plots = {"roc": roc_curve}
+
+        wandb.log(plots)
+        wandb.finish()
 
     # save model predictions to gzipped JSON
     benchmark_path = f"{MODULE_DIR}/benchmarks/preds-{model_name}-{timestamp}.json.gz"
@@ -187,11 +223,10 @@ def run_matbench_task(
         dataset_name: {"losses": str(loss_dict)},
     }
 
+    # record model predictions
     with open_json(benchmark_path) as bench_dict:
-        # record model predictions
         bench_dict[dataset_name][fold] = {
-            "preds": predictions.tolist(),
-            "ids": list(ids),
+            "data": df_preds.to_dict(orient="list"),
             "params": params,
         }
 
@@ -212,9 +247,9 @@ if __name__ == "__main__":
         # for testing and debugging
         model_name = "roostformer-tmp"
         timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
-        dataset = "matbench_jdft2d"
-        # dataset = "matbench_mp_is_metal"
-        run_matbench_task(model_name, dataset, timestamp, 4, epochs=1)
+        # dataset = "matbench_jdft2d"
+        dataset = "matbench_expt_is_metal"
+        run_matbench_task(model_name, dataset, timestamp, 0, epochs=1, log_wandb=False)
     finally:  # clean up
         for filename in glob(f"benchmarks/*{model_name}-*.json*"):
             os.remove(filename)
