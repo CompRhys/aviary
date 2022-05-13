@@ -2,12 +2,16 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
+import plotly.io as pio
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
 from plotly.graph_objs._figure import Figure
+from sklearn.metrics import auc, r2_score, roc_curve
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
+
+pio.templates.default = "plotly_white"
 
 
 def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
@@ -145,4 +149,47 @@ def error_heatmap(df: pd.DataFrame, log: bool = False) -> Figure:
         vals = np.log10(ticks)
         fig.update_layout(coloraxis_colorbar=dict(tickvals=vals, ticktext=ticks))
 
+    return fig
+
+
+anno_kwds = dict(
+    xref="paper", yref="paper", bgcolor="rgba(255, 255, 255, 0.7)", showarrow=False
+)
+
+
+def plotly_roc(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Figure:
+
+    false_pos_rate, true_pos_rate, _ = roc_curve(y_true, y_pred_proba)
+
+    labels = dict(x="False Positive Rate", y="True Positive Rate")
+    fig = px.area(x=false_pos_rate, y=true_pos_rate, labels=labels)
+
+    fig.add_shape(type="line", line=dict(dash="dash"), x0=0, x1=1, y0=0, y1=1)
+    auc_score = f"ROCAUC = {auc(false_pos_rate, true_pos_rate):.2f}"
+    fig.add_annotation(dict(text=auc_score, x=0.5, y=0.02, **anno_kwds))
+
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+    fig.update_xaxes(constrain="domain")
+
+    return fig
+
+
+def plotly_identity_scatter(
+    df: pd.DataFrame, x_col: str, y_col: str, **kwargs
+) -> Figure:
+    xy_min = df[[x_col, y_col]].min().min()
+    xy_max = df[[x_col, y_col]].max().max()
+
+    fig = px.scatter(df.round(3), x=x_col, y=y_col, **kwargs)
+
+    fig.add_shape(
+        **dict(type="line", x0=xy_min, y0=xy_min, x1=xy_max, y1=xy_max),
+        layer="below",
+        line=dict(color="gray", width=2, dash="dash"),
+    )
+
+    mae = (df[x_col] - df[y_col]).abs().mean()
+    r2 = r2_score(df[x_col], df[y_col])
+    auc_score = f"MAE = {mae:.2f}<br>R2 = {r2:.2f}"
+    fig.add_annotation(dict(text=auc_score, x=0.5, y=0.02, **anno_kwds))
     return fig
