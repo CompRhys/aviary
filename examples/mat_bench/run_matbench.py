@@ -94,8 +94,6 @@ def run_matbench_task(
     else:
         raise ValueError(f"{model_name = } must contain 'roost' or 'wren'")
 
-    n_features = df.features.iloc[0].shape[1]
-    assert n_features in (200 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
@@ -142,6 +140,9 @@ def run_matbench_task(
         [inputs, targets, ids], batch_size=128, collate_fn=collate_batch
     )
 
+    n_features = features[0].shape[-1]
+    assert n_features in (200 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
+
     # n_features = element + wyckoff embedding lengths + element weights in composition
     model = Wrenformer(
         n_targets=[1 if task_type == REG_KEY else 2],
@@ -184,6 +185,7 @@ def run_matbench_task(
         run_id=1,
         checkpoint=False,
         writer="wandb" if log_wandb else None,
+        verbose=True,
     )
 
     [targets], [preds], *ids = model.predict(test_loader)
@@ -232,8 +234,8 @@ def run_matbench_task(
 
     # save model scores to JSON
     with open_json(scores_path) as scores_dict:
-        scores_dict["scores"][dataset_name][fold] = metrics
-        scores_dict["params"].update(params)
+        scores_dict["scores"][dataset_name][f"{fold=}"] = metrics
+        scores_dict["params"] |= params
 
     print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
     return bench_dict
@@ -245,11 +247,15 @@ if __name__ == "__main__":
 
     try:
         # for testing and debugging
-        model_name = "roostformer-tmp"
-        timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
-        # dataset = "matbench_jdft2d"
-        dataset = "matbench_expt_is_metal"
-        run_matbench_task(model_name, dataset, timestamp, 0, epochs=1, log_wandb=False)
+        run_matbench_task(
+            model_name := "wrenformer-tmp",
+            # dataset = "matbench_mp_is_metal"
+            dataset_name="matbench_jdft2d",
+            timestamp=f"{datetime.now():%Y-%m-%d@%H-%M}",
+            fold=2,
+            epochs=3,
+            log_wandb=False,
+        )
     finally:  # clean up
         for filename in glob(f"benchmarks/*{model_name}-*.json*"):
             os.remove(filename)
