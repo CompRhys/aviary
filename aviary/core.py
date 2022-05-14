@@ -137,6 +137,7 @@ class BaseModelClass(nn.Module, ABC):
                             optimizer=None,
                             normalizer_dict=normalizer_dict,
                             action="val",
+                            verbose=verbose,
                         )
 
                     if isinstance(writer, SummaryWriter):

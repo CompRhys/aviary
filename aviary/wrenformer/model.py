@@ -81,7 +81,9 @@ class Wrenformer(BaseModelClass):
             ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
         )
 
-    def forward(self, features: Tensor, mask: BoolTensor) -> tuple[Tensor, ...]:  # type: ignore
+    def forward(  # type: ignore
+        self, features: Tensor, mask: BoolTensor, *args
+    ) -> tuple[Tensor, ...]:
         """Forward pass through the Wrenformer.
 
         Args:
@@ -91,12 +93,25 @@ class Wrenformer(BaseModelClass):
         Returns:
             tuple[Tensor, ...]: Predictions for each batch of multitask targets.
         """
+        # project input embedding onto d_model dimensions
         features = self.resize_embedding(features)
-        embedding = self.transformer_encoder(features, src_key_padding_mask=mask)
+        # run self-attention
+        embeddings = self.transformer_encoder(features, src_key_padding_mask=mask)
+
+        if len(args) == 1:
+            # running as wrenformer, not roostformer
+            equivalence_counts: list[int] = args[0]
+            # average over equivalent Wyckoff sets in a given material (brings len of dim 0
+            # back to batch_size)
+            equiv_embeddings = embeddings.split(equivalence_counts, dim=0)
+            augmented_embeddings = [tensor.mean(dim=0) for tensor in equiv_embeddings]
+            embeddings = torch.stack(augmented_embeddings)
+            # do the same for mask
+            mask = torch.stack([t[0] for t in mask.split(equivalence_counts, dim=0)])
 
         # aggregate all node representations into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
-        embedding_masked = embedding * ~mask[..., None]
+        embedding_masked = embeddings * ~mask[..., None]
         seq_lens = torch.sum(~mask, dim=1, keepdim=True)
         aggregated_embedding = torch.sum(embedding_masked, dim=1) / seq_lens
 

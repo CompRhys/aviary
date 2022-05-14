@@ -26,13 +26,29 @@ def collate_batch(
     Returns:
         tuple: Tuple of padded features and mask, targets and ids.
     """
-    padded_features = nn.utils.rnn.pad_sequence(tuple(features), batch_first=True)
-    # padded_features.shape = (batch_size, max_seq_len, n_features), so we mask sequence items that
-    # are all zero across feature dimension
+    if features[0].ndim == 3:
+        # wrenformer features are 3d with shape (n_equiv_wyksets [ragged],
+        # n_wyckoff_sites_per_set [ragged], n_features [uniform])
+        # we unpack the 1st dim into the batch dim and later take the mean of the
+        # transformer-encoded embeddings of equivalent sets
+        equivalence_counts = [len(tensor) for tensor in features]
+        # unpack 3d embedding tensors along dim=0 and restack equivalent Wyckoff sets
+        # along batch dim before padding
+        restacked = tuple(aug for emb in features for aug in emb)
+    else:
+        restacked = features  # for roostformer we do nothing
+
+    padded_features = nn.utils.rnn.pad_sequence(restacked, batch_first=True)
+
+    # padded_features.shape = (batch_size * mean_n_equiv_wyksets, max_seq_len, n_features),
+    # so we mask sequence items that are all zero across feature dimension
     mask = (padded_features == 0).all(dim=2)
 
     # insert outer dimension corresponding to different multi-tasking objectives
     targets = targets[None, ...]
+
+    if features[0].ndim == 3:
+        return (padded_features, mask, equivalence_counts), targets, ids
 
     return (padded_features, mask), targets, ids
 
@@ -45,45 +61,44 @@ with open(f"{PKG_DIR}/embeddings/element/matscholar200.json") as file:
 
 def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     """Concatenate matscholar element and Wyckoff set embeddings while handling
-    augmentation from equivalent Wyckoff sets.
+    augmentation of equivalent Wyckoff sets.
 
     Args:
         wyckoff_str (str): Aflow-style Wyckoff string.
 
     Returns:
-        Tensor: Shape (n_augmentations, n_features).
+        Tensor: Shape (n_equiv_wyksets, n_wyckoff_sites, n_features).
     """
     spg_num, elem_weights, elements, augmented_wyckoffs = parse_aflow_wyckoff_str(
         wyckoff_str
     )
 
-    elem_weights = np.atleast_2d(elem_weights).T / np.sum(elem_weights)
-
-    element_features = np.vstack([elem_features[el] for el in elements])
-
-    symmetry_features = np.vstack(
-        [sym_features[spg_num][wyk] for wyks in augmented_wyckoffs for wyk in wyks]
+    symmetry_features = torch.tensor(
+        [
+            [sym_features[spg_num][wyk] for wyk in equivalent_wyckoff_set]
+            for equivalent_wyckoff_set in augmented_wyckoffs
+        ]
     )
 
     n_augments = len(augmented_wyckoffs)  # number of equivalent Wyckoff sets
-    # convert all data to tensors
-    element_ratios = torch.tensor(elem_weights).repeat(n_augments, 1)
-    element_features = torch.tensor(element_features).repeat(n_augments, 1)
-    symmetry_features = torch.tensor(symmetry_features)
+    element_features = torch.tensor([elem_features[el] for el in elements])
+    element_features = element_features[None, ...].repeat(n_augments, 1, 1)
+
+    element_ratios = torch.tensor(elem_weights)[None, :, None] / sum(elem_weights)
+    element_ratios = element_ratios.repeat(n_augments, 1, 1)
 
     combined_features = torch.cat(
-        [element_ratios, element_features, symmetry_features], dim=1
+        [element_ratios, element_features, symmetry_features], dim=-1
     ).float()
 
     return combined_features
 
 
 def get_composition_embedding(formula: str) -> Tensor:
-    """Concatenate matscholar element and Wyckoff set embeddings while handling
-    augmentation from equivalent Wyckoff sets.
+    """Concatenate matscholar element embeddings with element ratios in compostion.
 
     Args:
-        wyckoff_str (str): Aflow-style Wyckoff string.
+        formula (str): Composition string.
 
     Returns:
         Tensor: Shape (n_elements, n_features). Usually (2-6, 200).
