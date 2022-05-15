@@ -1,7 +1,6 @@
 # %%
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from typing import Literal
 
@@ -25,7 +24,7 @@ from aviary.wrenformer.data import (
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
 from examples.mat_bench.plotting_functions import plotly_identity_scatter, plotly_roc
-from examples.mat_bench.utils import open_json, print_walltime
+from examples.mat_bench.utils import merge_json, print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -52,7 +51,7 @@ def run_matbench_task(
     epochs: int = 100,
     n_transformer_layers: int = 4,
     log_wandb: bool = True,
-) -> dict[str, dict[str, list[float]]]:
+) -> dict:
     """Run a single matbench task.
 
     Args:
@@ -73,14 +72,7 @@ def run_matbench_task(
         dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
             to model predictions.
     """
-    scores_path = f"{MODULE_DIR}/benchmarks/scores-{model_name}-{timestamp}.json"
-
-    with open_json(scores_path) as json_data:
-        scores_dict = json_data
-
-    if dataset_name in scores_dict and str(fold) in scores_dict[dataset_name]:
-        print(f"{fold = } of {dataset_name} already recorded! Skipping...")
-        return scores_dict
+    scores_path = f"{MODULE_DIR}/model_scores/{model_name}-{timestamp}.json"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
@@ -185,7 +177,7 @@ def run_matbench_task(
         run_id=1,
         checkpoint=False,
         writer="wandb" if log_wandb else None,
-        verbose=True,
+        verbose=False,
     )
 
     [targets], [preds], *ids = model.predict(test_loader)
@@ -203,7 +195,7 @@ def run_matbench_task(
         wandb.summary = {"test": metrics}
         if task_type == REG_KEY:
             scat_plot = plotly_identity_scatter(
-                df_preds, x_col=target, y_col="prediction", hover_data=["id"]
+                df_preds, x=target, y="prediction", hover_data=["id"]
             )
             plots = {"scatter": scat_plot}
         elif task_type == CLF_KEY:
@@ -213,49 +205,48 @@ def run_matbench_task(
         wandb.log(plots)
         wandb.finish()
 
-    # save model predictions to gzipped JSON
-    benchmark_path = f"{MODULE_DIR}/benchmarks/preds-{model_name}-{timestamp}.json.gz"
+    # save model predictions to JSON
+    preds_path = f"{MODULE_DIR}/model_preds/{model_name}-{timestamp}.json"
     params = {
         "epochs": epochs,
         "n_transformer_layers": n_transformer_layers,
         "learning_rate": learning_rate,
         "robust": robust,
         "n_features": n_features,  # embedding size
-        "benchmark_path": benchmark_path,
         dataset_name: {"losses": str(loss_dict)},
     }
 
     # record model predictions
-    with open_json(benchmark_path) as bench_dict:
-        bench_dict[dataset_name][fold] = {
-            "data": df_preds.to_dict(orient="list"),
-            "params": params,
-        }
+    preds_dict = {dataset_name: {f"fold_{fold}": df_preds.to_dict(orient="list")}}
+    merge_json(preds_path, preds_dict)
 
     # save model scores to JSON
-    with open_json(scores_path) as scores_dict:
-        scores_dict["scores"][dataset_name][f"{fold=}"] = metrics
-        scores_dict["params"] |= params
+    scores_dict = {dataset_name: {f"fold_{fold}": metrics}}
+    scores_dict["params"] = params
+    merge_json(scores_path, scores_dict)
 
     print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
-    return bench_dict
+    return scores_dict
 
 
 # %%
 if __name__ == "__main__":
     from glob import glob
 
+    timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+
     try:
         # for testing and debugging
         run_matbench_task(
-            model_name := "wrenformer-tmp",
-            # dataset = "matbench_mp_is_metal"
+            model_name := "roostformer-tmp",
+            # dataset_name="matbench_expt_is_metal",
             dataset_name="matbench_jdft2d",
-            timestamp=f"{datetime.now():%Y-%m-%d@%H-%M}",
-            fold=2,
-            epochs=3,
+            timestamp=timestamp,
+            fold=3,
+            epochs=1,
             log_wandb=False,
         )
     finally:  # clean up
-        for filename in glob(f"benchmarks/*{model_name}-*.json*"):
-            os.remove(filename)
+        for filename in glob("model_*/*former-tmp-*.json"):
+            # os.remove(filename)
+            pass

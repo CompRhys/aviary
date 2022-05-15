@@ -1,7 +1,5 @@
-import gzip
 import json
 import time
-from collections import defaultdict
 from contextlib import contextmanager
 from typing import Generator
 
@@ -13,39 +11,33 @@ def _int_keys(dct: dict) -> dict:
     return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in dct.items()}
 
 
-@contextmanager
-def open_json(filepath: str, initial: dict = None) -> Generator[dict, None, None]:
-    """Open a JSON file and yield a 2-level defaultdict of its contents. Save the modified
-    dict back to disk on exiting the context manager.
+def dict_merge(d1: dict, d2: dict) -> dict:
+    for key in d2:
+        if key in d1 and isinstance(d1[key], dict) and isinstance(d2[key], dict):
+            dict_merge(d1[key], d2[key])
+        else:
+            d1[key] = d2[key]
+    return d1
 
-    2-level defaultdict means you can assign d[key1][key2][key3] = value without setting
-    d[key1][key2] = {} first.
+
+def merge_json(file_path: str, dct: dict) -> None:
+    """Merge a dict into a (possibly) existing JSON file.
 
     Args:
-        filepath (str): JSON file path.
-        initial (dict, optional): Initial value (not lambda) for defaultdict if JSON file
-            was missing or empty. Defaults to None.
-
-    Yields:
-        Generator[dict[Any, Any], None, None]: Loaded JSON data.
+        file_path (str): Path to JSON file. File will be created if not exist.
+        dct (dict): Dictionary to merge into JSON file.
     """
-    open_fn = gzip.open if filepath.lower().endswith(".gz") else open
 
     try:
-        with open_fn(filepath) as json_file:
-            loaded = json.load(json_file, object_hook=_int_keys)
-            json_data = defaultdict(lambda: defaultdict(dict), loaded)
+        with open(file_path) as json_file:
+            data = json.load(json_file, object_hook=_int_keys)
+
+        dct = dict_merge(data, dct)
     except (FileNotFoundError, json.decoder.JSONDecodeError):  # file missing or empty
-        json_data = defaultdict(lambda: defaultdict(dict), initial or {})
+        pass
 
-    try:
-        yield json_data
-    finally:
-        # if user raises exception in with block, still try to save any changes they may
-        # have made to data back to disk
-        with open_fn(filepath, "wt") as json_file:
-            # 'wt' ensures text mode since gzip.open() defaults to binary
-            json.dump(json_data, json_file)
+    with open(file_path, "w") as file:
+        json.dump(dct, file)
 
 
 @contextmanager
