@@ -1,3 +1,5 @@
+from shutil import which
+
 import pytest
 from pymatgen.core.structure import Structure
 
@@ -5,6 +7,7 @@ from aviary.wren.utils import (
     count_distinct_wyckoff_letters,
     count_params,
     count_wyks,
+    get_aflow_label_aflow,
     get_aflow_label_spglib,
     get_isopointal_proto_from_aflow,
 )
@@ -54,3 +57,11 @@ def test_get_isopointal_proto(aflow_label, expected):
 )
 def test_count_distinct_wyckoff_letters(wyckoff_str, expected):
     assert count_distinct_wyckoff_letters(wyckoff_str) == expected
+
+
+@pytest.mark.skipif(which("aflow") is None, reason="aflow CLI not installed")
+def test_get_aflow_label_aflow(tests_dir):
+    """Check we extract corred correct aflow label for esseneite from  Aflow CLI"""
+    struct = Structure.from_file(f"{tests_dir}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
+
+    assert get_aflow_label_aflow(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
