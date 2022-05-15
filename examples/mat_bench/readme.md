@@ -26,3 +26,7 @@ print(f"{sum_wyckoffs_sqr/sum_wyckoffs_lte_16_sqr=:.3}")
 # prints 7.45, so Wrenformer has to do 7.45x more work, explaining the about 2x slow down
 # on a more powerful GPU (Nvidia A100 vs Wren on a P100)
 ```
+
+## Benchmarks
+
+JSON files in `model_scores/` contain only the calculated scores (MAE/ROCAUC) for a given model run. Files with the same name but in `model_preds/` contain the full model predictions, targets and material ids. Code for loading these into memory is in `make_plots.py`.
