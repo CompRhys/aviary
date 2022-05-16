@@ -13,7 +13,7 @@ import torch
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
-from aviary.wren.utils import mult_dict, relab_dict
+from aviary.wren.utils import relab_dict, wyckoff_multiplicity_dict
 
 
 class WyckoffData(Dataset):
@@ -280,7 +280,7 @@ def parse_aflow_wyckoff_str(
             m = int(n)
             elements.extend([el] * m)
             wyckoff_set.extend([l] * m)
-            element_weights.extend([float(mult_dict[spg_no][l])] * m)
+            element_weights.extend([float(wyckoff_multiplicity_dict[spg_no][l])] * m)
 
     # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of high
     # memory use. Can be turned off by commenting out the for loop and returning
