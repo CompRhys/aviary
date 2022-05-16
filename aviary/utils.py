@@ -33,7 +33,7 @@ else:
     from typing import Literal
 
 
-def init_model(
+def initialize_model(
     model_class: type[BaseModelClass],
     model_params: dict[str, Any],
     device: type[torch.device] | Literal["cuda", "cpu"],
@@ -128,7 +128,7 @@ def init_model(
     return model
 
 
-def init_optim(
+def initialize_optim(
     model: type[BaseModelClass],
     optim: type[Optimizer] | Literal["SGD", "Adam", "AdamW"],
     learning_rate: float,
@@ -189,7 +189,7 @@ def init_optim(
     return optimizer, scheduler
 
 
-def init_losses(
+def initialize_losses(
     task_dict: dict[str, TaskType],
     loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
@@ -198,13 +198,13 @@ def init_losses(
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss functions.
+        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss type.
         robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
 
     Returns:
         dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
     """
-    criterion_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
+    _loss_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
@@ -212,31 +212,31 @@ def init_losses(
                 raise NameError("Only CSE loss allowed for classification tasks")
 
             if robust:
-                criterion_dict[name] = (task, NLLLoss())
+                _loss_dict[name] = (task, NLLLoss())
             else:
-                criterion_dict[name] = (task, CrossEntropyLoss())
+                _loss_dict[name] = (task, CrossEntropyLoss())
 
         elif task == "regression":
             if robust:
                 if loss_dict[name] == "L1":
-                    criterion_dict[name] = (task, RobustL1Loss)
+                    _loss_dict[name] = (task, RobustL1Loss)
                 elif loss_dict[name] == "L2":
-                    criterion_dict[name] = (task, RobustL2Loss)
+                    _loss_dict[name] = (task, RobustL2Loss)
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"
                     )
             else:
                 if loss_dict[name] == "L1":
-                    criterion_dict[name] = (task, L1Loss())
+                    _loss_dict[name] = (task, L1Loss())
                 elif loss_dict[name] == "L2":
-                    criterion_dict[name] = (task, MSELoss())
+                    _loss_dict[name] = (task, MSELoss())
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for regression tasks"
                     )
 
-    return criterion_dict
+    return _loss_dict
 
 
 def init_normalizers(
@@ -331,19 +331,21 @@ def train_ensemble(
         if ensemble_folds == 1:
             j = run_id
 
-        model = init_model(
+        model = initialize_model(
             model_class=model_class,
             model_params=model_params,
             **setup_params,
             **restart_params,
         )
-        optimizer, scheduler = init_optim(
+        optimizer, scheduler = initialize_optim(
             model,
             **setup_params,
             **restart_params,
         )
 
-        criterion_dict = init_losses(model.task_dict, loss_dict, model_params["robust"])
+        _loss_dict = initialize_losses(
+            model.task_dict, loss_dict, model_params["robust"]
+        )
         normalizer_dict = init_normalizers(
             model.task_dict, setup_params["device"], restart_params["resume"]
         )
@@ -369,7 +371,7 @@ def train_ensemble(
             with torch.no_grad():
                 v_metrics = model.evaluate(
                     val_loader,
-                    criterion_dict=criterion_dict,
+                    loss_dict=_loss_dict,
                     optimizer=None,
                     normalizer_dict=normalizer_dict,
                     action="val",
@@ -397,7 +399,7 @@ def train_ensemble(
             optimizer=optimizer,
             scheduler=scheduler,
             epochs=epochs,
-            criterion_dict=criterion_dict,
+            loss_dict=_loss_dict,
             normalizer_dict=normalizer_dict,
             model_name=model_name,
             run_id=j,
