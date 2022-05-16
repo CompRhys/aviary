@@ -6,7 +6,6 @@ import shutil
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from itertools import chain
 from typing import Any
 
 import numpy as np
@@ -66,8 +65,8 @@ class BaseModelClass(nn.Module, ABC):
 
     def fit(  # noqa: C901
         self,
-        train_generator: DataLoader | InMemoryDataLoader,
-        val_generator: DataLoader | InMemoryDataLoader,
+        train_loader: DataLoader | InMemoryDataLoader,
+        val_loader: DataLoader | InMemoryDataLoader,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler._LRScheduler,
         epochs: int,
@@ -83,8 +82,8 @@ class BaseModelClass(nn.Module, ABC):
         """Ctrl-C interruptible training method.
 
         Args:
-            train_generator (DataLoader): Dataloader containing training data.
-            val_generator (DataLoader): Dataloader containing validation data.
+            train_loader (DataLoader): Dataloader containing training data.
+            val_loader (DataLoader): Dataloader containing validation data.
             optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
             scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
                 Optimizer during training.
@@ -106,7 +105,7 @@ class BaseModelClass(nn.Module, ABC):
                 self.epoch += 1
                 # Training
                 train_metrics = self.evaluate(
-                    generator=train_generator,
+                    train_loader,
                     criterion_dict=criterion_dict,
                     optimizer=optimizer,
                     normalizer_dict=normalizer_dict,
@@ -128,11 +127,11 @@ class BaseModelClass(nn.Module, ABC):
                         print(f"Train \t\t: {task} - {metrics_str}")
 
                 # Validation
-                if val_generator is not None:
+                if val_loader is not None:
                     with torch.no_grad():
                         # evaluate on validation set
                         val_metrics = self.evaluate(
-                            generator=val_generator,
+                            val_loader,
                             criterion_dict=criterion_dict,
                             optimizer=None,
                             normalizer_dict=normalizer_dict,
@@ -219,7 +218,7 @@ class BaseModelClass(nn.Module, ABC):
 
     def evaluate(
         self,
-        generator: DataLoader | InMemoryDataLoader,
+        data_loader: DataLoader | InMemoryDataLoader,
         criterion_dict: dict[str, tuple[TaskType, nn.Module]],
         optimizer: torch.optim.Optimizer,
         normalizer_dict: dict[str, Normalizer | None],
@@ -229,7 +228,7 @@ class BaseModelClass(nn.Module, ABC):
         """Evaluate the model.
 
         Args:
-            generator (DataLoader): PyTorch Dataloader with the same data format used in fit().
+            data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit().
             criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
                 to apply for each task.
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
@@ -257,7 +256,7 @@ class BaseModelClass(nn.Module, ABC):
         # we do not need batch_comp or batch_ids when training
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
         for inputs, targets, *_ in tqdm(
-            generator, disable=True if not verbose else None
+            data_loader, disable=True if not verbose else None
         ):
             normed_targets = [
                 n.norm(tar) if n is not None else tar
@@ -326,12 +325,14 @@ class BaseModelClass(nn.Module, ABC):
 
     @torch.no_grad()
     def predict(
-        self, generator: DataLoader | InMemoryDataLoader, verbose: bool = False
-    ) -> tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]:
+        self, data_loader: DataLoader | InMemoryDataLoader, verbose: bool = False
+    ) -> tuple:
         """Make model predictions.
 
         Args:
-            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            data_loader (DataLoader): Iterator that yields minibatches with the same data
+                format used in fit(). To speed up inference, batch size can be set much
+                larger than during training.
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
@@ -342,41 +343,38 @@ class BaseModelClass(nn.Module, ABC):
         """
         test_ids = []
         test_targets = []
-        test_outputs = []
+        test_preds = []
         # Ensure model is in evaluation mode
         self.eval()
 
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
         for inputs, targets, *batch_ids in tqdm(
-            generator, disable=True if not verbose else None
+            data_loader, disable=True if not verbose else None
         ):
-            # compute output
-            output = self(*inputs)
-
-            # collect the model outputs
+            preds = self(*inputs)  # forward pass to get model preds
 
             test_ids.append(batch_ids)
             test_targets.append(targets)
-            test_outputs.append(output)
+            test_preds.append(preds)
 
         # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
         # for multitask learning
         targets = tuple(
-            torch.cat(test_t, dim=0).view(-1).cpu().numpy()
-            for test_t in zip(*test_targets)
+            torch.cat(targets, dim=0).view(-1).cpu().numpy()
+            for targets in zip(*test_targets)
         )
-        predictions = tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs))
+        predictions = tuple(torch.cat(preds, dim=0) for preds in zip(*test_preds))
         # identifier columns
-        ids = [list(chain(*x)) for x in list(zip(*test_ids))]
-        return (targets, predictions, *ids)  # type: ignore
+        ids = tuple(np.concatenate(x) for x in zip(*test_ids))
+        return targets, predictions, ids
 
     @torch.no_grad()
-    def featurise(self, generator: DataLoader) -> np.ndarray:
+    def featurise(self, data_loader: DataLoader) -> np.ndarray:
         """Generate features for a list of composition strings. When using Roost,
         this runs only the message-passing part of the model without the ResNet.
 
         Args:
-            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit()
 
         Returns:
             np.array: 2d array of features
@@ -388,7 +386,7 @@ class BaseModelClass(nn.Module, ABC):
         self.eval()  # ensure model is in evaluation mode
         features = []
 
-        for input_, *_ in generator:
+        for input_, *_ in data_loader:
             output = self.trunk_nn(self.material_nn(*input_)).cpu().numpy()
             features.append(output)
 

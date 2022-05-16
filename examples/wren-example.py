@@ -290,7 +290,7 @@ def input_parser():
         help="Preset embedding name or path to JSON file",
     )
 
-    # dataloader inputs
+    # data loader inputs
     parser.add_argument(
         "--workers",
         default=0,

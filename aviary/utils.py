@@ -301,7 +301,7 @@ def train_ensemble(
         train_set (Subset): Dataloader containing training data.
         val_set (Subset): Dataloader containing validation data.
         log (bool): Whether to log intermediate metrics to tensorboard.
-        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
         model_params (dict[str, Any]): Dictionary of model parameters
@@ -316,14 +316,14 @@ def train_ensemble(
     if isinstance(val_set, Subset):
         val_set = val_set.dataset
 
-    train_generator = DataLoader(train_set, **data_params)
+    train_loader = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
     if val_set is not None:
         data_params.update({"batch_size": 16 * data_params["batch_size"]})
-        val_generator = DataLoader(val_set, **data_params)
+        val_loader = DataLoader(val_set, **data_params)
     else:
-        val_generator = None
+        val_loader = None
 
     for j in range(ensemble_folds):
         #  this allows us to run ensembles in parallel rather than in series
@@ -368,7 +368,7 @@ def train_ensemble(
             print("Getting Validation Baseline")
             with torch.no_grad():
                 v_metrics = model.evaluate(
-                    generator=val_generator,
+                    val_loader,
                     criterion_dict=criterion_dict,
                     optimizer=None,
                     normalizer_dict=normalizer_dict,
@@ -392,8 +392,8 @@ def train_ensemble(
                 model.best_val_scores = val_score
 
         model.fit(
-            train_generator=train_generator,
-            val_generator=val_generator,
+            train_loader,
+            val_loader,
             optimizer=optimizer,
             scheduler=scheduler,
             epochs=epochs,
@@ -429,7 +429,7 @@ def results_multitask(  # noqa: C901
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
         test_set (Subset): Dataloader containing testing data.
-        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        data_params (dict[str, Any]): Dictionary of data loader parameters
         robust (bool): Whether to estimate standard deviation for use in a robust
             loss function.
         task_dict (dict[str, TaskType]): Map of target names to "regression" or
@@ -460,7 +460,7 @@ def results_multitask(  # noqa: C901
     if isinstance(test_set, Subset):
         test_set = test_set.dataset
 
-    test_generator = DataLoader(test_set, **data_params)
+    test_loader = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
 
     results_dict: dict[str, dict[str, list | np.ndarray]] = {n: {} for n in task_dict}
@@ -510,7 +510,7 @@ def results_multitask(  # noqa: C901
             else:
                 normalizer_dict[task] = None
 
-        y_test, output, *ids = model.predict(generator=test_generator)
+        y_test, output, *ids = model.predict(test_loader)
 
         for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
             if task == "regression":
@@ -545,7 +545,7 @@ def results_multitask(  # noqa: C901
     # TODO cleaner way to get identifier names
     if save_results:
         save_results_dict(
-            dict(zip(test_generator.dataset.dataset.identifiers, ids)),
+            dict(zip(test_loader.dataset.identifiers, ids)),
             results_dict,
             model_name,
         )
@@ -801,6 +801,6 @@ def get_metrics(
         class1_probas = predictions[:, 1]
         metrics["rocauc"] = roc_auc_score(targets, class1_probas)
 
-    metrics = {key: round(val, prec) for key, val in metrics.items()}
+    metrics = {key: round(float(val), prec) for key, val in metrics.items()}
 
     return metrics
