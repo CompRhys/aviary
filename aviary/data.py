@@ -57,6 +57,6 @@ class InMemoryDataLoader:
         return batch
 
     def __len__(self) -> int:
-        """Get the number of batches in this dataloader."""
+        """Get the number of batches in this data loader."""
         n_batches, remainder = divmod(self.dataset_len, self.batch_size)
         return n_batches + bool(remainder)
