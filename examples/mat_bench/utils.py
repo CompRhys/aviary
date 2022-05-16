@@ -12,6 +12,7 @@ def _int_keys(dct: dict) -> dict:
 
 
 def dict_merge(d1: dict, d2: dict) -> dict:
+    """Merge two dicts recursively."""
     for key in d2:
         if key in d1 and isinstance(d1[key], dict) and isinstance(d2[key], dict):
             dict_merge(d1[key], d2[key])
@@ -20,7 +21,7 @@ def dict_merge(d1: dict, d2: dict) -> dict:
     return d1
 
 
-def merge_json(file_path: str, dct: dict) -> None:
+def merge_json_on_disk(dct: dict, file_path: str) -> None:
     """Merge a dict into a (possibly) existing JSON file.
 
     Args:
