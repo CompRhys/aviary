@@ -1,6 +1,7 @@
 # %%
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Literal
 
@@ -23,7 +24,6 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
-from examples.mat_bench.plotting_functions import plotly_identity_scatter, plotly_roc
 from examples.mat_bench.utils import merge_json, print_walltime
 
 __author__ = "Janosh Riebesell"
@@ -92,7 +92,6 @@ def run_matbench_task(
     target, task_type = (
         str(matbench_task.metadata[x]) for x in ("target", "task_type")
     )
-    task_dict = {target: task_type}  # e.g. {'exfoliation_en': 'regression'}
 
     robust = False
     loss_func = (
@@ -139,7 +138,7 @@ def run_matbench_task(
     model = Wrenformer(
         n_targets=[1 if task_type == REG_KEY else 2],
         n_features=n_features,
-        task_dict=task_dict,
+        task_dict={target: task_type},  # e.g. {'exfoliation_en': 'regression'}
         n_transformer_layers=n_transformer_layers,
         robust=robust,
     )
@@ -151,8 +150,9 @@ def run_matbench_task(
     if log_wandb:
         wandb.login()
         wandb.init(
-            # Set the project where this run will be logged
-            project="matbench",
+            project="matbench",  # run will be added to this project
+            # https://docs.wandb.ai/guides/track/launch#init-start-error
+            settings=wandb.Settings(start_method="fork"),
             name=fold_name,
             config={
                 "model": model_name,
@@ -180,27 +180,39 @@ def run_matbench_task(
         verbose=False,
     )
 
-    [targets], [preds], *ids = model.predict(test_loader)
+    _, [predictions], _ = model.predict(test_loader)
     if task_type == CLF_KEY:
-        preds = preds.softmax(1)
-    predictions = preds.cpu().squeeze().numpy()
-    ids = np.array(ids).squeeze()
-    df_preds = pd.DataFrame(
-        {"id": ids, target: targets, "prediction": predictions.tolist()}
-    )
+        predictions = predictions.softmax(dim=1)
+    predictions = predictions.cpu().numpy().squeeze()
+    targets = targets.cpu().numpy()
+    test_df["predictions"] = predictions.tolist()
 
     metrics = get_metrics(targets, predictions, task_type)
 
     if log_wandb:
         wandb.summary = {"test": metrics}
         if task_type == REG_KEY:
-            scat_plot = plotly_identity_scatter(
-                df_preds, x=target, y="prediction", hover_data=["id"]
+            import plotly.express as px
+            from pymatviz.utils import add_identity_line
+
+            fig = px.scatter(
+                test_df,
+                x=target,
+                y="predictions",
+                hover_data=["mbid"],
+                opacity=0.7,
+                width=1200,
+                height=800,
             )
-            plots = {"scatter": scat_plot}
+            add_identity_line(fig)
+            fig.update_yaxes(title=f"predicted {target}")
+
+            plots = {"scatter": fig}
         elif task_type == CLF_KEY:
-            roc_curve = plotly_roc(targets, predictions[:, 1])
-            plots = {"roc": roc_curve}
+            from examples.mat_bench.plotting_functions import plotly_roc
+
+            fig = plotly_roc(targets, predictions[:, 1])
+            plots = {"roc": fig}
 
         wandb.log(plots)
         wandb.finish()
@@ -217,8 +229,8 @@ def run_matbench_task(
     }
 
     # record model predictions
-    preds_dict = {dataset_name: {f"fold_{fold}": df_preds.to_dict(orient="list")}}
-    merge_json(preds_path, preds_dict)
+    preds_dict = test_df[["mbid", target, "predictions"]].to_dict(orient="list")
+    merge_json(preds_path, {dataset_name: {f"fold_{fold}": preds_dict}})
 
     # save model scores to JSON
     scores_dict = {dataset_name: {f"fold_{fold}": metrics}}
@@ -244,9 +256,8 @@ if __name__ == "__main__":
             timestamp=timestamp,
             fold=3,
             epochs=1,
-            log_wandb=False,
+            log_wandb=True,
         )
     finally:  # clean up
         for filename in glob("model_*/*former-tmp-*.json"):
-            # os.remove(filename)
-            pass
+            os.remove(filename)
