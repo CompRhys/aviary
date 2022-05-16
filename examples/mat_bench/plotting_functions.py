@@ -6,7 +6,7 @@ import plotly.io as pio
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
 from plotly.graph_objs._figure import Figure
-from sklearn.metrics import auc, r2_score, roc_curve
+from sklearn.metrics import auc, roc_curve
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
@@ -68,13 +68,14 @@ x_labels = {
 }
 
 
-def plot_leaderboard(df: pd.DataFrame) -> Figure:
+def plot_leaderboard(df: pd.DataFrame, html_path: str = None) -> Figure:
     """Generate the Matbench scaled errors graph seen on
     https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
 
         Args:
             df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
                 models. Missing entries are fine.
+            html_path (str): HTML file path where to save the plotly figure.
 
         Returns:
             Figure: Plotly graph objects Figure instance
@@ -112,6 +113,18 @@ def plot_leaderboard(df: pd.DataFrame) -> Figure:
     fig.update_traces(marker_size=10)
     fig.update_xaxes(linecolor="grey", gridcolor="grey")
     fig.update_yaxes(linecolor="grey", gridcolor="grey")
+
+    if html_path:
+        fig.write_html(html_path, include_plotlyjs="cdn")
+        # change plot background to black since Matbench site uses dark mode
+        with open(html_path, "r+") as file:
+            html = file.read()
+            file.seek(0)  # rewind file pointer to start of file
+            html = html.replace(
+                "</head>", "<style>body { background-color: black; }</style></head>"
+            )
+            file.write(html)
+            file.truncate()
 
     return fig
 
@@ -171,25 +184,4 @@ def plotly_roc(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Figure:
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
     fig.update_xaxes(constrain="domain")
 
-    return fig
-
-
-def plotly_identity_scatter(
-    df: pd.DataFrame, x_col: str, y_col: str, **kwargs
-) -> Figure:
-    xy_min = df[[x_col, y_col]].min().min()
-    xy_max = df[[x_col, y_col]].max().max()
-
-    fig = px.scatter(df.round(3), x=x_col, y=y_col, **kwargs)
-
-    fig.add_shape(
-        **dict(type="line", x0=xy_min, y0=xy_min, x1=xy_max, y1=xy_max),
-        layer="below",
-        line=dict(color="gray", width=2, dash="dash"),
-    )
-
-    mae = (df[x_col] - df[y_col]).abs().mean()
-    r2 = r2_score(df[x_col], df[y_col])
-    auc_score = f"MAE = {mae:.2f}<br>R2 = {r2:.2f}"
-    fig.add_annotation(dict(text=auc_score, x=0.5, y=0.02, **anno_kwds))
     return fig

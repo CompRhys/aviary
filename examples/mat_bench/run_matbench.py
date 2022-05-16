@@ -24,7 +24,7 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
-from examples.mat_bench.utils import merge_json, print_walltime
+from examples.mat_bench.utils import merge_json_on_disk, print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -230,12 +230,12 @@ def run_matbench_task(
 
     # record model predictions
     preds_dict = test_df[["mbid", target, "predictions"]].to_dict(orient="list")
-    merge_json(preds_path, {dataset_name: {f"fold_{fold}": preds_dict}})
+    merge_json_on_disk({dataset_name: {f"fold_{fold}": preds_dict}}, preds_path)
 
     # save model scores to JSON
     scores_dict = {dataset_name: {f"fold_{fold}": metrics}}
     scores_dict["params"] = params
-    merge_json(scores_path, scores_dict)
+    merge_json_on_disk(scores_dict, scores_path)
 
     print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
     return scores_dict
