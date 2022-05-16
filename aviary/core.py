@@ -6,7 +6,7 @@ import shutil
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import torch
@@ -70,8 +70,8 @@ class BaseModelClass(nn.Module, ABC):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler._LRScheduler,
         epochs: int,
-        criterion_dict: dict[str, tuple[TaskType, nn.Module]],
-        normalizer_dict: dict[str, Normalizer | None],
+        loss_dict: Mapping[str, tuple[TaskType, nn.Module]],
+        normalizer_dict: Mapping[str, Normalizer | None],
         model_name: str,
         run_id: int,
         checkpoint: bool = True,
@@ -88,7 +88,7 @@ class BaseModelClass(nn.Module, ABC):
             scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
                 Optimizer during training.
             epochs (int): Number of epochs to train for.
-            criterion_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
+            loss_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
             model_name (str): String describing the model.
@@ -106,7 +106,7 @@ class BaseModelClass(nn.Module, ABC):
                 # Training
                 train_metrics = self.evaluate(
                     train_loader,
-                    criterion_dict=criterion_dict,
+                    loss_dict=loss_dict,
                     optimizer=optimizer,
                     normalizer_dict=normalizer_dict,
                     action="train",
@@ -132,7 +132,7 @@ class BaseModelClass(nn.Module, ABC):
                         # evaluate on validation set
                         val_metrics = self.evaluate(
                             val_loader,
-                            criterion_dict=criterion_dict,
+                            loss_dict=loss_dict,
                             optimizer=None,
                             normalizer_dict=normalizer_dict,
                             action="val",
@@ -219,9 +219,9 @@ class BaseModelClass(nn.Module, ABC):
     def evaluate(
         self,
         data_loader: DataLoader | InMemoryDataLoader,
-        criterion_dict: dict[str, tuple[TaskType, nn.Module]],
+        loss_dict: Mapping[str, tuple[TaskType, nn.Module]],
         optimizer: torch.optim.Optimizer,
-        normalizer_dict: dict[str, Normalizer | None],
+        normalizer_dict: Mapping[str, Normalizer | None],
         action: Literal["train", "val"] = "train",
         verbose: bool = False,
     ):
@@ -229,7 +229,7 @@ class BaseModelClass(nn.Module, ABC):
 
         Args:
             data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit().
-            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
+            loss_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
                 to apply for each task.
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
@@ -259,8 +259,8 @@ class BaseModelClass(nn.Module, ABC):
             data_loader, disable=True if not verbose else None
         ):
             normed_targets = [
-                n.norm(tar) if n is not None else tar
-                for tar, n in zip(targets, normalizer_dict.values())
+                normalizer.norm(tensor) if normalizer is not None else tensor
+                for tensor, normalizer in zip(targets, normalizer_dict.values())
             ]
 
             # compute output
@@ -269,14 +269,14 @@ class BaseModelClass(nn.Module, ABC):
             mixed_loss: Tensor = 0
 
             for name, output, target in zip(self.target_names, outputs, normed_targets):
-                task, criterion = criterion_dict[name]
+                task, loss_func = loss_dict[name]
 
                 if task == "regression":
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
-                        loss = criterion(output, log_std, target)
+                        loss = loss_func(output, log_std, target)
                     else:
-                        loss = criterion(output, target[..., None])
+                        loss = loss_func(output, target[..., None])
 
                     pred = normalizer_dict[name].denorm(output.data.cpu())  # type: ignore
                     target = normalizer_dict[name].denorm(target.data.cpu())  # type: ignore
@@ -287,10 +287,10 @@ class BaseModelClass(nn.Module, ABC):
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
                         logits = sampled_softmax(output, log_std)
-                        loss = criterion(torch.log(logits), target.squeeze())
+                        loss = loss_func(torch.log(logits), target.squeeze())
                     else:
                         logits = softmax(output, dim=1)
-                        loss = criterion(output, target)
+                        loss = loss_func(output, target)
 
                     logits = logits.data.cpu()
                     target = target.data.cpu()

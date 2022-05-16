@@ -171,7 +171,7 @@ def run_matbench_task(
         optimizer,
         scheduler,
         epochs=epochs,
-        criterion_dict=loss_dict,
+        loss_dict=loss_dict,
         normalizer_dict=normalizer_dict,
         model_name=fold_name,
         run_id=1,
