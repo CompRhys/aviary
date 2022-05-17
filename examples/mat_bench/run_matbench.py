@@ -93,8 +93,8 @@ def run_matbench_task(
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
-    target = str(matbench_task.metadata["target"])
-    task_type: TaskType = str(matbench_task.metadata["task_type"])
+    target = matbench_task.metadata.target
+    task_type: TaskType = matbench_task.metadata.task_type
 
     robust = False
     loss_func = (
@@ -275,7 +275,7 @@ if __name__ == "__main__":
     try:
         # for testing and debugging
         run_matbench_task(
-            model_name := "roostformer-swa-tmp",
+            model_name := "roostformer-swa-sum+mean+min+max-aggregation-tmp",
             dataset_name="matbench_expt_is_metal",
             # dataset_name="matbench_jdft2d",
             timestamp=timestamp,

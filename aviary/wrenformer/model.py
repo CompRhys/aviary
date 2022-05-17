@@ -71,8 +71,9 @@ class Wrenformer(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
+        n_aggregators = 4  # number of embedding aggregation functions
         self.trunk_nn = ResidualNetwork(
-            input_dim=d_model,
+            input_dim=n_aggregators * d_model,
             output_dim=out_hidden[0],
             hidden_layer_dims=trunk_hidden,
         )
@@ -113,11 +114,20 @@ class Wrenformer(BaseModelClass):
             # do the same for mask
             mask = torch.stack([t[0] for t in mask.split(equivalence_counts, dim=0)])
 
-        # aggregate all node representations into a single vector Wyckoff embedding
+        # aggregate all embedding sequences of a material corresponding to Wyckoff positions
+        # into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
         masked_embeddings = embeddings * ~mask[..., None]
         seq_lens = torch.sum(~mask, dim=1, keepdim=True)
-        aggregated_embeddings = torch.sum(masked_embeddings, dim=1) / seq_lens
+
+        sum_embeddings = torch.sum(masked_embeddings, dim=1)
+        min_embeddings, _ = torch.min(masked_embeddings, dim=1)
+        max_embeddings, _ = torch.max(masked_embeddings, dim=1)
+        mean_embeddings = sum_embeddings / seq_lens
+
+        aggregated_embeddings = torch.cat(
+            [sum_embeddings, min_embeddings, max_embeddings, mean_embeddings], dim=1
+        )
 
         # main body of the feed-forward NN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))
