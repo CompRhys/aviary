@@ -6,7 +6,7 @@ import plotly.io as pio
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
 from plotly.graph_objs._figure import Figure
-from sklearn.metrics import auc, roc_curve
+from sklearn.metrics import accuracy_score, auc, roc_curve
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
@@ -165,9 +165,20 @@ def error_heatmap(df: pd.DataFrame, log: bool = False) -> Figure:
     return fig
 
 
-anno_kwds = dict(
-    xref="paper", yref="paper", bgcolor="rgba(255, 255, 255, 0.7)", showarrow=False
-)
+def annotate_fig(fig: Figure, **kwargs) -> None:
+    """Add text to a plotly figure.
+
+    Wrapper around fig.add_annotation() sensible defaults.
+    """
+    defaults = dict(
+        xref="paper",
+        yref="paper",
+        bgcolor="rgba(255, 255, 255, 0.7)",
+        bordercolor="gray",
+        showarrow=False,
+        borderpad=3,
+    )
+    fig.add_annotation({**defaults, **kwargs})
 
 
 def plotly_roc(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Figure:
@@ -178,8 +189,19 @@ def plotly_roc(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Figure:
     fig = px.area(x=false_pos_rate, y=true_pos_rate, labels=labels)
 
     fig.add_shape(type="line", line=dict(dash="dash"), x0=0, x1=1, y0=0, y1=1)
-    auc_score = f"ROCAUC = {auc(false_pos_rate, true_pos_rate):.2f}"
-    fig.add_annotation(dict(text=auc_score, x=0.5, y=0.02, **anno_kwds))
+    ROCAUC = auc(false_pos_rate, true_pos_rate)
+    accuracy = accuracy_score(y_true, y_pred_proba > 0.5)
+    text = f"{accuracy=:.2f}<br>{ROCAUC=:.2f}"
+    annotate_fig(
+        fig,
+        text=text,
+        x=0.95,
+        y=0.05,
+        xanchor="right",
+        yanchor="bottom",
+        xref=None,
+        yref=None,
+    )
 
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
     fig.update_xaxes(constrain="domain")
