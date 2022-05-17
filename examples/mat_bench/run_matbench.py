@@ -11,9 +11,10 @@ import torch
 import wandb
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.task import MatbenchTask
+from sklearn.metrics import r2_score
 from torch import nn
 
-from aviary.core import Normalizer
+from aviary.core import Normalizer, TaskType
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
 from aviary.utils import get_metrics
@@ -24,6 +25,7 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
+from examples.mat_bench.plotting_functions import annotate_fig
 from examples.mat_bench.utils import merge_json_on_disk, print_walltime
 
 __author__ = "Janosh Riebesell"
@@ -89,9 +91,8 @@ def run_matbench_task(
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
-    target, task_type = (
-        str(matbench_task.metadata[x]) for x in ("target", "task_type")
-    )
+    target = str(matbench_task.metadata["target"])
+    task_type: TaskType = str(matbench_task.metadata["task_type"])
 
     robust = False
     loss_func = (
@@ -183,9 +184,10 @@ def run_matbench_task(
     _, [predictions], _ = model.predict(test_loader)
     if task_type == CLF_KEY:
         predictions = predictions.softmax(dim=1)
+
     predictions = predictions.cpu().numpy().squeeze()
     targets = targets.cpu().numpy()
-    test_df["predictions"] = predictions.tolist()
+    test_df[(pred_col := "predictions")] = predictions.tolist()
 
     metrics = get_metrics(targets, predictions, task_type)
 
@@ -198,7 +200,7 @@ def run_matbench_task(
             fig = px.scatter(
                 test_df,
                 x=target,
-                y="predictions",
+                y=pred_col,
                 hover_data=["mbid"],
                 opacity=0.7,
                 width=1200,
@@ -206,6 +208,11 @@ def run_matbench_task(
             )
             add_identity_line(fig)
             fig.update_yaxes(title=f"predicted {target}")
+
+            MAE = (test_df[pred_col] - test_df[target]).abs().mean()
+            R2 = r2_score(test_df[target], test_df[pred_col])
+            text = f"{MAE=:.2f}<br>{R2=:.2f}"
+            annotate_fig(fig, text=text, x=0.02, y=0.95, xanchor="left")
 
             plots = {"scatter": fig}
         elif task_type == CLF_KEY:
@@ -229,7 +236,7 @@ def run_matbench_task(
     }
 
     # record model predictions
-    preds_dict = test_df[["mbid", target, "predictions"]].to_dict(orient="list")
+    preds_dict = test_df[["mbid", target, pred_col]].to_dict(orient="list")
     merge_json_on_disk({dataset_name: {f"fold_{fold}": preds_dict}}, preds_path)
 
     # save model scores to JSON

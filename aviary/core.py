@@ -55,7 +55,7 @@ class BaseModelClass(nn.Module, ABC):
         """
         super().__init__()
         self.task_dict = task_dict
-        self.target_names = list(task_dict.keys())
+        self.target_names = list(task_dict)
         self.robust = robust
         self.epoch = epoch
         self.best_val_scores = best_val_scores or {}
@@ -175,7 +175,7 @@ class BaseModelClass(nn.Module, ABC):
                         self.es_patience += 1
                         if patience and self.es_patience > patience:
                             print(
-                                "Stopping early due to lack of improvement on Validation set"
+                                "Stopping early due to lack of improvement on validation set"
                             )
                             break
 

@@ -89,6 +89,10 @@ class Wrenformer(BaseModelClass):
         Args:
             features (Tensor): Padded sequences of Wyckoff embeddings.
             mask (BoolTensor): Indicates which tensor entries are padding.
+            equivalence_counts (list[int], optional): Only needed for Wrenformer,
+                not Roostformer. Number of successive embeddings in the batch
+                dim originating from equivalent Wyckoff sets. Those are averaged
+                to reduce dim=0 of features back to batch_size.
 
         Returns:
             tuple[Tensor, ...]: Predictions for each batch of multitask targets.
@@ -99,10 +103,10 @@ class Wrenformer(BaseModelClass):
         embeddings = self.transformer_encoder(features, src_key_padding_mask=mask)
 
         if len(args) == 1:
-            # running as wrenformer, not roostformer
+            # if forward() got a 3rd arg, we're running as wrenformer, not roostformer
             equivalence_counts: list[int] = args[0]
-            # average over equivalent Wyckoff sets in a given material (brings len of dim 0
-            # back to batch_size)
+            # average over equivalent Wyckoff sets in a given material (brings dim 0 of
+            # features back to batch_size)
             equiv_embeddings = embeddings.split(equivalence_counts, dim=0)
             augmented_embeddings = [tensor.mean(dim=0) for tensor in equiv_embeddings]
             embeddings = torch.stack(augmented_embeddings)
@@ -111,11 +115,11 @@ class Wrenformer(BaseModelClass):
 
         # aggregate all node representations into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
-        embedding_masked = embeddings * ~mask[..., None]
+        masked_embeddings = embeddings * ~mask[..., None]
         seq_lens = torch.sum(~mask, dim=1, keepdim=True)
-        aggregated_embedding = torch.sum(embedding_masked, dim=1) / seq_lens
+        aggregated_embeddings = torch.sum(masked_embeddings, dim=1) / seq_lens
 
         # main body of the feed-forward NN jointly used by all multitask objectives
-        predictions = F.relu(self.trunk_nn(aggregated_embedding))
+        predictions = F.relu(self.trunk_nn(aggregated_embeddings))
 
         return tuple(output_nn(predictions) for output_nn in self.output_nns)
