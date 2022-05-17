@@ -13,6 +13,8 @@ from matbench.constants import CLF_KEY, REG_KEY
 from matbench.task import MatbenchTask
 from sklearn.metrics import r2_score
 from torch import nn
+from torch.optim.swa_utils import SWALR, AveragedModel
+from tqdm import tqdm
 
 from aviary.core import Normalizer, TaskType
 from aviary.data import InMemoryDataLoader
@@ -36,7 +38,7 @@ torch.manual_seed(0)  # ensure reproducible results
 
 
 # %%
-learning_rate = 1e-3
+learning_rate = 1e-4
 warmup_steps = 10
 
 
@@ -146,7 +148,13 @@ def run_matbench_task(
     model.to(device)
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
 
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, verbose=True)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+    swa_model = AveragedModel(model)
+    # scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
+    # epoch to start using the SWA model, set to start at 10% of epochs
+    swa_start = epochs // 2
+    swa_scheduler = SWALR(optimizer, swa_lr=0.05)
 
     if log_wandb:
         wandb.login()
@@ -166,22 +174,32 @@ def run_matbench_task(
             },
         )
 
-    model.fit(
-        train_loader,
-        test_loader,
-        optimizer,
-        scheduler,
-        epochs=epochs,
-        loss_dict=loss_dict,
-        normalizer_dict=normalizer_dict,
-        model_name=fold_name,
-        run_id=1,
-        checkpoint=False,
-        writer="wandb" if log_wandb else None,
-        verbose=False,
-    )
+    for epoch in tqdm(range(epochs)):
+        model.epoch += 1
+        train_metrics = model.evaluate(
+            train_loader, loss_dict, optimizer, normalizer_dict, action="train"
+        )
 
-    _, [predictions], _ = model.predict(test_loader)
+        with torch.no_grad():
+            val_metrics = model.evaluate(
+                test_loader, loss_dict, None, normalizer_dict, action="val"
+            )
+
+        if epoch > swa_start:
+            swa_model.update_parameters(model)
+            swa_scheduler.step()
+        else:
+            scheduler.step()
+        scheduler.step()
+
+        if log_wandb:
+            wandb.log({"train": train_metrics, "validation": val_metrics})
+
+    # get test set predictions
+    swa_model.eval()
+    with torch.no_grad():
+        predictions = torch.cat([swa_model(*inputs)[0] for inputs, *_ in test_loader])
+
     if task_type == CLF_KEY:
         predictions = predictions.softmax(dim=1)
 
@@ -257,14 +275,14 @@ if __name__ == "__main__":
     try:
         # for testing and debugging
         run_matbench_task(
-            model_name := "roostformer-tmp",
-            # dataset_name="matbench_expt_is_metal",
-            dataset_name="matbench_jdft2d",
+            model_name := "roostformer-swa-tmp",
+            dataset_name="matbench_expt_is_metal",
+            # dataset_name="matbench_jdft2d",
             timestamp=timestamp,
             fold=3,
-            epochs=1,
+            epochs=10,
             log_wandb=True,
         )
     finally:  # clean up
-        for filename in glob("model_*/*former-tmp-*.json"):
+        for filename in glob("model_*/*former-*-tmp-*.json"):
             os.remove(filename)
