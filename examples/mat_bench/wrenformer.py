@@ -11,7 +11,6 @@ from aviary.data import InMemoryDataLoader
 from aviary.wrenformer.data import collate_batch, wyckoff_embedding_from_aflow_str
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS
-from examples.mat_bench.utils import print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-12"
@@ -28,13 +27,15 @@ structure_datasets = [
 
 # %%
 dataset_name = "matbench_jdft2d"
-df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
-target = "exfoliation_en"
-task_type = "regression"
-task_dict = {target: task_type}
-
 matbench_task = MatbenchTask(dataset_name, autoload=False)
+
+df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
+df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
+
 matbench_task.df = df
+target = matbench_task.metadata.target
+task_type = matbench_task.metadata.task_type
+task_dict = {target: task_type}
 
 
 # %%
@@ -62,9 +63,6 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 
 # %%
-with print_walltime("Generating Wyckoff embeddings"):
-    df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
-
 features, targets, ids = (df[x] for x in ["features", target, "mbid"])
 targets = torch.tensor(targets, device=device)
 features = tuple(tensor.to(device) for tensor in features)
@@ -86,6 +84,8 @@ train_loader = InMemoryDataLoader(
     collate_fn=collate_batch,
 )
 
+
+# %%
 features, targets, ids = (test_df[x] for x in ["features", target, "mbid"])
 targets = torch.tensor(targets, device=device)
 inputs = np.empty(len(features), dtype=object)
@@ -96,4 +96,7 @@ test_loader = InMemoryDataLoader(
     [inputs, targets, ids], batch_size=1024, collate_fn=collate_batch
 )
 
-_, [predictions], *_ = model.predict(test_loader)
+# get test set predictions
+model.eval()
+with torch.no_grad():
+    predictions = torch.cat([model(*inputs)[0].squeeze() for inputs, *_ in test_loader])
