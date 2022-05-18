@@ -53,7 +53,7 @@ def run_matbench_task(
     timestamp: str,
     fold: Literal[0, 1, 2, 3, 4],
     epochs: int = 100,
-    trafo_layers: int = 4,
+    n_attn_layers: int = 4,
     log_wandb: bool = True,
 ) -> dict:
     """Run a single matbench task.
@@ -66,7 +66,7 @@ def run_matbench_task(
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
         epochs (int): How many epochs to train for in each CV fold.
-        trafo_layers (int): Number of transformer encoder layers to use. Defaults to 4.
+        n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
         wandb (bool): Whether to log this run to Weights and Biases. Defaults to True.
 
     Raises:
@@ -142,7 +142,7 @@ def run_matbench_task(
         n_targets=[1 if task_type == REG_KEY else 2],
         n_features=n_features,
         task_dict={target: task_type},  # e.g. {'exfoliation_en': 'regression'}
-        trafo_layers=trafo_layers,
+        n_attn_layers=n_attn_layers,
         robust=robust,
     )
     model.to(device)
@@ -168,7 +168,7 @@ def run_matbench_task(
                 "dataset": dataset_name,
                 "fold": fold,
                 "epochs": epochs,
-                "trafo_layers": trafo_layers,
+                "n_attn_layers": n_attn_layers,
                 "learning_rate": learning_rate,
                 "warmup_steps": warmup_steps,
             },
@@ -246,7 +246,7 @@ def run_matbench_task(
     preds_path = f"{MODULE_DIR}/model_preds/{model_name}-{timestamp}.json"
     params = {
         "epochs": epochs,
-        "trafo_layers": trafo_layers,
+        "n_attn_layers": n_attn_layers,
         "learning_rate": learning_rate,
         "robust": robust,
         "n_features": n_features,  # embedding size
