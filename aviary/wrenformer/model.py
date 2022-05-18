@@ -30,7 +30,7 @@ class Wrenformer(BaseModelClass):
         n_targets: list[int],
         n_features: int,
         d_model: int = 128,
-        n_transformer_layers: int = 6,
+        trafo_layers: int = 6,
         n_attention_heads: int = 4,
         trunk_hidden: list[int] = [1024, 512],
         out_hidden: list[int] = [256, 128, 64],
@@ -46,7 +46,7 @@ class Wrenformer(BaseModelClass):
             d_model (int): Dimension of the transformer layers. Determines size of the learned
                 embedding passed to the output NN. d_model should be increased for large datasets.
                 Defaults to 256.
-            n_transformer_layers (int): Number of transformer layers to use. Defaults to 3.
+            trafo_layers (int): Number of transformer encoder layers to use. Defaults to 3.
             n_attention_heads (int): Number of attention heads to use in the transformer. d_model
                 needs to be divisible by this number. Defaults to 4.
             trunk_hidden (list[int], optional): Number of hidden units in the trunk network which
@@ -65,7 +65,7 @@ class Wrenformer(BaseModelClass):
             d_model=d_model, nhead=n_attention_heads, batch_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(
-            transformer_layer, num_layers=n_transformer_layers
+            transformer_layer, num_layers=trafo_layers
         )
 
         if self.robust:

@@ -14,8 +14,8 @@ __date__ = "2022-04-25"
 
 # %% write Python submission file and sbatch it
 epochs = 300
-n_transformer_layers = 6
-model_name = f"wrenformer-{epochs=}-{n_transformer_layers=}"
+trafo_layers = 6
+model_name = f"wrenformer-{epochs=}-{trafo_layers=}"
 folds = list(range(5))
 
 if "roost" in model_name.lower():
@@ -51,7 +51,7 @@ run_matbench_task(
     {timestamp=},
     fold=fold,
     {epochs=},
-    {n_transformer_layers=},
+    {trafo_layers=},
 )
 """
 
