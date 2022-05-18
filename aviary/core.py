@@ -162,7 +162,9 @@ class BaseModelClass(nn.Module, ABC):
 
                     for name in self.best_val_scores:
                         score_name = (
-                            "MAE" if self.task_dict[name] == "regression" else "Acc"
+                            "MAE"
+                            if self.task_dict[name] == "regression"
+                            else "Accuracy"
                         )
                         score = val_metrics[name][score_name]
                         prev_best = self.best_val_scores[name]
@@ -239,7 +241,7 @@ class BaseModelClass(nn.Module, ABC):
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
-            dict[str, dict["Loss" | "MAE" | "RMSE" | "Acc" | "F1", np.ndarray]]: nested
+            dict[str, dict["Loss" | "MAE" | "RMSE" | "Accuracy" | "F1", np.ndarray]]: nested
                 dictionary of metrics for each task.
         """
         if action == "val":
@@ -250,7 +252,7 @@ class BaseModelClass(nn.Module, ABC):
             raise NameError("Only train or val allowed as action")
 
         metrics: dict[
-            str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], list]
+            str, dict[Literal["Loss", "MAE", "RMSE", "Accuracy", "F1"], list]
         ] = defaultdict(lambda: defaultdict(list))
 
         # we do not need batch_comp or batch_ids when training
@@ -296,7 +298,7 @@ class BaseModelClass(nn.Module, ABC):
                     target = target.data.cpu()
 
                     acc = float((target == logits.argmax(dim=1)).float().mean())
-                    metrics[name]["Acc"].append(acc)
+                    metrics[name]["Accuracy"].append(acc)
                     f1 = float(
                         f1_score(target, logits.argmax(dim=1), average="weighted")
                     )
