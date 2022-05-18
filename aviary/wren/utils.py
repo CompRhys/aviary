@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from itertools import chain, groupby, permutations, product
 from operator import itemgetter
 from os.path import abspath, dirname, join
@@ -13,6 +14,12 @@ from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
 from pymatgen.io.vasp import Poscar
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
+if sys.version_info < (3, 8):
+    from typing_extensions import Literal
+else:
+    from typing import Literal
+
 
 module_dir = dirname(abspath(__file__))
 
@@ -53,7 +60,11 @@ cry_param_dict = {
 remove_digits = str.maketrans("", "", digits)
 
 
-def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
+def get_aflow_label_aflow(
+    struct: Structure,
+    aflow_executable: str = None,
+    errors: Literal["raise", "annotate", "ignore"] = "raise",
+) -> str:
     """Get Aflow prototype label for a pymatgen Structure. Make sure you're running a recent
     version of the aflow CLI as there's been several breaking changes. This code was tested
     under v3.2.12.
@@ -66,6 +77,13 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
     Args:
         struct (Structure): pymatgen Structure
         aflow_executable (str): path to aflow executable. Defaults to which("aflow").
+        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
+            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
+            with 'invalid <reason>: '.
+
+    Raises:
+        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
+            expected composition.
 
     Returns:
         str: Aflow prototype label
@@ -107,11 +125,18 @@ def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> st
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
         )
 
-    eqi_comp = Composition(elem_dict)
-    if eqi_comp.reduced_formula != struct.composition.reduced_formula:
-        return f"Invalid WP Multiplicities: {aflow_label}"
-
     full_label = f"{aflow_label}:{'-'.join(elems)}"
+
+    observed_formula = Composition(elem_dict).reduced_formula
+    expected_formula = struct.composition.reduced_formula
+    if observed_formula != expected_formula:
+        if errors == "raise":
+            raise ValueError(
+                f"Invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
+                f"to be {expected_formula}"
+            )
+        elif errors == "annotate":
+            return f"invalid multiplicities: {full_label}"
 
     return full_label
 
@@ -139,11 +164,24 @@ def get_aflow_label_spglib(struct: Structure) -> str:
     return aflow
 
 
-def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
+def get_aflow_label_from_spga(
+    spga: SpacegroupAnalyzer,
+    errors: Literal["raise", "annotate", "ignore"] = "raise",
+) -> str:
     """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
         spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object
+        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
+            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
+            with 'invalid <reason>: '.
+
+    Raises:
+        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
+            expected composition.
+
+    Raises:
+        ValueError: if Wyckoff multiplicities do not add up to expected composition.
 
     Returns:
         str: AFLOW prototype labels
@@ -185,14 +223,19 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
 
     prototype_form = prototype_formula(sym_struct.composition)
 
-    aflow_label = (
-        f"{prototype_form}_{pearson}_{spg_no}_{canonical}:"
-        f"{sym_struct.composition.chemical_system}"
-    )
+    chem_sys = sym_struct.composition.chemical_system
+    aflow_label = f"{prototype_form}_{pearson}_{spg_no}_{canonical}:{chem_sys}"
 
-    eqi_comp = Composition(elem_dict)
-    if not eqi_comp.reduced_formula == sym_struct.composition.reduced_formula:
-        return f"Invalid WP Multiplicities - {aflow_label}"
+    observed_formula = Composition(elem_dict).reduced_formula
+    expected_formula = sym_struct.composition.reduced_formula
+    if observed_formula != expected_formula:
+        if errors == "raise":
+            raise ValueError(
+                f"Invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
+                f"to be {expected_formula}"
+            )
+        elif errors == "annotate":
+            return f"invalid multiplicities: {aflow_label}"
 
     return aflow_label
 
