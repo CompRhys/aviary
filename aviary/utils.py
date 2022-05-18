@@ -387,9 +387,9 @@ def train_ensemble(
                             f"Validation Baseline - {name}: MAE {val_score[name]:.2f}"
                         )
                     elif task == "classification":
-                        val_score[name] = v_metrics[name]["Acc"]
+                        val_score[name] = v_metrics[name]["Accuracy"]
                         print(
-                            f"Validation Baseline - {name}: Acc {val_score[name]:.2f}"
+                            f"Validation Baseline - {name}: Accuracy {val_score[name]:.2f}"
                         )
                 model.best_val_scores = val_score
 
