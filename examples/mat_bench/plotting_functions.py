@@ -38,7 +38,7 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
         series.loc[~mask] = np.nan
         return series
 
-    scaled_df = df.copy(deep=True)
+    scaled_df = df.copy(deep=True).T
     for task in scaled_df:
         task_type = mbv01_metadata[task].task_type
         assert task_type in [REG_KEY, CLF_KEY], f"Unknown {task_type = } for {task = }"
@@ -48,7 +48,7 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
         elif task_type == CLF_KEY:
             scaled_df[task] = scale_clf_task(scaled_df[task])
 
-    return scaled_df
+    return scaled_df.T
 
 
 x_labels = {
@@ -129,7 +129,7 @@ def plot_leaderboard(df: pd.DataFrame, html_path: str = None) -> Figure:
     return fig
 
 
-def error_heatmap(df: pd.DataFrame, log: bool = False) -> Figure:
+def error_heatmap(df_err: pd.DataFrame, log: bool = False, prec: int = 3) -> Figure:
     """Create a heatmap of the errors with a column for mean error across all tasks
     added on the right. Title assumes the errors are scaled relative to dummy
     performance but works with unscaled errors too.
@@ -142,14 +142,21 @@ def error_heatmap(df: pd.DataFrame, log: bool = False) -> Figure:
         Figure: Plotly graph objects Figure instance
     """
     # deep copy df so we don't modify the original
-    df = df.copy(deep=True)
+
+    df_err_scaled = scale_errors(df_err).T
+    # rename column names for prettier axis ticks (must be after scale_errors() to have
+    # correct dict keys)
+    df_err_scaled = df_err_scaled.rename(columns=x_labels)
+
     if log:
-        df = np.log10(df)
+        df_err_scaled = np.log10(df_err_scaled)
 
-    df["mean scaled error"] = df.mean(1)
-    df = df.sort_values(by="mean scaled error").round(3)
+    df_err_scaled["mean scaled error"] = df_err_scaled.mean(1)
+    df_err_scaled = df_err_scaled.sort_values(by="mean scaled error").round(prec)
 
-    fig = px.imshow(df, width=1400, height=600, text_auto=".2f", aspect="auto")
+    fig = px.imshow(
+        df_err_scaled, width=1200, height=600, text_auto=f".{prec}f", aspect="auto"
+    )
 
     fig.update_layout(
         title=dict(text="<b>Matbench Scaled Errors</b>", x=0.5, font_size=20),
