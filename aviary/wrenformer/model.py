@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import BoolTensor, Tensor
 
-from aviary.core import BaseModelClass
+from aviary.core import BaseModelClass, masked_mean
 from aviary.segments import ResidualNetwork
 
 
@@ -89,7 +89,9 @@ class Wrenformer(BaseModelClass):
 
         Args:
             features (Tensor): Padded sequences of Wyckoff embeddings.
-            mask (BoolTensor): Indicates which tensor entries are padding.
+            mask (BoolTensor): Indicates which tensor entries are sequence padding.
+                mask[i,j] = True means batch index i, sequence index j is not allowed to
+                attend, False means it participates in self-attention.
             equivalence_counts (list[int], optional): Only needed for Wrenformer,
                 not Roostformer. Number of successive embeddings in the batch
                 dim originating from equivalent Wyckoff sets. Those are averaged
@@ -111,23 +113,22 @@ class Wrenformer(BaseModelClass):
             equiv_embeddings = embeddings.split(equivalence_counts, dim=0)
             augmented_embeddings = [tensor.mean(dim=0) for tensor in equiv_embeddings]
             embeddings = torch.stack(augmented_embeddings)
-            # do the same for mask
+            # all equivalent Wyckoff sets have the same mask so we pick the 1st one from
+            # each split
             mask = torch.stack([t[0] for t in mask.split(equivalence_counts, dim=0)])
 
         # aggregate all embedding sequences of a material corresponding to Wyckoff positions
         # into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
-        masked_embeddings = embeddings * ~mask[..., None]
-        seq_lens = torch.sum(~mask, dim=1, keepdim=True)
+        inv_mask: torch.BoolTensor = ~mask[..., None]
+        sum_agg = (embeddings * inv_mask).sum(dim=1)
 
-        sum_embeddings = torch.sum(masked_embeddings, dim=1)
-        min_embeddings, _ = torch.min(masked_embeddings, dim=1)
-        max_embeddings, _ = torch.max(masked_embeddings, dim=1)
-        mean_embeddings = sum_embeddings / seq_lens
+        # replace padded values with +/-inf to exclude them from min/max
+        min_agg, _ = embeddings.where(inv_mask, torch.tensor(float("inf"))).min(dim=1)
+        max_agg, _ = embeddings.where(inv_mask, torch.tensor(float("-inf"))).max(dim=1)
+        mean_agg = masked_mean(embeddings, inv_mask, dim=1)
 
-        aggregated_embeddings = torch.cat(
-            [sum_embeddings, min_embeddings, max_embeddings, mean_embeddings], dim=1
-        )
+        aggregated_embeddings = torch.cat([sum_agg, min_agg, max_agg, mean_agg], dim=1)
 
         # main body of the feed-forward NN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))

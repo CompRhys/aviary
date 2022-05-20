@@ -566,3 +566,41 @@ def np_one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
     if n_classes is None:
         n_classes = np.max(targets) + 1
     return np.eye(n_classes)[targets]
+
+
+def masked_std(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.Tensor:
+    """Compute the standard deviation of a tensor, ignoring masked values.
+
+    Args:
+        x (torch.Tensor): Tensor to compute standard deviation over.
+        mask (torch.BoolTensor): Should be True where x is valid and False where x should
+            be ignored.
+        dim (int, optional): Dimension to take std of. Defaults to 0.
+
+    Returns:
+        torch.Tensor: Same shape as x, except dimension dim reduced.
+    """
+    x_nans = torch.where(mask, x, torch.nan)
+
+    nan_mean = x_nans.nanmean(dim=dim, keepdim=True)
+    squared_diffs = (x_nans - nan_mean) ** 2
+    out = squared_diffs.nanmean(dim=dim).sqrt()
+    return out
+
+
+def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.Tensor:
+    """Compute the mean of a tensor, ignoring masked values.
+
+    Args:
+        x (torch.Tensor): Tensor to compute standard deviation over.
+        mask (torch.BoolTensor): Should be True where x is valid and False where x should
+            be ignored.
+        dim (int, optional): Dimension to take mean of. Defaults to 0.
+
+    Returns:
+        torch.Tensor: Same shape as x, except dimension dim reduced.
+    """
+    # mask should be True where x is valid and False where x should be masked
+    x_nans = torch.where(mask, x, torch.nan)
+
+    return x_nans.nanmean(dim=dim)
