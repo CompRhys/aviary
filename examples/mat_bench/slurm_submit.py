@@ -13,9 +13,9 @@ __date__ = "2022-04-25"
 
 
 # %% write Python submission file and sbatch it
-epochs = 300
-n_attn_layers = 6
-model_name = f"wrenformer-{epochs=}-{n_attn_layers=}"
+epochs = 100
+n_attn_layers = 3
+model_name = f"wrenformer-swa-s2m3-aggregation-{epochs=}-{n_attn_layers=}"
 folds = list(range(5))
 
 if "roost" in model_name.lower():

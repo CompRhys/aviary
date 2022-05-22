@@ -275,9 +275,9 @@ if __name__ == "__main__":
     try:
         # for testing and debugging
         run_matbench_task(
-            model_name := "roostformer-swa-sum+mean+min+max-aggregation-tmp",
-            dataset_name="matbench_expt_is_metal",
-            # dataset_name="matbench_jdft2d",
+            model_name := "roostformer-swa-s2m3-aggregation-tmp",
+            # dataset_name="matbench_expt_is_metal",
+            dataset_name="matbench_jdft2d",
             timestamp=timestamp,
             fold=3,
             epochs=10,
