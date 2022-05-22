@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import BoolTensor, Tensor
 
-from aviary.core import BaseModelClass, masked_mean
+from aviary.core import BaseModelClass, masked_mean, masked_std
 from aviary.segments import ResidualNetwork
 
 
@@ -71,7 +71,7 @@ class Wrenformer(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
-        n_aggregators = 4  # number of embedding aggregation functions
+        n_aggregators = 5  # number of embedding aggregation functions
         self.trunk_nn = ResidualNetwork(
             input_dim=n_aggregators * d_model,
             output_dim=out_hidden[0],
@@ -127,8 +127,12 @@ class Wrenformer(BaseModelClass):
         min_agg, _ = embeddings.where(inv_mask, torch.tensor(float("inf"))).min(dim=1)
         max_agg, _ = embeddings.where(inv_mask, torch.tensor(float("-inf"))).max(dim=1)
         mean_agg = masked_mean(embeddings, inv_mask, dim=1)
+        std_agg = masked_std(embeddings, inv_mask, dim=1)
 
-        aggregated_embeddings = torch.cat([sum_agg, min_agg, max_agg, mean_agg], dim=1)
+        # Sum+Std+Min+Max+Mean: we call this S2M3 aggregation
+        aggregated_embeddings = torch.cat(
+            [sum_agg, std_agg, min_agg, max_agg, mean_agg], dim=1
+        )
 
         # main body of the feed-forward NN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))

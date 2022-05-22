@@ -308,7 +308,7 @@ class BaseModelClass(nn.Module, ABC):
 
                 metrics[name]["Loss"].append(loss.cpu().item())
 
-                # NOTE we are currently just using a direct sum of losses
+                # NOTE multitasking currently just uses a direct sum of individual target losses
                 # this should be okay but is perhaps sub-optimal
                 mixed_loss += loss
 
@@ -568,39 +568,42 @@ def np_one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
     return np.eye(n_classes)[targets]
 
 
-def masked_std(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.Tensor:
+def masked_std(
+    x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0, eps: float = 1e-12
+) -> torch.Tensor:
     """Compute the standard deviation of a tensor, ignoring masked values.
 
     Args:
-        x (torch.Tensor): Tensor to compute standard deviation over.
-        mask (torch.BoolTensor): Should be True where x is valid and False where x should
-            be ignored.
+        x (torch.Tensor): Tensor to compute standard deviation of.
+        mask (torch.BoolTensor): Same shape as x with True where x is valid and False
+            where x should be masked.
         dim (int, optional): Dimension to take std of. Defaults to 0.
+        eps (float, optional): Small positive number to ensure std is differentiable.
+            Defaults to 1e-12.
 
     Returns:
         torch.Tensor: Same shape as x, except dimension dim reduced.
     """
-    x_nans = torch.where(mask, x, torch.nan)
-
-    nan_mean = x_nans.nanmean(dim=dim, keepdim=True)
-    squared_diffs = (x_nans - nan_mean) ** 2
-    out = squared_diffs.nanmean(dim=dim).sqrt()
-    return out
+    mean = masked_mean(x, mask, dim=dim)
+    squared_diff = (x - mean.unsqueeze(dim=dim)) ** 2
+    var = masked_mean(squared_diff, mask, dim=dim)
+    std = (var + eps).sqrt()
+    return std
 
 
 def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.Tensor:
     """Compute the mean of a tensor, ignoring masked values.
 
     Args:
-        x (torch.Tensor): Tensor to compute standard deviation over.
-        mask (torch.BoolTensor): Should be True where x is valid and False where x should
-            be ignored.
+        x (torch.Tensor): Tensor to compute standard deviation of.
+        mask (torch.BoolTensor): Same shape as x with True where x is valid and False
+            where x should be masked.
         dim (int, optional): Dimension to take mean of. Defaults to 0.
 
     Returns:
         torch.Tensor: Same shape as x, except dimension dim reduced.
     """
     # mask should be True where x is valid and False where x should be masked
-    x_nans = torch.where(mask, x, torch.nan)
+    x_nan = torch.where(mask, x, torch.nan)
 
-    return x_nans.nanmean(dim=dim)
+    return x_nan.nanmean(dim=dim)
