@@ -576,7 +576,8 @@ def masked_std(
     Args:
         x (torch.Tensor): Tensor to compute standard deviation of.
         mask (torch.BoolTensor): Same shape as x with True where x is valid and False
-            where x should be masked.
+            where x should be masked. Mask should not be all False in any column of
+            dimension dim to avoid NaNs.
         dim (int, optional): Dimension to take std of. Defaults to 0.
         eps (float, optional): Small positive number to ensure std is differentiable.
             Defaults to 1e-12.
@@ -597,7 +598,8 @@ def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.
     Args:
         x (torch.Tensor): Tensor to compute standard deviation of.
         mask (torch.BoolTensor): Same shape as x with True where x is valid and False
-            where x should be masked.
+            where x should be masked. Mask should not be all False in any column of
+            dimension dim to avoid NaNs.
         dim (int, optional): Dimension to take mean of. Defaults to 0.
 
     Returns:
