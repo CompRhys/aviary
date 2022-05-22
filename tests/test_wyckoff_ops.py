@@ -59,9 +59,14 @@ def test_count_distinct_wyckoff_letters(wyckoff_str, expected):
     assert count_distinct_wyckoff_letters(wyckoff_str) == expected
 
 
-@pytest.mark.skipif(which("aflow") is None, reason="aflow CLI not installed")
+aflow_cli = which("aflow")
+
+
+@pytest.mark.skipif(aflow_cli is None, reason="aflow CLI not installed")
 def test_get_aflow_label_aflow(tests_dir):
     """Check we extract corred correct aflow label for esseneite from  Aflow CLI"""
     struct = Structure.from_file(f"{tests_dir}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
-    assert get_aflow_label_aflow(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    out = get_aflow_label_aflow(struct, aflow_cli)
+    expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    assert out == expected

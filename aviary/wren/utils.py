@@ -12,7 +12,6 @@ from string import ascii_uppercase, digits
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
-from pymatgen.io.vasp import Poscar
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 if sys.version_info < (3, 8):
@@ -93,16 +92,15 @@ def get_aflow_label_aflow(
 
     if which(aflow_executable or "") is None:
         raise FileNotFoundError(
-            "AFLOW could not found, please specify path to its binary with "
+            "AFLOW could not be found, please specify path to its binary with "
             "aflow_executable='...'"
         )
 
-    poscar = Poscar(struct)
     cmd = f"{aflow_executable} --prototype --print=json cat".split()
 
     output = subprocess.run(
         cmd,
-        input=poscar.get_string(),
+        input=struct.to(fmt="poscar"),
         text=True,
         capture_output=True,
         check=True,
@@ -114,7 +112,7 @@ def get_aflow_label_aflow(
 
     # check that multiplicities satisfy original composition
     _, _, spg_no, *wyks = aflow_label.split("_")
-    elems = sorted(poscar.site_symbols)
+    elems = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
     subst = r"1\g<1>"  # normalize Wyckoff letters to start with 1 if missing digit
     for el, wyk in zip(elems, wyks):
