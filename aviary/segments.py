@@ -127,36 +127,37 @@ class MessageLayer(nn.Module):
     def forward(
         self,
         node_weights: Tensor,
-        msg_in_fea: Tensor,
+        node_prev_features: Tensor,
         self_idx: LongTensor,
-        nbr_idx: LongTensor,
+        neighbor_idx: LongTensor,
     ) -> Tensor:
         """Forward pass
 
         Args:
             node_weights (Tensor): The fractional weights of elements in their materials
-            msg_in_fea (Tensor): Node hidden features before message passing
+            node_prev_features (Tensor): Node hidden features before message passing
             self_idx (LongTensor): Indices of the 1st element in each of the node pairs
-            nbr_idx (LongTensor): Indices of the 2nd element in each of the node pairs
+            neighbor_idx (LongTensor): Indices of the 2nd element in each of the node pairs
 
         Returns:
             Tensor: node hidden features after message passing
         """
         # construct the total features for passing
-        node_nbr_weights = node_weights[nbr_idx, :]
-        msg_nbr_fea = msg_in_fea[nbr_idx, :]
-        msg_self_fea = msg_in_fea[self_idx, :]
-        fea = torch.cat([msg_self_fea, msg_nbr_fea], dim=1)
+        node_nbr_weights = node_weights[neighbor_idx, :]
+        msg_nbr_fea = node_prev_features[neighbor_idx, :]
+        msg_self_fea = node_prev_features[self_idx, :]
+        message = torch.cat([msg_self_fea, msg_nbr_fea], dim=1)
 
         # sum selectivity over the neighbours to get node updates
-        head_fea = []
+        head_features = []
         for attn_head in self.pooling:
-            head_fea.append(attn_head(fea, index=self_idx, weights=node_nbr_weights))
+            out_msg = attn_head(message, index=self_idx, weights=node_nbr_weights)
+            head_features.append(out_msg)
 
         # average the attention heads
-        fea = torch.mean(torch.stack(head_fea), dim=0)
+        node_update = torch.stack(head_features).mean(dim=0)
 
-        return fea + msg_in_fea
+        return node_update + node_prev_features
 
     def __repr__(self) -> str:
         return self._repr
