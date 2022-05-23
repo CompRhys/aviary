@@ -7,12 +7,8 @@ from torch import LongTensor, Tensor
 from torch_scatter import scatter_mean
 
 from aviary.core import BaseModelClass
-from aviary.segments import (
-    MessageLayer,
-    ResidualNetwork,
-    SimpleNetwork,
-    WeightedAttentionPooling,
-)
+from aviary.nn import ResidualNetwork, SimpleNetwork
+from aviary.segments import MessageLayer, WeightedAttentionPooling
 
 
 class Wren(BaseModelClass):

@@ -6,12 +6,8 @@ import torch.nn.functional as F
 from torch import LongTensor, Tensor
 
 from aviary.core import BaseModelClass
-from aviary.segments import (
-    MessageLayer,
-    ResidualNetwork,
-    SimpleNetwork,
-    WeightedAttentionPooling,
-)
+from aviary.nn import ResidualNetwork, SimpleNetwork
+from aviary.segments import MessageLayer, WeightedAttentionPooling
 
 
 class Roost(BaseModelClass):
