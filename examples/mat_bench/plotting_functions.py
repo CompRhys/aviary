@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -57,8 +59,8 @@ x_labels = {
     "matbench_phonons": "ωᵐᵃˣ Phonons",
     "matbench_dielectric": "𝑛",
     "matbench_expt_gap": "Eᵍ Experimental",
-    "matbench_expt_is_metal": "Expt. Metallicity Classification",
-    "matbench_glass": "Metallic Glass Classification",
+    "matbench_expt_is_metal": "Expt. Metallicity Clf",
+    "matbench_glass": "Metallic Glass Clf",
     "matbench_log_kvrh": "log₁₀Kᵛʳʰ",
     "matbench_log_gvrh": "log₁₀Gᵛʳʰ",
     "matbench_perovskites": "Eᶠ Perovskites, DFT",
@@ -68,7 +70,7 @@ x_labels = {
 }
 
 
-def plot_leaderboard(df: pd.DataFrame, html_path: str = None) -> Figure:
+def plot_leaderboard(df: pd.DataFrame, html_path: str = None, **kwargs: Any) -> Figure:
     """Generate the Matbench scaled errors graph seen on
     https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
 
@@ -80,13 +82,12 @@ def plot_leaderboard(df: pd.DataFrame, html_path: str = None) -> Figure:
         Returns:
             Figure: Plotly graph objects Figure instance
     """
+    df = df.rename(x_labels)
     # deep copy df so we don't modify the original
-    df = df.copy(deep=True)
-
     best_values = df.min(axis=1)
     best_algos = df.idxmin(axis=1)
 
-    fig = px.scatter(df, log_y=True, labels=x_labels)
+    fig = px.scatter(df, log_y=True, labels=x_labels, **kwargs)
 
     fig.update_layout(
         title=dict(text="Scaled Errors", font_size=25, x=0.4),
@@ -129,7 +130,9 @@ def plot_leaderboard(df: pd.DataFrame, html_path: str = None) -> Figure:
     return fig
 
 
-def error_heatmap(df_err: pd.DataFrame, log: bool = False, prec: int = 3) -> Figure:
+def error_heatmap(
+    df_err: pd.DataFrame, log: bool = False, prec: int = 3, **kwargs: Any
+) -> Figure:
     """Create a heatmap of the errors with a column for mean error across all tasks
     added on the right. Title assumes the errors are scaled relative to dummy
     performance but works with unscaled errors too.
@@ -151,12 +154,15 @@ def error_heatmap(df_err: pd.DataFrame, log: bool = False, prec: int = 3) -> Fig
     if log:
         df_err_scaled = np.log10(df_err_scaled)
 
-    df_err_scaled["mean scaled error"] = df_err_scaled.mean(1)
-    df_err_scaled = df_err_scaled.sort_values(by="mean scaled error").round(prec)
+    # mean scaled error across all recorded tasks for each model
+    df_err_scaled["mean scaled error"] = df_err_scaled.mean(axis=1)
+    # mean scaled error across only those tasks recorded for all models
+    # usually jdft2d, log_gvrh, dielectric, perovskites, mp_gap, mp_e_form
+    df_err_scaled["dense scaled error"] = df_err_scaled.dropna(axis=1).mean(axis=1)
 
-    fig = px.imshow(
-        df_err_scaled, width=1200, height=600, text_auto=f".{prec}f", aspect="auto"
-    )
+    df_err_scaled = df_err_scaled.sort_values(by="dense scaled error").round(prec)
+
+    fig = px.imshow(df_err_scaled, text_auto=f".{prec}f", aspect="auto", **kwargs)
 
     fig.update_layout(
         title=dict(text="<b>Matbench Scaled Errors</b>", x=0.5, font_size=20),
