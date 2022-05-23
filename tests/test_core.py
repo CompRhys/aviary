@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 import torch
@@ -26,6 +28,15 @@ def test_np_softmax():
             assert np.allclose(out.sum(axis=axis), 1)
 
 
+reason = """
+our use of torch.where() requires torch pre-release 1.12.0 which handles type promotion
+(pytorch#76691) and avoids:
+RuntimeError: expected scalar type long int but found double
+skipif CI can be removed once 1.12 is released as stable
+"""
+
+
+@pytest.mark.skipif("CI" in os.environ, reason=reason)
 def test_masked_mean():
     # test 1d tensor
     x1 = torch.arange(5)
@@ -42,6 +53,7 @@ def test_masked_mean():
     assert masked_mean(x2, mask2, dim=1) == pytest.approx([1.5, 6])
 
 
+@pytest.mark.skipif("CI" in os.environ, reason=reason)
 def test_masked_std():
     # test 1d tensor
     x1 = torch.arange(5)
