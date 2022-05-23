@@ -124,8 +124,8 @@ class Wrenformer(BaseModelClass):
         sum_agg = (embeddings * inv_mask).sum(dim=1)
 
         # replace padded values with +/-inf to exclude them from min/max
-        min_agg, _ = embeddings.where(inv_mask, torch.tensor(float("inf"))).min(dim=1)
-        max_agg, _ = embeddings.where(inv_mask, torch.tensor(float("-inf"))).max(dim=1)
+        min_agg, _ = torch.where(inv_mask, embeddings, float("inf")).min(dim=1)
+        max_agg, _ = torch.where(inv_mask, embeddings, float("-inf")).max(dim=1)
         mean_agg = masked_mean(embeddings, inv_mask, dim=1)
         std_agg = masked_std(embeddings, inv_mask, dim=1)
 
