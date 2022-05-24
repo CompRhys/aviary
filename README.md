@@ -18,22 +18,20 @@ The aviary contains:
 
 The aim is to contain multiple models for materials discovery under a common interface
 
-## Environment Setup
+## `conda` Installation
 
 To use `aviary` you need to create an environment with the correct dependencies. The easiest way to get up and running is to use `anaconda`.
-A `cudatoolkit=11.1` environment file is provided `environment-gpu-cu111.yml` allowing a working environment to be created with:
+A `cudatoolkit=11.1` environment is provided in `environment-gpu-cu111.yml` allowing a working environment to be created with:
 
 ```bash
 conda env create -f environment-gpu-cu111.yml
 ```
 
-If you are not using `cudatoolkit=11.1` or do not have access to a GPU this setup will not work for you. If so please check the following pages [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch-Scatter](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) for how to install the core packages and then install the remaining requirements as detailed in `requirements.txt`.
+If you are not using `cudatoolkit=11.1` or do not have access to a GPU this setup will not work for you. If so please check the following pages [PyTorch](https://pytorch.org/get-started/locally), [PyTorch-Scatter](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) for how to install the core packages.
 
-The code was developed and tested on Linux Mint 19.1 Tessa. The code should work with other Operating Systems but it has not been tested for such use.
+The code was developed and tested on Linux Mint 19.1 Tessa. It should work with other operating systems but it has not been tested for such use.
 
-## Aviary Setup
-
-Once you have set up an environment with the correct dependencies you can install `aviary` using the following commands from the top of the directory:
+Once you have setup an environment with the correct dependencies you can install `aviary` using the following commands from the top of the directory:
 
 ```bash
 conda activate aviary
@@ -42,6 +40,20 @@ pip install -e .
 ```
 
 This will install the library in an editable state allowing for advanced users to make changes as desired.
+
+## `pip` Installation
+
+Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). To `pip install` it, make sure you replace `1.11.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
+
+```sh
+pip install torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+cpu.html
+
+pip install -U git+https://github.com/CompRhys/aviary  # install aviary itself
+
+# or for an editable install
+git clone https://github.com/CompRhys/aviary
+pip install -e ./aviary
+```
 
 ## Example Use
 

@@ -2,6 +2,7 @@
 __pycache__/
 *.egg-info
 .mypy_cache/
+build/
 
 # vscode
 .vscode/
@@ -18,6 +19,7 @@ models/
 *.pkl
 *.pdf
 *.json.gz
+*.json.bz2
 
 # HPC
 slurm-*.out

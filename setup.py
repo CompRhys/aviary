@@ -23,7 +23,7 @@ setup(
         "Wyckoff positions",
         "Crystal Structure Prediction",
     ],
-    package_data={"": ["embeddings/**/*.json"]},
+    package_data={"": ["**/*.json"]},  # include all JSON files in the package
     python_requires=">=3.7",
     install_requires=[
         "scipy",
