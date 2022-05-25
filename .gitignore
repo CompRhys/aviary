@@ -28,8 +28,9 @@ pds/
 manuscript/
 voro-thesis/
 
-# MatBench model preds, metrics and slurm job logs
+# MatBench run artifacts like model preds, checkpoints, metrics and slurm job logs
 examples/mat_bench/model_preds
 examples/mat_bench/model_scores
+examples/mat_bench/checkpoints
 examples/mat_bench/job-logs*
 wandb

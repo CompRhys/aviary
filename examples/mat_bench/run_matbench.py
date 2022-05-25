@@ -55,6 +55,7 @@ def run_matbench_task(
     epochs: int = 100,
     n_attn_layers: int = 4,
     log_wandb: bool = True,
+    checkpoint: Literal["local", "wandb"] | None = None,
 ) -> dict:
     """Run a single matbench task.
 
@@ -68,15 +69,26 @@ def run_matbench_task(
         epochs (int): How many epochs to train for in each CV fold.
         n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
         wandb (bool): Whether to log this run to Weights and Biases. Defaults to True.
+        checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
+            dicts to disk (local) or upload to wandb. Defaults to None.
+            To later copy the checkpoint file to cwd and use it:
+            ```py
+            run_path="<user|team>/<project>/<run_id>"  # e.g. aviary/matbench/31qh7b5q
+            checkpoint = wandb.restore("checkpoint.pth", run_path)
+            torch.load(checkpoint.name)
+            ```
 
     Raises:
-        ValueError: On unknown dataset_name.
+        ValueError: On unknown dataset_name or invalid checkpoint.
 
     Returns:
         dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
             to model predictions.
     """
-    scores_path = f"{MODULE_DIR}/model_scores/{model_name}-{timestamp}.json"
+    if checkpoint not in (None, "local", "wandb"):
+        raise ValueError(f"Unknown {checkpoint=}")
+    if checkpoint == "wandb" and not log_wandb:
+        raise ValueError(f"Cannot save checkpoint to wandb if {log_wandb=}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
@@ -209,6 +221,25 @@ def run_matbench_task(
 
     metrics = get_metrics(targets, predictions, task_type)
 
+    # save model checkpoint
+    if checkpoint is not None:
+        state_dict = {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "loss_dict": loss_dict,
+            "epoch": epochs,
+            "metrics": metrics,
+        }
+        if checkpoint == "local":
+            os.makedirs(f"{MODULE_DIR}/checkpoints", exist_ok=True)
+            checkpoint_path = f"{MODULE_DIR}/checkpoints/{fold_name}.pth"
+            torch.save(state_dict, checkpoint_path)
+        if checkpoint == "wandb":
+            assert log_wandb and wandb.run is not None, "wandb.run is None"
+            torch.save(state_dict, f"{wandb.run.dir}/checkpoint.pth")
+
+    # record test set metrics and scatter/ROC plots to wandb
     if log_wandb:
         wandb.summary = {"test": metrics}
         if task_type == REG_KEY:
@@ -258,6 +289,7 @@ def run_matbench_task(
     merge_json_on_disk({dataset_name: {f"fold_{fold}": preds_dict}}, preds_path)
 
     # save model scores to JSON
+    scores_path = f"{MODULE_DIR}/model_scores/{model_name}-{timestamp}.json"
     scores_dict = {dataset_name: {f"fold_{fold}": metrics}}
     scores_dict["params"] = params
     merge_json_on_disk(scores_dict, scores_path)
@@ -280,8 +312,9 @@ if __name__ == "__main__":
             dataset_name="matbench_jdft2d",
             timestamp=timestamp,
             fold=3,
-            epochs=10,
+            epochs=3,
             log_wandb=True,
+            checkpoint=None,
         )
     finally:  # clean up
         for filename in glob("model_*/*former-*-tmp-*.json"):

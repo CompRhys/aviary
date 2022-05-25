@@ -217,7 +217,7 @@ class BaseModelClass(nn.Module, ABC):
             pass
 
         if isinstance(writer, SummaryWriter):
-            writer.close()
+            writer.close()  # close tensorboard SummaryWriter at end of training
 
     def evaluate(
         self,
@@ -497,7 +497,7 @@ def save_checkpoint(
     """Saves a checkpoint and overwrites the best model when is_best = True.
 
     Args:
-        state (dict[str, Any]): Dictionary containing model parameters.
+        state (dict[str, Any]): Model parameters and other stateful objects like optimizer.
         is_best (bool): Whether the model is the best seen according to validation set.
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
