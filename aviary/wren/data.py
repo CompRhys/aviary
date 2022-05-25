@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import re
 from itertools import groupby
-from os.path import abspath, dirname, exists, join
 from typing import Any, Sequence
 
 import numpy as np
@@ -13,6 +13,7 @@ import torch
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
+from aviary import PKG_DIR
 from aviary.wren.utils import mult_dict, relab_dict
 
 
@@ -51,12 +52,9 @@ class WyckoffData(Dataset):
         self.df = df
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
-            elem_emb = join(
-                dirname(abspath(__file__)), f"../embeddings/element/{elem_emb}.json"
-            )
-        else:
-            if not exists(elem_emb):
-                raise AssertionError(f"{elem_emb} does not exist!")
+            elem_emb = f"{PKG_DIR}/embeddings/element/{elem_emb}.json"
+        elif not os.path.exists(elem_emb):
+            raise AssertionError(f"{elem_emb} does not exist!")
 
         with open(elem_emb) as f:
             self.elem_features = json.load(f)
@@ -64,12 +62,9 @@ class WyckoffData(Dataset):
         self.elem_emb_len = len(list(self.elem_features.values())[0])
 
         if sym_emb in ["bra-alg-off", "spg-alg-off"]:
-            sym_emb = join(
-                dirname(abspath(__file__)), f"../embeddings/wyckoff/{sym_emb}.json"
-            )
-        else:
-            if not exists(sym_emb):
-                raise AssertionError(f"{sym_emb} does not exist!")
+            sym_emb = f"{PKG_DIR}/embeddings/wyckoff/{sym_emb}.json"
+        elif not os.path.exists(sym_emb):
+            raise AssertionError(f"{sym_emb} does not exist!")
 
         with open(sym_emb) as f:
             self.sym_features = json.load(f)
