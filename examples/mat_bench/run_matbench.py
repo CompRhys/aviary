@@ -13,7 +13,6 @@ from matbench.constants import CLF_KEY, REG_KEY
 from matbench.task import MatbenchTask
 from sklearn.metrics import r2_score
 from torch import nn
-from torch.optim.swa_utils import SWALR, AveragedModel
 from tqdm import tqdm
 
 from aviary.core import Normalizer, TaskType
@@ -29,6 +28,8 @@ from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
 from examples.mat_bench.plotting_functions import annotate_fig
 from examples.mat_bench.utils import merge_json_on_disk, print_walltime
+
+# from torch.optim.swa_utils import SWALR, AveragedModel
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -162,11 +163,11 @@ def run_matbench_task(
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
-    swa_model = AveragedModel(model)
+    # swa_model = AveragedModel(model)
     # scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
     # epoch to start using the SWA model, set to start at 10% of epochs
-    swa_start = epochs // 2
-    swa_scheduler = SWALR(optimizer, swa_lr=0.05)
+    # swa_start = epochs // 2
+    # swa_scheduler = SWALR(optimizer, swa_lr=0.05)
 
     if log_wandb:
         wandb.login()
@@ -186,7 +187,7 @@ def run_matbench_task(
             },
         )
 
-    for epoch in tqdm(range(epochs)):
+    for _ in tqdm(range(epochs)):
         model.epoch += 1
         train_metrics = model.evaluate(
             train_loader, loss_dict, optimizer, normalizer_dict, action="train"
@@ -197,20 +198,21 @@ def run_matbench_task(
                 test_loader, loss_dict, None, normalizer_dict, action="val"
             )
 
-        if epoch > swa_start:
-            swa_model.update_parameters(model)
-            swa_scheduler.step()
-        else:
-            scheduler.step()
+        # if epoch > swa_start:
+        #     swa_model.update_parameters(model)
+        #     swa_scheduler.step()
+        # else:
+        #     scheduler.step()
         scheduler.step()
 
         if log_wandb:
             wandb.log({"train": train_metrics, "validation": val_metrics})
 
     # get test set predictions
-    swa_model.eval()
+    # swa_model.eval()
+    model.eval()
     with torch.no_grad():
-        predictions = torch.cat([swa_model(*inputs)[0] for inputs, *_ in test_loader])
+        predictions = torch.cat([model(*inputs)[0] for inputs, *_ in test_loader])
 
     if task_type == CLF_KEY:
         predictions = predictions.softmax(dim=1)
@@ -307,7 +309,7 @@ if __name__ == "__main__":
     try:
         # for testing and debugging
         run_matbench_task(
-            model_name := "roostformer-swa-s2m3-aggregation-tmp",
+            model_name := "wrenformer-mean+std-aggregation-tmp",
             # dataset_name="matbench_expt_is_metal",
             dataset_name="matbench_jdft2d",
             timestamp=timestamp,

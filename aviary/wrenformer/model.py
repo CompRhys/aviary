@@ -58,7 +58,7 @@ class Wrenformer(BaseModelClass):
         """
         super().__init__(robust=robust, **kwargs)
 
-        # up or down size embedding dimension to chosen model dimension
+        # up- or down-size embedding dimension (n_features) to model dimension (d_model)
         self.resize_embedding = nn.Linear(n_features, d_model)
 
         transformer_layer = nn.TransformerEncoderLayer(
@@ -71,7 +71,7 @@ class Wrenformer(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
-        n_aggregators = 5  # number of embedding aggregation functions
+        n_aggregators = 2  # number of embedding aggregation functions
         self.trunk_nn = ResidualNetwork(
             input_dim=n_aggregators * d_model,
             output_dim=out_hidden[0],
@@ -93,9 +93,9 @@ class Wrenformer(BaseModelClass):
                 mask[i,j] = True means batch index i, sequence index j is not allowed to
                 attend, False means it participates in self-attention.
             equivalence_counts (list[int], optional): Only needed for Wrenformer,
-                not Roostformer. Number of successive embeddings in the batch
-                dim originating from equivalent Wyckoff sets. Those are averaged
-                to reduce dim=0 of features back to batch_size.
+                not Roostformer. Length of slices of features in the batch dimension
+                originating from equivalent Wyckoff sets. Those are averaged to reduce
+                dim=0 of features back to batch_size.
 
         Returns:
             tuple[Tensor, ...]: Predictions for each batch of multitask targets.
@@ -106,7 +106,7 @@ class Wrenformer(BaseModelClass):
         embeddings = self.transformer_encoder(features, src_key_padding_mask=mask)
 
         if len(args) == 1:
-            # if forward() got a 3rd arg, we're running as wrenformer, not roostformer
+            # if forward() got a 3rd arg, we're running as Wrenformer, not Roostformer
             equivalence_counts: list[int] = args[0]
             # average over equivalent Wyckoff sets in a given material (brings dim 0 of
             # features back to batch_size)
@@ -121,18 +121,16 @@ class Wrenformer(BaseModelClass):
         # into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
         inv_mask: torch.BoolTensor = ~mask[..., None]
-        sum_agg = (embeddings * inv_mask).sum(dim=1)
+        # sum_agg = (embeddings * inv_mask).sum(dim=1)
 
-        # replace padded values with +/-inf to exclude them from min/max
-        min_agg, _ = torch.where(inv_mask, embeddings, float("inf")).min(dim=1)
-        max_agg, _ = torch.where(inv_mask, embeddings, float("-inf")).max(dim=1)
+        # # replace padded values with +/-inf to exclude them from min/max
+        # min_agg, _ = torch.where(inv_mask, embeddings, float("inf")).min(dim=1)
+        # max_agg, _ = torch.where(inv_mask, embeddings, float("-inf")).max(dim=1)
         mean_agg = masked_mean(embeddings, inv_mask, dim=1)
         std_agg = masked_std(embeddings, inv_mask, dim=1)
 
         # Sum+Std+Min+Max+Mean: we call this S2M3 aggregation
-        aggregated_embeddings = torch.cat(
-            [sum_agg, std_agg, min_agg, max_agg, mean_agg], dim=1
-        )
+        aggregated_embeddings = torch.cat([mean_agg, std_agg], dim=1)
 
         # main body of the feed-forward NN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))
