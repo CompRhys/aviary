@@ -139,17 +139,23 @@ def get_aflow_label_aflow(
     return full_label
 
 
-def get_aflow_label_spglib(struct: Structure) -> str:
+def get_aflow_label_spglib(
+    struct: Structure,
+    errors: Literal["raise", "annotate", "ignore"] = "ignore",
+) -> str:
     """Get AFLOW prototype label for pymatgen Structure.
 
     Args:
-        struct (Structure): pymatgen Structure object
+        struct (Structure): pymatgen Structure object.
+        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
+            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
+            with 'invalid <reason>: '.
 
     Returns:
         str: AFLOW prototype label
     """
     spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
-    aflow = get_aflow_label_from_spga(spga)
+    aflow = get_aflow_label_from_spga(spga, errors)
 
     # try again with refined structure if it initially fails
     # NOTE structures with magmoms fail unless all have same magmom
@@ -157,7 +163,7 @@ def get_aflow_label_spglib(struct: Structure) -> str:
         spga = SpacegroupAnalyzer(
             spga.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
         )
-        aflow = get_aflow_label_from_spga(spga)
+        aflow = get_aflow_label_from_spga(spga, errors)
 
     return aflow
 
@@ -169,7 +175,7 @@ def get_aflow_label_from_spga(
     """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
-        spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object
+        spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
         errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
             'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
             with 'invalid <reason>: '.
