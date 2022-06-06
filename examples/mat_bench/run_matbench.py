@@ -96,6 +96,13 @@ def run_matbench_task(
 
     df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
     if "wren" in model_name.lower():
+        err_msg = "Missing 'wyckoff' column in dataframe. "
+        err_msg += (
+            "Please generate Aflow Wyckoff labels ahead of time."
+            if "structure" in df
+            else "Trying to deploy Wrenformer on composition-only task?"
+        )
+        assert "wyckoff" in df, err_msg
         with print_walltime("Generating initial Wyckoff embedding"):
             df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
     elif "roost" in model_name.lower():
@@ -312,8 +319,8 @@ if __name__ == "__main__":
         # for testing and debugging
         run_matbench_task(
             model_name := "wrenformer-mean+std-aggregation-tmp",
-            # dataset_name="matbench_expt_is_metal",
-            dataset_name="matbench_jdft2d",
+            dataset_name="matbench_expt_is_metal",
+            # dataset_name="matbench_jdft2d",
             timestamp=timestamp,
             fold=3,
             epochs=3,
