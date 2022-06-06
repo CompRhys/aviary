@@ -14,6 +14,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
@@ -22,6 +23,8 @@ setup(
         "Machine Learning",
         "Wyckoff positions",
         "Crystal Structure Prediction",
+        "Self-Attention",
+        "Transformer",
     ],
     package_data={"": ["embeddings/**/*.json"]},
     python_requires=">=3.7",
@@ -35,6 +38,8 @@ setup(
         "scikit_learn",
         "tensorboard",
         "typing_extensions;python_version<'3.8'",
+        "protobuf<4.21.0",  # temporary fix this issue:
+        # https://github.com/PyTorchLightning/pytorch-lightning/issues/13159
     ],
     extras_require={
         "test": ["pytest", "pytest-cov", "matminer"],
