@@ -7,6 +7,7 @@ import plotly.graph_objs as go
 import plotly.io as pio
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
+from matbench.metadata import mbv01_metadata as matbench_metadata
 from plotly.graph_objs._figure import Figure
 from sklearn.metrics import accuracy_score, auc, roc_curve
 
@@ -53,7 +54,7 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
     return scaled_df.T
 
 
-x_labels = {
+dataset_labels = {
     "matbench_steels": "σᵧ Steel alloys",
     "matbench_jdft2d": "Eˣ 2D Materials",
     "matbench_phonons": "ωᵐᵃˣ Phonons",
@@ -67,6 +68,10 @@ x_labels = {
     "matbench_mp_gap": "Eᵍ DFT",
     "matbench_mp_is_metal": "Metallicity DFT",
     "matbench_mp_e_form": "Eᶠ DFT",
+}
+dataset_sizes = {k: v["n_samples"] for k, v in matbench_metadata.items()}
+dataset_labels_html = {
+    k: f"<b>{v}</b>  {dataset_sizes[k]:,}" for k, v in dataset_labels.items()
 }
 
 
@@ -82,12 +87,12 @@ def plot_leaderboard(df: pd.DataFrame, html_path: str = None, **kwargs: Any) -> 
         Returns:
             Figure: Plotly graph objects Figure instance
     """
-    df = df.rename(x_labels)
+    df = df.rename(dataset_labels_html)
     # deep copy df so we don't modify the original
     best_values = df.min(axis=1)
     best_algos = df.idxmin(axis=1)
 
-    fig = px.scatter(df, log_y=True, labels=x_labels, **kwargs)
+    fig = px.scatter(df, log_y=True, labels=dataset_labels, **kwargs)
 
     fig.update_layout(
         title=dict(text="Scaled Errors", font_size=25, x=0.4),
@@ -149,7 +154,7 @@ def error_heatmap(
     df_err_scaled = scale_errors(df_err).T
     # rename column names for prettier axis ticks (must be after scale_errors() to have
     # correct dict keys)
-    df_err_scaled = df_err_scaled.rename(columns=x_labels)
+    df_err_scaled = df_err_scaled.rename(columns=dataset_labels_html)
 
     if log:
         df_err_scaled = np.log10(df_err_scaled)
