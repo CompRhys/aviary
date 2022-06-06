@@ -170,19 +170,21 @@ def run_matbench_task(
     # swa_scheduler = SWALR(optimizer, swa_lr=0.05)
 
     if log_wandb:
-        wandb.login()
+        if wandb.run is None:
+            wandb.login()
         wandb.init(
             project="matbench",  # run will be added to this project
             # https://docs.wandb.ai/guides/track/launch#init-start-error
             settings=wandb.Settings(start_method="fork"),
             name=fold_name,
             config={
-                "model": model_name,
                 "dataset": dataset_name,
-                "fold": fold,
                 "epochs": epochs,
-                "n_attn_layers": n_attn_layers,
+                "fold": fold,
                 "learning_rate": learning_rate,
+                "model": model_name,
+                "n_attn_layers": n_attn_layers,
+                "target": target,
                 "warmup_steps": warmup_steps,
             },
         )
