@@ -223,7 +223,7 @@ def run_matbench_task(
     targets = targets.cpu().numpy()
     test_df[(pred_col := "predictions")] = predictions.tolist()
 
-    metrics = get_metrics(targets, predictions, task_type)
+    test_metrics = get_metrics(targets, predictions, task_type)
 
     # save model checkpoint
     if checkpoint is not None:
@@ -233,7 +233,7 @@ def run_matbench_task(
             "scheduler_state_dict": scheduler.state_dict(),
             "loss_dict": loss_dict,
             "epoch": epochs,
-            "metrics": metrics,
+            "metrics": test_metrics,
         }
         if checkpoint == "local":
             os.makedirs(f"{MODULE_DIR}/checkpoints", exist_ok=True)
@@ -245,7 +245,7 @@ def run_matbench_task(
 
     # record test set metrics and scatter/ROC plots to wandb
     if log_wandb:
-        wandb.summary = {"test": metrics}
+        wandb.run.summary["test"] = test_metrics
         if task_type == REG_KEY:
             import plotly.express as px
             from pymatviz.utils import add_identity_line
@@ -294,7 +294,7 @@ def run_matbench_task(
 
     # save model scores to JSON
     scores_path = f"{MODULE_DIR}/model_scores/{model_name}-{timestamp}.json"
-    scores_dict = {dataset_name: {f"fold_{fold}": metrics}}
+    scores_dict = {dataset_name: {f"fold_{fold}": test_metrics}}
     scores_dict["params"] = params
     merge_json_on_disk(scores_dict, scores_path)
 
