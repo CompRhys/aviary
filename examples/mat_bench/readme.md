@@ -1,8 +1,22 @@
 # Matbench
 
-Work in progress preparing Matbench submissions for Roost and Wren (structure tasks only for Wren).
+This directory contains the files needed to create Matbench submissions for Roostformer and Wrenformer (structure tasks only for Wren) which are rewrites of Roost and Wren using PyTorch's builtin `TransformerEncoder` in favor of custom self-attention modules used by Roost and Wren.
+
+Added in [aviary#44](https://github.com/CompRhys/aviary/pull/44).
 
 Directory is named `mat_bench` to avoid shadowing the `matbench` package.
+
+The important files are:
+
+- `run_matbench.py`: The function that trains and tests Roost- and Wrenformer models on a given Matbench task.
+- `slurm_submit.py`: Launch a slurm array to train and evaluate models with a given set of hyperparameters on all Matbench tasks. Calls `run_matbench.py`.
+- `featurize_matbench.py`: Generate Spglib Wyckoff labels for all 13 Matbench tasks.
+
+Less important files:
+
+- `make_plots.py`: Imports `plotting_functions.py` to visualize and compare ours against other models and different sets of hyperparams.
+- `compare_spglib_vs_aflow_wyckoff_labels.py`: See module doc string.
+- `wandb_api.py`: Change run metadata recorded on [Weights and Biases](https://wandb.ai/aviary/matbench) after the fact.
 
 ## Speed difference between Wren and Wrenformer
 
@@ -29,4 +43,4 @@ print(f"{sum_wyckoffs_sqr/sum_wyckoffs_lte_16_sqr=:.3}")
 
 ## Benchmarks
 
-JSON files in `model_scores/` contain only the calculated scores (MAE/ROCAUC) for a given model run. Files with the same name but in `model_preds/` contain the full model predictions, targets and material ids. Code for loading these into memory is in `make_plots.py`.
+JSON files in `model_scores/` contain only the calculated scores (MAE/ROCAUC) for a given model run. Files with the same name in `model_preds/` contain the full set of model predictions, targets and material ids. Code for loading these into memory is in `make_plots.py`.

@@ -14,6 +14,14 @@ from examples.mat_bench import DATA_PATHS
 __author__ = "Janosh Riebesell"
 __date__ = "2022-05-17"
 
+"""
+This notebook compares the output of Aflow and Spglib algorithms for assigning crystal
+symmetries and Wyckoff position to crystal structures. Aflow is much slower but believed
+to be more accurate. Materials Project uses Spglib so our spacegroups should be
+identical to theirs. CCSD has their own algorithm and we found both Aflow and Spglib
+occasionally disagree with their results.
+"""
+
 
 # %%
 df_perovskites = pd.read_json(DATA_PATHS["matbench_perovskites"]).set_index("mbid")

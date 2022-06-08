@@ -27,7 +27,7 @@ __date__ = "2022-04-25"
 
 logging.getLogger("matbench").setLevel("ERROR")
 
-timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+today = f"{datetime.now():%Y-%m-%d}"
 matbench_repo_path = "/Users/janosh/dev/matbench"  # path to clone of matbench repo
 bench_dir = f"{matbench_repo_path}/benchmarks"
 
@@ -155,7 +155,7 @@ df_err
 
 
 # %%
-# html_path = f"plots/matbench-leaderboard-{timestamp}.html"
+# html_path = f"plots/{today}-matbench-leaderboard.html"
 html_path = None
 plot_leaderboard(df_err.dropna(axis=1, thresh=5), html_path, width=1200, height=600)
 
@@ -178,7 +178,7 @@ df_display.style.format(precision=3).background_gradient(cmap="viridis")
 # thresh=x means require at least x non-NA values
 fig = error_heatmap(df_err.dropna(thresh=9, axis=1), width=1200, height=600)
 fig.show()
-fig.write_image(f"plots/matbench-scaled-errors-heatmap-{timestamp}.png", scale=2)
+fig.write_image(f"plots/{today}-matbench-scaled-errors-heatmap.png", scale=2)
 
 
 # %% scatter plot of predictions vs. targets for multiple models on matbench_mp_e_form
@@ -213,4 +213,4 @@ add_identity_line(fig)
 
 fig.update_layout(legend=dict(x=0.02, y=0.95, xanchor="left", title="Models"))
 
-# fig.write_image(f"plots/matbench-mp-e-form-scatter-{timestamp}.png", scale=2)
+# fig.write_image(f"plots/{today}-matbench-mp-e-form-scatter.png", scale=2)
