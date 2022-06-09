@@ -154,10 +154,13 @@ def run_matbench_task(
         [inputs, targets, ids], batch_size=128, collate_fn=collate_batch
     )
 
+    # n_features is the length of the embedding vector for a Wyckoff position encoding
+    # the element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
+    # 'bra-alg-off.json') + 1 for the weight of that element/Wyckoff position in the
+    # material's composition
     n_features = features[0].shape[-1]
     assert n_features in (200 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
 
-    # n_features = element + wyckoff embedding lengths + element weights in composition
     model = Wrenformer(
         n_targets=[1 if task_type == REG_KEY else 2],
         n_features=n_features,

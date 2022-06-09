@@ -10,6 +10,12 @@ __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
 
 
+"""
+This file uses Spglib to generate Aflow Wyckoff labels for all Matbench datasets and stores them
+to disk in the datasets/ folder as Bzip2-compressed JSON files.
+"""
+
+
 mbbm = MatbenchBenchmark()
 
 for idx, task in enumerate(mbbm.tasks, 1):
@@ -29,6 +35,6 @@ for idx, task in enumerate(mbbm.tasks, 1):
         raise ValueError("No structure or composition column found")
 
     df.to_json(
-        f"{ROOT}/data/{task.dataset_name}.json.bz2",
+        f"{ROOT}/datasets/{task.dataset_name}.json.bz2",
         default_handler=MontyEncoder().encode,
     )
