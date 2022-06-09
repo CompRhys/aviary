@@ -3,8 +3,8 @@ from __future__ import annotations
 import ast
 import functools
 import json
+import os
 from itertools import groupby
-from os.path import abspath, dirname, exists, join
 from typing import Any, Sequence
 
 import numpy as np
@@ -13,6 +13,8 @@ import torch
 from pymatgen.core import Structure
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
+
+from aviary import PKG_DIR
 
 
 class CrystalGraphData(Dataset):
@@ -60,11 +62,9 @@ class CrystalGraphData(Dataset):
         self.max_num_nbr = max_num_nbr
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
-            elem_emb = join(
-                dirname(abspath(__file__)), f"../embeddings/element/{elem_emb}.json"
-            )
+            elem_emb = f"{PKG_DIR}/embeddings/element/{elem_emb}.json"
         else:
-            if not exists(elem_emb):
+            if not os.path.exists(elem_emb):
                 raise AssertionError(f"{elem_emb} does not exist!")
 
         with open(elem_emb) as f:
