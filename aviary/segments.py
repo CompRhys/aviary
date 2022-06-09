@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch import LongTensor, Tensor
 from torch_scatter import scatter_add, scatter_max
 
-from aviary.nn import SimpleNetwork
+from aviary.networks import SimpleNetwork
 
 
 class AttentionPooling(nn.Module):

@@ -7,7 +7,7 @@ from torch import LongTensor, Tensor
 from torch_scatter import scatter_add, scatter_mean
 
 from aviary.core import BaseModelClass
-from aviary.nn import SimpleNetwork
+from aviary.networks import SimpleNetwork
 
 
 class CrystalGraphConvNet(BaseModelClass):

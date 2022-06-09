@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch import LongTensor, Tensor
 
 from aviary.core import BaseModelClass
-from aviary.nn import ResidualNetwork, SimpleNetwork
+from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.segments import MessageLayer, WeightedAttentionPooling
 
 

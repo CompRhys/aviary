@@ -7,7 +7,7 @@ from torch import LongTensor, Tensor
 from torch_scatter import scatter_mean
 
 from aviary.core import BaseModelClass
-from aviary.nn import ResidualNetwork, SimpleNetwork
+from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.segments import MessageLayer, WeightedAttentionPooling
 
 
