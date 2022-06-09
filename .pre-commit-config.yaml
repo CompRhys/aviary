@@ -50,7 +50,7 @@ repos:
     rev: v0.942
     hooks:
       - id: mypy
-        exclude: (tests|examples)
+        exclude: (tests|examples)/
 
   - repo: https://github.com/myint/autoflake
     rev: v1.4
@@ -67,7 +67,7 @@ repos:
     rev: 6.1.1
     hooks:
       - id: pydocstyle
-        exclude: (tests|examples)
+        exclude: (tests|examples)/
 
   - repo: https://github.com/janosh/format-ipy-cells
     rev: v0.1.10
