@@ -6,7 +6,7 @@ import shutil
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import numpy as np
 import torch
@@ -62,7 +62,7 @@ class BaseModelClass(nn.Module, ABC):
         self.best_val_scores = best_val_scores or {}
         self.es_patience = 0
 
-        self.model_params = {"task_dict": task_dict}
+        self.model_params: dict[str, Any] = {"task_dict": task_dict}
 
     def fit(  # noqa: C901
         self,
@@ -71,7 +71,7 @@ class BaseModelClass(nn.Module, ABC):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler._LRScheduler,
         epochs: int,
-        loss_dict: Mapping[str, tuple[TaskType, nn.Module]],
+        loss_dict: Mapping[str, tuple[TaskType, Callable]],
         normalizer_dict: Mapping[str, Normalizer | None],
         model_name: str,
         run_id: int,
@@ -396,7 +396,7 @@ class BaseModelClass(nn.Module, ABC):
         return np.vstack(features)
 
     @abstractmethod
-    def forward(self, *x):
+    def forward(self, *x) -> tuple[Tensor, ...]:
         """Forward pass through the model.
 
         Raises:

@@ -193,7 +193,7 @@ def initialize_losses(
     task_dict: dict[str, TaskType],
     loss_name_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
-) -> dict[str, tuple[str, Callable]]:
+) -> dict[str, tuple[TaskType, Callable]]:
     """_summary_
 
     Args:
@@ -204,7 +204,7 @@ def initialize_losses(
     Returns:
         dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
     """
-    loss_func_dict: dict[str, tuple[str, Callable]] = {}
+    loss_func_dict: dict[str, tuple[TaskType, Callable]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
@@ -243,7 +243,7 @@ def init_normalizers(
     task_dict: dict[str, TaskType],
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
-) -> dict[str, Normalizer]:
+) -> dict[str, Normalizer | None]:
     """Initialise a Normalizer to scale the output targets
 
     Args:
@@ -254,15 +254,14 @@ def init_normalizers(
     Returns:
         dict[str, Normalizer]: Dictionary of Normalizers for each task
     """
+    normalizer_dict: dict[str, Normalizer | None] = {}
     if resume:
         checkpoint = torch.load(resume, map_location=device)
-        normalizer_dict = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
             normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
 
         return normalizer_dict
 
-    normalizer_dict = {}
     for target, task in task_dict.items():
         # Select Task and Loss Function
         if task == "regression":
@@ -274,7 +273,7 @@ def init_normalizers(
 
 
 def train_ensemble(
-    model_class: type[BaseModelClass],
+    model_class: BaseModelClass,
     model_name: str,
     run_id: int,
     ensemble_folds: int,
@@ -505,7 +504,7 @@ def results_multitask(  # noqa: C901
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        normalizer_dict: dict[str, Normalizer] = {}
+        normalizer_dict: dict[str, Normalizer | None] = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
             if state_dict is not None:
                 normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
@@ -516,13 +515,15 @@ def results_multitask(  # noqa: C901
 
         for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
             if task == "regression":
+                normalizer = normalizer_dict[name]
+                assert isinstance(normalizer, Normalizer)
                 if model.robust:
                     mean, log_std = pred.chunk(2, dim=1)
-                    pred = normalizer_dict[name].denorm(mean.data.cpu())
-                    ale_std = torch.exp(log_std).data.cpu() * normalizer_dict[name].std
+                    pred = normalizer.denorm(mean.data.cpu())
+                    ale_std = torch.exp(log_std).data.cpu() * normalizer.std
                     results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()  # type: ignore
                 else:
-                    pred = normalizer_dict[name].denorm(pred.data.cpu())
+                    pred = normalizer.denorm(pred.data.cpu())
 
                 results_dict[name]["pred"][j, :] = pred.view(-1).numpy()  # type: ignore
 
