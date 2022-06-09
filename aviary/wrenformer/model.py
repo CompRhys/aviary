@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch import BoolTensor, Tensor
 
 from aviary.core import BaseModelClass, masked_mean, masked_std
-from aviary.nn import ResidualNetwork
+from aviary.networks import ResidualNetwork
 
 
 class Wrenformer(BaseModelClass):
