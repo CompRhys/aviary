@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import numpy as np
 import pandas as pd
@@ -191,9 +191,9 @@ def initialize_optim(
 
 def initialize_losses(
     task_dict: dict[str, TaskType],
-    loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
+    loss_name_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
-) -> dict[str, tuple[str, type[torch.nn.Module]]]:
+) -> dict[str, tuple[str, Callable]]:
     """_summary_
 
     Args:
@@ -204,39 +204,39 @@ def initialize_losses(
     Returns:
         dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
     """
-    _loss_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
+    loss_func_dict: dict[str, tuple[str, Callable]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
-            if loss_dict[name] != "CSE":
+            if loss_name_dict[name] != "CSE":
                 raise NameError("Only CSE loss allowed for classification tasks")
 
             if robust:
-                _loss_dict[name] = (task, NLLLoss())
+                loss_func_dict[name] = (task, NLLLoss())
             else:
-                _loss_dict[name] = (task, CrossEntropyLoss())
+                loss_func_dict[name] = (task, CrossEntropyLoss())
 
         elif task == "regression":
             if robust:
-                if loss_dict[name] == "L1":
-                    _loss_dict[name] = (task, RobustL1Loss)
-                elif loss_dict[name] == "L2":
-                    _loss_dict[name] = (task, RobustL2Loss)
+                if loss_name_dict[name] == "L1":
+                    loss_func_dict[name] = (task, RobustL1Loss)
+                elif loss_name_dict[name] == "L2":
+                    loss_func_dict[name] = (task, RobustL2Loss)
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"
                     )
             else:
-                if loss_dict[name] == "L1":
-                    _loss_dict[name] = (task, L1Loss())
-                elif loss_dict[name] == "L2":
-                    _loss_dict[name] = (task, MSELoss())
+                if loss_name_dict[name] == "L1":
+                    loss_func_dict[name] = (task, L1Loss())
+                elif loss_name_dict[name] == "L2":
+                    loss_func_dict[name] = (task, MSELoss())
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for regression tasks"
                     )
 
-    return _loss_dict
+    return loss_func_dict
 
 
 def init_normalizers(
@@ -343,7 +343,7 @@ def train_ensemble(
             **restart_params,
         )
 
-        _loss_dict = initialize_losses(
+        loss_func_dict = initialize_losses(
             model.task_dict, loss_dict, model_params["robust"]
         )
         normalizer_dict = init_normalizers(
@@ -371,7 +371,7 @@ def train_ensemble(
             with torch.no_grad():
                 v_metrics = model.evaluate(
                     val_loader,
-                    loss_dict=_loss_dict,
+                    loss_dict=loss_func_dict,
                     optimizer=None,
                     normalizer_dict=normalizer_dict,
                     action="val",
@@ -399,7 +399,7 @@ def train_ensemble(
             optimizer=optimizer,
             scheduler=scheduler,
             epochs=epochs,
-            loss_dict=_loss_dict,
+            loss_dict=loss_func_dict,
             normalizer_dict=normalizer_dict,
             model_name=model_name,
             run_id=j,

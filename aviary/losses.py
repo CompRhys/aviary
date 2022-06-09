@@ -34,7 +34,6 @@ def RobustL2Loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> Ten
     Returns:
         Tensor: Evaluated robust L2 loss
     """
-    # TODO from Rhys: can we scale log_std by something sensible to improve the OOD behaviour?
     loss = (
         0.5 * torch.pow(pred_mean - target, 2.0) * torch.exp(-2.0 * pred_log_std)
         + pred_log_std
