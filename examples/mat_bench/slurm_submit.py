@@ -2,7 +2,6 @@
 import os
 import subprocess
 from datetime import datetime
-from glob import glob
 
 from matbench.metadata import mbv01_metadata
 
@@ -13,9 +12,9 @@ __date__ = "2022-04-25"
 
 
 # %% write Python submission file and sbatch it
-epochs = 100
-n_attn_layers = 3
-model_name = f"wrenformer-swa-s2m3-aggregation-{epochs=}-{n_attn_layers=}"
+epochs = 200
+n_attn_layers = 6
+model_name = f"wrenformer-mean+std-aggregation-{epochs=}-{n_attn_layers=}"
 folds = list(range(5))
 
 if "roost" in model_name.lower():
@@ -85,10 +84,3 @@ with open(submit_script, "w") as file:
 
 # %% submit slurm job
 result = subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
-
-
-# %% clean up log files for failed jobs
-job_id = "60041076"
-n_removed = len(list(map(os.remove, glob(f"{log_dir}/*-{job_id}-*.log"))))
-
-print(f"{n_removed} log files removed for {job_id=}")

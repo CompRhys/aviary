@@ -67,7 +67,7 @@ def run_matbench_task(
         timestamp (str): Timestamp to append to the names of JSON files for model predictions
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
-        epochs (int): How many epochs to train for in each CV fold.
+        epochs (int): How many epochs to train for. Defaults to 100.
         n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
         wandb (bool): Whether to log this run to Weights and Biases. Defaults to True.
         checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
@@ -83,8 +83,8 @@ def run_matbench_task(
         ValueError: On unknown dataset_name or invalid checkpoint.
 
     Returns:
-        dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: preds}}
-            to model predictions.
+        dict[str, dict[str, list[float]]]: Dictionary mapping {dataset_name: {fold: metrics}}
+            to model test set metrics.
     """
     if checkpoint not in (None, "local", "wandb"):
         raise ValueError(f"Unknown {checkpoint=}")
@@ -179,6 +179,20 @@ def run_matbench_task(
     # swa_start = epochs // 2
     # swa_scheduler = SWALR(optimizer, swa_lr=0.05)
 
+    params = {
+        "dataset": dataset_name,
+        "epochs": epochs,
+        "fold": fold,
+        "learning_rate": learning_rate,
+        "model": model_name,
+        "n_attn_layers": n_attn_layers,
+        "target": target,
+        "warmup_steps": warmup_steps,
+        "robust": robust,
+        "n_features": n_features,  # embedding size
+        "losses": str(loss_dict),
+    }
+
     if log_wandb:
         if wandb.run is None:
             wandb.login()
@@ -187,27 +201,17 @@ def run_matbench_task(
             # https://docs.wandb.ai/guides/track/launch#init-start-error
             settings=wandb.Settings(start_method="fork"),
             name=fold_name,
-            config={
-                "dataset": dataset_name,
-                "epochs": epochs,
-                "fold": fold,
-                "learning_rate": learning_rate,
-                "model": model_name,
-                "n_attn_layers": n_attn_layers,
-                "target": target,
-                "warmup_steps": warmup_steps,
-            },
+            config=params,
         )
 
     for _ in tqdm(range(epochs)):
-        model.epoch += 1
         train_metrics = model.evaluate(
             train_loader, loss_dict, optimizer, normalizer_dict, action="train"
         )
 
         with torch.no_grad():
             val_metrics = model.evaluate(
-                test_loader, loss_dict, None, normalizer_dict, action="val"
+                test_loader, loss_dict, None, normalizer_dict, action="evaluate"
             )
 
         # if epoch > swa_start:
@@ -216,6 +220,7 @@ def run_matbench_task(
         # else:
         #     scheduler.step()
         scheduler.step()
+        model.epoch += 1
 
         if log_wandb:
             wandb.log({"train": train_metrics, "validation": val_metrics})
@@ -289,14 +294,6 @@ def run_matbench_task(
 
     # save model predictions to JSON
     preds_path = f"{MODULE_DIR}/model_preds/{model_name}-{timestamp}.json"
-    params = {
-        "epochs": epochs,
-        "n_attn_layers": n_attn_layers,
-        "learning_rate": learning_rate,
-        "robust": robust,
-        "n_features": n_features,  # embedding size
-        dataset_name: {"losses": str(loss_dict)},
-    }
 
     # record model predictions
     preds_dict = test_df[["mbid", target, pred_col]].to_dict(orient="list")
