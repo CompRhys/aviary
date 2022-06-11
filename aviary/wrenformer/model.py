@@ -53,8 +53,10 @@ class Wrenformer(BaseModelClass):
                 is shared across tasks when multitasking. Defaults to [1024, 512].
             out_hidden (list[int], optional): Number of hidden units in the output networks which
                 are task-specific. Defaults to [256, 128, 64].
-            robust (bool): Whether to estimate standard deviation of a prediction alongside the
-                prediction itself for use in a robust loss function. Defaults to False.
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
         """
         super().__init__(robust=robust, **kwargs)
 

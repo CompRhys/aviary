@@ -49,7 +49,10 @@ class BaseModelClass(nn.Module, ABC):
 
         Args:
             task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
             epoch (int, optional): Epoch model training will begin/resume from. Defaults to 0.
             best_val_scores (dict[str, float], optional): Validation score to use for early
                 stopping. Defaults to None.
