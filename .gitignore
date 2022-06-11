@@ -32,5 +32,5 @@ voro-thesis/
 examples/mat_bench/model_preds
 examples/mat_bench/model_scores
 examples/mat_bench/checkpoints
-examples/mat_bench/job-logs*
+job-logs*
 wandb

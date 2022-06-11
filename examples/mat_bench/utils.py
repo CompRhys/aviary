@@ -42,17 +42,25 @@ def merge_json_on_disk(dct: dict, file_path: str) -> None:
 
 
 @contextmanager
-def print_walltime(desc: str = "Execution") -> Generator[None, None, None]:
+def print_walltime(
+    start_desc: str = "",
+    end_desc: str = "",
+    newline: bool = True,
+) -> Generator[None, None, None]:
     """Context manager and decorator that prints the wall time of its lifetime.
 
     Args:
-        desc (str, optional): Description prints as f"{desc} took 1.23 sec".
-            Defaults to "Execution".
+        start_desc (str): Text to print when entering context. Defaults to ''.
+        end_desc (str): Text to print when exiting context. Will be followed by 'took
+            {duration} sec'. i.e. f"{end_desc} took 1.23 sec". Defaults to ''.
+        newline (bool): Whether to print a newline after start_desc. Defaults to True.
     """
     start_time = time.perf_counter()
+    if start_desc:
+        print(start_desc, end="\n" if newline else "")
 
     try:
         yield
     finally:
         run_time = time.perf_counter() - start_time
-        print(f"{desc} took {run_time:.2f} sec")
+        print(f"{end_desc} took {run_time:.2f} sec")
