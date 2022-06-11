@@ -194,7 +194,7 @@ def initialize_losses(
     loss_name_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
 ) -> dict[str, tuple[TaskType, Callable]]:
-    """_summary_
+    """Create a dictionary of loss functions for a multi-task model.
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".

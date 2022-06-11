@@ -40,7 +40,10 @@ class Roost(BaseModelClass):
         """_summary_
 
         Args:
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function.
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
             n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of features in initial element embedding
             elem_fea_len (int, optional): Number of hidden features to use to encode elements.

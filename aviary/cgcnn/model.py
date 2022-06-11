@@ -36,7 +36,10 @@ class CrystalGraphConvNet(BaseModelClass):
         """Initialize CrystalGraphConvNet.
 
         Args:
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
             n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of atom features in the input.
             nbr_fea_len (int): Number of bond features.

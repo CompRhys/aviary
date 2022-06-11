@@ -43,7 +43,10 @@ class Wren(BaseModelClass):
         """_summary_
 
         Args:
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
             n_targets (list[int]): Number of targets to train on. 1 for regression and number of
                 different class labels for classification.
             elem_emb_len (int): Number of features in initial element embedding
