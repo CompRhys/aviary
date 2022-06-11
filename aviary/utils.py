@@ -34,18 +34,18 @@ else:
 
 
 def initialize_model(
-    model_class: type[BaseModelClass],
+    model_class: BaseModelClass,
     model_params: dict[str, Any],
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
     fine_tune: str = None,
     transfer: str = None,
     **kwargs,
-) -> type[BaseModelClass]:
+) -> BaseModelClass:
     """Initialise a model
 
     Args:
-        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_class (BaseModelClass): Which model class to initialize.
         model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
         device (type[torch.device] | "cuda" | "cpu"): Device the model will run on.
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
@@ -129,7 +129,7 @@ def initialize_model(
 
 
 def initialize_optim(
-    model: type[BaseModelClass],
+    model: BaseModelClass,
     optim: type[Optimizer] | Literal["SGD", "Adam", "AdamW"],
     learning_rate: float,
     weight_decay: float,
@@ -143,7 +143,7 @@ def initialize_optim(
     """Initialize Optimizer and Scheduler.
 
     Args:
-        model (type[BaseModelClass]): Model to be optimized.
+        model (BaseModelClass): Model to be optimized.
         optim (type[Optimizer] | "SGD" | "Adam" | "AdamW"): Which optimizer to use
         learning_rate (float): Learning rate for optimization
         weight_decay (float): Weight decay for optimizer
@@ -292,7 +292,7 @@ def train_ensemble(
     """Convenience method to train multiple models in serial.
 
     Args:
-        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_class (BaseModelClass): Which model class to initialize.
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
@@ -373,7 +373,7 @@ def train_ensemble(
                     loss_dict=loss_func_dict,
                     optimizer=None,
                     normalizer_dict=normalizer_dict,
-                    action="val",
+                    action="evaluate",
                     verbose=verbose,
                 )
 
@@ -410,7 +410,7 @@ def train_ensemble(
 # TODO find a better name for this function @janosh
 @torch.no_grad()
 def results_multitask(  # noqa: C901
-    model_class: type[BaseModelClass],
+    model_class: BaseModelClass,
     model_name: str,
     run_id: int,
     ensemble_folds: int,

@@ -136,7 +136,7 @@ class BaseModelClass(nn.Module, ABC):
                             loss_dict=loss_dict,
                             optimizer=None,
                             normalizer_dict=normalizer_dict,
-                            action="val",
+                            action="evaluate",
                             verbose=verbose,
                         )
 
@@ -225,9 +225,9 @@ class BaseModelClass(nn.Module, ABC):
         loss_dict: Mapping[str, tuple[TaskType, nn.Module]],
         optimizer: torch.optim.Optimizer,
         normalizer_dict: Mapping[str, Normalizer | None],
-        action: Literal["train", "val"] = "train",
+        action: Literal["train", "evaluate"] = "train",
         verbose: bool = False,
-    ):
+    ) -> dict[str, dict[str, float]]:
         """Evaluate the model.
 
         Args:
@@ -237,77 +237,82 @@ class BaseModelClass(nn.Module, ABC):
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
-            action ("train" | "val"], optional): Whether to track gradients depending on
+            action ("train" | "evaluate"], optional): Whether to track gradients depending on
                 whether we are carrying out a training or validation pass. Defaults to "train".
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
             dict[str, dict["Loss" | "MAE" | "RMSE" | "Accuracy" | "F1", np.ndarray]]: nested
-                dictionary of metrics for each task.
+                dictionary for each target of metrics averaged over an epoch.
         """
-        if action == "val":
+        if action == "evaluate":
             self.eval()
         elif action == "train":
             self.train()
         else:
             raise NameError("Only train or val allowed as action")
 
-        metrics: dict[
-            str, dict[Literal["Loss", "MAE", "RMSE", "Accuracy", "F1"], list]
-        ] = defaultdict(lambda: defaultdict(list))
+        epoch_metrics: dict[str, dict[str, list[float]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
 
-        # we do not need batch_comp or batch_ids when training
+        # *_ discards identifiers like material_id and formula which we don't need when training
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
-        for inputs, targets, *_ in tqdm(
+        for inputs, targets_list, *_ in tqdm(
             data_loader, disable=True if not verbose else None
         ):
-            normed_targets = [
-                normalizer.norm(tensor) if normalizer is not None else tensor
-                for tensor, normalizer in zip(targets, normalizer_dict.values())
-            ]
-
             # compute output
             outputs = self(*inputs)
 
             mixed_loss: Tensor = 0
 
-            for name, output, target in zip(self.target_names, outputs, normed_targets):
-                task, loss_func = loss_dict[name]
+            for target_name, targets, output, normalizer in zip(
+                self.target_names, targets_list, outputs, normalizer_dict.values()
+            ):
+                task, loss_func = loss_dict[target_name]
+                target_metrics = epoch_metrics[target_name]
+                if normalizer is not None:
+                    targets = normalizer.norm(targets)
 
                 if task == "regression":
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
-                        loss = loss_func(output, log_std, target)
+                        loss = loss_func(output, log_std, targets)
                     else:
-                        loss = loss_func(output, target[..., None])
+                        loss = loss_func(output, targets[..., None])
 
-                    pred = normalizer_dict[name].denorm(output.data.cpu())  # type: ignore
-                    target = normalizer_dict[name].denorm(target.data.cpu())  # type: ignore
-                    metrics[name]["MAE"].append((pred - target).abs().mean())
-                    metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
+                    preds = normalizer.denorm(output.data.cpu())  # type: ignore
+                    targets = normalizer.denorm(targets.data.cpu())  # type: ignore
+
+                    mae = (preds - targets).abs().mean()
+                    rmse = (preds - targets).pow(2).mean().sqrt()
+                    target_metrics["MAE"].append(mae)
+                    target_metrics["RMSE"].append(rmse)
 
                 elif task == "classification":
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
                         logits = sampled_softmax(output, log_std)
-                        loss = loss_func(torch.log(logits), target.squeeze())
+                        loss = loss_func(torch.log(logits), targets.squeeze())
                     else:
                         logits = softmax(output, dim=1)
-                        loss = loss_func(output, target)
+                        loss = loss_func(output, targets)
+                    preds = logits
 
                     logits = logits.data.cpu()
-                    target = target.data.cpu()
+                    targets = targets.data.cpu()
 
-                    acc = float((target == logits.argmax(dim=1)).float().mean())
-                    metrics[name]["Accuracy"].append(acc)
+                    acc = float((targets == logits.argmax(dim=1)).float().mean())
+                    target_metrics["Accuracy"].append(acc)
                     f1 = float(
-                        f1_score(target, logits.argmax(dim=1), average="weighted")
+                        f1_score(targets, logits.argmax(dim=1), average="weighted")
                     )
-                    metrics[name]["F1"].append(f1)
+                    target_metrics["F1"].append(f1)
+
                 else:
                     raise ValueError(f"invalid task: {task}")
 
-                metrics[name]["Loss"].append(loss.cpu().item())
+                epoch_metrics[target_name]["Loss"].append(loss.cpu().item())
 
                 # NOTE multitasking currently just uses a direct sum of individual target losses
                 # this should be okay but is perhaps sub-optimal
@@ -319,12 +324,15 @@ class BaseModelClass(nn.Module, ABC):
                 mixed_loss.backward()
                 optimizer.step()
 
-        metrics = {
-            key: {k: np.array(lst).mean().squeeze() for k, lst in dct.items()}
-            for key, dct in metrics.items()
+        epoch_averaged_metrics = {
+            target: {
+                metric_key: np.array(values).mean().squeeze()
+                for metric_key, values in dct.items()
+            }
+            for target, dct in epoch_metrics.items()
         }
 
-        return metrics
+        return epoch_averaged_metrics
 
     @torch.no_grad()
     def predict(
