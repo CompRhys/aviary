@@ -11,7 +11,6 @@ import torch
 import wandb
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.task import MatbenchTask
-from sklearn.metrics import r2_score
 from torch import nn
 from tqdm import tqdm
 
@@ -26,7 +25,6 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from examples.mat_bench import DATA_PATHS, MODULE_DIR, MatbenchDatasets
-from examples.mat_bench.plotting_functions import annotate_fig
 from examples.mat_bench.utils import merge_json_on_disk, print_walltime
 
 # from torch.optim.swa_utils import SWALR, AveragedModel
@@ -61,7 +59,9 @@ def run_matbench_task(
     """Run a single matbench task.
 
     Args:
-        model_name (str): Can be any string to describe particular Roost/Wren variants.
+        model_name (str): Can be any string to describe particular Roost/Wren variants. Include
+            'robust' to use a robust loss function and have the model learn to predict an aleatoric
+            uncertainty.
         dataset_name (str): Name of a matbench dataset like 'matbench_dielectric',
             'matbench_perovskites', etc.
         timestamp (str): Timestamp to append to the names of JSON files for model predictions
@@ -116,7 +116,7 @@ def run_matbench_task(
     target = matbench_task.metadata.target
     task_type: TaskType = matbench_task.metadata.task_type
 
-    robust = False
+    robust = "robust" in model_name.lower()
     loss_func = (
         (RobustL1Loss if robust else nn.L1Loss())
         if task_type == REG_KEY
@@ -125,7 +125,7 @@ def run_matbench_task(
     loss_dict = {target: (task_type, loss_func)}
     normalizer_dict = {target: Normalizer() if task_type == REG_KEY else None}
 
-    fold_name = f"{model_name}-{dataset_name}-{fold=}"
+    run_name = f"{model_name}-{dataset_name}-{fold=}"
 
     train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
     test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
@@ -200,7 +200,7 @@ def run_matbench_task(
             project="matbench",  # run will be added to this project
             # https://docs.wandb.ai/guides/track/launch#init-start-error
             settings=wandb.Settings(start_method="fork"),
-            name=fold_name,
+            name=run_name,
             config=params,
         )
 
@@ -231,6 +231,10 @@ def run_matbench_task(
     with torch.no_grad():
         predictions = torch.cat([model(*inputs)[0] for inputs, *_ in test_loader])
 
+    if robust:
+        predictions, aleat_log_std = predictions.chunk(2, dim=1)
+        aleat_std = aleat_log_std.exp().cpu().numpy().squeeze()
+        test_df["aleat_std"] = aleat_std.tolist()
     if task_type == CLF_KEY:
         predictions = predictions.softmax(dim=1)
 
@@ -252,7 +256,7 @@ def run_matbench_task(
         }
         if checkpoint == "local":
             os.makedirs(f"{MODULE_DIR}/checkpoints", exist_ok=True)
-            checkpoint_path = f"{MODULE_DIR}/checkpoints/{fold_name}.pth"
+            checkpoint_path = f"{MODULE_DIR}/checkpoints/{run_name}.pth"
             torch.save(state_dict, checkpoint_path)
         if checkpoint == "wandb":
             assert log_wandb and wandb.run is not None, "wandb.run is None"
@@ -260,36 +264,29 @@ def run_matbench_task(
 
     # record test set metrics and scatter/ROC plots to wandb
     if log_wandb:
-        wandb.run.summary["test"] = test_metrics
+        wandb.summary = {"test": test_metrics}
+        table_cols = ["mbid", target, pred_col]
+        if robust:
+            table_cols.append("aleat_std")
+        table = wandb.Table(dataframe=test_df[table_cols])
+        wandb.log({"test_set_predictions": table})
         if task_type == REG_KEY:
-            import plotly.express as px
-            from pymatviz.utils import add_identity_line
+            from sklearn.metrics import r2_score
 
-            fig = px.scatter(
-                test_df,
-                x=target,
-                y=pred_col,
-                hover_data=["mbid"],
-                opacity=0.7,
-                width=1200,
-                height=800,
-            )
-            add_identity_line(fig)
-            fig.update_yaxes(title=f"predicted {target}")
-
-            MAE = (test_df[pred_col] - test_df[target]).abs().mean()
-            R2 = r2_score(test_df[target], test_df[pred_col])
-            text = f"{MAE=:.2f}<br>{R2=:.2f}"
-            annotate_fig(fig, text=text, x=0.02, y=0.95, xanchor="left")
-
-            plots = {"scatter": fig}
+            MAE = np.abs(targets - predictions).mean()
+            R2 = r2_score(targets, predictions)
+            title = f"{model_name}\n{MAE=:.2f}\n{R2=:.2f}"
+            scatter_plot = wandb.plot.scatter(table, target, pred_col, title=title)
+            wandb.log({"true_pred_scatter": scatter_plot})
         elif task_type == CLF_KEY:
-            from examples.mat_bench.plotting_functions import plotly_roc
+            from sklearn.metrics import accuracy_score, roc_auc_score
 
-            fig = plotly_roc(targets, predictions[:, 1])
-            plots = {"roc": fig}
+            ROCAUC = roc_auc_score(targets, predictions[:, 1])
+            accuracy = accuracy_score(targets, predictions.argmax(axis=1))
+            title = f"{model_name}\n{accuracy=:.2f}\n{ROCAUC=:.2f}"
+            roc_curve = wandb.plot.roc_curve(targets, predictions)
+            wandb.log({"roc_curve": roc_curve})
 
-        wandb.log(plots)
         wandb.finish()
 
     # save model predictions to JSON
@@ -318,12 +315,12 @@ if __name__ == "__main__":
     try:
         # for testing and debugging
         run_matbench_task(
-            model_name := "wrenformer-mean+std-aggregation-tmp",
+            model_name="roostformer-robust-mean+std-aggregation-tmp",
             dataset_name="matbench_expt_is_metal",
             # dataset_name="matbench_jdft2d",
             timestamp=timestamp,
-            fold=3,
-            epochs=3,
+            fold=0,
+            epochs=10,
             log_wandb=True,
             checkpoint=None,
         )
