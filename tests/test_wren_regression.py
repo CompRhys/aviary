@@ -10,7 +10,7 @@ from aviary.wren.model import Wren
 def test_wren_regression(df_matbench_phonons_wyckoff):
     elem_emb = "matscholar200"
     sym_emb = "bra-alg-off"
-    targets = ["last phdos peak"]
+    target_name = "last phdos peak"
     task = "regression"
     losses = ["L1"]
     robust = True
@@ -36,8 +36,8 @@ def test_wren_regression(df_matbench_phonons_wyckoff):
     workers = 0
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    task_dict = dict(zip(targets, [task]))
-    loss_dict = dict(zip(targets, losses))
+    task_dict = dict(zip([target_name], [task]))
+    loss_dict = dict(zip([target_name], losses))
 
     dataset = WyckoffData(
         df=df_matbench_phonons_wyckoff,
@@ -138,10 +138,10 @@ def test_wren_regression(df_matbench_phonons_wyckoff):
         save_results=False,
     )
 
-    pred = results_dict["last phdos peak"]["pred"]
-    target = results_dict["last phdos peak"]["target"]
+    preds = results_dict[target_name]["pred"]
+    target = results_dict[target_name]["target"]
 
-    y_ens = np.mean(pred, axis=0)
+    y_ens = np.mean(preds, axis=0)
 
     mae, rmse, r2 = get_metrics(target, y_ens, task).values()
 

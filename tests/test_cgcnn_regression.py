@@ -9,7 +9,7 @@ from aviary.utils import get_metrics, results_multitask, train_ensemble
 
 def test_cgcnn_regression(df_matbench_phonons):
     elem_emb = "cgcnn92"
-    targets = ["last phdos peak"]
+    target_name = "last phdos peak"
     task = "regression"
     losses = ["L1"]
     robust = True
@@ -36,8 +36,8 @@ def test_cgcnn_regression(df_matbench_phonons):
     workers = 0
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    task_dict = dict(zip(targets, [task]))
-    loss_dict = dict(zip(targets, losses))
+    task_dict = dict(zip([target_name], [task]))
+    loss_dict = dict(zip([target_name], losses))
 
     dataset = CrystalGraphData(
         df=df_matbench_phonons, elem_emb=elem_emb, task_dict=task_dict
@@ -128,12 +128,12 @@ def test_cgcnn_regression(df_matbench_phonons):
         save_results=False,
     )
 
-    pred = results_dict["last phdos peak"]["pred"]
-    target = results_dict["last phdos peak"]["target"]
+    preds = results_dict[target_name]["pred"]
+    target_name = results_dict[target_name]["target"]
 
-    y_ens = np.mean(pred, axis=0)
+    y_ens = np.mean(preds, axis=0)
 
-    mae, rmse, r2 = get_metrics(target, y_ens, task).values()
+    mae, rmse, r2 = get_metrics(target_name, y_ens, task).values()
 
     assert r2 > 0.7
     assert mae < 150
