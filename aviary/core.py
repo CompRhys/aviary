@@ -267,30 +267,30 @@ class BaseModelClass(nn.Module, ABC):
             # compute output
             outputs = self(*inputs)
 
-            mixed_loss: Tensor = 0
+            # if initializing as int means we get error if trying to call .backward() on it
+            mixed_loss: Tensor = 0  # type: ignore
 
             for target_name, targets, output, normalizer in zip(
                 self.target_names, targets_list, outputs, normalizer_dict.values()
             ):
                 task, loss_func = loss_dict[target_name]
                 target_metrics = epoch_metrics[target_name]
-                if normalizer is not None:
-                    targets = normalizer.norm(targets)
 
                 if task == "regression":
+                    assert normalizer is not None
+                    targets = normalizer.norm(targets)
+
                     if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        loss = loss_func(output, log_std, targets)
+                        preds, log_std = output.unbind(dim=1)
+                        loss = loss_func(preds, log_std, targets)
                     else:
-                        loss = loss_func(output, targets[..., None])
+                        preds = output.squeeze(1)
+                        loss = loss_func(preds, targets)
 
-                    preds = normalizer.denorm(output.data.cpu())  # type: ignore
-                    targets = normalizer.denorm(targets.data.cpu())  # type: ignore
-
-                    mae = (preds - targets).abs().mean()
-                    rmse = (preds - targets).pow(2).mean().sqrt()
-                    target_metrics["MAE"].append(mae)
-                    target_metrics["RMSE"].append(rmse)
+                    z_scored_error = preds - targets
+                    error = normalizer.denorm(z_scored_error.data.cpu())
+                    target_metrics["MAE"].append(float(error.abs().mean()))
+                    target_metrics["MSE"].append(float(error.pow(2).mean()))
 
                 elif task == "classification":
                     if self.robust:
@@ -334,6 +334,11 @@ class BaseModelClass(nn.Module, ABC):
             }
             for target, dct in epoch_metrics.items()
         }
+        # take sqrt at the end to get correct RMSE (sqrt(a + b) != sqrt(a) + sqrt(b))
+        # per-batch averaged RMSE != RMSE of the full epoch
+        for metrics_for_target in epoch_averaged_metrics.values():
+            if "MSE" in metrics_for_target:
+                metrics_for_target["RMSE"] = metrics_for_target.pop("MSE") ** 0.5
 
         return epoch_averaged_metrics
 
