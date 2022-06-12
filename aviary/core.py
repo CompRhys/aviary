@@ -267,7 +267,6 @@ class BaseModelClass(nn.Module, ABC):
             # compute output
             outputs = self(*inputs)
 
-            # if initializing as int means we get error if trying to call .backward() on it
             mixed_loss: Tensor = 0  # type: ignore
 
             for target_name, targets, output, normalizer in zip(
@@ -278,7 +277,7 @@ class BaseModelClass(nn.Module, ABC):
 
                 if task == "regression":
                     assert normalizer is not None
-                    targets = normalizer.norm(targets)
+                    targets = normalizer.norm(targets).squeeze()
 
                     if self.robust:
                         preds, log_std = output.unbind(dim=1)

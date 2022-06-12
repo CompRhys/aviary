@@ -518,7 +518,7 @@ def results_multitask(  # noqa: C901
                 normalizer = normalizer_dict[name]
                 assert isinstance(normalizer, Normalizer)
                 if model.robust:
-                    mean, log_std = pred.chunk(2, dim=1)
+                    mean, log_std = pred.unbind(dim=1)
                     pred = normalizer.denorm(mean.data.cpu())
                     ale_std = torch.exp(log_std).data.cpu() * normalizer.std
                     results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()  # type: ignore
