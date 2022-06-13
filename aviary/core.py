@@ -164,16 +164,14 @@ class BaseModelClass(nn.Module, ABC):
 
                     is_best: list[bool] = []
 
-                    for name in self.best_val_scores:
+                    for key in self.best_val_scores:
                         score_name = (
-                            "MAE"
-                            if self.task_dict[name] == "regression"
-                            else "Accuracy"
+                            "MAE" if self.task_dict[key] == "regression" else "Accuracy"
                         )
-                        score = val_metrics[name][score_name]
-                        prev_best = self.best_val_scores[name]
+                        score = val_metrics[key][score_name]
+                        prev_best = self.best_val_scores[key]
                         is_best.append(score < prev_best)
-                        self.best_val_scores[name] = min(prev_best, score)
+                        self.best_val_scores[key] = min(prev_best, score)
 
                     if any(is_best):
                         self.es_patience = 0
