@@ -46,7 +46,7 @@ def lr_lambda(epoch: int) -> float:
 
 
 @print_walltime("run_matbench_task()")
-def run_matbench_task(
+def run_matbench_task(  # noqa C901
     model_name: str,
     dataset_name: MatbenchDatasets,
     timestamp: str,
