@@ -2,10 +2,11 @@ from glob import glob
 from os.path import dirname
 from typing import Literal
 
+from aviary import ROOT
+
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
 
-ROOT = __file__.split("examples/mat_bench")[0]
 MODULE_DIR = dirname(__file__)
 
 DATA_PATHS = {

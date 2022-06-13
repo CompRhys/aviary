@@ -27,11 +27,11 @@ else:
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
 
-python_cmd = f"""import os
+python_script = f"""import os
 from datetime import datetime
 from itertools import product
 
-from examples.mat_bench.run_matbench import run_matbench_task
+from examples.mat_bench.run import run_wrenformer_on_matbench
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
@@ -44,7 +44,7 @@ print(f"{{job_array_id=}}")
 dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]
 print(f"{{dataset_name=}}\\n{{fold=}}")
 
-run_matbench_task(
+run_wrenformer_on_matbench(
     {model_name=},
     dataset_name=dataset_name,
     {timestamp=},
@@ -55,7 +55,7 @@ run_matbench_task(
 """
 
 
-submit_script = f"{log_dir}/{model_name}-{timestamp}.py"
+submit_script = f"{log_dir}/{timestamp}-{model_name}.py"
 
 # prepend into sbatch script to source module command and load default env
 # for Ampere GPU partition before actual job command
@@ -79,8 +79,9 @@ slurm_cmd = f"""sbatch
 header = f'"""\nSlurm submission command:\n{slurm_cmd}"""'
 
 with open(submit_script, "w") as file:
-    file.write(f"{header}\n\n{python_cmd}")
+    file.write(f"{header}\n\n{python_script}")
 
 
 # %% submit slurm job
 result = subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
+print(f"\n{submit_script = }")
