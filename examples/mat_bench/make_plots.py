@@ -13,6 +13,7 @@ from matbench.metadata import mbv01_metadata as matbench_metadata
 from pymatviz.utils import add_identity_line
 from sklearn.metrics import r2_score, roc_auc_score
 
+from aviary.wrenformer.utils import recursive_dict_merge
 from examples.mat_bench import DATA_PATHS
 from examples.mat_bench.plotting_functions import (
     dataset_labels_html,
@@ -20,7 +21,6 @@ from examples.mat_bench.plotting_functions import (
     plot_leaderboard,
     scale_errors,
 )
-from examples.mat_bench.utils import dict_merge
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
@@ -148,7 +148,7 @@ for file_path in our_pred_files:
 
 
 # %%
-df_err = pd.DataFrame(dict_merge(our_scores, others_scores))
+df_err = pd.DataFrame(recursive_dict_merge(our_scores, others_scores))
 df_err.index.name = "dataset"
 print(f"{df_err.shape=}")
 df_err

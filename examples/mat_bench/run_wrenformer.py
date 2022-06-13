@@ -10,8 +10,8 @@ from matbench.task import MatbenchTask
 
 from aviary.core import TaskType
 from aviary.wrenformer.run import run_wrenformer
+from aviary.wrenformer.utils import merge_json_on_disk
 from examples.mat_bench import DATA_PATHS, MODULE_DIR
-from examples.mat_bench.utils import merge_json_on_disk
 
 
 def run_wrenformer_on_matbench(
