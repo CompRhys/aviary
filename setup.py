@@ -6,7 +6,7 @@ setup(
     author="Rhys Goodall",
     author_email="rhys.goodall@outlook.com",
     url="https://github.com/CompRhys/aviary",
-    description="A Collection of Machine Learning Models for Materials Discovery",
+    description="A collection of machine learning models for materials discovery",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     packages=find_packages(include=["aviary*"]),
@@ -14,6 +14,8 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
@@ -23,7 +25,9 @@ setup(
         "Wyckoff positions",
         "Crystal Structure Prediction",
     ],
-    package_data={"": ["**/*.json"]},  # include all JSON files in the package
+    # if any package at most 2 levels under the aviary namespace contains *.json files,
+    # include them in the package
+    package_data={"aviary": ["**/*.json", "**/**/*.json"]},
     python_requires=">=3.7",
     install_requires=[
         "scipy",
