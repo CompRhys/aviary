@@ -25,7 +25,9 @@ setup(
         "Wyckoff positions",
         "Crystal Structure Prediction",
     ],
-    package_data={"": ["**/*.json"]},  # include all JSON files in the package
+    # if any package at most 2 levels under the aviary namespace contains *.json files,
+    # include them in the package
+    package_data={"aviary": ["**/*.json", "**/**/*.json"]},
     python_requires=">=3.7",
     install_requires=[
         "scipy",
