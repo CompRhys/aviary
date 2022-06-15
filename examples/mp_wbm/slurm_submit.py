@@ -13,7 +13,7 @@ __date__ = "2022-06-13"
 # %% write Python submission file and sbatch it
 epochs = 300
 n_attn_layers = 6
-model_name = f"wrenformer-robust-mean+std-aggregation-{epochs=}-{n_attn_layers=}"
+model_name = f"wrenformer-robust-s2m3-aggregation-{epochs=}-{n_attn_layers=}"
 fold = 0
 n_folds = 1
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
@@ -37,6 +37,8 @@ print("{model_name=}")
 print("{data_path=}")
 
 job_array_id = os.environ.get("SLURM_ARRAY_TASK_ID")
+if job_array_id is not None:
+    job_array_id = int(job_array_id)
 print(f"{{job_array_id=}}")
 
 run_wrenformer_on_mp_wbm(
@@ -45,7 +47,7 @@ run_wrenformer_on_mp_wbm(
     {data_path=},
     {timestamp=},
     test_size=0.05,
-    # fold=(n_folds, int(job_array_id)),
+    # fold=(n_folds, job_array_id),
     {epochs=},
     {n_attn_layers=},
     {checkpoint=},

@@ -49,7 +49,7 @@ def run_wrenformer(
     run_params: dict[str, Any] = None,
     learning_rate: float = 3e-4,
     warmup_steps: int = 10,
-) -> tuple[dict[str, float], dict[str, Any]]:
+) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Run a single matbench task.
 
     Args:
@@ -87,7 +87,7 @@ def run_wrenformer(
 
     Returns:
         tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.
-            2nd dict are the run's hyperparameters.
+            2nd dict are the run's hyperparameters. 3rd is the dataframe with test set predictions.
     """
     if checkpoint not in (None, "local", "wandb"):
         raise ValueError(f"Unknown {checkpoint=}")
@@ -299,4 +299,4 @@ def run_wrenformer(
 
         wandb.finish()
 
-    return test_metrics, run_params
+    return test_metrics, run_params, test_df
