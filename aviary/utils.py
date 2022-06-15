@@ -158,6 +158,7 @@ def initialize_optim(
         tuple[Optimizer, _LRScheduler]: Optimizer and scheduler for given model
     """
     # Select Optimiser
+    optimizer: Optimizer
     if optim == "SGD":
         optimizer = SGD(
             model.parameters(),
