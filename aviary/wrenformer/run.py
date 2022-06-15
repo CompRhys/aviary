@@ -30,15 +30,6 @@ __date__ = "2022-06-12"
 torch.manual_seed(0)  # ensure reproducible results
 
 reg_key, clf_key = "regression", "classification"
-learning_rate = 1e-4
-warmup_steps = 10
-
-
-def lr_lambda(epoch: int) -> float:
-    """Learning rate schedule. Goes up linearly until warmup_steps, then follows a
-    power law decay.
-    """
-    return min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5))
 
 
 @print_walltime(end_desc="run_wrenformer()")
@@ -56,6 +47,8 @@ def run_wrenformer(
     checkpoint: Literal["local", "wandb"] | None = None,
     swa_start=0.7,  # start SWA after 50% of epochs
     run_params: dict[str, Any] = None,
+    learning_rate: float = 3e-4,
+    warmup_steps: int = 10,
 ) -> tuple[dict[str, float], dict[str, Any]]:
     """Run a single matbench task.
 
@@ -86,6 +79,8 @@ def run_wrenformer(
             None to disable SWA. Defaults to 0.7.
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
+        learning_rate (float): The optimizer's learning rate. Defaults to 3e-4.
+        warmup_steps (int): How many warmup steps the scheduler should do. Defaults to 10.
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -170,7 +165,13 @@ def run_wrenformer(
     model.to(device)
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
 
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    # This lambda goes up linearly until warmup_steps, then follows a power law decay.
+    # Acts as a prefactor to the learning rate, i.e. actual_lr = lr_lambda(epoch) *
+    # learning_rate.
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda epoch: min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5)),
+    )
 
     if swa_start is not None:
         swa_model = AveragedModel(model)
