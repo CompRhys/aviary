@@ -71,8 +71,8 @@ def run_wrenformer(
         id_col (str): Name of df column containing material IDs.
         epochs (int): How many epochs to train for. Defaults to 100.
         n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
-        wandb_project (bool): Name of project on Weights and Biases where to log this run.
-            Defaults to None.
+        wandb_project (str | None): Name of Weights and Biases project where to log this run.
+            Defaults to None which means logging is disabled.
         checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
             dicts to disk (local) or upload to wandb. Defaults to None.
             To later copy a wandb checkpoint file to cwd and use it:
