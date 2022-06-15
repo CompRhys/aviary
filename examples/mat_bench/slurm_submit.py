@@ -12,10 +12,12 @@ __date__ = "2022-04-25"
 
 
 # %% write Python submission file and sbatch it
-epochs = 200
+epochs = 300
 n_attn_layers = 6
-model_name = f"wrenformer-mean+std-aggregation-{epochs=}-{n_attn_layers=}"
+model_name = f"wrenformer-robust-s2m3-aggregation-{epochs=}-{n_attn_layers=}"
 folds = list(range(5))
+checkpoint = "wandb"  # None | 'local' | 'wandb'
+learning_rate = 1e-3
 
 if "roost" in model_name.lower():
     # deploy Roost on all tasks
@@ -31,7 +33,7 @@ python_script = f"""import os
 from datetime import datetime
 from itertools import product
 
-from examples.mat_bench.run import run_wrenformer_on_matbench
+from examples.mat_bench.run_wrenformer import run_wrenformer_on_matbench
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
@@ -39,9 +41,11 @@ print(f"{{job_id=}}")
 print("{model_name=}")
 
 job_array_id = os.environ.get("SLURM_ARRAY_TASK_ID")
+if job_array_id is not None:
+    job_array_id = int(job_array_id)
 print(f"{{job_array_id=}}")
 
-dataset_name, fold = list(product({datasets}, {folds}))[int(job_array_id)]
+dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]
 print(f"{{dataset_name=}}\\n{{fold=}}")
 
 run_wrenformer_on_matbench(
@@ -51,6 +55,8 @@ run_wrenformer_on_matbench(
     fold=fold,
     {epochs=},
     {n_attn_layers=},
+    {checkpoint=},
+    {learning_rate=},
 )
 """
 
@@ -71,7 +77,7 @@ slurm_cmd = f"""sbatch
     --gpus-per-node 1
     --chdir {log_dir}
     --array 0-{len(datasets) * len(folds) - 1}
-    --out {model_name}-%A-%a.log
+    --out {timestamp}-{model_name}-%A-%a.log
     --job-name {model_name}
     --wrap '{slurm_setup} python {submit_script}'
 """

@@ -13,11 +13,15 @@ from aviary.wrenformer.run import run_wrenformer
 from aviary.wrenformer.utils import merge_json_on_disk
 from examples.mat_bench import DATA_PATHS, MODULE_DIR
 
+__author__ = "Janosh Riebesell"
+__date__ = "2022-04-11"
+
 
 def run_wrenformer_on_matbench(
     model_name: str,
     dataset_name: str,
     fold: Literal[0, 1, 2, 3, 4],
+    wandb_project: str | None = "matbench",
     **kwargs,
 ) -> None:
     """Run a single matbench task.
@@ -32,6 +36,8 @@ def run_wrenformer_on_matbench(
         timestamp (str): Timestamp to append to the names of JSON files for model predictions
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
+        wandb_project (str | None): Project name to use when logging to wandb. Defaults to "mp-wbm".
+            Set to None to disable logging.
         kwargs: Additional keyword arguments are passed to run_wrenformer(). See its doc string.
 
     Raises:
@@ -42,25 +48,26 @@ def run_wrenformer_on_matbench(
     """
     run_name = f"{model_name}-{dataset_name}-{fold=}"
 
-    df = pd.read_json(DATA_PATHS[dataset_name]).set_index("mbid", drop=False)
+    id_col = "mbid"
+    df = pd.read_json(DATA_PATHS[dataset_name]).set_index(id_col, drop=False)
 
     matbench_task = MatbenchTask(dataset_name, autoload=False)
     matbench_task.df = df
 
-    target_name = matbench_task.metadata.target
+    target = matbench_task.metadata.target
     task_type: TaskType = matbench_task.metadata.task_type
 
     train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
     test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
-    test_metrics, run_params = run_wrenformer(
+    test_metrics, run_params, test_df = run_wrenformer(
         run_name=run_name,
         train_df=train_df,
         test_df=test_df,
-        target_col=target_name,
+        target_col=target,
         task_type=task_type,
-        wandb_project="matbench",
-        id_col=(id_col := "mbid"),
+        wandb_project=wandb_project,
+        id_col=id_col,
         run_params={
             "dataset": dataset_name,
             "fold": fold,
@@ -72,7 +79,7 @@ def run_wrenformer_on_matbench(
     preds_path = f"{MODULE_DIR}/model_preds/{model_name}-{timestamp}.json"
 
     # record model predictions
-    preds_dict = test_df[[id_col, target_name, "predictions"]].to_dict(orient="list")
+    preds_dict = test_df[[id_col, target, f"{target}_pred"]].to_dict(orient="list")
     merge_json_on_disk({dataset_name: {f"fold_{fold}": preds_dict}}, preds_path)
 
     # save model scores to JSON
@@ -99,7 +106,7 @@ if __name__ == "__main__":
             timestamp=timestamp,
             fold=0,
             epochs=10,
-            log_wandb=True,
+            wandb_project="matbench",
             checkpoint=None,
         )
     finally:  # clean up

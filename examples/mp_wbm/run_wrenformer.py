@@ -32,6 +32,7 @@ def run_wrenformer_on_mp_wbm(
         timestamp (str): Will prefix the names of model checkpoint files and other output files.
         wandb_project (str | None): Project name to use when logging to wandb. Defaults to "mp-wbm".
             Set to None to disable logging.
+        kwargs: Additional keyword arguments are passed to run_wrenformer(). See its doc string.
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -41,7 +42,8 @@ def run_wrenformer_on_mp_wbm(
     """
     run_name = f"{model_name}-mp+wbm-{target}"
 
-    df = pd.read_json(data_path).set_index("material_id", drop=False)
+    id_col = "material_id"
+    df = pd.read_json(data_path).set_index(id_col, drop=False)
     df = df.sample(frac=1)  # shuffle samples
 
     if (folds, test_size) == (None, None):
@@ -69,9 +71,10 @@ def run_wrenformer_on_mp_wbm(
         run_name=run_name,
         train_df=train_df,
         test_df=test_df,
+        target_col=target,
         task_type="regression",
         wandb_project=wandb_project,
-        target_col=target,
+        id_col=id_col,
         run_params={
             "data_path": data_path,
         },
