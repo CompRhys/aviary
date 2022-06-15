@@ -63,9 +63,8 @@ class CrystalGraphData(Dataset):
 
         if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_emb = f"{PKG_DIR}/embeddings/element/{elem_emb}.json"
-        else:
-            if not os.path.exists(elem_emb):
-                raise AssertionError(f"{elem_emb} does not exist!")
+        elif not os.path.exists(elem_emb):
+            raise AssertionError(f"{elem_emb} does not exist!")
 
         with open(elem_emb) as f:
             self.elem_features = json.load(f)
