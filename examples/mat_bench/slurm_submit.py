@@ -38,7 +38,7 @@ job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
 print("{model_name=}")
 
-job_array_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
+job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"))
 print(f"{{job_array_id=}}")
 
 dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]
