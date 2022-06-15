@@ -326,13 +326,13 @@ class BaseModelClass(nn.Module, ABC):
 
         epoch_averaged_metrics = {
             target: {
-                metric_key: np.array(values).mean().squeeze()
+                metric_key: np.array(values).mean().squeeze().round(4)
                 for metric_key, values in dct.items()
             }
             for target, dct in epoch_metrics.items()
         }
-        # take sqrt at the end to get correct RMSE (sqrt(a + b) != sqrt(a) + sqrt(b))
-        # per-batch averaged RMSE != RMSE of the full epoch
+        # take sqrt at the end to get correct epoch RMSE
+        # per-batch averaged RMSE != RMSE of full epoch since (sqrt(a + b) != sqrt(a) + sqrt(b))
         for metrics_for_target in epoch_averaged_metrics.values():
             if "MSE" in metrics_for_target:
                 metrics_for_target["RMSE"] = metrics_for_target.pop("MSE") ** 0.5

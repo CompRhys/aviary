@@ -54,7 +54,7 @@ def run_wrenformer(
     n_attn_layers: int = 4,
     wandb_project: str = None,
     checkpoint: Literal["local", "wandb"] | None = None,
-    swa: bool = True,
+    swa_start=0.7,  # start SWA after 50% of epochs
     run_params: dict[str, Any] = None,
 ) -> tuple[dict[str, float], dict[str, Any]]:
     """Run a single matbench task.
@@ -81,8 +81,9 @@ def run_wrenformer(
             checkpoint = wandb.restore("checkpoint.pth", run_path)
             torch.load(checkpoint.name)
             ```
-        swa (bool): Whether to use stochastic weight averaging for training and inference.
-            Defaults to True.
+        swa_start (float | None): When to start using stochastic weight averaging during training.
+            Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
+            None to disable SWA. Defaults to 0.7.
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
 
@@ -171,11 +172,10 @@ def run_wrenformer(
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
-    swa_model = AveragedModel(model)
-    # scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
-    # epoch to start using the SWA model
-    swa_start = epochs // 2  # start at 50% of epochs
-    swa_scheduler = SWALR(optimizer, swa_lr=0.05)
+    if swa_start is not None:
+        swa_model = AveragedModel(model)
+        # scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
+        swa_scheduler = SWALR(optimizer, swa_lr=0.01)
 
     run_params = {
         "epochs": epochs,
@@ -188,6 +188,9 @@ def run_wrenformer(
         "losses": str(loss_dict),
         "training_samples": len(train_df),
         "test_samples": len(test_df),
+        "trainable_params": model.num_params,
+        "swa_start": swa_start,
+        "timestamp": timestamp,
         **(run_params or {}),
     }
 
@@ -212,7 +215,7 @@ def run_wrenformer(
                 test_loader, loss_dict, None, normalizer_dict, action="evaluate"
             )
 
-        if swa and epoch > swa_start:
+        if swa_start is not None and epoch > swa_start * epochs:
             swa_model.update_parameters(model)
             swa_scheduler.step()
         else:
@@ -224,9 +227,8 @@ def run_wrenformer(
             wandb.log({"training": train_metrics, "validation": val_metrics})
 
     # get test set predictions
-    swa_model.eval()
-    model.eval()
-    inference_model = swa_model if swa else model
+    inference_model = swa_model if swa_start is not None else model
+    inference_model.eval()
 
     with torch.no_grad():
         predictions = torch.cat(
@@ -242,7 +244,7 @@ def run_wrenformer(
 
     predictions = predictions.cpu().numpy().squeeze()
     targets = targets.cpu().numpy()
-    test_df[(pred_col := "predictions")] = predictions.tolist()
+    test_df[(pred_col := f"{target_col}_pred")] = predictions.tolist()
 
     test_metrics = get_metrics(targets, predictions, task_type)
     test_metrics["size"] = len(test_df)
@@ -250,9 +252,11 @@ def run_wrenformer(
     # save model checkpoint
     if checkpoint is not None:
         state_dict = {
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": scheduler.state_dict(),
+            "model_state": inference_model.state_dict(),
+            "optimizer_state": optimizer.state_dict(),
+            "scheduler_state": (
+                scheduler if swa_start is None else swa_scheduler
+            ).state_dict(),
             "loss_dict": loss_dict,
             "epoch": epochs,
             "metrics": test_metrics,
@@ -262,13 +266,15 @@ def run_wrenformer(
             checkpoint_path = f"{ROOT}/models/{timestamp}-{run_name}.pth"
             torch.save(state_dict, checkpoint_path)
         if checkpoint == "wandb":
-            assert wandb_project and wandb.run is not None, "wandb.run is None"
+            assert (
+                wandb_project and wandb.run is not None
+            ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
             torch.save(state_dict, f"{wandb.run.dir}/checkpoint.pth")
 
     # record test set metrics and scatter/ROC plots to wandb
     if wandb_project:
         wandb.run.summary["test"] = test_metrics
-        table_cols = ["mbid", target_col, pred_col]
+        table_cols = [id_col, target_col, pred_col]
         if robust:
             table_cols.append("aleat_std")
         table = wandb.Table(dataframe=test_df[table_cols])

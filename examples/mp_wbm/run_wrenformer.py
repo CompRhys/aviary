@@ -29,12 +29,7 @@ def run_wrenformer_on_mp_wbm(
             'robust' to use a robust loss function and have the model learn to predict an aleatoric
             uncertainty.
         data_path (str): Path to a data file to load with pandas.read_json().
-        timestamp (str): Timestamp to append to the names of JSON files for model predictions
-            and performance scores. If the files already exist, results from different datasets
-            or foldss will be merged in.
-        epochs (int): How many epochs to train for. Defaults to 100.
-        n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
-        wandb (bool): Whether to log this run to Weights and Biases. Defaults to True.
+        timestamp (str): Will prefix the names of model checkpoint files and other output files.
         wandb_project (str | None): Project name to use when logging to wandb. Defaults to "mp-wbm".
             Set to None to disable logging.
 
@@ -61,7 +56,7 @@ def run_wrenformer_on_mp_wbm(
             0 <= test_fold_idx < n_folds
         ), f"{test_fold_idx = } must be between 0 and {n_folds - 1}"
 
-        df_splits = np.array_split(df, n_folds)
+        df_splits: list[pd.DataFrame] = np.array_split(df, n_folds)
         test_df = df_splits.pop(test_fold_idx)
         train_df = pd.concat(df_splits)
     if test_size is not None:

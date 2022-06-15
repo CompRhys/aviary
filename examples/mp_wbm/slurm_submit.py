@@ -15,10 +15,11 @@ epochs = 300
 n_attn_layers = 6
 model_name = f"wrenformer-robust-mean+std-aggregation-{epochs=}-{n_attn_layers=}"
 fold = 0
-n_folds = 10
+n_folds = 1
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
 task_type = "regression"
+checkpoint = "wandb"  # None | 'local' | 'wandb'
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
@@ -34,7 +35,7 @@ print(f"{{job_id=}}")
 print("{model_name=}")
 print("{data_path=}")
 
-job_array_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
+job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"))
 print(f"{{job_array_id=}}")
 
 run_wrenformer_on_mp_wbm(
@@ -46,6 +47,7 @@ run_wrenformer_on_mp_wbm(
     # fold=(n_folds, job_array_id),
     {epochs=},
     {n_attn_layers=},
+    {checkpoint=},
 )
 """
 
@@ -65,10 +67,9 @@ slurm_cmd = f"""sbatch
     --nodes 1
     --gpus-per-node 1
     --chdir {log_dir}
-    --array 0-{n_folds - 1}
-    --out {model_name}-%A-%a.log
+    --array 1-{n_folds}
+    --out {timestamp}-{model_name}-%A-%a.log
     --job-name {model_name}
-    --comment '{submit_script}'
     --wrap '{slurm_setup} python {submit_script}'
 """
 
