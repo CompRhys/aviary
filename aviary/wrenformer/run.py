@@ -6,11 +6,11 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from torch import nn
 from torch.optim.swa_utils import SWALR, AveragedModel
 from tqdm import tqdm
 
-import wandb
 from aviary import ROOT
 from aviary.core import Normalizer, TaskType
 from aviary.data import InMemoryDataLoader
