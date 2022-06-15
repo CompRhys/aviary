@@ -27,6 +27,7 @@ jobs:
           pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
           pip install torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+cpu.html
           pip install .[test]
+          cat aviary.egg-info/SOURCES.txt
 
       - name: Run Tests
         run: python -m pytest --capture=no --cov aviary
