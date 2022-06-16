@@ -12,17 +12,34 @@ __date__ = "2022-04-09"
 
 torch.manual_seed(0)  # ensure reproducible results (applies to all tests)
 
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 @pytest.fixture(scope="session")
 def df_matbench_phonons():
-    """Return a pandas dataframe with the data from the Matbench phonons dataset."""
+    """Returns the dataframe for the Matbench phonon DOS peak task."""
 
     df = load_dataset("matbench_phonons")
     df[["lattice", "sites"]] = [get_cgcnn_input(x) for x in df.structure]
-    df["material_id"] = [f"mb_phdos_{i}" for i in range(len(df))]
+    df["material_id"] = [f"mb_phdos_{i+1}" for i in range(len(df))]
+    df = df.set_index("material_id", drop=False)
     df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
 
     df["phdos_clf"] = [1 if x > 450 else 0 for x in df["last phdos peak"]]
+
+    return df
+
+
+@pytest.fixture(scope="session")
+def df_matbench_jdft2d():
+    """Returns the dataframe for the Matbench experimental band gap task."""
+
+    df = load_dataset("matbench_jdft2d")
+    df["material_id"] = [f"mb_jdft2d_{i+1}" for i in range(len(df))]
+    df = df.set_index("material_id", drop=False)
+    df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
+
+    df["wyckoff"] = [get_aflow_label_spglib(x) for x in df.structure]
 
     return df
 
@@ -37,8 +54,3 @@ def df_matbench_phonons_wyckoff(df_matbench_phonons):
     ]
 
     return df_matbench_phonons
-
-
-@pytest.fixture(scope="session")
-def tests_dir():
-    return os.path.dirname(os.path.abspath(__file__))

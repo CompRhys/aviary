@@ -23,7 +23,7 @@ def run_wrenformer_on_matbench(
     fold: Literal[0, 1, 2, 3, 4],
     wandb_project: str | None = "matbench",
     **kwargs,
-) -> None:
+) -> dict[str, float]:
     """Run a single matbench task.
 
     Args:
@@ -44,7 +44,7 @@ def run_wrenformer_on_matbench(
         ValueError: On unknown dataset_name or invalid checkpoint.
 
     Returns:
-        dict[str, dict[str, list[float]]]: The model's test set metrics.
+        dict[str, float]: The model's test set metrics.
     """
     run_name = f"{model_name}-{dataset_name}-{fold=}"
 
@@ -90,25 +90,29 @@ def run_wrenformer_on_matbench(
 
     print(f"scores for {fold = } of task {dataset_name} written to {scores_path}")
 
+    return test_metrics
+
 
 # %%
 if __name__ == "__main__":
     from glob import glob
 
     timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+    # dataset_name = "matbench_expt_is_metal"
+    dataset_name = "matbench_jdft2d"
 
     try:
         # for testing and debugging
-        run_wrenformer_on_matbench(
-            model_name="roostformer-robust-mean+std-aggregation-tmp",
-            # dataset_name="matbench_expt_is_metal",
-            dataset_name="matbench_jdft2d",
+        test_metrics = run_wrenformer_on_matbench(
+            model_name=f"roostformer-{dataset_name}-tmp",
+            dataset_name=dataset_name,
             timestamp=timestamp,
             fold=0,
-            epochs=10,
-            wandb_project="matbench",
-            checkpoint=None,
+            epochs=25,
+            wandb_project=None,
+            verbose=True,
         )
+        print(f"{test_metrics = }")
     finally:  # clean up
         for filename in glob("model_*/*former-*-tmp-*.json"):
             os.remove(filename)

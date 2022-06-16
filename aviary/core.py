@@ -108,6 +108,8 @@ class BaseModelClass(nn.Module, ABC):
             for epoch in range(start_epoch, start_epoch + epochs):
                 self.epoch += 1
                 # Training
+                if verbose:
+                    print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
                 train_metrics = self.evaluate(
                     train_loader,
                     loss_dict=loss_dict,
@@ -121,14 +123,6 @@ class BaseModelClass(nn.Module, ABC):
                     for task, metrics in train_metrics.items():
                         for metric, val in metrics.items():
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch)
-
-                if verbose:
-                    print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
-                    for task, metrics in train_metrics.items():
-                        metrics_str = "".join(
-                            [f"{key} {val:.2f}\t" for key, val in metrics.items()]
-                        )
-                        print(f"Train \t\t: {task} - {metrics_str}")
 
                 # Validation
                 if val_loader is not None:
@@ -149,13 +143,6 @@ class BaseModelClass(nn.Module, ABC):
                                 writer.add_scalar(
                                     f"{task}/validation/{metric}", val, epoch
                                 )
-
-                    if verbose:
-                        for task, metrics in val_metrics.items():
-                            metrics_str = "".join(
-                                [f"{key} {val:.2f}\t" for key, val in metrics.items()]
-                            )
-                            print(f"Validation \t: {task} - {metrics_str}")
 
                     # TODO test all tasks to see if they are best,
                     # save a best model if any is best.
@@ -228,6 +215,7 @@ class BaseModelClass(nn.Module, ABC):
         normalizer_dict: Mapping[str, Normalizer | None],
         action: Literal["train", "evaluate"] = "train",
         verbose: bool = False,
+        pbar: bool = False,
     ) -> dict[str, dict[str, float]]:
         """Evaluate the model.
 
@@ -241,6 +229,7 @@ class BaseModelClass(nn.Module, ABC):
             action ("train" | "evaluate"], optional): Whether to track gradients depending on
                 whether we are carrying out a training or validation pass. Defaults to "train".
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
+            pbar (bool, optional): Whether to display a progress bar. Defaults to False.
 
         Returns:
             dict[str, dict["Loss" | "MAE" | "RMSE" | "Accuracy" | "F1", np.ndarray]]: nested
@@ -258,9 +247,10 @@ class BaseModelClass(nn.Module, ABC):
         )
 
         # *_ discards identifiers like material_id and formula which we don't need when training
-        # disable output in non-tty (e.g. log files) https://git.io/JnBOi
+        # disable=None means suppress output in non-tty (e.g. CI/log files) but keep in tty mode
+        # https://git.io/JnBOi
         for inputs, targets_list, *_ in tqdm(
-            data_loader, disable=True if not verbose else None
+            data_loader, disable=None if pbar else True
         ):
             # compute output
             outputs = self(*inputs)
@@ -335,6 +325,12 @@ class BaseModelClass(nn.Module, ABC):
             avrg_mse = avrg_metrics[target].pop("MSE", None)
             if avrg_mse:
                 avrg_metrics[target]["RMSE"] = (avrg_mse**0.5).round(4)
+
+            if verbose:
+                metrics_str = " ".join(
+                    f"{key:>8} {val:<8.2f}" for key, val in avrg_metrics[target].items()
+                )
+                print(f"{action:>9}: {target} {metrics_str}")
 
         return avrg_metrics
 
@@ -619,6 +615,7 @@ def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.
         torch.Tensor: Same shape as x, except dimension dim reduced.
     """
     # mask should be True where x is valid and False where x should be masked
-    x_nan = torch.where(mask, x, torch.nan)
+    x_nan = torch.where(mask, x, torch.tensor(float("nan")))
+    # torch.tensor(float("nan")) can be simplified to torch.nan in torch>=1.12
 
     return x_nan.nanmean(dim=dim)
