@@ -69,9 +69,8 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     Returns:
         Tensor: Shape (n_equiv_wyksets, n_wyckoff_sites, n_features).
     """
-    spg_num, elem_weights, elements, augmented_wyckoffs = parse_aflow_wyckoff_str(
-        wyckoff_str
-    )
+    parsed_output = parse_aflow_wyckoff_str(wyckoff_str)
+    spg_num, wyckoff_site_multiplicities, elements, augmented_wyckoffs = parsed_output
 
     symmetry_features = torch.tensor(
         [
@@ -84,7 +83,9 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     element_features = torch.tensor([elem_features[el] for el in elements])
     element_features = element_features[None, ...].repeat(n_augments, 1, 1)
 
-    element_ratios = torch.tensor(elem_weights)[None, :, None] / sum(elem_weights)
+    element_ratios = torch.tensor(wyckoff_site_multiplicities)[None, :, None] / sum(
+        wyckoff_site_multiplicities
+    )
     element_ratios = element_ratios.repeat(n_augments, 1, 1)
 
     combined_features = torch.cat(
