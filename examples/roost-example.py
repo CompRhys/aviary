@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split as split
 
+from aviary import ROOT
 from aviary.roost.data import CompositionData, collate_batch
 from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
@@ -161,7 +162,7 @@ def main(  # noqa: C901
     }
 
     if resume:
-        resume = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
+        resume = f"{ROOT}/models/{model_name}/checkpoint-r{run_id}.pth.tar"
 
     restart_params = {
         "resume": resume,
@@ -277,7 +278,7 @@ def input_parser():
         help="Preset embedding name or path to JSON file",
     )
 
-    # dataloader inputs
+    # data loader inputs
     parser.add_argument(
         "--workers",
         default=0,

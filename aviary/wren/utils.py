@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from itertools import chain, groupby, permutations, product
 from operator import itemgetter
 from os.path import abspath, dirname, join
@@ -11,23 +12,25 @@ from string import ascii_uppercase, digits
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
-from pymatgen.io.vasp import Poscar
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
+if sys.version_info < (3, 8):
+    from typing_extensions import Literal
+else:
+    from typing import Literal
+
 
 module_dir = dirname(abspath(__file__))
 
-mult_file = join(module_dir, "wp-mult.json")
-param_file = join(module_dir, "wp-params.json")
-relab_file = join(module_dir, "wp-relab.json")
+with open(join(module_dir, "wp-mult.json")) as file:
+    # dictionary mapping Wyckoff letters in a given space group to their multiplicity
+    wyckoff_multiplicity_dict = json.load(file)
 
-with open(mult_file) as f:
-    mult_dict = json.load(f)
+with open(join(module_dir, "wp-params.json")) as file:
+    param_dict = json.load(file)
 
-with open(param_file) as f:
-    param_dict = json.load(f)
-
-with open(relab_file) as f:
-    relab_dict = json.load(f)
+with open(join(module_dir, "wp-relab.json")) as file:
+    relab_dict = json.load(file)
 
 relab_dict = {
     spg: [{int(k): l for k, l in val.items()} for val in vals]
@@ -56,93 +59,133 @@ cry_param_dict = {
 remove_digits = str.maketrans("", "", digits)
 
 
-def get_aflow_label_aflow(struct: Structure, aflow_executable: str = None) -> str:
-    """Get AFLOW prototype label for pymatgen Structure
+def get_aflow_label_aflow(
+    struct: Structure,
+    aflow_executable: str = None,
+    errors: Literal["raise", "annotate", "ignore"] = "raise",
+) -> str:
+    """Get Aflow prototype label for a pymatgen Structure. Make sure you're running a recent
+    version of the aflow CLI as there's been several breaking changes. This code was tested
+    under v3.2.12.
+
+    Install guide: https://aflow.org/install-aflow/#install_aflow
+        http://aflow.org/install-aflow/install-aflow.sh -o install-aflow.sh
+        chmod 555 install-aflow.sh
+        ./install-aflow.sh
+
+    Args:
+        struct (Structure): pymatgen Structure
+        aflow_executable (str): path to aflow executable. Defaults to which("aflow").
+        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
+            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
+            with 'invalid <reason>: '.
+
+    Raises:
+        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
+            expected composition.
 
     Returns:
-        str: AFLOW prototype label
+        str: Aflow prototype label
     """
     if aflow_executable is None:
         aflow_executable = which("aflow")
 
     if which(aflow_executable or "") is None:
         raise FileNotFoundError(
-            "AFLOW could not found, please specify path to its binary with "
+            "AFLOW could not be found, please specify path to its binary with "
             "aflow_executable='...'"
         )
 
-    poscar = Poscar(struct)
-
-    cmd = f"{aflow_executable} --prototype --print=json cat"
+    cmd = f"{aflow_executable} --prototype --print=json cat".split()
 
     output = subprocess.run(
         cmd,
-        input=poscar.get_string(),
+        input=struct.to(fmt="poscar"),
         text=True,
         capture_output=True,
-        shell=True,
         check=True,
     )
 
     aflow_proto = json.loads(output.stdout)
 
-    aflow_label = aflow_proto["aflow_label"]
-
-    # to be consistent with spglib and wren embeddings
-    aflow_label = aflow_label.replace("alpha", "A")
+    aflow_label = aflow_proto["aflow_prototype_label"]
 
     # check that multiplicities satisfy original composition
-    symm = aflow_label.split("_")
-    spg_no = symm[2]
-    wyks = symm[3:]
-    elems = poscar.site_symbols
+    _, _, spg_no, *wyks = aflow_label.split("_")
+    elems = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
-    subst = r"1\g<1>"
+    subst = r"1\g<1>"  # normalize Wyckoff letters to start with 1 if missing digit
     for el, wyk in zip(elems, wyks):
         wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
         sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
         elem_dict[el] = sum(
-            float(mult_dict[spg_no][w]) * float(n)
+            float(wyckoff_multiplicity_dict[spg_no][w]) * float(n)
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
         )
 
-    aflow_label += ":" + "-".join(elems)
+    full_label = f"{aflow_label}:{'-'.join(elems)}"
 
-    eqi_comp = Composition(elem_dict)
-    if not eqi_comp.reduced_formula == struct.composition.reduced_formula:
-        return f"Invalid WP Multiplicities - {aflow_label}"
+    observed_formula = Composition(elem_dict).reduced_formula
+    expected_formula = struct.composition.reduced_formula
+    if observed_formula != expected_formula:
+        if errors == "raise":
+            raise ValueError(
+                f"Invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
+                f"to be {expected_formula}"
+            )
+        elif errors == "annotate":
+            return f"invalid multiplicities: {full_label}"
 
-    return aflow_label
+    return full_label
 
 
-def get_aflow_label_spglib(struct: Structure) -> str:
+def get_aflow_label_spglib(
+    struct: Structure,
+    errors: Literal["raise", "annotate", "ignore"] = "ignore",
+) -> str:
     """Get AFLOW prototype label for pymatgen Structure.
 
     Args:
-        struct (Structure): pymatgen Structure object
+        struct (Structure): pymatgen Structure object.
+        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
+            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
+            with 'invalid <reason>: '.
 
     Returns:
         str: AFLOW prototype label
     """
     spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
-    aflow = get_aflow_label_from_spga(spga)
+    aflow_label_with_chemsys = get_aflow_label_from_spga(spga, errors)
 
     # try again with refined structure if it initially fails
     # NOTE structures with magmoms fail unless all have same magmom
-    if "Invalid" in aflow:
+    if "Invalid" in aflow_label_with_chemsys:
         spga = SpacegroupAnalyzer(
             spga.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
         )
-        aflow = get_aflow_label_from_spga(spga)
+        aflow_label_with_chemsys = get_aflow_label_from_spga(spga, errors)
 
-    return aflow
+    return aflow_label_with_chemsys
 
 
-def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
+def get_aflow_label_from_spga(
+    spga: SpacegroupAnalyzer,
+    errors: Literal["raise", "annotate", "ignore"] = "raise",
+) -> str:
     """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
-        spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object
+        spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
+        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
+            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
+            with 'invalid <reason>: '.
+
+    Raises:
+        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
+            expected composition.
+
+    Raises:
+        ValueError: if Wyckoff multiplicities do not add up to expected composition.
 
     Returns:
         str: AFLOW prototype labels
@@ -161,7 +204,9 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
     elem_wyks = []
     for el, g in groupby(equivs, key=lambda x: x[1]):  # sort alphabetically by element
         lg = list(g)
-        elem_dict[el] = sum(float(mult_dict[str(spg_no)][e[2]]) for e in lg)
+        elem_dict[el] = sum(
+            float(wyckoff_multiplicity_dict[str(spg_no)][e[2]]) for e in lg
+        )
         wyks = ""
         for wyk, w in groupby(
             lg, key=lambda x: x[2]
@@ -182,16 +227,23 @@ def get_aflow_label_from_spga(spga: SpacegroupAnalyzer) -> str:
 
     prototype_form = prototype_formula(sym_struct.composition)
 
-    aflow_label = (
-        f"{prototype_form}_{pearson}_{spg_no}_{canonical}:"
-        f"{sym_struct.composition.chemical_system}"
+    chem_sys = sym_struct.composition.chemical_system
+    aflow_label_with_chemsys = (
+        f"{prototype_form}_{pearson}_{spg_no}_{canonical}:{chem_sys}"
     )
 
-    eqi_comp = Composition(elem_dict)
-    if not eqi_comp.reduced_formula == sym_struct.composition.reduced_formula:
-        return f"Invalid WP Multiplicities - {aflow_label}"
+    observed_formula = Composition(elem_dict).reduced_formula
+    expected_formula = sym_struct.composition.reduced_formula
+    if observed_formula != expected_formula:
+        if errors == "raise":
+            raise ValueError(
+                f"Invalid WP multiplicities - {aflow_label_with_chemsys}, expected "
+                f"{observed_formula} to be {expected_formula}"
+            )
+        elif errors == "annotate":
+            return f"invalid multiplicities: {aflow_label_with_chemsys}"
 
-    return aflow_label
+    return aflow_label_with_chemsys
 
 
 def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
@@ -314,7 +366,8 @@ def count_wyks(aflow_label: str) -> int:
 
 
 def count_params(aflow_label: str) -> int:
-    """Count number of parameters coarse-grained in Wyckoff representation.
+    """Count number of free parameters coarse-grained in Wyckoff representation: how many
+    degrees of freedom would remain to optimize during a crystal structure relaxation.
 
     Args:
         aflow_label (str): AFLOW-style prototype label with appended chemical system
@@ -324,7 +377,7 @@ def count_params(aflow_label: str) -> int:
     """
     num_params = 0
 
-    aflow_label, _ = aflow_label.split(":")
+    aflow_label, _ = aflow_label.split(":")  # chop off chemical system
     _, pearson, spg, *wyks = aflow_label.split("_")
 
     num_params += cry_param_dict[pearson[0]]
@@ -406,3 +459,12 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     # TODO: how to tie break when the scores are the same?
     # currently done by alphabetical
     return "_".join((c_anom, pearson, spg, canonical[0][1]))
+
+
+def count_distinct_wyckoff_letters(aflow_str: str) -> int:
+    """Count number of distinct Wyckoff letters in Wyckoff representation."""
+    aflow_str, _ = aflow_str.split(":")  # drop chemical system
+    _, _, _, wyckoff_letters = aflow_str.split("_", 3)  # drop prototype, Pearson, spg
+    wyckoff_letters = wyckoff_letters.translate(remove_digits).replace("_", "")
+    n_uniq = len(set(wyckoff_letters))
+    return n_uniq
