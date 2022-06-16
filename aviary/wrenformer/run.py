@@ -44,7 +44,7 @@ def run_wrenformer(
     n_attn_layers: int = 4,
     wandb_project: str = None,
     checkpoint: Literal["local", "wandb"] | None = None,
-    swa_start=0.7,  # start SWA after 50% of epochs
+    swa_start=0.7,
     run_params: dict[str, Any] = None,
     learning_rate: float = 3e-4,
     batch_size: int = 128,

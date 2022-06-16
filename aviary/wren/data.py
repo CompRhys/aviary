@@ -103,18 +103,26 @@ class WyckoffData(Dataset):
         wyckoff_str = row[self.inputs]
         material_ids = row[self.identifiers].to_list()
 
-        spg_no, weights, elements, aug_wyks = parse_aflow_wyckoff_str(wyckoff_str)
-        weights = np.atleast_2d(weights).T / np.sum(weights)
+        parsed_output = parse_aflow_wyckoff_str(wyckoff_str)
+        spg_num, wyk_site_multiplcities, elements, augmented_wyks = parsed_output
+
+        wyk_site_multiplcities = np.atleast_2d(wyk_site_multiplcities).T / np.sum(
+            wyk_site_multiplcities
+        )
 
         try:
-            elem_fea = np.vstack([self.elem_features[el] for el in elements])
+            element_features = np.vstack([self.elem_features[el] for el in elements])
         except AssertionError:
             print(f"Failed to process elements for {material_ids}")
             raise
 
         try:
-            sym_fea = np.vstack(
-                [self.sym_features[spg_no][wyk] for wyks in aug_wyks for wyk in wyks]
+            symmetry_features = np.vstack(
+                [
+                    self.sym_features[spg_num][wyk]
+                    for wyckoff_sites in augmented_wyks
+                    for wyk in wyckoff_sites
+                ]
             )
         except AssertionError:
             print(f"Failed to process Wyckoff positions for {material_ids}")
@@ -129,15 +137,15 @@ class WyckoffData(Dataset):
 
         self_aug_fea_idx = []
         nbr_aug_fea_idx = []
-        n_aug = len(aug_wyks)
+        n_aug = len(augmented_wyks)
         for i in range(n_aug):
             self_aug_fea_idx += [x + i * n_wyks for x in self_idx]
             nbr_aug_fea_idx += [x + i * n_wyks for x in nbr_idx]
 
         # convert all data to tensors
-        mult_weights = Tensor(weights)
-        elem_fea = Tensor(elem_fea)
-        sym_fea = Tensor(sym_fea)
+        wyckoff_weights = Tensor(wyk_site_multiplcities)
+        element_features = Tensor(element_features)
+        symmetry_features = Tensor(symmetry_features)
         self_idx = LongTensor(self_aug_fea_idx)
         nbr_idx = LongTensor(nbr_aug_fea_idx)
 
@@ -149,7 +157,7 @@ class WyckoffData(Dataset):
                 targets.append(LongTensor([int(self.df.iloc[idx][name])]))
 
         return (
-            (mult_weights, elem_fea, sym_fea, self_idx, nbr_idx),
+            (wyckoff_weights, element_features, symmetry_features, self_idx, nbr_idx),
             targets,
             *material_ids,
         )
@@ -251,14 +259,14 @@ def parse_aflow_wyckoff_str(
         aflow_label (str): AFLOW-style prototype string with appended chemical system
 
     Returns:
-        tuple[str, list[float], list[str], list[str]]: spacegroup number, element weights,
-            elements symbols and equivalent wyckoff sets
+        tuple[str, list[float], list[str], list[str]]: spacegroup number, Wyckoff site
+            multiplicities, elements symbols and equivalent wyckoff sets
     """
     proto, chemsys = aflow_label.split(":")
     elems = chemsys.split("-")
     _, _, spg_no, *wyckoff_letters = proto.split("_")
 
-    element_weights = []
+    wyckoff_site_multiplicities = []
     elements = []
     wyckoff_set = []
 
@@ -275,7 +283,9 @@ def parse_aflow_wyckoff_str(
             m = int(n)
             elements.extend([el] * m)
             wyckoff_set.extend([l] * m)
-            element_weights.extend([float(wyckoff_multiplicity_dict[spg_no][l])] * m)
+            wyckoff_site_multiplicities.extend(
+                [float(wyckoff_multiplicity_dict[spg_no][l])] * m
+            )
 
     # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of high
     # memory use. Can be turned off by commenting out the for loop and returning
@@ -290,4 +300,4 @@ def parse_aflow_wyckoff_str(
 
     augmented_wyckoff_set = list(set(augmented_wyckoff_set))
 
-    return spg_no, element_weights, elements, augmented_wyckoff_set
+    return spg_no, wyckoff_site_multiplicities, elements, augmented_wyckoff_set

@@ -155,17 +155,17 @@ def get_aflow_label_spglib(
         str: AFLOW prototype label
     """
     spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
-    aflow = get_aflow_label_from_spga(spga, errors)
+    aflow_label_with_chemsys = get_aflow_label_from_spga(spga, errors)
 
     # try again with refined structure if it initially fails
     # NOTE structures with magmoms fail unless all have same magmom
-    if "Invalid" in aflow:
+    if "Invalid" in aflow_label_with_chemsys:
         spga = SpacegroupAnalyzer(
             spga.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
         )
-        aflow = get_aflow_label_from_spga(spga, errors)
+        aflow_label_with_chemsys = get_aflow_label_from_spga(spga, errors)
 
-    return aflow
+    return aflow_label_with_chemsys
 
 
 def get_aflow_label_from_spga(
@@ -228,20 +228,22 @@ def get_aflow_label_from_spga(
     prototype_form = prototype_formula(sym_struct.composition)
 
     chem_sys = sym_struct.composition.chemical_system
-    aflow_label = f"{prototype_form}_{pearson}_{spg_no}_{canonical}:{chem_sys}"
+    aflow_label_with_chemsys = (
+        f"{prototype_form}_{pearson}_{spg_no}_{canonical}:{chem_sys}"
+    )
 
     observed_formula = Composition(elem_dict).reduced_formula
     expected_formula = sym_struct.composition.reduced_formula
     if observed_formula != expected_formula:
         if errors == "raise":
             raise ValueError(
-                f"Invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
-                f"to be {expected_formula}"
+                f"Invalid WP multiplicities - {aflow_label_with_chemsys}, expected "
+                f"{observed_formula} to be {expected_formula}"
             )
         elif errors == "annotate":
-            return f"invalid multiplicities: {aflow_label}"
+            return f"invalid multiplicities: {aflow_label_with_chemsys}"
 
-    return aflow_label
+    return aflow_label_with_chemsys
 
 
 def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
