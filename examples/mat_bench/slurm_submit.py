@@ -43,9 +43,7 @@ job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
 print("{model_name=}")
 
-job_array_id = os.environ.get("SLURM_ARRAY_TASK_ID")
-if job_array_id is not None:
-    job_array_id = int(job_array_id)
+job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"), 0)
 print(f"{{job_array_id=}}")
 
 dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]
