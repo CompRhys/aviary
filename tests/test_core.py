@@ -39,7 +39,7 @@ skipif CI can be removed once 1.12 is released as stable
 @pytest.mark.skipif("CI" in os.environ, reason=reason)
 def test_masked_mean():
     # test 1d tensor
-    x1 = torch.arange(5)
+    x1 = torch.arange(5).float()
     mask1 = torch.tensor([0, 1, 0, 1, 0]).bool()
     assert masked_mean(x1, mask1) == 2
 
@@ -56,7 +56,7 @@ def test_masked_mean():
 @pytest.mark.skipif("CI" in os.environ, reason=reason)
 def test_masked_std():
     # test 1d tensor
-    x1 = torch.arange(5)
+    x1 = torch.arange(5).float()
     mask1 = torch.tensor([0, 1, 0, 1, 0]).bool()
     assert masked_std(x1, mask1) == 1
 
@@ -72,7 +72,7 @@ def test_masked_std():
     for xi, mask in zip(rand_floats, rand_masks):
         for dim in (0, 1):
             out = masked_std(xi, mask, dim=dim)
-            xi_nan = torch.where(mask, xi, torch.nan)
+            xi_nan = torch.where(mask, xi, torch.tensor(float("nan")))
             mean = xi_nan.nanmean(dim=dim)
             std = (xi_nan - mean.unsqueeze(dim=dim)).pow(2).nanmean(dim=dim).sqrt()
 

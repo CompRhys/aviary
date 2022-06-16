@@ -21,7 +21,7 @@ def run_wrenformer_on_mp_wbm(
     test_size: float | None = None,
     wandb_project: str | None = "mp-wbm",
     **kwargs,
-) -> None:
+) -> dict[str, float]:
     """Run a single matbench task.
 
     Args:
@@ -38,7 +38,7 @@ def run_wrenformer_on_mp_wbm(
         ValueError: On unknown dataset_name or invalid checkpoint.
 
     Returns:
-        dict[str, dict[str, list[float]]]: The model's test set metrics.
+        dict[str, float]: The model's test set metrics.
     """
     run_name = f"{model_name}-mp+wbm-{target}"
 
@@ -67,7 +67,7 @@ def run_wrenformer_on_mp_wbm(
         train_df = df.sample(frac=1 - test_size, random_state=0)
         test_df = df.drop(train_df.index)
 
-    run_wrenformer(
+    test_metrics, *_ = run_wrenformer(
         run_name=run_name,
         train_df=train_df,
         test_df=test_df,
@@ -81,14 +81,16 @@ def run_wrenformer_on_mp_wbm(
         **kwargs,
     )
 
+    return test_metrics
+
 
 # %%
 if __name__ == "__main__":
     timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
 
     # for testing and debugging
-    run_wrenformer_on_mp_wbm(
-        model_name="wrenformer-robust-mean+std-aggregation-tmp",
+    test_metrics = run_wrenformer_on_mp_wbm(
+        model_name="wrenformer-robust-tmp",
         target="e_form",
         data_path=f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz",
         fold=0,
@@ -99,3 +101,4 @@ if __name__ == "__main__":
         swa=True,
         wandb_project=None,
     )
+    print(f"{test_metrics=}")

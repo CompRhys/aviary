@@ -9,7 +9,6 @@ import torch
 import wandb
 from torch import nn
 from torch.optim.swa_utils import SWALR, AveragedModel
-from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.core import Normalizer, TaskType
@@ -40,16 +39,18 @@ def run_wrenformer(
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
     target_col: str,
+    epochs: int,
     id_col: str = "material_id",
-    epochs: int = 100,
     n_attn_layers: int = 4,
     wandb_project: str = None,
     checkpoint: Literal["local", "wandb"] | None = None,
     swa_start=0.7,  # start SWA after 50% of epochs
     run_params: dict[str, Any] = None,
     learning_rate: float = 3e-4,
+    batch_size: int = 128,
     warmup_steps: int = 10,
     embedding_aggregations: Sequence[str] = ("mean",),
+    verbose: bool = False,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Run a single matbench task.
 
@@ -81,10 +82,12 @@ def run_wrenformer(
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
         learning_rate (float): The optimizer's learning rate. Defaults to 3e-4.
+        batch_size (int): The mini-batch size during training. Defaults to 128.
         warmup_steps (int): How many warmup steps the scheduler should do. Defaults to 10.
         embedding_aggregations (list[str]): Aggregations to apply to the learned embedding returned
             by the transformer encoder before passing into the ResidualNetwork. One or more of
             ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
+        verbose (bool): Whether to print progress and metrics to stdout. Defaults to False.
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -137,7 +140,10 @@ def run_wrenformer(
         inputs[idx] = tensor.to(device)
 
     train_loader = InMemoryDataLoader(
-        [inputs, targets, ids], batch_size=128, shuffle=True, collate_fn=collate_batch
+        [inputs, targets, ids],
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=collate_batch,
     )
 
     features, targets, ids = (test_df[x] for x in ["features", target_col, id_col])
@@ -186,6 +192,7 @@ def run_wrenformer(
     run_params = {
         "epochs": epochs,
         "learning_rate": learning_rate,
+        "batch_size": batch_size,
         "n_attn_layers": n_attn_layers,
         "target": target_col,
         "warmup_steps": warmup_steps,
@@ -212,14 +219,26 @@ def run_wrenformer(
             config=run_params,
         )
 
-    for epoch in tqdm(range(epochs)):
+    for epoch in range(epochs):
+        if verbose:
+            print(f"Epoch {epoch + 1}/{epochs}")
         train_metrics = model.evaluate(
-            train_loader, loss_dict, optimizer, normalizer_dict, action="train"
+            train_loader,
+            loss_dict,
+            optimizer,
+            normalizer_dict,
+            action="train",
+            verbose=verbose,
         )
 
         with torch.no_grad():
             val_metrics = model.evaluate(
-                test_loader, loss_dict, None, normalizer_dict, action="evaluate"
+                test_loader,
+                loss_dict,
+                None,
+                normalizer_dict,
+                action="evaluate",
+                verbose=verbose,
             )
 
         if swa_start is not None and epoch > swa_start * epochs:
@@ -260,7 +279,7 @@ def run_wrenformer(
     test_df[(pred_col := f"{target_col}_pred")] = predictions.tolist()
 
     test_metrics = get_metrics(targets, predictions, task_type)
-    test_metrics["size"] = len(test_df)
+    test_metrics["test_size"] = len(test_df)
 
     # save model checkpoint
     if checkpoint is not None:

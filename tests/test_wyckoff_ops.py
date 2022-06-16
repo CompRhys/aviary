@@ -12,10 +12,12 @@ from aviary.wren.utils import (
     get_isopointal_proto_from_aflow,
 )
 
+from .conftest import TEST_DIR
 
-def test_get_aflow_label_spglib(tests_dir):
+
+def test_get_aflow_label_spglib():
     """Check that spglib gives correct Aflow label for esseneite"""
-    struct = Structure.from_file(f"{tests_dir}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
+    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
     assert get_aflow_label_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
 
@@ -63,9 +65,9 @@ aflow_cli = which("aflow")
 
 
 @pytest.mark.skipif(aflow_cli is None, reason="aflow CLI not installed")
-def test_get_aflow_label_aflow(tests_dir):
+def test_get_aflow_label_aflow():
     """Check we extract corred correct aflow label for esseneite from  Aflow CLI"""
-    struct = Structure.from_file(f"{tests_dir}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
+    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
     out = get_aflow_label_aflow(struct, aflow_cli)
     expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
