@@ -88,7 +88,7 @@ def run_wrenformer_on_matbench(
     scores_dict["params"] = run_params
     merge_json_on_disk(scores_dict, scores_path)
 
-    print(f"scores for {fold = } of {dataset_name} written to {scores_path}")
+    print(f"scores for {fold = } of task {dataset_name} written to {scores_path}")
 
 
 # %%

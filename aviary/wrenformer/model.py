@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable, Sequence
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -35,6 +37,7 @@ class Wrenformer(BaseModelClass):
         trunk_hidden: list[int] = [1024, 512],
         out_hidden: list[int] = [256, 128, 64],
         robust: bool = False,
+        embedding_aggregations: Sequence[str] = ("mean",),
         **kwargs,
     ) -> None:
         """Initialize the Wrenformer model.
@@ -57,6 +60,9 @@ class Wrenformer(BaseModelClass):
                 target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
                 the sample) which can be used with a robust loss function to attenuate the weighting
                 of uncertain samples.
+            embedding_aggregations (list[str]): Aggregations to apply to the learned embedding
+                returned by the transformer encoder before passing into the ResidualNetwork. One or
+                more of ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
         """
         super().__init__(robust=robust, **kwargs)
 
@@ -73,9 +79,10 @@ class Wrenformer(BaseModelClass):
         if self.robust:
             n_targets = [2 * n for n in n_targets]
 
-        n_aggregators = 2  # number of embedding aggregation functions
+        self.embedding_aggregations = embedding_aggregations
         self.trunk_nn = ResidualNetwork(
-            input_dim=n_aggregators * d_model,
+            # len(embedding_aggregations) = number of catted tensors in aggregated_embeddings below
+            input_dim=len(embedding_aggregations) * d_model,
             output_dim=out_hidden[0],
             hidden_layer_dims=trunk_hidden,
         )
@@ -123,18 +130,25 @@ class Wrenformer(BaseModelClass):
         # into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
         inv_mask: torch.BoolTensor = ~mask[..., None]
-        # sum_agg = (embeddings * inv_mask).sum(dim=1)
 
-        # # replace padded values with +/-inf to exclude them from min/max
-        # min_agg, _ = torch.where(inv_mask, embeddings, float("inf")).min(dim=1)
-        # max_agg, _ = torch.where(inv_mask, embeddings, float("-inf")).max(dim=1)
-        mean_agg = masked_mean(embeddings, inv_mask, dim=1)
-        std_agg = masked_std(embeddings, inv_mask, dim=1)
-
-        # Sum+Std+Min+Max+Mean: we call this S2M3 aggregation
-        aggregated_embeddings = torch.cat([mean_agg, std_agg], dim=1)
+        aggregation_funcs = [aggregators[key] for key in self.embedding_aggregations]
+        aggregated_embeddings = torch.cat(
+            [func(embeddings, inv_mask, 1) for func in aggregation_funcs], dim=1
+        )
 
         # main body of the feed-forward NN jointly used by all multitask objectives
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))
 
         return tuple(output_nn(predictions) for output_nn in self.output_nns)
+
+
+# using all at once we call this S2M3 aggregation
+aggregators: dict[str, Callable[[Tensor, BoolTensor, int], Tensor]] = {
+    "mean": masked_mean,
+    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
+    "std": masked_std,
+    # replace padded values with +/-inf to make sure min()/max() ignore them
+    "min": lambda x, mask, dim: torch.where(mask, x, float("inf")).min(dim=dim)[0],
+    # 1st ret val = max, 2nd ret val = max indices
+    "max": lambda x, mask, dim: torch.where(mask, x, float("-inf")).max(dim=dim)[0],
+}
