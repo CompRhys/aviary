@@ -24,13 +24,14 @@ setup(
         "Machine Learning",
         "Wyckoff positions",
         "Crystal Structure Prediction",
+        "Self-Attention",
+        "Transformer",
     ],
     # if any package at most 2 levels under the aviary namespace contains *.json files,
     # include them in the package
     package_data={"aviary": ["**/*.json", "**/**/*.json"]},
     python_requires=">=3.7",
     install_requires=[
-        "scipy",
         "tqdm",
         "torch",
         "numpy",
@@ -40,6 +41,8 @@ setup(
         "scikit_learn",
         "tensorboard",
         "typing_extensions;python_version<'3.8'",
+        "protobuf<4.21.0",  # temporary fix this issue:
+        # https://github.com/PyTorchLightning/pytorch-lightning/issues/13159
     ],
     extras_require={
         "test": ["pytest", "pytest-cov", "matminer"],

@@ -6,23 +6,30 @@ import shutil
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from itertools import chain
-from typing import Any
+from typing import Any, Callable, Mapping
 
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import f1_score
 from torch import Tensor
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.autonotebook import tqdm
 
+from aviary import ROOT
+from aviary.data import InMemoryDataLoader
+
 if sys.version_info < (3, 8):
     from typing_extensions import Literal
 else:
     from typing import Literal
+
+try:
+    import wandb
+except ImportError:
+    wandb = None  # type: ignore
 
 
 TaskType = Literal["regression", "classification"]
@@ -35,65 +42,63 @@ class BaseModelClass(nn.Module, ABC):
         self,
         task_dict: dict[str, TaskType],
         robust: bool,
-        device: type[torch.device] | Literal["cuda", "cpu"] | None = None,
-        epoch: int = 1,
+        epoch: int = 0,
         best_val_scores: dict[str, float] = None,
     ) -> None:
         """Store core model parameters.
 
         Args:
             task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function
-            device (torch.device | "cuda" | "cpu"): Device the model will run on.
-            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 1.
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
+            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 0.
             best_val_scores (dict[str, float], optional): Validation score to use for early
                 stopping. Defaults to None.
         """
         super().__init__()
         self.task_dict = task_dict
-        self.target_names = list(task_dict.keys())
+        self.target_names = list(task_dict)
         self.robust = robust
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
         self.epoch = epoch
         self.best_val_scores = best_val_scores or {}
         self.es_patience = 0
 
-        self.model_params = {"task_dict": task_dict}
+        self.model_params: dict[str, Any] = {"task_dict": task_dict}
 
     def fit(  # noqa: C901
         self,
-        train_generator: DataLoader,
-        val_generator: DataLoader,
+        train_loader: DataLoader | InMemoryDataLoader,
+        val_loader: DataLoader | InMemoryDataLoader,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler._LRScheduler,
         epochs: int,
-        criterion_dict: dict[str, nn.Module],
-        normalizer_dict: dict[str, Normalizer],
+        loss_dict: Mapping[str, tuple[TaskType, Callable]],
+        normalizer_dict: Mapping[str, Normalizer | None],
         model_name: str,
         run_id: int,
         checkpoint: bool = True,
-        writer: SummaryWriter = None,
+        writer: Literal["wandb"] | SummaryWriter | None = None,
         verbose: bool = True,
         patience: int = None,
     ) -> None:
-        """Convenience class to carry out training loop.
+        """Ctrl-C interruptible training method.
 
         Args:
-            train_generator (DataLoader): Dataloader containing training data.
-            val_generator (DataLoader): Dataloader containing validation data.
+            train_loader (DataLoader): Dataloader containing training data.
+            val_loader (DataLoader): Dataloader containing validation data.
             optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
             scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
                 Optimizer during training.
             epochs (int): Number of epochs to train for.
-            criterion_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
+            loss_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
             model_name (str): String describing the model.
             run_id (int): Unique identifier of the model run.
             checkpoint (bool, optional): Whether to save model checkpoints. Defaults to True.
-            writer (SummaryWriter, optional): TensorBoard writer to save logs in. Defaults to None.
+            writer (SummaryWriter, optional): TensorBoard writer for saving logs. Defaults to None.
             verbose (bool, optional): Whether to print out intermediate results. Defaults to True.
             patience (int, optional): Patience for early stopping. Defaults to None.
         """
@@ -103,53 +108,41 @@ class BaseModelClass(nn.Module, ABC):
             for epoch in range(start_epoch, start_epoch + epochs):
                 self.epoch += 1
                 # Training
-                t_metrics = self.evaluate(
-                    generator=train_generator,
-                    criterion_dict=criterion_dict,
+                if verbose:
+                    print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
+                train_metrics = self.evaluate(
+                    train_loader,
+                    loss_dict=loss_dict,
                     optimizer=optimizer,
                     normalizer_dict=normalizer_dict,
                     action="train",
                     verbose=verbose,
                 )
 
-                if writer is not None:
-                    for task, metrics in t_metrics.items():
+                if isinstance(writer, SummaryWriter):
+                    for task, metrics in train_metrics.items():
                         for metric, val in metrics.items():
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch)
 
-                if verbose:
-                    print(f"Epoch: [{epoch}/{start_epoch + epochs - 1}]")
-                    for task, metrics in t_metrics.items():
-                        metrics_str = "".join(
-                            [f"{key} {val:.3f}\t" for key, val in metrics.items()]
-                        )
-                        print(f"Train \t\t: {task} - {metrics_str}")
-
                 # Validation
-                if val_generator is not None:
+                if val_loader is not None:
                     with torch.no_grad():
                         # evaluate on validation set
-                        v_metrics = self.evaluate(
-                            generator=val_generator,
-                            criterion_dict=criterion_dict,
+                        val_metrics = self.evaluate(
+                            val_loader,
+                            loss_dict=loss_dict,
                             optimizer=None,
                             normalizer_dict=normalizer_dict,
-                            action="val",
+                            action="evaluate",
+                            verbose=verbose,
                         )
 
-                    if writer is not None:
-                        for task, metrics in v_metrics.items():
+                    if isinstance(writer, SummaryWriter):
+                        for task, metrics in val_metrics.items():
                             for metric, val in metrics.items():
                                 writer.add_scalar(
                                     f"{task}/validation/{metric}", val, epoch
                                 )
-
-                    if verbose:
-                        for task, metrics in v_metrics.items():
-                            metrics_str = "".join(
-                                [f"{key} {val:.3f}\t" for key, val in metrics.items()]
-                            )
-                            print(f"Validation \t: {task} - {metrics_str}")
 
                     # TODO test all tasks to see if they are best,
                     # save a best model if any is best.
@@ -158,17 +151,14 @@ class BaseModelClass(nn.Module, ABC):
 
                     is_best: list[bool] = []
 
-                    for name in self.best_val_scores:
-                        if self.task_dict[name] == "regression":
-                            if v_metrics[name]["MAE"] < self.best_val_scores[name]:
-                                self.best_val_scores[name] = v_metrics[name]["MAE"]
-                                is_best.append(True)
-                            is_best.append(False)
-                        elif self.task_dict[name] == "classification":
-                            if v_metrics[name]["Acc"] > self.best_val_scores[name]:
-                                self.best_val_scores[name] = v_metrics[name]["Acc"]
-                                is_best.append(True)
-                            is_best.append(False)
+                    for key in self.best_val_scores:
+                        score_name = (
+                            "MAE" if self.task_dict[key] == "regression" else "Accuracy"
+                        )
+                        score = val_metrics[key][score_name]
+                        prev_best = self.best_val_scores[key]
+                        is_best.append(score < prev_best)
+                        self.best_val_scores[key] = min(prev_best, score)
 
                     if any(is_best):
                         self.es_patience = 0
@@ -176,7 +166,7 @@ class BaseModelClass(nn.Module, ABC):
                         self.es_patience += 1
                         if patience and self.es_patience > patience:
                             print(
-                                "Stopping early due to lack of improvement on Validation set"
+                                "Stopping early due to lack of improvement on validation set"
                             )
                             break
 
@@ -206,110 +196,115 @@ class BaseModelClass(nn.Module, ABC):
                 # catch memory leak
                 gc.collect()
 
+                if writer == "wandb":
+                    if wandb is None:
+                        raise ImportError("wandb not installed. Run pip install wandb")
+                    wandb.log({"train": train_metrics, "validation": val_metrics})
+
         except KeyboardInterrupt:
             pass
 
-        if writer is not None:
-            writer.close()
+        if isinstance(writer, SummaryWriter):
+            writer.close()  # close tensorboard SummaryWriter at end of training
 
     def evaluate(
         self,
-        generator: DataLoader,
-        criterion_dict: dict[str, tuple[TaskType, nn.Module]],
+        data_loader: DataLoader | InMemoryDataLoader,
+        loss_dict: Mapping[str, tuple[TaskType, nn.Module]],
         optimizer: torch.optim.Optimizer,
-        normalizer_dict: dict[str, Normalizer],
-        action: Literal["train", "val"] = "train",
+        normalizer_dict: Mapping[str, Normalizer | None],
+        action: Literal["train", "evaluate"] = "train",
         verbose: bool = False,
-    ):
+        pbar: bool = False,
+    ) -> dict[str, dict[str, float]]:
         """Evaluate the model.
 
         Args:
-            generator (DataLoader): PyTorch Dataloader with the same data format used in fit().
-            criterion_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
+            data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit().
+            loss_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
                 to apply for each task.
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
-            action ("train" | "val"], optional): Whether to track gradients depending on
+            action ("train" | "evaluate"], optional): Whether to track gradients depending on
                 whether we are carrying out a training or validation pass. Defaults to "train".
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
+            pbar (bool, optional): Whether to display a progress bar. Defaults to False.
 
         Returns:
-            dict[str, dict["Loss" | "MAE" | "RMSE" | "Acc" | "F1", np.ndarray]]: nested
-                dictionary of metrics for each task.
+            dict[str, dict["Loss" | "MAE" | "RMSE" | "Accuracy" | "F1", np.ndarray]]: nested
+                dictionary for each target of metrics averaged over an epoch.
         """
-        if action == "val":
+        if action == "evaluate":
             self.eval()
         elif action == "train":
             self.train()
         else:
-            raise NameError("Only train or val allowed as action")
+            raise NameError("Only 'train' or 'evaluate' allowed as action")
 
-        metrics: dict[str, dict[Literal["Loss", "MAE", "RMSE", "Acc", "F1"], list]] = {
-            key: defaultdict(list) for key in self.task_dict
-        }
+        epoch_metrics: dict[str, dict[str, list[float]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
 
-        # we do not need batch_comp or batch_ids when training
-        # disable output in non-tty (e.g. log files) https://git.io/JnBOi
-        for inputs, targets, *_ in tqdm(
-            generator, disable=True if not verbose else None
+        # *_ discards identifiers like material_id and formula which we don't need when training
+        # disable=None means suppress output in non-tty (e.g. CI/log files) but keep in tty mode
+        # https://git.io/JnBOi
+        for inputs, targets_list, *_ in tqdm(
+            data_loader, disable=None if pbar else True
         ):
-
-            # move tensors to GPU
-            inputs = (tensor.to(self.device) for tensor in inputs)
-
-            targets = (
-                n.norm(tar) if n is not None else tar
-                for tar, n in zip(targets, normalizer_dict.values())
-            )
-
-            targets = [target.to(self.device) for target in targets]
-
             # compute output
             outputs = self(*inputs)
 
-            mixed_loss: Tensor = 0
+            mixed_loss: Tensor = 0  # type: ignore
 
-            for name, output, target in zip(self.target_names, outputs, targets):
-                task, criterion = criterion_dict[name]
+            for target_name, targets, output, normalizer in zip(
+                self.target_names, targets_list, outputs, normalizer_dict.values()
+            ):
+                task, loss_func = loss_dict[target_name]
+                target_metrics = epoch_metrics[target_name]
 
                 if task == "regression":
-                    if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        loss = criterion(output, log_std, target)
-                    else:
-                        loss = criterion(output, target)
+                    assert normalizer is not None
+                    targets = normalizer.norm(targets).squeeze()
 
-                    pred = normalizer_dict[name].denorm(output.data.cpu())
-                    target = normalizer_dict[name].denorm(target.data.cpu())
-                    metrics[name]["MAE"].append((pred - target).abs().mean())
-                    metrics[name]["RMSE"].append((pred - target).pow(2).mean().sqrt())
+                    if self.robust:
+                        preds, log_std = output.unbind(dim=1)
+                        loss = loss_func(preds, log_std, targets)
+                    else:
+                        preds = output.squeeze(1)
+                        loss = loss_func(preds, targets)
+
+                    z_scored_error = preds - targets
+                    error = normalizer.denorm(z_scored_error.data.cpu())
+                    target_metrics["MAE"].append(float(error.abs().mean()))
+                    target_metrics["MSE"].append(float(error.pow(2).mean()))
 
                 elif task == "classification":
                     if self.robust:
                         output, log_std = output.chunk(2, dim=1)
                         logits = sampled_softmax(output, log_std)
-                        loss = criterion(torch.log(logits), target.squeeze(1))
+                        loss = loss_func(torch.log(logits), targets.squeeze())
                     else:
                         logits = softmax(output, dim=1)
-                        loss = criterion(output, target.squeeze(1))
+                        loss = loss_func(output, targets)
+                    preds = logits
 
                     logits = logits.data.cpu()
-                    target = target.squeeze(1).data.cpu()
+                    targets = targets.data.cpu()
 
-                    # classification metrics from sklearn need numpy arrays
-                    metrics[name]["Acc"].append(
-                        accuracy_score(target, np.argmax(logits, axis=1))
+                    acc = float((targets == logits.argmax(dim=1)).float().mean())
+                    target_metrics["Accuracy"].append(acc)
+                    f1 = float(
+                        f1_score(targets, logits.argmax(dim=1), average="weighted")
                     )
-                    metrics[name]["F1"].append(
-                        f1_score(target, np.argmax(logits, axis=1), average="weighted")
-                    )
+                    target_metrics["F1"].append(f1)
+
                 else:
                     raise ValueError(f"invalid task: {task}")
 
-                metrics[name]["Loss"].append(loss.cpu().item())
+                epoch_metrics[target_name]["Loss"].append(loss.cpu().item())
 
-                # NOTE we are currently just using a direct sum of losses
+                # NOTE multitasking currently just uses a direct sum of individual target losses
                 # this should be okay but is perhaps sub-optimal
                 mixed_loss += loss
 
@@ -319,21 +314,36 @@ class BaseModelClass(nn.Module, ABC):
                 mixed_loss.backward()
                 optimizer.step()
 
-        metrics = {
-            key: {k: np.array(v).mean() for k, v in d.items() if v}
-            for key, d in metrics.items()
-        }
+        avrg_metrics: dict[str, dict[str, float]] = {}
+        for target, per_batch_metrics in epoch_metrics.items():
+            avrg_metrics[target] = {
+                metric_key: (np.array(values).mean().squeeze().round(4))
+                for metric_key, values in per_batch_metrics.items()
+            }
+            # take sqrt at the end to get correct epoch RMSE as per-batch averaged RMSE
+            # != RMSE of full epoch since (sqrt(a + b) != sqrt(a) + sqrt(b))
+            avrg_mse = avrg_metrics[target].pop("MSE", None)
+            if avrg_mse:
+                avrg_metrics[target]["RMSE"] = (avrg_mse**0.5).round(4)
 
-        return metrics
+            if verbose:
+                metrics_str = " ".join(
+                    f"{key:>8} {val:<8.2f}" for key, val in avrg_metrics[target].items()
+                )
+                print(f"{action:>9}: {target} {metrics_str}")
+
+        return avrg_metrics
 
     @torch.no_grad()
     def predict(
-        self, generator: DataLoader, verbose: bool = False
-    ) -> tuple[tuple[Tensor, ...], tuple[Tensor, ...], tuple[str, ...]]:
+        self, data_loader: DataLoader | InMemoryDataLoader, verbose: bool = False
+    ) -> tuple:
         """Make model predictions.
 
         Args:
-            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            data_loader (DataLoader): Iterator that yields minibatches with the same data
+                format used in fit(). To speed up inference, batch size can be set much
+                larger than during training.
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
@@ -344,47 +354,38 @@ class BaseModelClass(nn.Module, ABC):
         """
         test_ids = []
         test_targets = []
-        test_outputs = []
+        test_preds = []
         # Ensure model is in evaluation mode
         self.eval()
 
         # disable output in non-tty (e.g. log files) https://git.io/JnBOi
-        for input_, targets, *batch_ids in tqdm(
-            generator, disable=True if not verbose else None
+        for inputs, targets, *batch_ids in tqdm(
+            data_loader, disable=True if not verbose else None
         ):
-
-            # move tensors to device (GPU or CPU)
-            input_ = (tensor.to(self.device) for tensor in input_)
-
-            # compute output
-            output = self(*input_)
-
-            # collect the model outputs
+            preds = self(*inputs)  # forward pass to get model preds
 
             test_ids.append(batch_ids)
             test_targets.append(targets)
-            test_outputs.append(output)
+            test_preds.append(preds)
 
-        # TODO the return values should be described in doc string @janosh
-        return (
-            # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
-            # for multitask learning
-            tuple(
-                torch.cat(test_t, dim=0).view(-1).numpy()
-                for test_t in zip(*test_targets)
-            ),
-            tuple(torch.cat(test_o, dim=0) for test_o in zip(*test_outputs)),
-            # return identifier columns
-            *(list(chain(*x)) for x in list(zip(*test_ids))),
-        )  # type: ignore
+        # NOTE zip(*...) transposes list dims 0 (n_batches) and 1 (n_tasks)
+        # for multitask learning
+        targets = tuple(
+            torch.cat(targets, dim=0).view(-1).cpu().numpy()
+            for targets in zip(*test_targets)
+        )
+        predictions = tuple(torch.cat(preds, dim=0) for preds in zip(*test_preds))
+        # identifier columns
+        ids = tuple(np.concatenate(x) for x in zip(*test_ids))
+        return targets, predictions, ids
 
     @torch.no_grad()
-    def featurise(self, generator: DataLoader) -> np.ndarray:
+    def featurise(self, data_loader: DataLoader) -> np.ndarray:
         """Generate features for a list of composition strings. When using Roost,
         this runs only the message-passing part of the model without the ResNet.
 
         Args:
-            generator (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit()
 
         Returns:
             np.array: 2d array of features
@@ -396,18 +397,15 @@ class BaseModelClass(nn.Module, ABC):
         self.eval()  # ensure model is in evaluation mode
         features = []
 
-        for input_, *_ in generator:
-
-            input_ = (tensor.to(self.device) for tensor in input_)
-
+        for input_, *_ in data_loader:
             output = self.trunk_nn(self.material_nn(*input_)).cpu().numpy()
             features.append(output)
 
         return np.vstack(features)
 
     @abstractmethod
-    def forward(self, *x):
-        """Forward pass through the model. Needs to be implemented in any derived model class.
+    def forward(self, *x) -> tuple[Tensor, ...]:
+        """Forward pass through the model.
 
         Raises:
             NotImplementedError: Raise error if child class doesn't implement forward
@@ -420,10 +418,9 @@ class BaseModelClass(nn.Module, ABC):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def __repr__(self) -> str:
-        """Return unambiguous string representation of model."""
-        name = self._get_name()
+        """Return model name with number of parameters and epochs trained."""
         n_params, n_epochs = self.num_params, self.epoch
-        return f"{name}: {n_params:,} trainable params at {n_epochs:,} epochs"
+        return f"{type(self).__name__} with {n_params:,} trainable params at {n_epochs:,} epochs"
 
 
 class Normalizer:
@@ -508,14 +505,15 @@ def save_checkpoint(
     """Saves a checkpoint and overwrites the best model when is_best = True.
 
     Args:
-        state (dict[str, Any]): Dictionary containing model parameters.
+        state (dict[str, Any]): Model parameters and other stateful objects like optimizer.
         is_best (bool): Whether the model is the best seen according to validation set.
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
     """
-    os.makedirs(f"models/{model_name}", exist_ok=True)
-    checkpoint = f"models/{model_name}/checkpoint-r{run_id}.pth.tar"
-    best = f"models/{model_name}/best-r{run_id}.pth.tar"
+    model_dir = f"{ROOT}/models/{model_name}"
+    os.makedirs(model_dir, exist_ok=True)
+    checkpoint = f"{model_dir}/checkpoint-r{run_id}.pth.tar"
+    best = f"{model_dir}/best-r{run_id}.pth.tar"
 
     torch.save(state, checkpoint)
     if is_best:
@@ -547,3 +545,74 @@ def sampled_softmax(pre_logits: Tensor, log_std: Tensor, samples: int = 10) -> T
     )
     logits = softmax(pre_logits, dim=1).view(len(log_std), samples, -1)
     return torch.mean(logits, dim=1)
+
+
+def np_softmax(arr: np.ndarray, axis: int = -1) -> np.ndarray:
+    """Compute the softmax of an array along an axis.
+
+    Args:
+        arr (np.ndarray): Arbitrary dimensional array.
+        axis (int, optional): Dimension over which to take softmax. Defaults to -1 (last).
+
+    Returns:
+        np.ndarray: Same dimension as input array, but specified axis reduced
+            to singleton.
+    """
+    exp = np.exp(arr)
+    return exp / exp.sum(axis=axis, keepdims=True)
+
+
+def np_one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
+    """Get a one-hot encoded version of an array of class labels.
+
+    Args:
+        targets (np.ndarray): 1d array of integer class labels.
+        n_classes (int, optional): Number of classes. Defaults to np.max(targets) + 1.
+
+    Returns:
+        np.ndarray: 2d array of 1-hot encoded class labels.
+    """
+    if n_classes is None:
+        n_classes = np.max(targets) + 1
+    return np.eye(n_classes)[targets]
+
+
+def masked_std(
+    x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0, eps: float = 1e-12
+) -> torch.Tensor:
+    """Compute the standard deviation of a tensor, ignoring masked values.
+
+    Args:
+        x (torch.Tensor): Tensor to compute standard deviation of.
+        mask (torch.BoolTensor): Same shape as x with True where x is valid and False
+            where x should be masked. Mask should not be all False in any column of
+            dimension dim to avoid NaNs.
+        dim (int, optional): Dimension to take std of. Defaults to 0.
+        eps (float, optional): Small positive number to ensure std is differentiable.
+            Defaults to 1e-12.
+
+    Returns:
+        torch.Tensor: Same shape as x, except dimension dim reduced.
+    """
+    mean = masked_mean(x, mask, dim=dim)
+    squared_diff = (x - mean.unsqueeze(dim=dim)) ** 2
+    var = masked_mean(squared_diff, mask, dim=dim)
+    std = (var + eps).sqrt()
+    return std
+
+
+def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.Tensor:
+    """Compute the mean of a tensor, ignoring masked values.
+
+    Args:
+        x (torch.Tensor): Tensor to compute standard deviation of.
+        mask (torch.BoolTensor): Same shape as x with True where x is valid and False
+            where x should be masked. Mask should not be all False in any column of
+            dimension dim to avoid NaNs from zero division.
+        dim (int, optional): Dimension to take mean of. Defaults to 0.
+
+    Returns:
+        torch.Tensor: Same shape as x, except dimension dim reduced.
+    """
+    x_nan = x.masked_fill(~mask, float("nan"))
+    return x_nan.nanmean(dim=dim)

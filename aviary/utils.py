@@ -3,14 +3,15 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import numpy as np
 import pandas as pd
 import torch
-from scipy.special import softmax
 from sklearn.metrics import (
     accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
     precision_recall_fscore_support,
     r2_score,
     roc_auc_score,
@@ -22,6 +23,7 @@ from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.tensorboard import SummaryWriter
 
+from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import RobustL1Loss, RobustL2Loss
 
@@ -31,19 +33,19 @@ else:
     from typing import Literal
 
 
-def init_model(
-    model_class: type[BaseModelClass],
+def initialize_model(
+    model_class: BaseModelClass,
     model_params: dict[str, Any],
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
     fine_tune: str = None,
     transfer: str = None,
     **kwargs,
-) -> type[BaseModelClass]:
+) -> BaseModelClass:
     """Initialise a model
 
     Args:
-        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_class (BaseModelClass): Which model class to initialize.
         model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
         device (type[torch.device] | "cuda" | "cpu"): Device the model will run on.
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
@@ -63,10 +65,7 @@ def init_model(
         # update the task disk to fine tuning task
         checkpoint["model_params"]["task_dict"] = model_params["task_dict"]
 
-        model = model_class(
-            **checkpoint["model_params"],
-            device=device,
-        )
+        model = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -90,7 +89,7 @@ def init_model(
         )
         checkpoint = torch.load(transfer, map_location=device)
 
-        model = model_class(device=device, **model_params)
+        model = model_class(**model_params)
         model.to(device)
 
         model_dict = model.state_dict()
@@ -104,17 +103,14 @@ def init_model(
         print(f"Resuming training from '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
-        model = model_class(
-            **checkpoint["model_params"],
-            device=device,
-        )
+        model = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
         model.epoch = checkpoint["epoch"]
         model.best_val_score = checkpoint["best_val_score"]
 
     else:
-        model = model_class(device=device, **model_params)
+        model = model_class(**model_params)
 
         model.to(device)
 
@@ -132,8 +128,8 @@ def init_model(
     return model
 
 
-def init_optim(
-    model: type[BaseModelClass],
+def initialize_optim(
+    model: BaseModelClass,
     optim: type[Optimizer] | Literal["SGD", "Adam", "AdamW"],
     learning_rate: float,
     weight_decay: float,
@@ -147,7 +143,7 @@ def init_optim(
     """Initialize Optimizer and Scheduler.
 
     Args:
-        model (type[BaseModelClass]): Model to be optimized.
+        model (BaseModelClass): Model to be optimized.
         optim (type[Optimizer] | "SGD" | "Adam" | "AdamW"): Which optimizer to use
         learning_rate (float): Learning rate for optimization
         weight_decay (float): Weight decay for optimizer
@@ -162,6 +158,7 @@ def init_optim(
         tuple[Optimizer, _LRScheduler]: Optimizer and scheduler for given model
     """
     # Select Optimiser
+    optimizer: Optimizer
     if optim == "SGD":
         optimizer = SGD(
             model.parameters(),
@@ -193,61 +190,61 @@ def init_optim(
     return optimizer, scheduler
 
 
-def init_losses(
+def initialize_losses(
     task_dict: dict[str, TaskType],
-    loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
+    loss_name_dict: dict[str, Literal["L1", "L2", "CSE"]],
     robust: bool = False,
-) -> dict[str, tuple[str, type[torch.nn.Module]]]:
-    """_summary_
+) -> dict[str, tuple[TaskType, Callable]]:
+    """Create a dictionary of loss functions for a multi-task model.
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss functions.
+        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss type.
         robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
 
     Returns:
         dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
     """
-    criterion_dict: dict[str, tuple[str, type[torch.nn.Module]]] = {}
+    loss_func_dict: dict[str, tuple[TaskType, Callable]] = {}
     for name, task in task_dict.items():
         # Select Task and Loss Function
         if task == "classification":
-            if loss_dict[name] != "CSE":
+            if loss_name_dict[name] != "CSE":
                 raise NameError("Only CSE loss allowed for classification tasks")
 
             if robust:
-                criterion_dict[name] = (task, NLLLoss())
+                loss_func_dict[name] = (task, NLLLoss())
             else:
-                criterion_dict[name] = (task, CrossEntropyLoss())
+                loss_func_dict[name] = (task, CrossEntropyLoss())
 
         elif task == "regression":
             if robust:
-                if loss_dict[name] == "L1":
-                    criterion_dict[name] = (task, RobustL1Loss)
-                elif loss_dict[name] == "L2":
-                    criterion_dict[name] = (task, RobustL2Loss)
+                if loss_name_dict[name] == "L1":
+                    loss_func_dict[name] = (task, RobustL1Loss)
+                elif loss_name_dict[name] == "L2":
+                    loss_func_dict[name] = (task, RobustL2Loss)
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"
                     )
             else:
-                if loss_dict[name] == "L1":
-                    criterion_dict[name] = (task, L1Loss())
-                elif loss_dict[name] == "L2":
-                    criterion_dict[name] = (task, MSELoss())
+                if loss_name_dict[name] == "L1":
+                    loss_func_dict[name] = (task, L1Loss())
+                elif loss_name_dict[name] == "L2":
+                    loss_func_dict[name] = (task, MSELoss())
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for regression tasks"
                     )
 
-    return criterion_dict
+    return loss_func_dict
 
 
 def init_normalizers(
     task_dict: dict[str, TaskType],
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
-) -> dict[str, Normalizer]:
+) -> dict[str, Normalizer | None]:
     """Initialise a Normalizer to scale the output targets
 
     Args:
@@ -258,15 +255,14 @@ def init_normalizers(
     Returns:
         dict[str, Normalizer]: Dictionary of Normalizers for each task
     """
+    normalizer_dict: dict[str, Normalizer | None] = {}
     if resume:
         checkpoint = torch.load(resume, map_location=device)
-        normalizer_dict = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
             normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
 
         return normalizer_dict
 
-    normalizer_dict = {}
     for target, task in task_dict.items():
         # Select Task and Loss Function
         if task == "regression":
@@ -278,7 +274,7 @@ def init_normalizers(
 
 
 def train_ensemble(
-    model_class: type[BaseModelClass],
+    model_class: BaseModelClass,
     model_name: str,
     run_id: int,
     ensemble_folds: int,
@@ -297,7 +293,7 @@ def train_ensemble(
     """Convenience method to train multiple models in serial.
 
     Args:
-        model_class (type[BaseModelClass]): Which model class to initialize.
+        model_class (BaseModelClass): Which model class to initialize.
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
@@ -305,7 +301,7 @@ def train_ensemble(
         train_set (Subset): Dataloader containing training data.
         val_set (Subset): Dataloader containing validation data.
         log (bool): Whether to log intermediate metrics to tensorboard.
-        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
         model_params (dict[str, Any]): Dictionary of model parameters
@@ -320,14 +316,14 @@ def train_ensemble(
     if isinstance(val_set, Subset):
         val_set = val_set.dataset
 
-    train_generator = DataLoader(train_set, **data_params)
+    train_loader = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
     if val_set is not None:
         data_params.update({"batch_size": 16 * data_params["batch_size"]})
-        val_generator = DataLoader(val_set, **data_params)
+        val_loader = DataLoader(val_set, **data_params)
     else:
-        val_generator = None
+        val_loader = None
 
     for j in range(ensemble_folds):
         #  this allows us to run ensembles in parallel rather than in series
@@ -335,19 +331,21 @@ def train_ensemble(
         if ensemble_folds == 1:
             j = run_id
 
-        model = init_model(
+        model = initialize_model(
             model_class=model_class,
             model_params=model_params,
             **setup_params,
             **restart_params,
         )
-        optimizer, scheduler = init_optim(
+        optimizer, scheduler = initialize_optim(
             model,
             **setup_params,
             **restart_params,
         )
 
-        criterion_dict = init_losses(model.task_dict, loss_dict, model_params["robust"])
+        loss_func_dict = initialize_losses(
+            model.task_dict, loss_dict, model_params["robust"]
+        )
         normalizer_dict = init_normalizers(
             model.task_dict, setup_params["device"], restart_params["resume"]
         )
@@ -363,7 +361,7 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                f"runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
+                f"{ROOT}/runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
         else:
             writer = None
@@ -372,11 +370,11 @@ def train_ensemble(
             print("Getting Validation Baseline")
             with torch.no_grad():
                 v_metrics = model.evaluate(
-                    generator=val_generator,
-                    criterion_dict=criterion_dict,
+                    val_loader,
+                    loss_dict=loss_func_dict,
                     optimizer=None,
                     normalizer_dict=normalizer_dict,
-                    action="val",
+                    action="evaluate",
                     verbose=verbose,
                 )
 
@@ -386,22 +384,22 @@ def train_ensemble(
                     if task == "regression":
                         val_score[name] = v_metrics[name]["MAE"]
                         print(
-                            f"Validation Baseline - {name}: MAE {val_score[name]:.3f}"
+                            f"Validation Baseline - {name}: MAE {val_score[name]:.2f}"
                         )
                     elif task == "classification":
-                        val_score[name] = v_metrics[name]["Acc"]
+                        val_score[name] = v_metrics[name]["Accuracy"]
                         print(
-                            f"Validation Baseline - {name}: Acc {val_score[name]:.3f}"
+                            f"Validation Baseline - {name}: Accuracy {val_score[name]:.2f}"
                         )
                 model.best_val_scores = val_score
 
         model.fit(
-            train_generator=train_generator,
-            val_generator=val_generator,
+            train_loader,
+            val_loader,
             optimizer=optimizer,
             scheduler=scheduler,
             epochs=epochs,
-            criterion_dict=criterion_dict,
+            loss_dict=loss_func_dict,
             normalizer_dict=normalizer_dict,
             model_name=model_name,
             run_id=j,
@@ -413,7 +411,7 @@ def train_ensemble(
 # TODO find a better name for this function @janosh
 @torch.no_grad()
 def results_multitask(  # noqa: C901
-    model_class: type[BaseModelClass],
+    model_class: BaseModelClass,
     model_name: str,
     run_id: int,
     ensemble_folds: int,
@@ -433,7 +431,7 @@ def results_multitask(  # noqa: C901
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
         test_set (Subset): Dataloader containing testing data.
-        data_params (dict[str, Any]): Dictionary of dataloader parameters
+        data_params (dict[str, Any]): Dictionary of data loader parameters
         robust (bool): Whether to estimate standard deviation for use in a robust
             loss function.
         task_dict (dict[str, TaskType]): Map of target names to "regression" or
@@ -464,7 +462,7 @@ def results_multitask(  # noqa: C901
     if isinstance(test_set, Subset):
         test_set = test_set.dataset
 
-    test_generator = DataLoader(test_set, **data_params)
+    test_loader = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
 
     results_dict: dict[str, dict[str, list | np.ndarray]] = {n: {} for n in task_dict}
@@ -483,10 +481,10 @@ def results_multitask(  # noqa: C901
     for j in range(ensemble_folds):
 
         if ensemble_folds == 1:
-            resume = f"models/{model_name}/{eval_type}-r{run_id}.pth.tar"
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
         else:
-            resume = f"models/{model_name}/{eval_type}-r{j}.pth.tar"
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{j}.pth.tar"
             print(f"Evaluating Model {j + 1}/{ensemble_folds}")
 
         if not os.path.isfile(resume):
@@ -503,28 +501,30 @@ def results_multitask(  # noqa: C901
                 f"task_dict {task_dict}"
             )
 
-        model = model_class(**checkpoint["model_params"], device=device)
+        model = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
-        normalizer_dict: dict[str, Normalizer] = {}
+        normalizer_dict: dict[str, Normalizer | None] = {}
         for task, state_dict in checkpoint["normalizer_dict"].items():
             if state_dict is not None:
                 normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
             else:
                 normalizer_dict[task] = None
 
-        y_test, output, *ids = model.predict(generator=test_generator)
+        y_test, output, *ids = model.predict(test_loader)
 
         for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
             if task == "regression":
+                normalizer = normalizer_dict[name]
+                assert isinstance(normalizer, Normalizer)
                 if model.robust:
-                    mean, log_std = pred.chunk(2, dim=1)
-                    pred = normalizer_dict[name].denorm(mean.data.cpu())
-                    ale_std = torch.exp(log_std).data.cpu() * normalizer_dict[name].std
+                    mean, log_std = pred.unbind(dim=1)
+                    pred = normalizer.denorm(mean.data.cpu())
+                    ale_std = torch.exp(log_std).data.cpu() * normalizer.std
                     results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()  # type: ignore
                 else:
-                    pred = normalizer_dict[name].denorm(pred.data.cpu())
+                    pred = normalizer.denorm(pred.data.cpu())
 
                 results_dict[name]["pred"][j, :] = pred.view(-1).numpy()  # type: ignore
 
@@ -539,7 +539,7 @@ def results_multitask(  # noqa: C901
                     results_dict[name]["pre-logits_ale"].append(pre_logits_std)  # type: ignore
                 else:
                     pre_logits = pred.data.cpu().numpy()
-                    logits = softmax(pre_logits, axis=1)
+                    logits = pre_logits.softmax(1)
 
                 results_dict[name]["pre-logits"].append(pre_logits)  # type: ignore
                 results_dict[name]["logits"].append(logits)  # type: ignore
@@ -549,7 +549,7 @@ def results_multitask(  # noqa: C901
     # TODO cleaner way to get identifier names
     if save_results:
         save_results_dict(
-            dict(zip(test_generator.dataset.dataset.identifiers, ids)),
+            dict(zip(test_loader.dataset.identifiers, ids)),
             results_dict,
             model_name,
         )
@@ -768,3 +768,43 @@ def save_results_dict(
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to '{csv_path}'")
+
+
+def get_metrics(
+    targets: np.ndarray,
+    predictions: np.ndarray,
+    type: Literal["regression", "classification"],
+    prec: int = 4,
+) -> dict:
+    """Get performance metrics for model predictions.
+
+    Args:
+        targets (np.ndarray): Ground truth values.
+        preds (np.ndarray): Model predictions. Should be class probabilities for classification
+            (i.e. output model after applying softmax/sigmoid). Same shape as targets for
+            regression, and [len(targets), n_classes] for classification.
+        type ('regression' | 'classification'): Task type.
+        prec (int, optional): Number of decimal places to round metrics to. Defaults to 4.
+
+    Returns:
+        dict[str, float]: Keys are rmse, mae, r2 for regression and accuracy, balanced_accuracy,
+            f1, rocauc for classification.
+    """
+    metrics = {}
+
+    if type == "regression":
+        metrics["mae"] = np.abs(targets - predictions).mean()
+        metrics["rmse"] = ((targets - predictions) ** 2).mean() ** 0.5
+        metrics["r2"] = r2_score(targets, predictions)
+    elif type == "classification":
+        pred_labels = predictions.argmax(axis=1)
+
+        metrics["accuracy"] = accuracy_score(targets, pred_labels)
+        metrics["balanced_accuracy"] = balanced_accuracy_score(targets, pred_labels)
+        metrics["f1"] = f1_score(targets, pred_labels)
+        class1_probas = predictions[:, 1]
+        metrics["rocauc"] = roc_auc_score(targets, class1_probas)
+
+    metrics = {key: round(float(val), prec) for key, val in metrics.items()}
+
+    return metrics

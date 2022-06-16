@@ -7,12 +7,8 @@ from torch import LongTensor, Tensor
 from torch_scatter import scatter_mean
 
 from aviary.core import BaseModelClass
-from aviary.segments import (
-    MessageLayer,
-    ResidualNetwork,
-    SimpleNetwork,
-    WeightedAttentionPooling,
-)
+from aviary.networks import ResidualNetwork, SimpleNetwork
+from aviary.segments import MessageLayer, WeightedAttentionPooling
 
 
 class Wren(BaseModelClass):
@@ -47,8 +43,12 @@ class Wren(BaseModelClass):
         """_summary_
 
         Args:
-            robust (bool): Whether to estimate standard deviation for use in a robust loss function
-            n_targets (list[int]): Number of targets to train on
+            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
+                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
+                the sample) which can be used with a robust loss function to attenuate the weighting
+                of uncertain samples.
+            n_targets (list[int]): Number of targets to train on. 1 for regression and number of
+                different class labels for classification.
             elem_emb_len (int): Number of features in initial element embedding
             sym_emb_len (int): Number of features in initial Wyckoff letter embedding
             elem_fea_len (int, optional): Number of hidden features to use to encode elements.

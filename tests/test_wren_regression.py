@@ -1,9 +1,8 @@
 import numpy as np
 import torch
-from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split as split
 
-from aviary.utils import results_multitask, train_ensemble
+from aviary.utils import get_metrics, results_multitask, train_ensemble
 from aviary.wren.data import WyckoffData, collate_batch
 from aviary.wren.model import Wren
 
@@ -11,8 +10,8 @@ from aviary.wren.model import Wren
 def test_wren_regression(df_matbench_phonons_wyckoff):
     elem_emb = "matscholar200"
     sym_emb = "bra-alg-off"
-    targets = ["last phdos peak"]
-    tasks = ["regression"]
+    target_name = "last phdos peak"
+    task = "regression"
     losses = ["L1"]
     robust = True
     model_name = "wren-reg-test"
@@ -37,8 +36,8 @@ def test_wren_regression(df_matbench_phonons_wyckoff):
     workers = 0
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    task_dict = dict(zip(targets, tasks))
-    loss_dict = dict(zip(targets, losses))
+    task_dict = dict(zip([target_name], [task]))
+    loss_dict = dict(zip([target_name], losses))
 
     dataset = WyckoffData(
         df=df_matbench_phonons_wyckoff,
@@ -139,15 +138,12 @@ def test_wren_regression(df_matbench_phonons_wyckoff):
         save_results=False,
     )
 
-    pred = results_dict["last phdos peak"]["pred"]
-    target = results_dict["last phdos peak"]["target"]
+    preds = results_dict[target_name]["pred"]
+    target = results_dict[target_name]["target"]
 
-    y_ens = np.mean(pred, axis=0)
+    y_ens = np.mean(preds, axis=0)
 
-    mae = np.abs(target - y_ens).mean()
-    mse = np.square(target - y_ens).mean()
-    rmse = np.sqrt(mse)
-    r2 = r2_score(target, y_ens)
+    mae, rmse, r2 = get_metrics(target, y_ens, task).values()
 
     assert r2 > 0.7
     assert mae < 150
