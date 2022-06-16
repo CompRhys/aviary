@@ -276,7 +276,8 @@ def run_wrenformer(
 
     predictions = predictions.cpu().numpy().squeeze()
     targets = targets.cpu().numpy()
-    test_df[(pred_col := f"{target_col}_pred")] = predictions.tolist()
+    pred_col = f"{target_col}_pred"
+    test_df[pred_col] = predictions.tolist()
 
     test_metrics = get_metrics(targets, predictions, task_type)
     test_metrics["test_size"] = len(test_df)
