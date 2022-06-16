@@ -1,4 +1,4 @@
-from aviary.wrenformer.run import run_wrenformer
+from examples.wrenformer import run_wrenformer
 
 
 def test_wrenformer_regression(df_matbench_jdft2d):

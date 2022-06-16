@@ -9,9 +9,9 @@ import pandas as pd
 from matbench.task import MatbenchTask
 
 from aviary.core import TaskType
-from aviary.wrenformer.run import run_wrenformer
 from aviary.wrenformer.utils import merge_json_on_disk
 from examples.mat_bench import DATA_PATHS, MODULE_DIR
+from examples.wrenformer import run_wrenformer
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from aviary import ROOT
-from aviary.wrenformer.run import run_wrenformer
+from examples.wrenformer import run_wrenformer
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-13"
