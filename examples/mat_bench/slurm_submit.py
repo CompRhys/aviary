@@ -13,8 +13,8 @@ __date__ = "2022-04-25"
 
 # %% write Python submission file and sbatch it
 epochs = 300
-n_attn_layers = 6
-embedding_aggregations = ("mean",)
+n_attn_layers = 3
+embedding_aggregations = ("mean", "std", "min", "max")
 folds = list(range(5))
 checkpoint = None  # None | 'local' | 'wandb'
 lr = 3e-4
