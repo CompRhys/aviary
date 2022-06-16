@@ -6,8 +6,6 @@ from typing import Callable, Iterator
 import numpy as np
 from torch import Tensor
 
-np.random.seed(0)
-
 
 @dataclass
 class InMemoryDataLoader:
@@ -36,24 +34,25 @@ class InMemoryDataLoader:
 
     def __iter__(self) -> Iterator[tuple[Tensor, ...]]:
         self.indices = np.random.permutation(self.dataset_len) if self.shuffle else None
-        self.idx = 0
+        self.current_idx = 0
         return self
 
     def __next__(self) -> tuple[Tensor, ...]:
-        if self.idx >= self.dataset_len:
+        start_idx = self.current_idx
+        if start_idx >= self.dataset_len:
             raise StopIteration
 
-        end_idx = self.idx + self.batch_size
+        end_idx = start_idx + self.batch_size
 
         if self.indices is None:  # shuffle=False
-            slices = (t[self.idx : end_idx] for t in self.tensors)
+            slices = (t[start_idx:end_idx] for t in self.tensors)
         else:
-            idx = self.indices[self.idx : end_idx]
+            idx = self.indices[start_idx:end_idx]
             slices = (t[idx] for t in self.tensors)
 
         batch = self.collate_fn(*slices)
 
-        self.idx += self.batch_size
+        self.current_idx += self.batch_size
         return batch
 
     def __len__(self) -> int:

@@ -6,7 +6,6 @@ from typing import Any, Literal, Sequence
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 from torch import nn
 from torch.optim.swa_utils import SWALR, AveragedModel
 
@@ -22,6 +21,11 @@ from aviary.wrenformer.data import (
 )
 from aviary.wrenformer.model import Wrenformer
 from aviary.wrenformer.utils import print_walltime
+
+try:
+    import wandb
+except ImportError:
+    pass
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-12"
