@@ -100,11 +100,11 @@ Predicting materials properties without crystal structure: Deep representation l
 }
 ```
 
-Rapid Discovery of Novel Materials by Coordinate-free Coarse Graining. [[arXiv]](https://arxiv.org/abs/2106.11132)
+Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining. [[arXiv]](https://arxiv.org/abs/2106.11132)
 
 ```tex
 @article{goodall2021rapid,
-  title={Rapid Discovery of Novel Materials by Coordinate-free Coarse Graining},
+  title={Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining},
   author={Goodall, Rhys EA and Parackal, Abhijith S and Faber, Felix A and Armiento, Rickard and Lee, Alpha A},
   journal={arXiv preprint arXiv:2106.11132},
   year={2021}
