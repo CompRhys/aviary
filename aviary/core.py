@@ -608,14 +608,11 @@ def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.
         x (torch.Tensor): Tensor to compute standard deviation of.
         mask (torch.BoolTensor): Same shape as x with True where x is valid and False
             where x should be masked. Mask should not be all False in any column of
-            dimension dim to avoid NaNs.
+            dimension dim to avoid NaNs from zero division.
         dim (int, optional): Dimension to take mean of. Defaults to 0.
 
     Returns:
         torch.Tensor: Same shape as x, except dimension dim reduced.
     """
-    # mask should be True where x is valid and False where x should be masked
-    x_nan = torch.where(mask, x, torch.tensor(float("nan")))
-    # torch.tensor(float("nan")) can be simplified to torch.nan in torch>=1.12
-
+    x_nan = x.masked_fill(~mask, float("nan"))
     return x_nan.nanmean(dim=dim)
