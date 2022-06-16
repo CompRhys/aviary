@@ -14,10 +14,11 @@ __date__ = "2022-04-25"
 # %% write Python submission file and sbatch it
 epochs = 300
 n_attn_layers = 6
-model_name = f"wrenformer-robust-s2m3-aggregation-{epochs=}-{n_attn_layers=}"
+embedding_aggregations = ("mean",)
 folds = list(range(5))
-checkpoint = "wandb"  # None | 'local' | 'wandb'
-learning_rate = 1e-3
+checkpoint = None  # None | 'local' | 'wandb'
+lr = 3e-4
+model_name = f"wrenformer-{lr=:.0e}-{epochs=}-{n_attn_layers=}".replace("e-0", "e-")
 
 if "roost" in model_name.lower():
     # deploy Roost on all tasks
@@ -25,6 +26,8 @@ if "roost" in model_name.lower():
 else:
     # deploy Wren on structure tasks only
     datasets = [k for k, v in mbv01_metadata.items() if v.input_type == "structure"]
+
+datasets = ["matbench_mp_e_form"]
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
@@ -56,7 +59,8 @@ run_wrenformer_on_matbench(
     {epochs=},
     {n_attn_layers=},
     {checkpoint=},
-    {learning_rate=},
+    learning_rate={lr},
+    {embedding_aggregations=},
 )
 """
 

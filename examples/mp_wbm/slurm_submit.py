@@ -13,14 +13,15 @@ __date__ = "2022-06-13"
 # %% write Python submission file and sbatch it
 epochs = 300
 n_attn_layers = 6
-model_name = f"wrenformer-robust-s2m3-aggregation-{epochs=}-{n_attn_layers=}"
+embedding_aggregations = ("mean",)
 fold = 0
 n_folds = 1
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
 task_type = "regression"
 checkpoint = "wandb"  # None | 'local' | 'wandb'
-learning_rate = 1e-3
+lr = 3e-4
+model_name = f"wrenformer-{lr=:.0e}-{epochs=}-{n_attn_layers=}".replace("e-0", "e-")
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
@@ -51,7 +52,8 @@ run_wrenformer_on_mp_wbm(
     {epochs=},
     {n_attn_layers=},
     {checkpoint=},
-    {learning_rate=},
+    learning_rate={lr},
+    {embedding_aggregations=},
 )
 """
 
@@ -71,7 +73,7 @@ slurm_cmd = f"""sbatch
     --nodes 1
     --gpus-per-node 1
     --chdir {log_dir}
-    --array 1-{n_folds}
+    --array 0-{n_folds - 1}
     --out {timestamp}-{model_name}-%A-%a.log
     --job-name {model_name}
     --wrap '{slurm_setup} python {submit_script}'

@@ -251,7 +251,7 @@ class BaseModelClass(nn.Module, ABC):
         elif action == "train":
             self.train()
         else:
-            raise NameError("Only train or val allowed as action")
+            raise NameError("Only 'train' or 'evaluate' allowed as action")
 
         epoch_metrics: dict[str, dict[str, list[float]]] = defaultdict(
             lambda: defaultdict(list)
@@ -324,20 +324,19 @@ class BaseModelClass(nn.Module, ABC):
                 mixed_loss.backward()
                 optimizer.step()
 
-        epoch_averaged_metrics = {
-            target: {
-                metric_key: np.array(values).mean().squeeze().round(4)
-                for metric_key, values in dct.items()
+        avrg_metrics: dict[str, dict[str, float]] = {}
+        for target, per_batch_metrics in epoch_metrics.items():
+            avrg_metrics[target] = {
+                metric_key: (np.array(values).mean().squeeze().round(4))
+                for metric_key, values in per_batch_metrics.items()
             }
-            for target, dct in epoch_metrics.items()
-        }
-        # take sqrt at the end to get correct epoch RMSE
-        # per-batch averaged RMSE != RMSE of full epoch since (sqrt(a + b) != sqrt(a) + sqrt(b))
-        for metrics_for_target in epoch_averaged_metrics.values():
-            if "MSE" in metrics_for_target:
-                metrics_for_target["RMSE"] = metrics_for_target.pop("MSE") ** 0.5
+            # take sqrt at the end to get correct epoch RMSE as per-batch averaged RMSE
+            # != RMSE of full epoch since (sqrt(a + b) != sqrt(a) + sqrt(b))
+            avrg_mse = avrg_metrics[target].pop("MSE", None)
+            if avrg_mse:
+                avrg_metrics[target]["RMSE"] = (avrg_mse**0.5).round(4)
 
-        return epoch_averaged_metrics
+        return avrg_metrics
 
     @torch.no_grad()
     def predict(

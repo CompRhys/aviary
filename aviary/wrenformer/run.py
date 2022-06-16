@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 import numpy as np
 import pandas as pd
@@ -49,6 +49,7 @@ def run_wrenformer(
     run_params: dict[str, Any] = None,
     learning_rate: float = 3e-4,
     warmup_steps: int = 10,
+    embedding_aggregations: Sequence[str] = ("mean",),
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Run a single matbench task.
 
@@ -81,6 +82,9 @@ def run_wrenformer(
             hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
         learning_rate (float): The optimizer's learning rate. Defaults to 3e-4.
         warmup_steps (int): How many warmup steps the scheduler should do. Defaults to 10.
+        embedding_aggregations (list[str]): Aggregations to apply to the learned embedding returned
+            by the transformer encoder before passing into the ResidualNetwork. One or more of
+            ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -107,7 +111,7 @@ def run_wrenformer(
             )
             assert "wyckoff" in df, err_msg
             with print_walltime(
-                start_desc=f"{label} Generating Wyckoff embeddings", newline=False
+                start_desc=f"Generating Wyckoff embeddings for {label}", newline=False
             ):
                 df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
         elif "roost" in run_name.lower():
@@ -161,6 +165,7 @@ def run_wrenformer(
         task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
         n_attn_layers=n_attn_layers,
         robust=robust,
+        embedding_aggregations=embedding_aggregations,
     )
     model.to(device)
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
@@ -192,6 +197,7 @@ def run_wrenformer(
         "trainable_params": model.num_params,
         "swa_start": swa_start,
         "timestamp": timestamp,
+        "embedding_aggregations": embedding_aggregations,
         **(run_params or {}),
     }
 
@@ -228,6 +234,12 @@ def run_wrenformer(
             wandb.log({"training": train_metrics, "validation": val_metrics})
 
     # get test set predictions
+    if swa_start is not None:
+        n_swa_epochs = int((1 - swa_start) * epochs)
+        print(
+            f"Using SWA model with weights averaged over {n_swa_epochs} epochs ({swa_start = })"
+        )
+
     inference_model = swa_model if swa_start is not None else model
     inference_model.eval()
 
