@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.metrics import f1_score
-from torch import Tensor
+from torch import BoolTensor, Tensor
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -577,14 +577,12 @@ def np_one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
     return np.eye(n_classes)[targets]
 
 
-def masked_std(
-    x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0, eps: float = 1e-12
-) -> torch.Tensor:
+def masked_std(x: Tensor, mask: BoolTensor, dim: int = 0, eps: float = 1e-12) -> Tensor:
     """Compute the standard deviation of a tensor, ignoring masked values.
 
     Args:
-        x (torch.Tensor): Tensor to compute standard deviation of.
-        mask (torch.BoolTensor): Same shape as x with True where x is valid and False
+        x (Tensor): Tensor to compute standard deviation of.
+        mask (BoolTensor): Same shape as x with True where x is valid and False
             where x should be masked. Mask should not be all False in any column of
             dimension dim to avoid NaNs.
         dim (int, optional): Dimension to take std of. Defaults to 0.
@@ -592,7 +590,7 @@ def masked_std(
             Defaults to 1e-12.
 
     Returns:
-        torch.Tensor: Same shape as x, except dimension dim reduced.
+        Tensor: Same shape as x, except dimension dim reduced.
     """
     mean = masked_mean(x, mask, dim=dim)
     squared_diff = (x - mean.unsqueeze(dim=dim)) ** 2
@@ -601,18 +599,42 @@ def masked_std(
     return std
 
 
-def masked_mean(x: torch.Tensor, mask: torch.BoolTensor, dim: int = 0) -> torch.Tensor:
+def masked_mean(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:
     """Compute the mean of a tensor, ignoring masked values.
 
     Args:
-        x (torch.Tensor): Tensor to compute standard deviation of.
-        mask (torch.BoolTensor): Same shape as x with True where x is valid and False
+        x (Tensor): Tensor to compute mean of.
+        mask (BoolTensor): Same shape as x with True where x is valid and False
             where x should be masked. Mask should not be all False in any column of
             dimension dim to avoid NaNs from zero division.
         dim (int, optional): Dimension to take mean of. Defaults to 0.
 
     Returns:
-        torch.Tensor: Same shape as x, except dimension dim reduced.
+        Tensor: Same shape as x, except dimension dim reduced.
     """
-    x_nan = x.masked_fill(~mask, float("nan"))
+    # for safety, we could add this assert but might impact performance
+    # assert (
+    #     mask.sum(dim=dim).ne(0).all()
+    # ), "mask should not be all False in any column, causes zero division"
+    x_nan = x.float().masked_fill(~mask, float("nan"))
     return x_nan.nanmean(dim=dim)
+
+
+def masked_max(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:
+    """Compute the max of a tensor along dimension dim, ignoring values at indices where
+    mask is False. See masked_mean docstring for Args details.
+    """
+    # replace padded values with +/-inf to make sure min()/max() ignore them
+    x_inf = x.float().masked_fill(~mask, float("-inf"))
+    # 1st ret val = max, 2nd ret val = max indices
+    x_max, _ = x_inf.max(dim=dim)
+    return x_max
+
+
+def masked_min(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:
+    """Compute the min of a tensor along dimension dim, ignoring values at indices where
+    mask is False. See masked_mean docstring for Args details.
+    """
+    x_inf = x.float().masked_fill(~mask, float("inf"))
+    x_min, _ = x_inf.min(dim=dim)
+    return x_min

@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import BoolTensor, Tensor
 
-from aviary.core import BaseModelClass, masked_mean, masked_std
+from aviary.core import BaseModelClass, masked_max, masked_mean, masked_min, masked_std
 from aviary.networks import ResidualNetwork
 
 
@@ -142,13 +142,11 @@ class Wrenformer(BaseModelClass):
         return tuple(output_nn(predictions) for output_nn in self.output_nns)
 
 
-# using all at once we call this S2M3 aggregation
+# map aggregation types to functions
 aggregators: dict[str, Callable[[Tensor, BoolTensor, int], Tensor]] = {
     "mean": masked_mean,
-    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
     "std": masked_std,
-    # replace padded values with +/-inf to make sure min()/max() ignore them
-    "min": lambda x, mask, dim: torch.where(mask, x, float("inf")).min(dim=dim)[0],
-    # 1st ret val = max, 2nd ret val = max indices
-    "max": lambda x, mask, dim: torch.where(mask, x, float("-inf")).max(dim=dim)[0],
+    "max": masked_max,
+    "min": masked_min,
+    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
 }
