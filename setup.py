@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="aviary",
-    version="0.0.3",
+    version="0.0.4",
     author="Rhys Goodall",
     author_email="rhys.goodall@outlook.com",
     url="https://github.com/CompRhys/aviary",
