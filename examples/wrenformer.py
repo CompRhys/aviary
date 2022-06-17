@@ -166,12 +166,15 @@ def run_wrenformer(
     # the element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
     # 'bra-alg-off.json') + 1 for the weight of that element/Wyckoff position in the
     # material's composition
-    n_features = features[0].shape[-1]
-    assert n_features in (200 + 1, 200 + 1 + 444)  # Roost and Wren embedding size resp.
+    embedding_len = features[0].shape[-1]
+    assert embedding_len in (
+        200 + 1,
+        200 + 1 + 444,
+    )  # Roost and Wren embedding size resp.
 
     model = Wrenformer(
         n_targets=[1 if task_type == reg_key else 2],
-        n_features=n_features,
+        n_features=embedding_len,
         task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
         n_attn_layers=n_attn_layers,
         robust=robust,
@@ -201,14 +204,14 @@ def run_wrenformer(
         "target": target_col,
         "warmup_steps": warmup_steps,
         "robust": robust,
-        "n_features": n_features,  # embedding size
+        "embedding_len": embedding_len,
         "losses": str(loss_dict),
         "training_samples": len(train_df),
         "test_samples": len(test_df),
         "trainable_params": model.num_params,
         "swa_start": swa_start,
         "timestamp": timestamp,
-        "embedding_aggregations": embedding_aggregations,
+        "embedding_aggregations": ",".join(embedding_aggregations),
         **(run_params or {}),
     }
 
