@@ -50,6 +50,8 @@ def run_wrenformer(
     checkpoint: Literal["local", "wandb"] | None = None,
     swa_start=0.7,
     run_params: dict[str, Any] = None,
+    optimizer: str | tuple[str, dict] = "AdamW",
+    scheduler: str | tuple[str, dict] = "LambdaLR",
     learning_rate: float = 3e-4,
     batch_size: int = 128,
     warmup_steps: int = 10,
@@ -82,9 +84,16 @@ def run_wrenformer(
             ```
         swa_start (float | None): When to start using stochastic weight averaging during training.
             Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
-            None to disable SWA. Defaults to 0.7.
+            None to disable SWA. Defaults to 0.7. Proposed in https://arxiv.org/abs/1803.05407.
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
+        optimizer (str | tuple[str, dict]): Name of a torch.optim.Optimizer class like 'Adam',
+            'AdamW', 'SGD', etc. Can be a string or a string and dict with params to pass to the
+            class. Defaults to 'AdamW'.
+        scheduler (str | tuple[str, dict]): Name of a torch.optim.lr_scheduler class like
+            'LambdaLR', 'StepLR', 'CosineAnnealingLR', etc. Defaults to 'LambdaLR'. Can be a string
+            or a string and dict with params to pass to the class. E.g.
+            ('CosineAnnealingLR', {'T_max': n_epochs}).
         learning_rate (float): The optimizer's learning rate. Defaults to 3e-4.
         batch_size (int): The mini-batch size during training. Defaults to 128.
         warmup_steps (int): How many warmup steps the scheduler should do. Defaults to 10.
@@ -181,31 +190,53 @@ def run_wrenformer(
         embedding_aggregations=embedding_aggregations,
     )
     model.to(device)
-    optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
+    if isinstance(optimizer, str):
+        optimizer_name, optimizer_params = optimizer, None
+    elif isinstance(optimizer, (tuple, list)):
+        optimizer_name, optimizer_params = optimizer
+    else:
+        raise ValueError(f"Unknown {optimizer=}")
+    optimizer_cls = getattr(torch.optim, optimizer_name)
+    optimizer_instance = optimizer_cls(
+        params=model.parameters(), lr=learning_rate, **(optimizer_params or {})
+    )
 
     # This lambda goes up linearly until warmup_steps, then follows a power law decay.
     # Acts as a prefactor to the learning rate, i.e. actual_lr = lr_lambda(epoch) *
     # learning_rate.
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda epoch: min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5)),
-    )
+    if scheduler == "LambdaLR":
+        scheduler_name, scheduler_params = "LambdaLR", {
+            "lr_lambda": lambda epoch: min(
+                (epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5)
+            )
+        }
+    elif isinstance(scheduler, str):
+        scheduler_name, scheduler_params = scheduler, None
+    elif isinstance(scheduler, (tuple, list)):
+        scheduler_name, scheduler_params = scheduler
+    else:
+        raise ValueError(f"Unknown {scheduler=}")
+    scheduler_cls = getattr(torch.optim.lr_scheduler, scheduler_name)
+    scheduler_instance = scheduler_cls(optimizer_instance, **(scheduler_params or {}))
 
     if swa_start is not None:
         swa_model = AveragedModel(model)
-        # scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
-        swa_scheduler = SWALR(optimizer, swa_lr=0.01)
+        swa_scheduler_instance = SWALR(optimizer_instance, swa_lr=0.01)
 
     run_params = {
         "epochs": epochs,
+        "optimizer": optimizer_name,
+        "optimizer_params": optimizer_params,
         "learning_rate": learning_rate,
+        "lr_scheduler": scheduler_name,
+        "scheduler_params": scheduler_params,
         "batch_size": batch_size,
         "n_attn_layers": n_attn_layers,
         "target": target_col,
         "warmup_steps": warmup_steps,
         "robust": robust,
         "embedding_len": embedding_len,
-        "losses": str(loss_dict),
+        "losses": loss_dict,
         "training_samples": len(train_df),
         "test_samples": len(test_df),
         "trainable_params": model.num_params,
@@ -232,7 +263,7 @@ def run_wrenformer(
         train_metrics = model.evaluate(
             train_loader,
             loss_dict,
-            optimizer,
+            optimizer_instance,
             normalizer_dict,
             action="train",
             verbose=verbose,
@@ -250,10 +281,10 @@ def run_wrenformer(
 
         if swa_start is not None and epoch > swa_start * epochs:
             swa_model.update_parameters(model)
-            swa_scheduler.step()
+            swa_scheduler_instance.step()
         else:
-            scheduler.step()
-        scheduler.step()
+            scheduler_instance.step()
+
         model.epoch += 1
 
         if wandb_project:
@@ -293,9 +324,9 @@ def run_wrenformer(
     if checkpoint is not None:
         state_dict = {
             "model_state": inference_model.state_dict(),
-            "optimizer_state": optimizer.state_dict(),
+            "optimizer_state": optimizer_instance.state_dict(),
             "scheduler_state": (
-                scheduler if swa_start is None else swa_scheduler
+                scheduler_instance if swa_start is None else swa_scheduler_instance
             ).state_dict(),
             "loss_dict": loss_dict,
             "epoch": epochs,

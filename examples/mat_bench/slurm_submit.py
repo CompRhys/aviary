@@ -18,7 +18,7 @@ embedding_aggregations = ("mean", "std", "min", "max")
 folds = list(range(5))
 checkpoint = None  # None | 'local' | 'wandb'
 lr = 3e-4
-model_name = f"wrenformer-{lr=:.0e}-{epochs=}-{n_attn_layers=}".replace("e-0", "e-")
+model_name = f"wrenformer-{lr=}-{epochs=}-{n_attn_layers=}"
 
 if "roost" in model_name.lower():
     # deploy Roost on all tasks
