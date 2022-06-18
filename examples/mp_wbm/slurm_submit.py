@@ -13,17 +13,18 @@ __date__ = "2022-06-13"
 # %% write Python submission file and sbatch it
 epochs = 300
 n_attn_layers = 3
-embedding_aggregations = ("mean", "std", "min", "max")
+embedding_aggregations = ("mean",)
+optimizer = "AdamW"
+lr = 3e-4
+scheduler = ("CosineAnnealingLR", {"T_max": epochs})
 n_folds = 1
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
 task_type = "regression"
 checkpoint = None  # None | 'local' | 'wandb'
-lr = 3e-4
-batch_size = 64
-model_name = f"wrenformer-robust-{lr=:.0e}-{epochs=}-{n_attn_layers=}".replace(
-    "e-0", "e-"
-)
+batch_size = 128
+model_name = f"wrenformer-robust-{epochs=}"
+
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
@@ -52,7 +53,9 @@ run_wrenformer_on_mp_wbm(
     {epochs=},
     {n_attn_layers=},
     {checkpoint=},
+    {optimizer=},
     learning_rate={lr},
+    {scheduler=},
     {embedding_aggregations=},
     {batch_size=},
 )
