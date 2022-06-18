@@ -14,9 +14,6 @@ repos:
     rev: 4.0.1
     hooks:
       - id: flake8
-        args: [--ignore, 'W503,E203']
-      # W503 black conflicts with "line break before operator" rule
-      # E203 black conflicts with "whitespace before ':'" rule
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v2.31.1

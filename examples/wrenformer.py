@@ -253,7 +253,7 @@ def run_wrenformer(
             swa_scheduler.step()
         else:
             scheduler.step()
-        scheduler.step()
+
         model.epoch += 1
 
         if wandb_project:
