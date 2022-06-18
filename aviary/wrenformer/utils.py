@@ -1,7 +1,7 @@
 import json
 import time
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, Literal
 
 
 def _int_keys(dct: dict) -> dict:
@@ -21,12 +21,20 @@ def recursive_dict_merge(d1: dict, d2: dict) -> dict:
     return d1
 
 
-def merge_json_on_disk(dct: dict, file_path: str) -> None:
+def merge_json_on_disk(
+    dct: dict,
+    file_path: str,
+    on_non_serializable: Literal["annotate", "error"] = "annotate",
+) -> None:
     """Merge a dict into a (possibly) existing JSON file.
 
     Args:
         file_path (str): Path to JSON file. File will be created if not exist.
         dct (dict): Dictionary to merge into JSON file.
+        on_non_serializable ('annotate' | 'error'): What to do with non-serializable values
+            encountered in dct. 'annotate' will replace the offending object with a string
+            indicating the type, e.g. '<not serializable: function>'. 'error' will raise
+            'TypeError: Object of type function is not JSON serializable'. Defaults to 'annotate'.
     """
     try:
         with open(file_path) as json_file:
@@ -36,8 +44,15 @@ def merge_json_on_disk(dct: dict, file_path: str) -> None:
     except (FileNotFoundError, json.decoder.JSONDecodeError):  # file missing or empty
         pass
 
+    def non_serializable_handler(obj: object) -> str:
+        # replace functions and classes in dct with string indicating a non-serializable type
+        return f"<not serializable: {type(obj).__qualname__}>"
+
     with open(file_path, "w") as file:
-        json.dump(dct, file)
+        default = (
+            non_serializable_handler if on_non_serializable == "annotate" else None
+        )
+        json.dump(dct, file, default=default)
 
 
 @contextmanager

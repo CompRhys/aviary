@@ -236,7 +236,7 @@ def run_wrenformer(
         "warmup_steps": warmup_steps,
         "robust": robust,
         "embedding_len": embedding_len,
-        "losses": str(loss_dict),
+        "losses": loss_dict,
         "training_samples": len(train_df),
         "test_samples": len(test_df),
         "trainable_params": model.num_params,
