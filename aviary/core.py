@@ -317,7 +317,7 @@ class BaseModelClass(nn.Module, ABC):
         avrg_metrics: dict[str, dict[str, float]] = {}
         for target, per_batch_metrics in epoch_metrics.items():
             avrg_metrics[target] = {
-                metric_key: (np.array(values).mean().squeeze().round(4))
+                metric_key: np.array(values).mean().squeeze().round(4)
                 for metric_key, values in per_batch_metrics.items()
             }
             # take sqrt at the end to get correct epoch RMSE as per-batch averaged RMSE
@@ -328,7 +328,7 @@ class BaseModelClass(nn.Module, ABC):
 
             if verbose:
                 metrics_str = " ".join(
-                    f"{key:>8} {val:<8.2f}" for key, val in avrg_metrics[target].items()
+                    f"{key} {val:<9.2f}" for key, val in avrg_metrics[target].items()
                 )
                 print(f"{action:>9}: {target} {metrics_str}")
 

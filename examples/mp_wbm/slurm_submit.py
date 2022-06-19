@@ -16,7 +16,10 @@ n_attn_layers = 3
 embedding_aggregations = ("mean",)
 optimizer = "AdamW"
 lr = 3e-4
-scheduler = ("CosineAnnealingLR", {"T_max": epochs})
+scheduler = (
+    "ReduceLROnPlateau",
+    {"factor": 0.25, "patience": 5, "verbose": True, "min_lr": 1e-7},
+)
 n_folds = 1
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
