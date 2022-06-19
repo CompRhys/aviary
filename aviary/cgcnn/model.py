@@ -63,16 +63,14 @@ class CrystalGraphConvNet(BaseModelClass):
 
         self.node_nn = DescriptorNetwork(**desc_dict)
 
-        self.model_params.update(
-            {
-                "robust": robust,
-                "n_targets": n_targets,
-                "h_fea_len": h_fea_len,
-                "n_hidden": n_hidden,
-            }
-        )
-
-        self.model_params.update(desc_dict)
+        model_params = {
+            "robust": robust,
+            "n_targets": n_targets,
+            "h_fea_len": h_fea_len,
+            "n_hidden": n_hidden,
+            **desc_dict,
+        }
+        self.model_params.update(model_params)
 
         # define an output neural network
         if self.robust:
