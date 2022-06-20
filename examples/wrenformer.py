@@ -252,6 +252,9 @@ def run_wrenformer(
         "embedding_aggregations": ",".join(embedding_aggregations),
         **(run_params or {}),
     }
+    for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
+        if x in os.environ:
+            run_params[x] = os.environ[x]
 
     if wandb_project:
         if wandb.run is None:
@@ -262,6 +265,7 @@ def run_wrenformer(
             settings=wandb.Settings(start_method="fork"),
             name=run_name,
             config=run_params,
+            save_code=True,
         )
 
     for epoch in range(epochs):
