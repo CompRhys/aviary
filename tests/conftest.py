@@ -47,7 +47,7 @@ def df_matbench_jdft2d():
 @pytest.fixture(scope="session")
 def df_matbench_phonons_wyckoff(df_matbench_phonons):
     """Getting Aflow labels is expensive so we split into a separate fixture to avoid
-    paying for it unless needed.
+    paying for it unless requested.
     """
     df_matbench_phonons["wyckoff"] = [
         get_aflow_label_spglib(x) for x in df_matbench_phonons.structure
