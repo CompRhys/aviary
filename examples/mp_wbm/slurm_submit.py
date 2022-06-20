@@ -16,7 +16,10 @@ n_attn_layers = 3
 embedding_aggregations = ("mean",)
 optimizer = "AdamW"
 lr = 3e-4
-scheduler = ("CosineAnnealingLR", {"T_max": epochs})
+scheduler = (
+    "ReduceLROnPlateau",
+    {"factor": 0.25, "patience": 5, "verbose": True, "min_lr": 1e-7},
+)
 n_folds = 1
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
@@ -27,7 +30,7 @@ model_name = f"wrenformer-robust-{epochs=}"
 
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
-timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
 python_script = f"""import os
 from datetime import datetime
@@ -40,7 +43,7 @@ print(f"{{job_id=}}")
 print("{model_name=}")
 print("{data_path=}")
 
-job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"), 0)
+job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
 run_wrenformer_on_mp_wbm(
