@@ -77,16 +77,14 @@ class Roost(BaseModelClass):
 
         self.material_nn = DescriptorNetwork(**desc_dict)  # type: ignore
 
-        self.model_params.update(
-            {
-                "robust": robust,
-                "n_targets": n_targets,
-                "out_hidden": out_hidden,
-                "trunk_hidden": trunk_hidden,
-            }
-        )
-
-        self.model_params.update(desc_dict)
+        model_params = {
+            "robust": robust,
+            "n_targets": n_targets,
+            "out_hidden": out_hidden,
+            "trunk_hidden": trunk_hidden,
+            **desc_dict,
+        }
+        self.model_params.update(model_params)
 
         # define an output neural network
         if self.robust:

@@ -6,8 +6,6 @@ from typing import Any, Literal, Sequence
 import numpy as np
 import pandas as pd
 import torch
-from torch import nn
-from torch.optim.swa_utils import SWALR, AveragedModel
 
 from aviary import ROOT
 from aviary.core import Normalizer, TaskType
@@ -39,22 +37,23 @@ reg_key, clf_key = "regression", "classification"
 def run_wrenformer(
     run_name: str,
     task_type: TaskType,
-    timestamp: str,
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
     target_col: str,
     epochs: int,
+    timestamp: str = None,
     id_col: str = "material_id",
     n_attn_layers: int = 4,
     wandb_project: str = None,
     checkpoint: Literal["local", "wandb"] | None = None,
-    swa_start=0.7,
     run_params: dict[str, Any] = None,
     optimizer: str | tuple[str, dict] = "AdamW",
     scheduler: str | tuple[str, dict] = "LambdaLR",
-    learning_rate: float = 3e-4,
+    learning_rate: float = 1e-4,
     batch_size: int = 128,
     warmup_steps: int = 10,
+    swa_start: float = 0.7,
+    swa_lr: float = None,
     embedding_aggregations: Sequence[str] = ("mean",),
     verbose: bool = False,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
@@ -65,12 +64,13 @@ def run_wrenformer(
             Include 'robust' to use a robust loss function and have the model learn to
             predict an aleatoric uncertainty.
         task_type ('regression' | 'classification'): What type of task to train the model for.
-        timestamp (str): Will be used as prefix for model checkpoints and result files.
         train_df (pd.DataFrame): Dataframe containing the training data.
         test_df (pd.DataFrame): Dataframe containing the test data.
         target_col (str): Name of df column containing the target values.
         id_col (str): Name of df column containing material IDs.
         epochs (int): How many epochs to train for. Defaults to 100.
+        timestamp (str): Will be included in run_params and used as file name prefix for model
+            checkpoints and result files. Defaults to None.
         n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
         wandb_project (str | None): Name of Weights and Biases project where to log this run.
             Defaults to None which means logging is disabled.
@@ -82,9 +82,6 @@ def run_wrenformer(
             checkpoint = wandb.restore("checkpoint.pth", run_path)
             torch.load(checkpoint.name)
             ```
-        swa_start (float | None): When to start using stochastic weight averaging during training.
-            Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
-            None to disable SWA. Defaults to 0.7. Proposed in https://arxiv.org/abs/1803.05407.
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
         optimizer (str | tuple[str, dict]): Name of a torch.optim.Optimizer class like 'Adam',
@@ -94,9 +91,13 @@ def run_wrenformer(
             'LambdaLR', 'StepLR', 'CosineAnnealingLR', etc. Defaults to 'LambdaLR'. Can be a string
             or a string and dict with params to pass to the class. E.g.
             ('CosineAnnealingLR', {'T_max': n_epochs}).
-        learning_rate (float): The optimizer's learning rate. Defaults to 3e-4.
+        learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
         batch_size (int): The mini-batch size during training. Defaults to 128.
         warmup_steps (int): How many warmup steps the scheduler should do. Defaults to 10.
+        swa_start (float | None): When to start using stochastic weight averaging during training.
+            Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
+            None to disable SWA. Defaults to 0.7. Proposed in https://arxiv.org/abs/1803.05407.
+        swa_lr (float): Learning rate for SWA scheduler. Defaults to learning_rate.
         embedding_aggregations (list[str]): Aggregations to apply to the learned embedding returned
             by the transformer encoder before passing into the ResidualNetwork. One or more of
             ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
@@ -137,9 +138,9 @@ def run_wrenformer(
 
     robust = "robust" in run_name.lower()
     loss_func = (
-        (RobustL1Loss if robust else nn.L1Loss())
+        (RobustL1Loss if robust else torch.nn.L1Loss())
         if task_type == reg_key
-        else (nn.NLLLoss() if robust else nn.CrossEntropyLoss())
+        else (torch.nn.NLLLoss() if robust else torch.nn.CrossEntropyLoss())
     )
     loss_dict = {target_col: (task_type, loss_func)}
     normalizer_dict = {target_col: Normalizer() if task_type == reg_key else None}
@@ -217,11 +218,12 @@ def run_wrenformer(
     else:
         raise ValueError(f"Unknown {scheduler=}")
     scheduler_cls = getattr(torch.optim.lr_scheduler, scheduler_name)
-    scheduler_instance = scheduler_cls(optimizer_instance, **(scheduler_params or {}))
+    lr_scheduler = scheduler_cls(optimizer_instance, **(scheduler_params or {}))
 
     if swa_start is not None:
-        swa_model = AveragedModel(model)
-        swa_scheduler_instance = SWALR(optimizer_instance, swa_lr=0.01)
+        swa_lr = swa_lr or learning_rate
+        swa_model = torch.optim.swa_utils.AveragedModel(model)
+        swa_scheduler = torch.optim.swa_utils.SWALR(optimizer_instance, swa_lr=swa_lr)
 
     run_params = {
         "epochs": epochs,
@@ -240,11 +242,21 @@ def run_wrenformer(
         "training_samples": len(train_df),
         "test_samples": len(test_df),
         "trainable_params": model.num_params,
-        "swa_start": swa_start,
-        "timestamp": timestamp,
+        "swa": {
+            "start": swa_start,
+            "epochs": int(swa_start * epochs),
+            "learning_rate": swa_lr,
+        }
+        if swa_start
+        else None,
         "embedding_aggregations": ",".join(embedding_aggregations),
         **(run_params or {}),
     }
+    if timestamp:
+        run_params["timestamp"] = timestamp
+    for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
+        if x in os.environ:
+            run_params[x] = os.environ[x]
 
     if wandb_project:
         if wandb.run is None:
@@ -255,6 +267,7 @@ def run_wrenformer(
             settings=wandb.Settings(start_method="fork"),
             name=run_name,
             config=run_params,
+            save_code=True,
         )
 
     for epoch in range(epochs):
@@ -279,11 +292,19 @@ def run_wrenformer(
                 verbose=verbose,
             )
 
-        if swa_start is not None and epoch > swa_start * epochs:
+        if swa_start and epoch >= int(swa_start * epochs):
+            if epoch == int(swa_start * epochs):
+                print("Starting stochastic weight averaging...")
             swa_model.update_parameters(model)
-            swa_scheduler_instance.step()
+            swa_scheduler.step()
         else:
-            scheduler_instance.step()
+            if scheduler_name == "ReduceLROnPlateau":
+                val_metric = val_metrics[target_col][
+                    "MAE" if task_type == reg_key else "Accuracy"
+                ]
+                lr_scheduler.step(val_metric)
+            else:
+                lr_scheduler.step()
 
         model.epoch += 1
 
@@ -297,7 +318,7 @@ def run_wrenformer(
             f"Using SWA model with weights averaged over {n_swa_epochs} epochs ({swa_start = })"
         )
 
-    inference_model = swa_model if swa_start is not None else model
+    inference_model = swa_model if swa_start else model
     inference_model.eval()
 
     with torch.no_grad():
@@ -325,12 +346,12 @@ def run_wrenformer(
         state_dict = {
             "model_state": inference_model.state_dict(),
             "optimizer_state": optimizer_instance.state_dict(),
-            "scheduler_state": (
-                scheduler_instance if swa_start is None else swa_scheduler_instance
-            ).state_dict(),
+            "scheduler_state": lr_scheduler.state_dict(),
             "loss_dict": loss_dict,
             "epoch": epochs,
             "metrics": test_metrics,
+            "run_name": run_name,
+            "normalizer_dict": normalizer_dict,
         }
         if checkpoint == "local":
             os.makedirs(f"{ROOT}/models", exist_ok=True)
