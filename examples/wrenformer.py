@@ -37,11 +37,11 @@ reg_key, clf_key = "regression", "classification"
 def run_wrenformer(
     run_name: str,
     task_type: TaskType,
-    timestamp: str,
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
     target_col: str,
     epochs: int,
+    timestamp: str = None,
     id_col: str = "material_id",
     n_attn_layers: int = 4,
     wandb_project: str = None,
@@ -64,12 +64,13 @@ def run_wrenformer(
             Include 'robust' to use a robust loss function and have the model learn to
             predict an aleatoric uncertainty.
         task_type ('regression' | 'classification'): What type of task to train the model for.
-        timestamp (str): Will be used as prefix for model checkpoints and result files.
         train_df (pd.DataFrame): Dataframe containing the training data.
         test_df (pd.DataFrame): Dataframe containing the test data.
         target_col (str): Name of df column containing the target values.
         id_col (str): Name of df column containing material IDs.
         epochs (int): How many epochs to train for. Defaults to 100.
+        timestamp (str): Will be included in run_params and used as file name prefix for model
+            checkpoints and result files. Defaults to None.
         n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
         wandb_project (str | None): Name of Weights and Biases project where to log this run.
             Defaults to None which means logging is disabled.
@@ -248,10 +249,11 @@ def run_wrenformer(
         }
         if swa_start
         else None,
-        "timestamp": timestamp,
         "embedding_aggregations": ",".join(embedding_aggregations),
         **(run_params or {}),
     }
+    if timestamp:
+        run_params["timestamp"] = timestamp
     for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
         if x in os.environ:
             run_params[x] = os.environ[x]
