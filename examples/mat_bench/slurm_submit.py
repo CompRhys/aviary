@@ -17,8 +17,8 @@ n_attn_layers = 3
 embedding_aggregations = ("mean", "std", "min", "max")
 folds = list(range(5))
 checkpoint = None  # None | 'local' | 'wandb'
-lr = 3e-4
-model_name = f"wrenformer-{lr=}-{epochs=}-{n_attn_layers=}"
+lr = 1e-4
+model_name = f"wrenformer-robust-{epochs=}"
 
 if "roost" in model_name.lower():
     # deploy Roost on all tasks
@@ -30,7 +30,7 @@ else:
 datasets = ["matbench_mp_e_form"]
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
-timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
 python_script = f"""import os
 from datetime import datetime
@@ -43,7 +43,7 @@ job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
 print("{model_name=}")
 
-job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"), 0)
+job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
 dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]

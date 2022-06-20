@@ -30,7 +30,7 @@ model_name = f"wrenformer-robust-{epochs=}"
 
 
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
-timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
 python_script = f"""import os
 from datetime import datetime
@@ -43,7 +43,7 @@ print(f"{{job_id=}}")
 print("{model_name=}")
 print("{data_path=}")
 
-job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"), 0)
+job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
 run_wrenformer_on_mp_wbm(
