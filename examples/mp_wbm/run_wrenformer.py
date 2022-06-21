@@ -1,4 +1,3 @@
-# %%
 from __future__ import annotations
 
 from datetime import datetime
@@ -19,7 +18,6 @@ def run_wrenformer_on_mp_wbm(
     target: str,
     folds: tuple[int, int] | None = None,
     test_size: float | None = None,
-    wandb_project: str | None = "mp-wbm",
     **kwargs,
 ) -> dict[str, float]:
     """Run a single matbench task.
@@ -30,8 +28,6 @@ def run_wrenformer_on_mp_wbm(
             uncertainty.
         data_path (str): Path to a data file to load with pandas.read_json().
         timestamp (str): Will prefix the names of model checkpoint files and other output files.
-        wandb_project (str | None): Project name to use when logging to wandb. Defaults to "mp-wbm".
-            Set to None to disable logging.
         kwargs: Additional keyword arguments are passed to run_wrenformer(). See its doc string.
 
     Raises:
@@ -44,7 +40,8 @@ def run_wrenformer_on_mp_wbm(
 
     id_col = "material_id"
     df = pd.read_json(data_path).set_index(id_col, drop=False)
-    df = df.sample(frac=1)  # shuffle samples
+    # shuffle samples for random train/test split
+    df = df.sample(frac=1, random_state=0)
 
     if (folds, test_size) == (None, None):
         raise ValueError("Must specify either folds or test_size")
@@ -73,7 +70,8 @@ def run_wrenformer_on_mp_wbm(
         test_df=test_df,
         target_col=target,
         task_type="regression",
-        wandb_project=wandb_project,
+        # set to None to disable logging
+        wandb_project=kwargs.pop("wandb_project", "mp-wbm"),
         id_col=id_col,
         run_params={
             "data_path": data_path,
@@ -84,7 +82,6 @@ def run_wrenformer_on_mp_wbm(
     return test_metrics
 
 
-# %%
 if __name__ == "__main__":
     timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
 

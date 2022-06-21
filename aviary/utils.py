@@ -565,22 +565,22 @@ def results_multitask(  # noqa: C901
     return results_dict
 
 
-def print_metrics_regression(target: Tensor, pred: Tensor, **kwargs) -> None:
+def print_metrics_regression(targets: Tensor, preds: Tensor, **kwargs) -> None:
     """Print out metrics for a regression task.
 
     Args:
-        target (ndarray(n_test)): targets for regression task
-        pred (ndarray(n_ensemble, n_test)): model predictions
+        targets (ndarray(n_test)): targets for regression task
+        preds (ndarray(n_ensemble, n_test)): model predictions
         kwargs: unused entries from the results dictionary
     """
-    ensemble_folds = pred.shape[0]
-    res = pred - target
+    ensemble_folds = preds.shape[0]
+    res = preds - targets
     mae = np.mean(np.abs(res), axis=1)
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
     r2 = r2_score(
-        np.repeat(target[:, np.newaxis], ensemble_folds, axis=1),
-        pred.T,
+        np.repeat(targets[:, np.newaxis], ensemble_folds, axis=1),
+        preds.T,
         multioutput="raw_values",
     )
 
@@ -605,13 +605,13 @@ def print_metrics_regression(target: Tensor, pred: Tensor, **kwargs) -> None:
         print(f"RMSE: {rmse_avg:.4f} +/- {rmse_std:.4f}")
 
         # calculate metrics and errors with associated errors for ensembles
-        y_ens = np.mean(pred, axis=0)
+        y_ens = np.mean(preds, axis=0)
 
-        mae_ens = np.abs(target - y_ens).mean()
-        mse_ens = np.square(target - y_ens).mean()
+        mae_ens = np.abs(targets - y_ens).mean()
+        mse_ens = np.square(targets - y_ens).mean()
         rmse_ens = np.sqrt(mse_ens)
 
-        r2_ens = r2_score(target, y_ens)
+        r2_ens = r2_score(targets, y_ens)
 
         print("\nEnsemble Performance Metrics:")
         print(f"R2 Score : {r2_ens:.4f} ")
