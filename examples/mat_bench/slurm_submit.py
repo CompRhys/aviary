@@ -27,8 +27,6 @@ else:
     # deploy Wren on structure tasks only
     datasets = [k for k, v in mbv01_metadata.items() if v.input_type == "structure"]
 
-datasets = ["matbench_mp_e_form"]
-
 os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
