@@ -1,4 +1,3 @@
-# %%
 from __future__ import annotations
 
 import os
@@ -21,7 +20,7 @@ def run_wrenformer_on_matbench(
     model_name: str,
     dataset_name: str,
     fold: Literal[0, 1, 2, 3, 4],
-    wandb_project: str | None = "matbench",
+    timestamp: str,
     **kwargs,
 ) -> dict[str, float]:
     """Run a single matbench task.
@@ -36,8 +35,6 @@ def run_wrenformer_on_matbench(
         timestamp (str): Timestamp to append to the names of JSON files for model predictions
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
-        wandb_project (str | None): Project name to use when logging to wandb. Defaults to "mp-wbm".
-            Set to None to disable logging.
         kwargs: Additional keyword arguments are passed to run_wrenformer(). See its doc string.
 
     Raises:
@@ -66,7 +63,8 @@ def run_wrenformer_on_matbench(
         test_df=test_df,
         target_col=target,
         task_type=task_type,
-        wandb_project=wandb_project,
+        # set to None to disable logging
+        wandb_project=kwargs.get("wandb_project", "mp-wbm"),
         id_col=id_col,
         run_params={
             "dataset": dataset_name,
@@ -76,14 +74,14 @@ def run_wrenformer_on_matbench(
     )
 
     # save model predictions to JSON
-    preds_path = f"{MODULE_DIR}/model_preds/{model_name}-{timestamp}.json"
+    preds_path = f"{MODULE_DIR}/model_preds/{timestamp}-{model_name}.json"
 
     # record model predictions
     preds_dict = test_df[[id_col, target, f"{target}_pred"]].to_dict(orient="list")
     merge_json_on_disk({dataset_name: {f"fold_{fold}": preds_dict}}, preds_path)
 
     # save model scores to JSON
-    scores_path = f"{MODULE_DIR}/model_scores/{model_name}-{timestamp}.json"
+    scores_path = f"{MODULE_DIR}/model_scores/{timestamp}-{model_name}.json"
     scores_dict = {dataset_name: {f"fold_{fold}": test_metrics}}
     scores_dict["params"] = run_params
     merge_json_on_disk(scores_dict, scores_path)
@@ -93,7 +91,6 @@ def run_wrenformer_on_matbench(
     return test_metrics
 
 
-# %%
 if __name__ == "__main__":
     from glob import glob
 

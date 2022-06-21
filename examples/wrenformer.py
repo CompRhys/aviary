@@ -75,10 +75,10 @@ def run_wrenformer(
         wandb_project (str | None): Name of Weights and Biases project where to log this run.
             Defaults to None which means logging is disabled.
         checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
-            dicts to disk (local) or upload to wandb. Defaults to None.
+            dicts to disk (local) or upload to WandB. Defaults to None.
             To later copy a wandb checkpoint file to cwd and use it:
             ```py
-            run_path="<user|team>/<project>/<run_id>"  # e.g. aviary/matbench/31qh7b5q
+            run_path = "<user|team>/<project>/<run_id>"  # e.g. aviary/matbench/31qh7b5q
             checkpoint = wandb.restore("checkpoint.pth", run_path)
             torch.load(checkpoint.name)
             ```
@@ -182,14 +182,16 @@ def run_wrenformer(
         200 + 1 + 444,
     )  # Roost and Wren embedding size resp.
 
-    model = Wrenformer(
-        n_targets=[1 if task_type == reg_key else 2],
+    model_params = dict(
+        # 1 for regression, n_classes for classification
+        n_targets=[1 if task_type == reg_key else train_df[target_col].max() + 1],
         n_features=embedding_len,
         task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
         n_attn_layers=n_attn_layers,
         robust=robust,
         embedding_aggregations=embedding_aggregations,
     )
+    model = Wrenformer(**model_params)
     model.to(device)
     if isinstance(optimizer, str):
         optimizer_name, optimizer_params = optimizer, None
@@ -227,11 +229,9 @@ def run_wrenformer(
 
     run_params = {
         "epochs": epochs,
-        "optimizer": optimizer_name,
-        "optimizer_params": optimizer_params,
         "learning_rate": learning_rate,
-        "lr_scheduler": scheduler_name,
-        "scheduler_params": scheduler_params,
+        "optimizer": {"name": optimizer_name, "params": optimizer_params},
+        "lr_scheduler": {"name": scheduler_name, "params": scheduler_params},
         "batch_size": batch_size,
         "n_attn_layers": n_attn_layers,
         "target": target_col,
@@ -267,7 +267,6 @@ def run_wrenformer(
             settings=wandb.Settings(start_method="fork"),
             name=run_name,
             config=run_params,
-            save_code=True,
         )
 
     for epoch in range(epochs):
@@ -344,6 +343,7 @@ def run_wrenformer(
     # save model checkpoint
     if checkpoint is not None:
         state_dict = {
+            "model_params": model_params,
             "model_state": inference_model.state_dict(),
             "optimizer_state": optimizer_instance.state_dict(),
             "scheduler_state": lr_scheduler.state_dict(),
