@@ -64,7 +64,7 @@ def run_wrenformer_on_matbench(
         target_col=target,
         task_type=task_type,
         # set to None to disable logging
-        wandb_project=kwargs.get("wandb_project", "mp-wbm"),
+        wandb_project=kwargs.pop("wandb_project", "mp-wbm"),
         id_col=id_col,
         run_params={
             "dataset": dataset_name,

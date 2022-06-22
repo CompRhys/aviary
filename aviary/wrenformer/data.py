@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+from typing import Literal
 
 import numpy as np
+import pandas as pd
 import torch
 from pymatgen.core import Composition
 from torch import LongTensor, Tensor, nn
 
 from aviary import PKG_DIR
+from aviary.data import InMemoryDataLoader
 from aviary.wren.data import parse_aflow_wyckoff_str
 
 
@@ -118,3 +121,56 @@ def get_composition_embedding(formula: str) -> Tensor:
     combined_features = torch.cat([element_ratios, element_features], dim=1).float()
 
     return combined_features
+
+
+def df_to_in_mem_dataloader(
+    df: pd.DataFrame,
+    target_col: str,
+    input_col: str = "wyckoff",
+    id_col: str = "material_id",
+    embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
+    device: str = None,
+    **kwargs,
+) -> InMemoryDataLoader:
+    """Construct an InMemoryDataLoader with Wrenformer batch collation from a dataframe.
+    Can also be used for Roostformer.
+
+    Args:
+        df (pd.DataFrame): Expected to have columns input_col, target_col, id_col.
+        target_col (str): Column name holding the target values.
+        input_col (str): Column name holding the input values (Aflow Wyckoff labels or composition
+            strings) from which initial embeddings will be constructed. Defaults to "wyckoff".
+        id_col (str): Column name holding material identifiers. Defaults to "material_id".
+        embedding_type ('wyckoff' | 'composition'): Defaults to "wyckoff".
+        device (str): torch.device to load tensors onto. Defaults to
+            "cuda" if torch.cuda.is_available() else "cpu".
+        kwargs (dict): Keyword arguments like batch_size: int and shuffle: bool
+            to pass to InMemoryDataLoader. Defaults to None.
+
+    Returns:
+        InMemoryDataLoader: Ready for use in model.evaluate(data_loader) or
+            [model(x) for x in data_loader]
+    """
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if embedding_type not in ["wyckoff", "composition"]:
+        raise ValueError(f"{embedding_type = } must be 'wyckoff' or 'composition'")
+
+    initial_embeddings = df[input_col].map(
+        wyckoff_embedding_from_aflow_str
+        if embedding_type == "wyckoff"
+        else get_composition_embedding
+    )
+    targets = torch.tensor(df[target_col], device=device)
+    if targets.dtype == torch.bool:
+        targets = targets.long()  # convert binary classification targets to 0 and 1
+    inputs = np.empty(len(initial_embeddings), dtype=object)
+    for idx, tensor in enumerate(initial_embeddings):
+        inputs[idx] = tensor.to(device)
+
+    ids = df[id_col].to_numpy()
+    data_loader = InMemoryDataLoader(
+        [inputs, targets, ids], collate_fn=collate_batch, **kwargs
+    )
+    return data_loader
