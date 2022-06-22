@@ -9,14 +9,9 @@ import torch
 
 from aviary import ROOT
 from aviary.core import Normalizer, TaskType
-from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
 from aviary.utils import get_metrics
-from aviary.wrenformer.data import (
-    collate_batch,
-    get_composition_embedding,
-    wyckoff_embedding_from_aflow_str,
-)
+from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
 from aviary.wrenformer.utils import print_walltime
 
@@ -42,6 +37,7 @@ def run_wrenformer(
     target_col: str,
     epochs: int,
     timestamp: str = None,
+    input_col: str = None,
     id_col: str = "material_id",
     n_attn_layers: int = 4,
     wandb_project: str = None,
@@ -67,6 +63,8 @@ def run_wrenformer(
         train_df (pd.DataFrame): Dataframe containing the training data.
         test_df (pd.DataFrame): Dataframe containing the test data.
         target_col (str): Name of df column containing the target values.
+        input_col (str): Name of df column containing the input values. Defaults to 'wyckoff' if
+            'wren' in run_name else 'composition'.
         id_col (str): Name of df column containing material IDs.
         epochs (int): How many epochs to train for. Defaults to 100.
         timestamp (str): Will be included in run_params and used as file name prefix for model
@@ -118,23 +116,16 @@ def run_wrenformer(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
 
-    for label, df in [("training set", train_df), ("test set", test_df)]:
-        if "wren" in run_name.lower():
-            err_msg = "Missing 'wyckoff' column in dataframe. "
-            err_msg += (
-                "Please generate Aflow Wyckoff labels ahead of time."
-                if "structure" in df
-                else "Trying to deploy Wrenformer on composition-only task?"
-            )
-            assert "wyckoff" in df, err_msg
-            with print_walltime(
-                start_desc=f"Generating Wyckoff embeddings for {label}", newline=False
-            ):
-                df["features"] = df.wyckoff.map(wyckoff_embedding_from_aflow_str)
-        elif "roost" in run_name.lower():
-            df["features"] = df.composition.map(get_composition_embedding)
-        else:
-            raise ValueError(f"{run_name = } must contain 'roost' or 'wren'")
+    if "wren" in run_name.lower():
+        input_col = input_col or "wyckoff"
+        embedding_type = "wyckoff"
+    elif "roost" in run_name.lower():
+        input_col = input_col or "composition"
+        embedding_type = "composition"
+    else:
+        raise ValueError(
+            f"{run_name = } must contain 'roost' or 'wren' (case insensitive)"
+        )
 
     robust = "robust" in run_name.lower()
     loss_func = (
@@ -145,42 +136,24 @@ def run_wrenformer(
     loss_dict = {target_col: (task_type, loss_func)}
     normalizer_dict = {target_col: Normalizer() if task_type == reg_key else None}
 
-    features, targets, ids = (train_df[x] for x in ["features", target_col, id_col])
-    targets = torch.tensor(targets, device=device)
-    if targets.dtype == torch.bool:
-        targets = targets.long()
-    inputs = np.empty(len(features), dtype=object)
-    for idx, tensor in enumerate(features):
-        inputs[idx] = tensor.to(device)
-
-    train_loader = InMemoryDataLoader(
-        [inputs, targets, ids],
-        batch_size=batch_size,
-        shuffle=True,
-        collate_fn=collate_batch,
+    data_loader_kwargs = dict(
+        target_col=target_col,
+        input_col=input_col,
+        id_col=id_col,
+        embedding_type=embedding_type,
+    )
+    train_loader = df_to_in_mem_dataloader(
+        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs
     )
 
-    features, targets, ids = (test_df[x] for x in ["features", target_col, id_col])
-    targets = torch.tensor(targets, device=device)
-    if targets.dtype == torch.bool:
-        targets = targets.long()
-    inputs = np.empty(len(features), dtype=object)
-    for idx, tensor in enumerate(features):
-        inputs[idx] = tensor.to(device)
+    test_loader = df_to_in_mem_dataloader(test_df, batch_size=512, **data_loader_kwargs)
 
-    test_loader = InMemoryDataLoader(
-        [inputs, targets, ids], batch_size=512, collate_fn=collate_batch
-    )
-
-    # n_features is the length of the embedding vector for a Wyckoff position encoding
-    # the element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
-    # 'bra-alg-off.json') + 1 for the weight of that element/Wyckoff position in the
-    # material's composition
-    embedding_len = features[0].shape[-1]
-    assert embedding_len in (
-        200 + 1,
-        200 + 1 + 444,
-    )  # Roost and Wren embedding size resp.
+    # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
+    # element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
+    # 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or element) in the material
+    embedding_len = train_loader.tensors[0][0].shape[-1]
+    # Roost and Wren embedding size resp.
+    assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
 
     model_params = dict(
         # 1 for regression, n_classes for classification
@@ -242,6 +215,7 @@ def run_wrenformer(
         "training_samples": len(train_df),
         "test_samples": len(test_df),
         "trainable_params": model.num_params,
+        "task_type": task_type,
         "swa": {
             "start": swa_start,
             "epochs": int(swa_start * epochs),
@@ -272,6 +246,7 @@ def run_wrenformer(
     for epoch in range(epochs):
         if verbose:
             print(f"Epoch {epoch + 1}/{epochs}")
+
         train_metrics = model.evaluate(
             train_loader,
             loss_dict,
@@ -333,9 +308,9 @@ def run_wrenformer(
         predictions = predictions.softmax(dim=1)
 
     predictions = predictions.cpu().numpy().squeeze()
-    targets = targets.cpu().numpy()
+    targets = test_df[target_col]
     pred_col = f"{target_col}_pred"
-    test_df[pred_col] = predictions.tolist()
+    test_df[pred_col] = predictions.tolist()  # requires shuffle=False for test_loader
 
     test_metrics = get_metrics(targets, predictions, task_type)
     test_metrics["test_size"] = len(test_df)
