@@ -129,7 +129,7 @@ def test_cgcnn_clf(df_matbench_phonons):
     )
 
     logits = results_dict["phdos_clf"]["logits"]
-    targets = results_dict["phdos_clf"]["target"]
+    targets = results_dict["phdos_clf"]["targets"]
 
     # calculate metrics and errors with associated errors for ensembles
     ens_logits = np.mean(logits, axis=0)

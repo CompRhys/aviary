@@ -37,3 +37,4 @@ examples/mat_bench/checkpoints
 examples/*/job-logs/
 examples/*/wandb/
 examples/*/artifacts/
+.wandb_checkpoints/
