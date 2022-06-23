@@ -125,9 +125,9 @@ def get_composition_embedding(formula: str) -> Tensor:
 
 def df_to_in_mem_dataloader(
     df: pd.DataFrame,
-    target_col: str,
     input_col: str = "wyckoff",
-    id_col: str = "material_id",
+    target_col: str = None,
+    id_col: str = None,
     embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
     device: str = None,
     **kwargs,
@@ -137,10 +137,12 @@ def df_to_in_mem_dataloader(
 
     Args:
         df (pd.DataFrame): Expected to have columns input_col, target_col, id_col.
-        target_col (str): Column name holding the target values.
         input_col (str): Column name holding the input values (Aflow Wyckoff labels or composition
             strings) from which initial embeddings will be constructed. Defaults to "wyckoff".
-        id_col (str): Column name holding material identifiers. Defaults to "material_id".
+        target_col (str): Column name holding the target values. Defaults to None. Only leave this
+            empty if making predictions since target tensor will be set to list of Nones.
+        id_col (str): Column name holding sample IDs. Defaults to None. If None, IDs will be
+            the dataframe index.
         embedding_type ('wyckoff' | 'composition'): Defaults to "wyckoff".
         device (str): torch.device to load tensors onto. Defaults to
             "cuda" if torch.cuda.is_available() else "cpu".
@@ -162,14 +164,18 @@ def df_to_in_mem_dataloader(
         if embedding_type == "wyckoff"
         else get_composition_embedding
     )
-    targets = torch.tensor(df[target_col], device=device)
+    targets = (
+        torch.tensor(df[target_col].to_numpy(), device=device)
+        if target_col in df
+        else np.empty(len(df))
+    )
     if targets.dtype == torch.bool:
         targets = targets.long()  # convert binary classification targets to 0 and 1
     inputs = np.empty(len(initial_embeddings), dtype=object)
     for idx, tensor in enumerate(initial_embeddings):
         inputs[idx] = tensor.to(device)
 
-    ids = df[id_col].to_numpy()
+    ids = (df[id_col] if id_col in df else df.index).to_numpy()
     data_loader = InMemoryDataLoader(
         [inputs, targets, ids], collate_fn=collate_batch, **kwargs
     )
