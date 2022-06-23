@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Callable, Iterable
 
@@ -444,7 +445,7 @@ def results_multitask(  # noqa: C901
         save_results (bool, optional): Whether to save results dict. Defaults to True.
 
     Returns:
-        dict[str, dict[str, list | np.ndarray]]: Dictionary of predicted results for each
+        dict[str, dict[str, list | np.array]]: Dictionary of predicted results for each
             task.
     """
     if not (print_results or save_results):
@@ -465,27 +466,22 @@ def results_multitask(  # noqa: C901
     test_loader = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
 
-    results_dict: dict[str, dict[str, list | np.ndarray]] = {n: {} for n in task_dict}
-    for name, task in task_dict.items():
-        if task == "regression":
-            results_dict[name]["pred"] = np.zeros((ensemble_folds, len(test_set)))
-            if robust:
-                results_dict[name]["ale"] = np.zeros((ensemble_folds, len(test_set)))
+    results_dict: dict[str, dict[str, list | np.ndarray]] = {}
+    for target_name, task_type in task_dict.items():
+        results_dict[target_name] = defaultdict(
+            list
+            if task_type == "classification"
+            else lambda: np.zeros((ensemble_folds, len(test_set)))  # type: ignore
+        )
 
-        elif task == "classification":
-            results_dict[name]["logits"] = []
-            results_dict[name]["pre-logits"] = []
-            if robust:
-                results_dict[name]["pre-logits_ale"] = []
-
-    for j in range(ensemble_folds):
+    for ens_idx in range(ensemble_folds):
 
         if ensemble_folds == 1:
             resume = f"{ROOT}/models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
         else:
-            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{j}.pth.tar"
-            print(f"Evaluating Model {j + 1}/{ensemble_folds}")
+            resume = f"{ROOT}/models/{model_name}/{eval_type}-r{ens_idx}.pth.tar"
+            print(f"Evaluating Model {ens_idx + 1}/{ensemble_folds}")
 
         if not os.path.isfile(resume):
             raise FileNotFoundError(f"no checkpoint found at '{resume}'")
@@ -506,45 +502,47 @@ def results_multitask(  # noqa: C901
         model.load_state_dict(checkpoint["state_dict"])
 
         normalizer_dict: dict[str, Normalizer | None] = {}
-        for task, state_dict in checkpoint["normalizer_dict"].items():
+        for task_type, state_dict in checkpoint["normalizer_dict"].items():
             if state_dict is not None:
-                normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
+                normalizer_dict[task_type] = Normalizer.from_state_dict(state_dict)
             else:
-                normalizer_dict[task] = None
+                normalizer_dict[task_type] = None
 
-        y_test, output, *ids = model.predict(test_loader)
+        y_test, outputs, *ids = model.predict(test_loader)
 
-        for pred, target, (name, task) in zip(output, y_test, model.task_dict.items()):
-            if task == "regression":
-                normalizer = normalizer_dict[name]
+        for preds, targets, (target_name, task_type), res_dict in zip(
+            outputs, y_test, model.task_dict.items(), results_dict.values()
+        ):
+            if task_type == "regression":
+                normalizer = normalizer_dict[target_name]
                 assert isinstance(normalizer, Normalizer)
                 if model.robust:
-                    mean, log_std = pred.unbind(dim=1)
-                    pred = normalizer.denorm(mean.data.cpu())
+                    mean, log_std = preds.unbind(dim=1)
+                    preds = normalizer.denorm(mean.data.cpu())
                     ale_std = torch.exp(log_std).data.cpu() * normalizer.std
-                    results_dict[name]["ale"][j, :] = ale_std.view(-1).numpy()  # type: ignore
+                    res_dict["ale"][ens_idx, :] = ale_std.view(-1).numpy()  # type: ignore
                 else:
-                    pred = normalizer.denorm(pred.data.cpu())
+                    preds = normalizer.denorm(preds.data.cpu())
 
-                results_dict[name]["pred"][j, :] = pred.view(-1).numpy()  # type: ignore
+                res_dict["preds"][ens_idx, :] = preds.view(-1).numpy()  # type: ignore
 
-            elif task == "classification":
+            elif task_type == "classification":
                 if model.robust:
-                    mean, log_std = pred.chunk(2, dim=1)
+                    mean, log_std = preds.chunk(2, dim=1)
                     logits = (
                         sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
                     )
                     pre_logits = mean.data.cpu().numpy()
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
-                    results_dict[name]["pre-logits_ale"].append(pre_logits_std)  # type: ignore
+                    res_dict["pre-logits_ale"].append(pre_logits_std)  # type: ignore
                 else:
-                    pre_logits = pred.data.cpu().numpy()
+                    pre_logits = preds.data.cpu().numpy()
                     logits = pre_logits.softmax(1)
 
-                results_dict[name]["pre-logits"].append(pre_logits)  # type: ignore
-                results_dict[name]["logits"].append(logits)  # type: ignore
+                res_dict["pre-logits"].append(pre_logits)  # type: ignore
+                res_dict["logits"].append(logits)  # type: ignore
 
-            results_dict[name]["target"] = target
+            res_dict["targets"] = targets
 
     # TODO cleaner way to get identifier names
     if save_results:
@@ -555,23 +553,23 @@ def results_multitask(  # noqa: C901
         )
 
     if print_results:
-        for name, task in task_dict.items():
-            print(f"\nTask: '{name}' on test set")
-            if task == "regression":
-                print_metrics_regression(**results_dict[name])  # type: ignore
-            elif task == "classification":
-                print_metrics_classification(**results_dict[name])  # type: ignore
+        for target_name, task_type in task_dict.items():
+            print(f"\nTask: '{target_name}' on test set")
+            if task_type == "regression":
+                print_metrics_regression(**results_dict[target_name])  # type: ignore
+            elif task_type == "classification":
+                print_metrics_classification(**results_dict[target_name])  # type: ignore
 
     return results_dict
 
 
-def print_metrics_regression(targets: Tensor, preds: Tensor, **kwargs) -> None:
-    """Print out metrics for a regression task.
+def print_metrics_regression(targets: np.ndarray, preds: np.ndarray, **kwargs) -> None:
+    """Print out single model and/or ensemble metrics for a regression task.
 
     Args:
-        targets (ndarray(n_test)): targets for regression task
-        preds (ndarray(n_ensemble, n_test)): model predictions
-        kwargs: unused entries from the results dictionary
+        targets (np.array): Targets for regression task. Shape (n_test,).
+        preds (np.array): Model predictions. Shape (n_ensemble, n_test).
+        kwargs: unused entries from the results dictionary.
     """
     ensemble_folds = preds.shape[0]
     res = preds - targets
@@ -620,7 +618,7 @@ def print_metrics_regression(targets: Tensor, preds: Tensor, **kwargs) -> None:
 
 
 def print_metrics_classification(
-    target: LongTensor,
+    targets: LongTensor,
     logits: Tensor,
     average: Literal["micro", "macro", "samples", "weighted"] = "micro",
     **kwargs,
@@ -632,8 +630,8 @@ def print_metrics_classification(
     to multi-task automatically?
 
     Args:
-        target (ndarray(n_test)): categorical encoding of the tasks
-        logits (list[n_ens * ndarray(n_targets, n_test)]): logits predicted by the model
+        targets (np.array): Categorical encoding of the tasks. Shape (n_test,).
+        logits (list[n_ens * np.array(n_targets, n_test)]): logits predicted by the model.
         average ("micro" | "macro" | "samples" | "weighted"): Determines the type of
             data averaging. Defaults to 'micro' which calculates metrics globally by
             considering each element of the label indicator matrix as a label.
@@ -652,16 +650,16 @@ def print_metrics_classification(
     fscore = np.zeros(len(logits))
 
     target_ohe = np.zeros_like(logits[0])
-    target_ohe[np.arange(target.size), target] = 1
+    target_ohe[np.arange(targets.size), targets] = 1
 
     for j, y_logit in enumerate(logits):
 
         y_pred = np.argmax(y_logit, axis=1)
 
-        acc[j] = accuracy_score(target, y_pred)
+        acc[j] = accuracy_score(targets, y_pred)
         roc_auc[j] = roc_auc_score(target_ohe, y_logit, average=average)
         precision[j], recall[j], fscore[j], _ = precision_recall_fscore_support(
-            target, y_pred, average=average
+            targets, y_pred, average=average
         )
 
     if len(logits) == 1:
@@ -699,10 +697,10 @@ def print_metrics_classification(
 
         y_pred = np.argmax(ens_logits, axis=1)
 
-        ens_acc = accuracy_score(target, y_pred)
+        ens_acc = accuracy_score(targets, y_pred)
         ens_roc_auc = roc_auc_score(target_ohe, ens_logits, average=average)
         ens_prec, ens_recall, ens_fscore, _ = precision_recall_fscore_support(
-            target, y_pred, average=average
+            targets, y_pred, average=average
         )
 
         print("\nEnsemble Performance Metrics:")
@@ -779,8 +777,8 @@ def get_metrics(
     """Get performance metrics for model predictions.
 
     Args:
-        targets (np.ndarray): Ground truth values.
-        preds (np.ndarray): Model predictions. Should be class probabilities for classification
+        targets (np.array): Ground truth values.
+        preds (np.array): Model predictions. Should be class probabilities for classification
             (i.e. output model after applying softmax/sigmoid). Same shape as targets for
             regression, and [len(targets), n_classes] for classification.
         type ('regression' | 'classification'): Task type.
