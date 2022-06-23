@@ -138,12 +138,12 @@ def test_wren_regression(df_matbench_phonons_wyckoff):
         save_results=False,
     )
 
-    preds = results_dict[target_name]["pred"]
-    target = results_dict[target_name]["target"]
+    preds = results_dict[target_name]["preds"]
+    targets = results_dict[target_name]["targets"]
 
     y_ens = np.mean(preds, axis=0)
 
-    mae, rmse, r2 = get_metrics(target, y_ens, task).values()
+    mae, rmse, r2 = get_metrics(targets, y_ens, task).values()
 
     assert r2 > 0.7
     assert mae < 150
