@@ -769,8 +769,8 @@ def save_results_dict(
 
 
 def get_metrics(
-    targets: np.ndarray,
-    predictions: np.ndarray,
+    targets: np.ndarray | pd.Series,
+    predictions: np.ndarray | pd.Series,
     type: Literal["regression", "classification"],
     prec: int = 4,
 ) -> dict:
@@ -791,17 +791,17 @@ def get_metrics(
     metrics = {}
 
     if type == "regression":
-        metrics["mae"] = np.abs(targets - predictions).mean()
-        metrics["rmse"] = ((targets - predictions) ** 2).mean() ** 0.5
-        metrics["r2"] = r2_score(targets, predictions)
+        metrics["MAE"] = np.abs(targets - predictions).mean()
+        metrics["RMSE"] = ((targets - predictions) ** 2).mean() ** 0.5
+        metrics["R2"] = r2_score(targets, predictions)
     elif type == "classification":
         pred_labels = predictions.argmax(axis=1)
 
         metrics["accuracy"] = accuracy_score(targets, pred_labels)
         metrics["balanced_accuracy"] = balanced_accuracy_score(targets, pred_labels)
-        metrics["f1"] = f1_score(targets, pred_labels)
+        metrics["F1"] = f1_score(targets, pred_labels)
         class1_probas = predictions[:, 1]
-        metrics["rocauc"] = roc_auc_score(targets, class1_probas)
+        metrics["ROCAUC"] = roc_auc_score(targets, class1_probas)
 
     metrics = {key: round(float(val), prec) for key, val in metrics.items()}
 
