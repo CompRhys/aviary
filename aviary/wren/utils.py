@@ -71,7 +71,7 @@ def get_aflow_label_aflow(
     Install guide: https://aflow.org/install-aflow/#install_aflow
         http://aflow.org/install-aflow/install-aflow.sh -o install-aflow.sh
         chmod 555 install-aflow.sh
-        ./install-aflow.sh
+        ./install-aflow.sh --slim
 
     Args:
         struct (Structure): pymatgen Structure
