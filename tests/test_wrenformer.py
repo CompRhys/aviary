@@ -16,9 +16,9 @@ def test_wrenformer_regression(df_matbench_phonons_wyckoff):
         epochs=30,
     )
 
-    assert test_metrics["mae"] < 260, test_metrics
-    assert test_metrics["rmse"] < 420, test_metrics
-    assert test_metrics["r2"] > 0.1, test_metrics
+    assert test_metrics["MAE"] < 260, test_metrics
+    assert test_metrics["RMSE"] < 420, test_metrics
+    assert test_metrics["R2"] > 0.1, test_metrics
 
 
 def test_wrenformer_classification(df_matbench_phonons_wyckoff):
@@ -36,4 +36,4 @@ def test_wrenformer_classification(df_matbench_phonons_wyckoff):
     )
 
     assert test_metrics["accuracy"] > 0.7, test_metrics
-    assert test_metrics["rocauc"] > 0.8, test_metrics
+    assert test_metrics["ROCAUC"] > 0.8, test_metrics
