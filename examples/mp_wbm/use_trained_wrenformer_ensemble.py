@@ -16,6 +16,7 @@ __date__ = "2022-06-23"
 the MP+WBM dataset and makes predictions on the test set, then prints ensemble metrics.
 """
 
+
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target_col = "e_form"
 test_size = 0.05
@@ -33,6 +34,10 @@ if load_checkpoints_from_wandb:
     wandb_api = wandb.Api()
 
     runs = wandb_api.runs("aviary/mp-wbm", filters={"tags": {"$in": ["ensemble-id-2"]}})
+
+    print(
+        f"Loading checkpoints for the following run IDs:\n{', '.join(run.id for run in runs)}\n"
+    )
 
     checkpoint_paths: list[str] = []
     for run in runs:
@@ -59,4 +64,18 @@ test_df, ensemble_metrics = make_ensemble_predictions(
     checkpoint_paths, df=test_df, target_col=target_col
 )
 
-test_df.to_csv(f"{ROOT}/examples/mp_wbm/ensemble-test-predictions.csv")
+test_df.to_csv(f"{ROOT}/examples/mp_wbm/ensemble-predictions.csv")
+
+
+# print output:
+# Predicting with 10 model checkpoints(s)
+#
+# Single model performance:
+#          MAE    RMSE      R2
+# mean  0.0369  0.1218  0.9864
+# std   0.0005  0.0014  0.0003
+#
+# Ensemble performance:
+# MAE      0.0308
+# RMSE     0.118
+# R2       0.987

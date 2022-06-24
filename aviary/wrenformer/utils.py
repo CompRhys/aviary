@@ -102,6 +102,7 @@ def make_ensemble_predictions(
     model_class: type[BaseModelClass] = Wrenformer,
     device: str = None,
     print_metrics: bool = True,
+    warn_target_mismatch: bool = False,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Make predictions using an ensemble of Wrenformer models.
 
@@ -117,11 +118,15 @@ def make_ensemble_predictions(
             else "cpu".
         print_metrics (bool, optional): Whether to print performance metrics. Defaults to True
             if target_col is not None.
+        warn_target_mismatch (bool, optional): Whether to warn if target_col != target_name from
+            model checkpoint. Defaults to False.
 
     Returns:
         pd.DataFrame: Input dataframe with added columns for model and ensemble predictions. If
             target_col is not None, returns a 2nd dataframe containing model and ensemble metrics.
     """
+    # TODO: Add support for predicting all tasks a multi-task models was trained on. Currently only
+    # handles single targets.
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     data_loader = df_to_in_mem_dataloader(
@@ -138,11 +143,12 @@ def make_ensemble_predictions(
         checkpoint = torch.load(checkpoint_path, map_location=device)
 
         model_params = checkpoint["model_params"]
-        target_name, task_type = next(model_params["task_dict"].items())
+        target_name, task_type = list(model_params["task_dict"].items())[0]
         assert task_type in ("regression", "classification"), f"invalid {task_type = }"
-        if target_name != target_col:
+        if target_name != target_col and warn_target_mismatch:
             print(
-                f"Warning: {target_col = } does not match {target_name = } in checkpoint."
+                f"Warning: {target_col = } does not match {target_name = } in checkpoint. "
+                "If this is not by accident, disable this warning by passing warn_target=False."
             )
         model = model_class(**model_params)
         model.to(device)
@@ -155,7 +161,7 @@ def make_ensemble_predictions(
         if model.robust:
             predictions, aleat_log_std = predictions.chunk(2, dim=1)
             aleat_std = aleat_log_std.exp().cpu().numpy().squeeze()
-            df[f"aleat_std_{idx}"] = aleat_std.tolist()
+            df[f"aleatoric_std_{idx}"] = aleat_std.tolist()
 
         predictions = predictions.cpu().numpy().squeeze()
         pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
@@ -163,7 +169,14 @@ def make_ensemble_predictions(
 
     df_preds = df.filter(regex=r"_pred_\d")
     df[f"{target_col}_pred_ens"] = ensemble_preds = df_preds.mean(axis=1)
-    df[f"{target_col}_ens_epistemic_std"] = df_preds.std(axis=1)
+    df[f"{target_col}_epistemic_std_ens"] = epistemic_std = df_preds.std(axis=1)
+
+    if df.columns.str.startswith("aleatoric_std_").sum() > 0:
+        aleatoric_std = df.filter(regex=r"aleatoric_std_\d").mean(axis=1)
+        df[f"{target_col}_aleatoric_std_ens"] = aleatoric_std
+        df[f"{target_col}_total_std_ens"] = (
+            epistemic_std**2 + aleatoric_std**2
+        ) ** 0.5
 
     if target_col and print_metrics:
         targets = df[target_col]
@@ -175,12 +188,12 @@ def make_ensemble_predictions(
             index=df_preds.columns,
         )
 
-        print("Single model performance:")
-        print(all_model_metrics.describe().loc[["mean", "std"]])
+        print("\nSingle model performance:")
+        print(all_model_metrics.describe().round(4).loc[["mean", "std"]])
 
         ensemble_metrics = get_metrics(targets, ensemble_preds, task_type)
 
-        print("Ensemble performance:")
+        print("\nEnsemble performance:")
         for key, val in ensemble_metrics.items():
             print(f"{key:<8} {val:.3}")
         return df, all_model_metrics
