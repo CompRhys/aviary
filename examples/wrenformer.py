@@ -317,7 +317,7 @@ def run_wrenformer(
 
     # save model checkpoint
     if checkpoint is not None:
-        state_dict = {
+        checkpoint_dict = {
             "model_params": model_params,
             "model_state": inference_model.state_dict(),
             "optimizer_state": optimizer_instance.state_dict(),
@@ -327,16 +327,17 @@ def run_wrenformer(
             "metrics": test_metrics,
             "run_name": run_name,
             "normalizer_dict": normalizer_dict,
+            "run_params": run_params,
         }
         if checkpoint == "local":
             os.makedirs(f"{ROOT}/models", exist_ok=True)
             checkpoint_path = f"{ROOT}/models/{timestamp}-{run_name}.pth"
-            torch.save(state_dict, checkpoint_path)
+            torch.save(checkpoint_dict, checkpoint_path)
         if checkpoint == "wandb":
             assert (
                 wandb_project and wandb.run is not None
             ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
-            torch.save(state_dict, f"{wandb.run.dir}/checkpoint.pth")
+            torch.save(checkpoint_dict, f"{wandb.run.dir}/checkpoint.pth")
 
     # record test set metrics and scatter/ROC plots to wandb
     if wandb_project:
