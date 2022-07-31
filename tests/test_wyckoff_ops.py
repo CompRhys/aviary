@@ -22,9 +22,16 @@ def test_get_aflow_label_spglib():
     assert get_aflow_label_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
 
 
-def test_count_wyckoff_positions():
-    """Count the number of Wyckoff positions in esseneite"""
-    assert count_wyckoff_positions("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 6
+@pytest.mark.parametrize(
+    "aflow_label, count",
+    [
+        ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 6),  # esseneite
+        ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 26),
+        ("foo_bar_42_abc_a_b:X-Y-Z", 5),
+    ],
+)
+def test_count_wyckoff_positions(aflow_label, count):
+    assert count_wyckoff_positions(aflow_label) == count
 
 
 def test_count_crystal_dof():
@@ -37,7 +44,7 @@ def test_count_crystal_dof():
     [
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", "ABC2D6_mC40_15_e_e_f_3f"),
         ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si", "ABC2D6_mC40_15_a_e_f_3f"),
-        # failure of this case means doesn't single element materials
+        # failure of this case means doesn't handle single element materials
         ("A_tI8_141_ea:Ca", "A_tI8_141_ae"),  # not ea is non-canonical
         # failure of this case means not reordering elements based on int but first digit
         ("A4BC20D2_oC108_41_2b_a_10b_b:B-Ca-H-N", "AB2C4D20_oC108_41_a_b_2b_10b"),
@@ -49,7 +56,7 @@ def test_get_isopointal_proto(aflow_label, expected):
 
 
 @pytest.mark.parametrize(
-    "wyckoff_str, expected",
+    "aflow_label, expected",
     [
         ["A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S", 1],
         ["ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 2],
@@ -57,8 +64,8 @@ def test_get_isopointal_proto(aflow_label, expected):
         ["A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 3],
     ],
 )
-def test_count_distinct_wyckoff_letters(wyckoff_str, expected):
-    assert count_distinct_wyckoff_letters(wyckoff_str) == expected
+def test_count_distinct_wyckoff_letters(aflow_label, expected):
+    assert count_distinct_wyckoff_letters(aflow_label) == expected
 
 
 aflow_cli = which("aflow")
