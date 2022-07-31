@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import json
 import os
+import re
 from itertools import groupby
 from typing import Any, Sequence
 
@@ -269,14 +270,14 @@ def parse_aflow_wyckoff_str(
     elements = []
     wyckoff_set = []
 
-    for el, wyk_letter in zip(elems, wyckoff_letters):
-
-        # Put 1's in front of all Wyckoff letters not preceded by numbers
-        if not wyk_letter[0].isdigit():
-            wyk_letter = f"1{wyk_letter}"
+    for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
+        # normalize Wyckoff letters to start with 1 if missing digit
+        wyk_letters_per_elem = re.sub(
+            r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
+        )
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
-        sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letter, str.isalpha)]
+        sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)]
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
             m = int(n)
