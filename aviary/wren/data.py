@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import json
 import os
-import re
 from itertools import groupby
 from typing import Any, Sequence
 
@@ -119,9 +118,9 @@ class WyckoffData(Dataset):
         try:
             symmetry_features = np.vstack(
                 [
-                    self.sym_features[spg_num][wyk]
+                    self.sym_features[spg_num][wyk_site]
                     for wyckoff_sites in augmented_wyks
-                    for wyk in wyckoff_sites
+                    for wyk_site in wyckoff_sites
                 ]
             )
         except AssertionError:
@@ -270,14 +269,14 @@ def parse_aflow_wyckoff_str(
     elements = []
     wyckoff_set = []
 
-    subst = r"1\g<1>"
-    for el, wyk in zip(elems, wyckoff_letters):
+    for el, wyk_letter in zip(elems, wyckoff_letters):
 
         # Put 1's in front of all Wyckoff letters not preceded by numbers
-        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
+        if not wyk_letter[0].isdigit():
+            wyk_letter = f"1{wyk_letter}"
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
-        sep_n_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+        sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letter, str.isalpha)]
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
             m = int(n)

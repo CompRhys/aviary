@@ -114,10 +114,11 @@ def get_aflow_label_aflow(
     _, _, spg_no, *wyks = aflow_label.split("_")
     elems = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
-    subst = r"1\g<1>"  # normalize Wyckoff letters to start with 1 if missing digit
-    for el, wyk in zip(elems, wyks):
-        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
-        sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+    for el, wyk_letter in zip(elems, wyks):
+        # normalize Wyckoff letters to start with 1 if missing digit
+        if not wyk_letter[0].isdigit():
+            wyk_letter = f"1{wyk_letter}"
+        sep_el_wyks = ["".join(g) for _, g in groupby(wyk_letter, str.isalpha)]
         elem_dict[el] = sum(
             float(wyckoff_multiplicity_dict[spg_no][w]) * float(n)
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
@@ -194,8 +195,10 @@ def get_aflow_label_from_spga(
     sym_struct = spga.get_symmetrized_structure()
 
     equivs = [
-        (len(s), s[0].species_string, f"{wyk.translate(remove_digits)}")
-        for s, wyk in zip(sym_struct.equivalent_sites, sym_struct.wyckoff_symbols)
+        (len(s), s[0].species_string, wyk_letter.translate(remove_digits))
+        for s, wyk_letter in zip(
+            sym_struct.equivalent_sites, sym_struct.wyckoff_symbols
+        )
     ]
     equivs = sorted(equivs, key=lambda x: (x[1], x[2]))
 
@@ -338,7 +341,7 @@ def prototype_formula(composition: Composition) -> str:
     return anon
 
 
-def count_wyks(aflow_label: str) -> int:
+def count_wyckoff_positions(aflow_label: str) -> int:
     """Count number of Wyckoff positions in Wyckoff representation.
 
     Args:
@@ -350,22 +353,22 @@ def count_wyks(aflow_label: str) -> int:
     num_wyk = 0
 
     aflow_label, _ = aflow_label.split(":")
-    wyks = aflow_label.split("_")[3:]
+    wyk_letters = aflow_label.split("_")[3:]
 
-    subst = r"1\g<1>"
-    for wyk in wyks:
-        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
-        sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+    for wyk_letter in wyk_letters:
+        if not wyk_letter[0].isdigit():
+            wyk_letter = f"1{wyk_letter}"
+        sep_el_wyks = ["".join(g) for _, g in groupby(wyk_letter, str.isalpha)]
         try:
             num_wyk += sum(int(n) for n in sep_el_wyks[0::2])
         except ValueError:
-            print(sep_el_wyks)
+            print(f"{sep_el_wyks=}")
             raise
 
     return num_wyk
 
 
-def count_params(aflow_label: str) -> int:
+def count_crystal_dof(aflow_label: str) -> int:
     """Count number of free parameters coarse-grained in Wyckoff representation: how many
     degrees of freedom would remain to optimize during a crystal structure relaxation.
 
@@ -382,17 +385,17 @@ def count_params(aflow_label: str) -> int:
 
     num_params += cry_param_dict[pearson[0]]
 
-    subst = r"1\g<1>"
-    for wyk in wyks:
-        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
-        sep_el_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+    for wyk_letter in wyks:
+        if not wyk_letter[0].isdigit():
+            wyk_letter = f"1{wyk_letter}"
+        sep_el_wyks = ["".join(g) for _, g in groupby(wyk_letter, str.isalpha)]
         try:
             num_params += sum(
                 float(n) * param_dict[spg][k]
                 for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
             )
         except ValueError:
-            print(sep_el_wyks)
+            print(f"{sep_el_wyks=}")
             raise
 
     return int(num_params)

@@ -4,9 +4,9 @@ import pytest
 from pymatgen.core.structure import Structure
 
 from aviary.wren.utils import (
+    count_crystal_dof,
     count_distinct_wyckoff_letters,
-    count_params,
-    count_wyks,
+    count_wyckoff_positions,
     get_aflow_label_aflow,
     get_aflow_label_spglib,
     get_isopointal_proto_from_aflow,
@@ -22,14 +22,14 @@ def test_get_aflow_label_spglib():
     assert get_aflow_label_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
 
 
-def test_count_wyks():
+def test_count_wyckoff_positions():
     """Count the number of Wyckoff positions in esseneite"""
-    assert count_wyks("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 6
+    assert count_wyckoff_positions("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 6
 
 
-def test_count_params():
+def test_count_crystal_dof():
     """Count the number of coarse-grained parameters in esseneite"""
-    assert count_params("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 18
+    assert count_crystal_dof("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 18
 
 
 @pytest.mark.parametrize(
