@@ -77,7 +77,7 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
 
     symmetry_features = torch.tensor(
         [
-            [sym_features[spg_num][wyk] for wyk in equivalent_wyckoff_set]
+            [sym_features[spg_num][wyk_pos] for wyk_pos in equivalent_wyckoff_set]
             for equivalent_wyckoff_set in augmented_wyckoffs
         ]
     )
@@ -99,7 +99,7 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
 
 
 def get_composition_embedding(formula: str) -> Tensor:
-    """Concatenate matscholar element embeddings with element ratios in compostion.
+    """Concatenate matscholar element embeddings with element ratios in composition.
 
     Args:
         formula (str): Composition string.

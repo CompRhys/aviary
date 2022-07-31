@@ -119,9 +119,9 @@ class WyckoffData(Dataset):
         try:
             symmetry_features = np.vstack(
                 [
-                    self.sym_features[spg_num][wyk]
+                    self.sym_features[spg_num][wyk_site]
                     for wyckoff_sites in augmented_wyks
-                    for wyk in wyckoff_sites
+                    for wyk_site in wyckoff_sites
                 ]
             )
         except AssertionError:
@@ -270,14 +270,14 @@ def parse_aflow_wyckoff_str(
     elements = []
     wyckoff_set = []
 
-    subst = r"1\g<1>"
-    for el, wyk in zip(elems, wyckoff_letters):
-
-        # Put 1's in front of all Wyckoff letters not preceded by numbers
-        wyk = re.sub(r"((?<![0-9])[A-z])", subst, wyk)
+    for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
+        # normalize Wyckoff letters to start with 1 if missing digit
+        wyk_letters_per_elem = re.sub(
+            r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
+        )
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
-        sep_n_wyks = ["".join(g) for _, g in groupby(wyk, str.isalpha)]
+        sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)]
 
         for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
             m = int(n)

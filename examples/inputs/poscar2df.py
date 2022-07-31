@@ -8,7 +8,7 @@ from pymatgen.core import Composition, Structure
 from tqdm.autonotebook import tqdm
 
 from aviary.cgcnn.utils import get_cgcnn_input
-from aviary.wren.utils import count_wyks, get_aflow_label_spglib
+from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_spglib
 
 tqdm.pandas()  # prime progress_apply functionality
 
@@ -101,7 +101,7 @@ df["E_f"] = df[["composition", "E_vasp_per_atom"]].apply(
 
 # %%
 # Remove invalid Wyckoff Sequences
-df["nwyckoff"] = df["wyckoff"].apply(count_wyks)
+df["nwyckoff"] = df["wyckoff"].apply(count_wyckoff_positions)
 
 df = df[~df["wyckoff"].str.contains("Invalid")]
 print(f"Valid Wyckoff representation {len(df)}")
