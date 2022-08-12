@@ -85,7 +85,7 @@ Please note that for speed/demonstration purposes this example runs on only ~68 
 
 If you use this code please cite the relevant work:
 
-Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv]](https://arxiv.org/abs/1910.00617)
+`roost` - Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv]](https://arxiv.org/abs/1910.00617)
 
 ```tex
 @article{goodall2020predicting,
@@ -100,7 +100,7 @@ Predicting materials properties without crystal structure: Deep representation l
 }
 ```
 
-Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining. [[Paper]](https://www.science.org/doi/10.1126/sciadv.abn4117) [[arXiv]](https://arxiv.org/abs/2106.11132)
+`wren` - Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining. [[Paper]](https://www.science.org/doi/10.1126/sciadv.abn4117) [[arXiv]](https://arxiv.org/abs/2106.11132)
 
 ```tex
 @article{goodall2022rapid,
@@ -115,7 +115,7 @@ Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining. [[Paper]
 }
 ```
 
-Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties. [[Paper]](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.120.145301) [[arXiv]](https://arxiv.org/abs/1710.10324)
+`cgcnn` - Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties. [[Paper]](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.120.145301) [[arXiv]](https://arxiv.org/abs/1710.10324)
 
 ```tex
 @article{xie2018crystal,
