@@ -111,10 +111,10 @@ def get_aflow_label_aflow(
     aflow_label = aflow_proto["aflow_prototype_label"]
 
     # check that multiplicities satisfy original composition
-    _, _, spg_no, *wyks = aflow_label.split("_")
-    elems = sorted(el.symbol for el in struct.composition)
+    _, _, spg_no, *wyckoff_letters = aflow_label.split("_")
+    elements = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
-    for el, wyk_letters_per_elem in zip(elems, wyks):
+    for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
 
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_per_elem = re.sub(
@@ -123,12 +123,12 @@ def get_aflow_label_aflow(
         sep_el_wyks = [
             "".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)
         ]
-        elem_dict[el] = sum(
+        elem_dict[elem] = sum(
             float(wyckoff_multiplicity_dict[spg_no][w]) * float(n)
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
         )
 
-    full_label = f"{aflow_label}:{'-'.join(elems)}"
+    full_label = f"{aflow_label}:{'-'.join(elements)}"
 
     observed_formula = Composition(elem_dict).reduced_formula
     expected_formula = struct.composition.reduced_formula
@@ -394,14 +394,10 @@ def count_crystal_dof(aflow_label: str) -> int:
         sep_el_wyks = [
             "".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)
         ]
-        try:
-            num_params += sum(
-                float(n) * param_dict[spg][k]
-                for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
-            )
-        except ValueError:
-            print(f"{sep_el_wyks=}")
-            raise
+        num_params += sum(
+            float(n) * param_dict[spg][k]
+            for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
+        )
 
     return int(num_params)
 
