@@ -264,7 +264,7 @@ def parse_aflow_wyckoff_str(
     """
     proto, chemsys = aflow_label.split(":")
     elems = chemsys.split("-")
-    _, _, spg_no, *wyckoff_letters = proto.split("_")
+    _, _, spg_num, *wyckoff_letters = proto.split("_")
 
     wyckoff_site_multiplicities = []
     elements = []
@@ -284,14 +284,14 @@ def parse_aflow_wyckoff_str(
             elements.extend([el] * m)
             wyckoff_set.extend([l] * m)
             wyckoff_site_multiplicities.extend(
-                [float(wyckoff_multiplicity_dict[spg_no][l])] * m
+                [float(wyckoff_multiplicity_dict[spg_num][l])] * m
             )
 
     # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of high
     # memory use. Can be turned off by commenting out the for loop and returning
     # [wyckoff_set] instead of augmented_wyckoff_set. Wren should be able to learn anyway.
     augmented_wyckoff_set = []
-    for trans in relab_dict[spg_no]:
+    for trans in relab_dict[spg_num]:
         # Apply translation dictionary of allowed relabelling operations in spacegroup
         t = str.maketrans(trans)
         augmented_wyckoff_set.append(
@@ -300,4 +300,4 @@ def parse_aflow_wyckoff_str(
 
     augmented_wyckoff_set = list(set(augmented_wyckoff_set))
 
-    return spg_no, wyckoff_site_multiplicities, elements, augmented_wyckoff_set
+    return spg_num, wyckoff_site_multiplicities, elements, augmented_wyckoff_set
