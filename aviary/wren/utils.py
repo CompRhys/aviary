@@ -231,7 +231,7 @@ def get_aflow_label_from_spg_analyzer(
     # canonicalize the possible wyckoff letter sequences
     canonical = canonicalize_elem_wyks("_".join(elem_wyks), spg_num)
 
-    # get pearson symbol
+    # get Pearson symbol
     cry_sys = spg_analyzer.get_crystal_system()
     spg_sym = spg_analyzer.get_space_group_symbol()
     centering = "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
