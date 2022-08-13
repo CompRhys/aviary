@@ -28,8 +28,8 @@ torch.manual_seed(0)  # ensure reproducible results
 reg_key, clf_key = "regression", "classification"
 
 
-@print_walltime(end_desc="run_wrenformer()")
-def run_wrenformer(
+@print_walltime(end_desc="train_wrenformer()")
+def train_wrenformer(
     run_name: str,
     task_type: TaskType,
     train_df: pd.DataFrame,

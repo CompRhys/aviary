@@ -35,7 +35,7 @@ timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 python_script = f"""import os
 from datetime import datetime
 
-from examples.mp_wbm.run_wrenformer import run_wrenformer_on_mp_wbm
+from examples.mp_wbm.train_wrenformer import train_wrenformer_on_mp_wbm
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
@@ -46,7 +46,7 @@ print("{data_path=}")
 job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
-run_wrenformer_on_mp_wbm(
+train_wrenformer_on_mp_wbm(
     {model_name=},
     {target=},
     {data_path=},

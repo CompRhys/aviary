@@ -21,7 +21,7 @@ data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target_col = "e_form"
 test_size = 0.05
 df = pd.read_json(data_path)
-# shuffle with same random seed as in run_wrenformer() to get identical train/test split
+# shuffle with same random seed as in train_wrenformer() to get identical train/test split
 df = df.sample(frac=1, random_state=0)
 train_df = df.sample(frac=1 - test_size, random_state=0)
 test_df = df.drop(train_df.index)

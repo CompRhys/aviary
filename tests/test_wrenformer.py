@@ -1,4 +1,4 @@
-from examples.wrenformer import run_wrenformer
+from examples.wrenformer import train_wrenformer
 
 
 def test_wrenformer_regression(df_matbench_phonons_wyckoff):
@@ -6,7 +6,7 @@ def test_wrenformer_regression(df_matbench_phonons_wyckoff):
     train_df = df_matbench_phonons_wyckoff.sample(frac=0.8, random_state=0)
     test_df = df_matbench_phonons_wyckoff.drop(train_df.index)
 
-    test_metrics, *_ = run_wrenformer(
+    test_metrics, *_ = train_wrenformer(
         run_name="wrenformer",
         train_df=train_df,
         test_df=test_df,
@@ -26,7 +26,7 @@ def test_wrenformer_classification(df_matbench_phonons_wyckoff):
     train_df = df_matbench_phonons_wyckoff.sample(frac=0.8, random_state=0)
     test_df = df_matbench_phonons_wyckoff.drop(train_df.index)
 
-    test_metrics, _, _ = run_wrenformer(
+    test_metrics, _, _ = train_wrenformer(
         run_name="wrenformer-robust",
         train_df=train_df,
         test_df=test_df,

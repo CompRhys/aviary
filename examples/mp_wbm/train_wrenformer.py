@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 
 from aviary import ROOT
-from examples.wrenformer import run_wrenformer
+from examples.wrenformer import train_wrenformer
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-13"
 
 
-def run_wrenformer_on_mp_wbm(
+def train_wrenformer_on_mp_wbm(
     model_name: str,
     data_path: str,
     target: str,
@@ -28,7 +28,7 @@ def run_wrenformer_on_mp_wbm(
             uncertainty.
         data_path (str): Path to a data file to load with pandas.read_json().
         timestamp (str): Will prefix the names of model checkpoint files and other output files.
-        kwargs: Additional keyword arguments are passed to run_wrenformer(). See its doc string.
+        kwargs: Additional keyword arguments are passed to train_wrenformer(). See its doc string.
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -64,7 +64,7 @@ def run_wrenformer_on_mp_wbm(
         train_df = df.sample(frac=1 - test_size, random_state=0)
         test_df = df.drop(train_df.index)
 
-    test_metrics, *_ = run_wrenformer(
+    test_metrics, *_ = train_wrenformer(
         run_name=run_name,
         train_df=train_df,
         test_df=test_df,
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     timestamp = f"{datetime.now():%Y-%m-%d@%H-%M}"
 
     # for testing and debugging
-    test_metrics = run_wrenformer_on_mp_wbm(
+    test_metrics = train_wrenformer_on_mp_wbm(
         model_name="wrenformer-robust-tmp",
         target="e_form",
         data_path=f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz",
