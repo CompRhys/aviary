@@ -4,7 +4,7 @@ from monty.json import MontyEncoder
 from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.wren.utils import get_aflow_label_spglib
+from aviary.wren.utils import get_aflow_label_from_spglib
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -26,7 +26,7 @@ for idx, task in enumerate(mbbm.tasks, 1):
     if "structure" in df:
         df["composition"] = [x.formula for x in df.structure]
         df["wyckoff"] = [
-            get_aflow_label_spglib(x)
+            get_aflow_label_from_spglib(x)
             for x in tqdm(df.structure, desc="Getting Aflow Wyckoff labels")
         ]
     elif "composition" in df:

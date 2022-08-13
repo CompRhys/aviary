@@ -5,7 +5,7 @@ import torch
 from matminer.datasets import load_dataset
 
 from aviary.cgcnn.utils import get_cgcnn_input
-from aviary.wren.utils import get_aflow_label_spglib
+from aviary.wren.utils import get_aflow_label_from_spglib
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-09"
@@ -39,7 +39,7 @@ def df_matbench_jdft2d():
     df = df.set_index("material_id", drop=False)
     df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
 
-    df["wyckoff"] = [get_aflow_label_spglib(x) for x in df.structure]
+    df["wyckoff"] = df.structure.map(get_aflow_label_from_spglib)
 
     return df
 
@@ -49,8 +49,8 @@ def df_matbench_phonons_wyckoff(df_matbench_phonons):
     """Getting Aflow labels is expensive so we split into a separate fixture to avoid
     paying for it unless requested.
     """
-    df_matbench_phonons["wyckoff"] = [
-        get_aflow_label_spglib(x) for x in df_matbench_phonons.structure
-    ]
+    df_matbench_phonons["wyckoff"] = df_matbench_phonons.structure.map(
+        get_aflow_label_from_spglib
+    )
 
     return df_matbench_phonons

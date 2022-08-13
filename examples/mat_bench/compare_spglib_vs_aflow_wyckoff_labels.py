@@ -8,7 +8,7 @@ from pymatviz.utils import get_crystal_sys
 from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.wren.utils import get_aflow_label_from_aflow, get_aflow_label_spglib
+from aviary.wren.utils import get_aflow_label_from_aflow, get_aflow_label_from_spglib
 from examples.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
@@ -42,7 +42,7 @@ for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskit
 # %%
 # takes ~30 sec
 for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskites)):
-    get_aflow_label_spglib(struct)
+    get_aflow_label_from_spglib(struct)
 
 
 # %%

@@ -8,7 +8,7 @@ from aviary.wren.utils import (
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
     get_aflow_label_from_aflow,
-    get_aflow_label_spglib,
+    get_aflow_label_from_spglib,
     get_isopointal_proto_from_aflow,
 )
 
@@ -19,7 +19,7 @@ def test_get_aflow_label_spglib():
     """Check that spglib gives correct Aflow label for esseneite"""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
-    assert get_aflow_label_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    assert get_aflow_label_from_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
 
 
 @pytest.mark.parametrize(

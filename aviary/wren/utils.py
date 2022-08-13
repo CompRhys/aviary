@@ -144,7 +144,7 @@ def get_aflow_label_from_aflow(
     return full_label
 
 
-def get_aflow_label_spglib(
+def get_aflow_label_from_spglib(
     struct: Structure,
     errors: Literal["raise", "annotate", "ignore"] = "ignore",
 ) -> str:
