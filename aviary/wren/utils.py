@@ -337,7 +337,7 @@ def prototype_formula(composition: Composition) -> str:
     if all(x == int(x) for x in composition.values()):
         reduced /= gcd(*(int(i) for i in composition.values()))
 
-    amounts = [amt for amt in sorted(reduced.valuues(), key=lambda x: str(x[0]))]
+    amounts = [reduced[key] for key in sorted(reduced, key=str)]
 
     anon = ""
     for e, amt in zip(ascii_uppercase, amounts):
