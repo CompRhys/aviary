@@ -415,14 +415,14 @@ def input_parser():
         default=5,
         type=float,
         metavar="FLOAT",
-        help="Maximum radius for local neighbour graph (default: 5)",
+        help="Maximum radius for local neighbor graph (default: 5)",
     )
     parser.add_argument(
         "--max-num-nbr",
         default=12,
         type=int,
         metavar="INT",
-        help="Maximum number of neighbours to consider (default: 12)",
+        help="Maximum number of neighbors to consider (default: 12)",
     )
     parser.add_argument(
         "--dmin",

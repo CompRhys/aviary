@@ -78,7 +78,7 @@ class CrystalGraphData(Dataset):
         self.nbr_fea_dim = self.gdf.embedding_size
 
         self.df = df
-        self.df["Structure_obj"] = self.df[self.inputs].apply(get_structure, axis=1)
+        self.df.Structure_obj = self.df[self.inputs].apply(get_structure, axis=1)
 
         self._pre_check()
 
@@ -100,16 +100,16 @@ class CrystalGraphData(Dataset):
     def _get_nbr_data(
         self, crystal: Structure
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Get neighbours for every site.
+        """Get neighbors for every site.
 
         Args:
-            crystal (Structure): pymatgen Structure to get neighbours for
+            crystal (Structure): pymatgen Structure to get neighbors for
 
         Returns:
             tuple containing:
             - np.ndarray: Site indices
-            - np.ndarray: Neighbour indices
-            - np.ndarray: Distances between sites and neighbours
+            - np.ndarray: Neighbor indices
+            - np.ndarray: Distances between sites and neighbors
         """
         self_idx, nbr_idx, _, nbr_dist = crystal.get_neighbor_list(
             self.radius, numerical_tol=1e-8
@@ -136,7 +136,7 @@ class CrystalGraphData(Dataset):
         all_isolated = []
         some_isolated = []
 
-        for cif_id, crystal in zip(self.df["material_id"], self.df["Structure_obj"]):
+        for cif_id, crystal in zip(self.df.material_id, self.df.Structure_obj):
             self_idx, nbr_idx, _ = self._get_nbr_data(crystal)
 
             if len(self_idx) == 0:
@@ -149,7 +149,7 @@ class CrystalGraphData(Dataset):
         if not all_isolated == some_isolated == []:
             # drop the data points that do not give rise to dense crystal graphs
             isolated = {*all_isolated, *some_isolated}  # set union
-            self.df = self.df[~self.df["material_id"].isin(isolated)]
+            self.df = self.df[~self.df.material_id.isin(isolated)]
 
             print(f"all atoms in these structure are isolated: {all_isolated}")
             print(f"these structure have some isolated atoms: {some_isolated}")

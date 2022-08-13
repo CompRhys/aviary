@@ -35,7 +35,7 @@ def train_wrenformer_on_matbench(
         timestamp (str): Timestamp to append to the names of JSON files for model predictions
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
-        kwargs: Additional keyword arguments are passed to train_wrenformer(). See its doc string.
+        kwargs: Additional keyword arguments are passed to train_wrenformer().
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.

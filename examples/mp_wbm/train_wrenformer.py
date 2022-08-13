@@ -28,7 +28,7 @@ def train_wrenformer_on_mp_wbm(
             uncertainty.
         data_path (str): Path to a data file to load with pandas.read_json().
         timestamp (str): Will prefix the names of model checkpoint files and other output files.
-        kwargs: Additional keyword arguments are passed to train_wrenformer(). See its doc string.
+        kwargs: Additional keyword arguments are passed to train_wrenformer().
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
