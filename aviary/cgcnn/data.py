@@ -78,7 +78,7 @@ class CrystalGraphData(Dataset):
         self.nbr_fea_dim = self.gdf.embedding_size
 
         self.df = df
-        self.df.Structure_obj = self.df[self.inputs].apply(get_structure, axis=1)
+        self.df["Structure_obj"] = self.df[self.inputs].apply(get_structure, axis=1)
 
         self._pre_check()
 
@@ -169,7 +169,7 @@ class CrystalGraphData(Dataset):
         """
         # NOTE sites must be given in fractional coordinates
         row = self.df.iloc[idx]
-        crystal = row["Structure_obj"]
+        crystal = row.Structure_obj
         material_ids = row[self.identifiers]
 
         # atom features for disordered sites
@@ -183,7 +183,6 @@ class CrystalGraphData(Dataset):
             ]
         )
 
-        # # # neighbours
         self_idx, nbr_idx, nbr_dist = self._get_nbr_data(crystal)
 
         if not len(self_idx):
