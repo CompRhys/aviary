@@ -57,7 +57,8 @@ def train_wrenformer(
     embedding_aggregations: Sequence[str] = ("mean",),
     verbose: bool = False,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
-    """Run a single matbench task.
+    """Core training function for Wrenformer. Handles checkpointing and metric logging.
+    Wrapped by other functions like train_wrenformer_on_matbench() for specific datasets.
 
     Args:
         run_name (str): Can be any string to describe the Roost/Wren variant being trained.
@@ -199,26 +200,27 @@ def train_wrenformer(
     run_params = {
         "epochs": epochs,
         "learning_rate": learning_rate,
-        "optimizer": {"name": optimizer_name, "params": optimizer_params},
-        "lr_scheduler": {"name": scheduler_name, "params": scheduler_params},
+        "optimizer": dict(name=optimizer_name, params=optimizer_params),
+        "lr_scheduler": dict(name=scheduler_name, params=scheduler_params),
         "batch_size": batch_size,
         "n_attn_layers": n_attn_layers,
         "target": target_col,
         "robust": robust,
         "embedding_len": embedding_len,
         "losses": loss_dict,
-        "training_samples": len(train_df),
-        "test_samples": len(test_df),
+        "train_df": dict(shape=train_df.shape, columns=", ".join(train_df)),
+        "test_df": dict(shape=test_df.shape, columns=", ".join(test_df)),
         "trainable_params": model.num_params,
         "task_type": task_type,
-        "swa": {
-            "start": swa_start,
-            "epochs": int(swa_start * epochs),
-            "learning_rate": swa_lr,
-        }
+        "swa": dict(
+            start=swa_start,
+            epochs=int(swa_start * epochs),
+            learning_rate=swa_lr,
+        )
         if swa_start
         else None,
         "embedding_aggregations": ",".join(embedding_aggregations),
+        "checkpoint": checkpoint,
         **(run_params or {}),
     }
     if timestamp:
@@ -375,7 +377,8 @@ def train_wrenformer_on_df(
     test_size: float | None = None,
     **kwargs,
 ) -> dict[str, float]:
-    """Run a single matbench task.
+    """Train a Wrenformer model on a generic dataframe. This function handles the train/test
+    splitting, then delegates to train_wrenformer().
 
     Args:
         model_name (str): Can be any string to describe particular Roost/Wren variants. Include
@@ -424,7 +427,7 @@ def train_wrenformer_on_df(
         train_df = df.sample(frac=1 - test_size, random_state=0)
         test_df = df.drop(train_df.index)
 
-    run_params = {"df_info": f"shape = {df.shape}, columns = {', '.join(df)}"}
+    run_params = {}
     if isinstance(df_or_path, str):
         run_params["data_path"] = df_or_path
 

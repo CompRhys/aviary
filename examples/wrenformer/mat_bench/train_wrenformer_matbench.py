@@ -9,8 +9,8 @@ from matbench.task import MatbenchTask
 
 from aviary.core import TaskType
 from aviary.wrenformer.utils import merge_json_on_disk
-from examples.mat_bench import DATA_PATHS, MODULE_DIR
-from examples.wrenformer import train_wrenformer
+from examples.wrenformer.mat_bench import DATA_PATHS, MODULE_DIR
+from examples.wrenformer.train_wrenformer import train_wrenformer
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -23,7 +23,7 @@ def train_wrenformer_on_matbench(
     timestamp: str,
     **kwargs,
 ) -> dict[str, float]:
-    """Run a single matbench task.
+    """Train a Wrenformer on a single Matbench task.
 
     Args:
         model_name (str): Can be any string to describe particular Roost/Wren variants. Include
