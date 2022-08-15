@@ -1,4 +1,4 @@
-from examples.wrenformer import train_wrenformer
+from examples.wrenformer.train_wrenformer import train_wrenformer
 
 
 def test_wrenformer_regression(df_matbench_phonons_wyckoff):
