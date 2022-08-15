@@ -18,7 +18,7 @@ https://github.com/janosh/pymatviz/blob/main/examples/mp_bimodal_e_form.ipynb
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-08-13"
-__email__ = "janosh@lbl.gov"
+
 
 today = f"{datetime.now():%Y-%m-%d}"
 

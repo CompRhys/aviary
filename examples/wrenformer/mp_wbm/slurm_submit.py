@@ -4,13 +4,17 @@ import subprocess
 from datetime import datetime
 
 from aviary import ROOT
-from examples.mp_wbm import MODULE_DIR
+from examples.wrenformer.mp_wbm import MODULE_DIR
+
+"""
+Write a Python job file and sbatch it using subprocess.run()
+"""
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-13"
 
 
-# %% write Python submission file and sbatch it
+# %%
 epochs = 300
 n_attn_layers = 3
 embedding_aggregations = ("mean",)
@@ -21,7 +25,7 @@ scheduler = (
     {"factor": 0.25, "patience": 5, "verbose": True, "min_lr": 1e-7},
 )
 n_folds = 1
-data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
+df_or_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
 task_type = "regression"
 checkpoint = None  # None | 'local' | 'wandb'
@@ -35,24 +39,24 @@ timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 python_script = f"""import os
 from datetime import datetime
 
-from examples.mp_wbm.train_wrenformer import train_wrenformer_on_mp_wbm
+from examples.wrenformer.train_wrenformer import train_wrenformer_on_df
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
 print("{model_name=}")
-print("{data_path=}")
+print("{df_or_path=}")
 
 job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
-train_wrenformer_on_mp_wbm(
+train_wrenformer_on_df(
     {model_name=},
     {target=},
-    {data_path=},
+    {df_or_path=},
     {timestamp=},
     test_size=0.05,
-    # fold=(n_folds, job_array_id),
+    # folds=(n_folds, job_array_id),
     {epochs=},
     {n_attn_layers=},
     {checkpoint=},
@@ -61,6 +65,7 @@ train_wrenformer_on_mp_wbm(
     {scheduler=},
     {embedding_aggregations=},
     {batch_size=},
+    wandb_project="mp_wbm",
 )
 """
 

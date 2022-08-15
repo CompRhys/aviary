@@ -15,17 +15,22 @@ from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
 from aviary.wrenformer.utils import print_walltime
 
-try:
-    import wandb
-except ImportError:
-    pass
-
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-12"
+
 
 torch.manual_seed(0)  # ensure reproducible results
 
 reg_key, clf_key = "regression", "classification"
+
+
+def lr_lambda(epoch: int) -> float:
+    """This lambda goes up linearly until warmup_steps, then follows a power law decay.
+    Acts as a prefactor to the learning rate, i.e. actual_lr = lr_lambda(epoch) *
+    learning_rate.
+    """
+    warmup_steps = 10
+    return min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5))
 
 
 @print_walltime(end_desc="train_wrenformer()")
@@ -47,8 +52,7 @@ def train_wrenformer(
     scheduler: str | tuple[str, dict] = "LambdaLR",
     learning_rate: float = 1e-4,
     batch_size: int = 128,
-    warmup_steps: int = 10,
-    swa_start: float = 0.7,
+    swa_start: float = None,
     swa_lr: float = None,
     embedding_aggregations: Sequence[str] = ("mean",),
     verbose: bool = False,
@@ -91,10 +95,9 @@ def train_wrenformer(
             ('CosineAnnealingLR', {'T_max': n_epochs}).
         learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
         batch_size (int): The mini-batch size during training. Defaults to 128.
-        warmup_steps (int): How many warmup steps the scheduler should do. Defaults to 10.
         swa_start (float | None): When to start using stochastic weight averaging during training.
             Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
-            None to disable SWA. Defaults to 0.7. Proposed in https://arxiv.org/abs/1803.05407.
+            None to disable SWA. Defaults to None. Proposed in https://arxiv.org/abs/1803.05407.
         swa_lr (float): Learning rate for SWA scheduler. Defaults to learning_rate.
         embedding_aggregations (list[str]): Aggregations to apply to the learned embedding returned
             by the transformer encoder before passing into the ResidualNetwork. One or more of
@@ -106,7 +109,7 @@ def train_wrenformer(
 
     Returns:
         tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.
-            2nd dict are the run's hyperparameters. 3rd is the dataframe with test set predictions.
+            2nd dict are the run's hyperparameters. 3rd is a dataframe with test set predictions.
     """
     if checkpoint not in (None, "local", "wandb"):
         raise ValueError(f"Unknown {checkpoint=}")
@@ -177,15 +180,8 @@ def train_wrenformer(
         params=model.parameters(), lr=learning_rate, **(optimizer_params or {})
     )
 
-    # This lambda goes up linearly until warmup_steps, then follows a power law decay.
-    # Acts as a prefactor to the learning rate, i.e. actual_lr = lr_lambda(epoch) *
-    # learning_rate.
     if scheduler == "LambdaLR":
-        scheduler_name, scheduler_params = "LambdaLR", {
-            "lr_lambda": lambda epoch: min(
-                (epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5)
-            )
-        }
+        scheduler_name, scheduler_params = "LambdaLR", {"lr_lambda": lr_lambda}
     elif isinstance(scheduler, str):
         scheduler_name, scheduler_params = scheduler, None
     elif isinstance(scheduler, (tuple, list)):
@@ -208,7 +204,6 @@ def train_wrenformer(
         "batch_size": batch_size,
         "n_attn_layers": n_attn_layers,
         "target": target_col,
-        "warmup_steps": warmup_steps,
         "robust": robust,
         "embedding_len": embedding_len,
         "losses": loss_dict,
@@ -233,6 +228,8 @@ def train_wrenformer(
             run_params[x] = os.environ[x]
 
     if wandb_project:
+        import wandb
+
         if wandb.run is None:
             wandb.login()
         wandb.init(
@@ -367,3 +364,79 @@ def train_wrenformer(
         wandb.finish()
 
     return test_metrics, run_params, test_df
+
+
+def train_wrenformer_on_df(
+    model_name: str,
+    df_or_path: str | pd.DataFrame,
+    target_col: str,
+    id_col: str = "material_id",
+    folds: tuple[int, int] | None = None,
+    test_size: float | None = None,
+    **kwargs,
+) -> dict[str, float]:
+    """Run a single matbench task.
+
+    Args:
+        model_name (str): Can be any string to describe particular Roost/Wren variants. Include
+            'robust' to use a robust loss function and have the model learn to predict an aleatoric
+            uncertainty.
+        df_or_path (str): Path to a data file to load with pandas.read_json().
+        timestamp (str): Will prefix the names of model checkpoint files and other output files.
+        folds (tuple[int, int] | None): If not None, split the data into n_folds[0] folds and use
+            fold with index n_folds[1] as the test set. E.g. (10, 0) will create a 90/10 split
+            and use first 10% as the test set.
+        kwargs: Additional keyword arguments are passed to train_wrenformer().
+
+    Raises:
+        ValueError: On unknown dataset_name or invalid checkpoint.
+
+    Returns:
+        dict[str, float]: The model's test set metrics.
+    """
+    run_name = f"{model_name}-mp-{target_col}"
+
+    if isinstance(df_or_path, str):
+        df = pd.read_json(df_or_path).set_index(id_col, drop=False)
+    else:
+        df = df_or_path
+    # shuffle samples for random train/test split
+    df = df.sample(frac=1, random_state=0)
+
+    if folds == test_size is None:
+        raise ValueError(f"Must specify either {folds=} or {test_size=}")
+    if folds is not None is not test_size:
+        raise ValueError(f"Must specify either {folds=} or {test_size=}, not both")
+
+    if folds is not None:
+        n_folds, test_fold_idx = folds
+        assert 1 < n_folds <= 10, f"{n_folds = } must be between 2 and 10"
+        assert (
+            0 <= test_fold_idx < n_folds
+        ), f"{test_fold_idx = } must be between 0 and {n_folds - 1}"
+
+        df_splits: list[pd.DataFrame] = np.array_split(df, n_folds)
+        test_df = df_splits.pop(test_fold_idx)
+        train_df = pd.concat(df_splits)
+    if test_size is not None:
+        assert 0 < test_size < 1, f"{test_size = } must be between 0 and 1"
+
+        train_df = df.sample(frac=1 - test_size, random_state=0)
+        test_df = df.drop(train_df.index)
+
+    run_params = {"df_info": f"shape = {df.shape}, columns = {', '.join(df)}"}
+    if isinstance(df_or_path, str):
+        run_params["data_path"] = df_or_path
+
+    test_metrics, *_ = train_wrenformer(
+        run_name=run_name,
+        train_df=train_df,
+        test_df=test_df,
+        target_col=target_col,
+        task_type="regression",
+        id_col=id_col,
+        run_params=run_params,
+        **kwargs,
+    )
+
+    return test_metrics

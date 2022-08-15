@@ -12,7 +12,8 @@ from aviary.wrenformer.utils import make_ensemble_predictions
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-23"
 
-"""Script that downloads checkpoints for an ensemble of Wrenformer models trained on
+"""
+Script that downloads checkpoints for an ensemble of Wrenformer models trained on
 the MP+WBM dataset and makes predictions on the test set, then prints ensemble metrics.
 """
 
