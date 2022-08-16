@@ -59,7 +59,7 @@ else:
         f"{ROOT}/examples/mp_wbm/job-logs/wandb/run-20220621_13*/files/checkpoint.pth"
     )
 
-print(f"Predicting with {len(checkpoint_paths):,} model checkpoints(s)")
+print(f"Predicting with {len(checkpoint_paths):,} model checkpoint(s)")
 
 test_df, ensemble_metrics = make_ensemble_predictions(
     checkpoint_paths, df=test_df, target_col=target_col
@@ -69,7 +69,7 @@ test_df.to_csv(f"{ROOT}/examples/mp_wbm/ensemble-predictions.csv")
 
 
 # print output:
-# Predicting with 10 model checkpoints(s)
+# Predicting with 10 model checkpoint(s)
 #
 # Single model performance:
 #          MAE    RMSE      R2
