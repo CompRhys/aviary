@@ -15,7 +15,7 @@ from aviary.wren.utils import (
 from .conftest import TEST_DIR
 
 
-def test_get_aflow_label_spglib():
+def test_get_aflow_label_from_spglib():
     """Check that spglib gives correct Aflow label for esseneite"""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
