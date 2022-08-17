@@ -400,7 +400,7 @@ def count_crystal_dof(aflow_label: str) -> int:
                 for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
             )
         except ValueError:
-            print(f"{sep_el_wyks=}")
+            print(f"sep_el_wyks = {sep_el_wyks}")
             raise
 
     return int(num_params)
