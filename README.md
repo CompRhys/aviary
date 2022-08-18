@@ -12,8 +12,8 @@
 
 The aviary contains:
 
-* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
-* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
+* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/new_colab/examples/colab/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
+* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/new_colab/examples/colab/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
 * `cgcnn`.
 
 The aim is to contain multiple models for materials discovery under a common interface
