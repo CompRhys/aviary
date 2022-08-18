@@ -275,7 +275,7 @@ class BaseModelClass(nn.Module, ABC):
                         loss = loss_func(preds, targets)
 
                     z_scored_error = preds - targets
-                    error = normalizer.denorm(z_scored_error.data.cpu())
+                    error = normalizer.std * z_scored_error.data.cpu()
                     target_metrics["MAE"].append(float(error.abs().mean()))
                     target_metrics["MSE"].append(float(error.pow(2).mean()))
 
