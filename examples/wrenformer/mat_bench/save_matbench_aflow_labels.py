@@ -1,6 +1,5 @@
 import pandas as pd
 from matbench import MatbenchBenchmark
-from monty.json import MontyEncoder
 from tqdm import tqdm
 
 from aviary import ROOT
@@ -36,5 +35,5 @@ for idx, task in enumerate(mbbm.tasks, 1):
 
     df.to_json(
         f"{ROOT}/datasets/{task.dataset_name}.json.bz2",
-        default_handler=MontyEncoder().encode,
+        default_handler=lambda x: x.as_dict(),
     )

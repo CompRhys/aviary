@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from glob import glob
 
 import pandas as pd
@@ -17,6 +18,7 @@ Script that downloads checkpoints for an ensemble of Wrenformer models trained o
 the MP+WBM dataset and makes predictions on the test set, then prints ensemble metrics.
 """
 
+today = f"{datetime.now():%Y-%m-%d}"
 
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target_col = "e_form"
@@ -56,7 +58,7 @@ if load_checkpoints_from_wandb:
 else:
     # load checkpoints from local run dirs
     checkpoint_paths = glob(
-        f"{ROOT}/examples/mp_wbm/job-logs/wandb/run-20220621_13*/files/checkpoint.pth"
+        f"{ROOT}/examples/wrenformer/mp_wbm/job-logs/wandb/run-20220621_13*/files/checkpoint.pth"
     )
 
 print(f"Predicting with {len(checkpoint_paths):,} model checkpoint(s)")
@@ -65,7 +67,7 @@ test_df, ensemble_metrics = make_ensemble_predictions(
     checkpoint_paths, df=test_df, target_col=target_col
 )
 
-test_df.to_csv(f"{ROOT}/examples/mp_wbm/ensemble-predictions.csv")
+test_df.to_csv(f"{ROOT}/examples/wrenformer/mp_wbm/{today}-ensemble-predictions.csv")
 
 
 # print output:

@@ -2,7 +2,7 @@
 from datetime import datetime
 
 import pandas as pd
-from mp_api import MPRester
+from mp_api.client import MPRester
 
 from aviary import ROOT
 from aviary.utils import as_dict_handler

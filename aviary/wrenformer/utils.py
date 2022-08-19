@@ -103,6 +103,8 @@ def make_ensemble_predictions(
     device: str = None,
     print_metrics: bool = True,
     warn_target_mismatch: bool = False,
+    embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
+    batch_size: int = 512,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Make predictions using an ensemble of Wrenformer models.
 
@@ -120,21 +122,25 @@ def make_ensemble_predictions(
             if target_col is not None.
         warn_target_mismatch (bool, optional): Whether to warn if target_col != target_name from
             model checkpoint. Defaults to False.
+        embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use depending on
+            using Wren-/Roostformer ensemble. Defaults to "wyckoff".
+        batch_size (int, optional): Batch size for data loader. Defaults to 512. Can be large to
+            speedup inference.
 
     Returns:
         pd.DataFrame: Input dataframe with added columns for model and ensemble predictions. If
             target_col is not None, returns a 2nd dataframe containing model and ensemble metrics.
     """
     # TODO: Add support for predicting all tasks a multi-task models was trained on. Currently only
-    # handles single targets.
+    # handles single targets. Low priority as multi-tasking is rarely used.
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     data_loader = df_to_in_mem_dataloader(
         df=df,
         target_col=target_col,
         input_col=input_col,
-        batch_size=512,
-        embedding_type="wyckoff",
+        batch_size=batch_size,
+        embedding_type=embedding_type,
     )
 
     print(f"Predicting with {len(checkpoint_paths):,} model checkpoints(s)")
@@ -145,7 +151,7 @@ def make_ensemble_predictions(
         model_params = checkpoint["model_params"]
         target_name, task_type = list(model_params["task_dict"].items())[0]
         assert task_type in ("regression", "classification"), f"invalid {task_type = }"
-        if target_name != target_col and warn_target_mismatch:
+        if warn_target_mismatch and target_name != target_col:
             print(
                 f"Warning: {target_col = } does not match {target_name = } in checkpoint. "
                 "If this is not by accident, disable this warning by passing warn_target=False."
