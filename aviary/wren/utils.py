@@ -367,7 +367,7 @@ def count_wyckoff_positions(aflow_label: str) -> int:
     wyk_letters = aflow_label.split("_", maxsplit=3)[-1]
     # throw Wyckoff positions for all elements together
     wyk_letters = wyk_letters.replace("_", "")
-    wyk_list = re.split("[a-z]", wyk_letters)[:-1]  # split on every letter
+    wyk_list = re.split("[A-z]", wyk_letters)[:-1]  # split on every letter
 
     # count 1 for letters without prefix
     num_wyk = sum(1 if len(x) == 0 else int(x) for x in wyk_list)

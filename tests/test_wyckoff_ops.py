@@ -27,7 +27,7 @@ def test_get_aflow_label_from_spglib():
     [
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 6),  # esseneite
         ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 26),
-        ("foo_bar_42_abc_a_b:X-Y-Z", 5),
+        ("foo_bar_47_abc_A_b:X-Y-Z", 5),
     ],
 )
 def test_count_wyckoff_positions(aflow_label, count):

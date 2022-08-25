@@ -10,13 +10,7 @@
 
 </h4>
 
-The aviary contains:
-
-* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
-* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/colab/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
-* `cgcnn`.
-
-The aim is to contain multiple models for materials discovery under a common interface
+The aim of `aviary` is to contain multiple models for materials discovery under a common interface, overtime we hope to add more models with a particularly focus on coordinate free deep learning models.
 
 ## `conda` Installation
 
@@ -55,7 +49,7 @@ git clone https://github.com/CompRhys/aviary
 pip install -e ./aviary
 ```
 
-## Example Use
+## Example Use from CLI
 
 To test the input files generation and cleaning/canonicalization please run:
 
@@ -80,6 +74,13 @@ python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/
 ```
 
 Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts have been used for all experiments conducted.
+
+## Notebooks
+
+We also provide some notebooks that show more a more pythonic way to interact with the codebase, these examples make use of the TAATA dataset examined in the `wren` manuscript:
+
+* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
+* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
 
 ## Cite This Work
 
