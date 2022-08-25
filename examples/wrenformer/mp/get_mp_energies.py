@@ -9,7 +9,7 @@ from aviary.utils import as_dict_handler
 from aviary.wren.utils import get_aflow_label_from_spglib
 
 """
-Download all MP formation and above hull energies on 2020-08-13 for training a Wrenformer
+Download all MP formation and above hull energies on 2022-08-13 for training a Wrenformer
 ensemble.
 
 Related EDA of MP formation energies:

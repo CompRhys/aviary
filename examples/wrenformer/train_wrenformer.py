@@ -45,7 +45,7 @@ def train_wrenformer(
     input_col: str = None,
     id_col: str = "material_id",
     n_attn_layers: int = 4,
-    wandb_project: str = None,
+    wandb_path: str = None,
     checkpoint: Literal["local", "wandb"] | None = None,
     run_params: dict[str, Any] = None,
     optimizer: str | tuple[str, dict] = "AdamW",
@@ -75,8 +75,8 @@ def train_wrenformer(
         timestamp (str): Will be included in run_params and used as file name prefix for model
             checkpoints and result files. Defaults to None.
         n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
-        wandb_project (str | None): Name of Weights and Biases project where to log this run.
-            Defaults to None which means logging is disabled.
+        wandb_path (str | None): Path to Weights and Biases project where to log this run formatted
+            as '<entity>/<project>'. Defaults to None which means logging is disabled.
         checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
             dicts to disk (local) or upload to WandB. Defaults to None.
             To later copy a wandb checkpoint file to cwd and use it:
@@ -114,8 +114,8 @@ def train_wrenformer(
     """
     if checkpoint not in (None, "local", "wandb"):
         raise ValueError(f"Unknown {checkpoint=}")
-    if checkpoint == "wandb" and not wandb_project:
-        raise ValueError(f"Cannot save checkpoint to wandb if {wandb_project=}")
+    if checkpoint == "wandb" and not wandb_path:
+        raise ValueError(f"Cannot save checkpoint to wandb if {wandb_path=}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
@@ -229,13 +229,15 @@ def train_wrenformer(
         if x in os.environ:
             run_params[x] = os.environ[x]
 
-    if wandb_project:
+    if wandb_path:
         import wandb
 
         if wandb.run is None:
             wandb.login()
+        wandb_entity, wandb_project = wandb_path.split("/")
         wandb.init(
-            project=wandb_project,  # run will be added to this project
+            entity=wandb_entity,  # run will be added to this entity/project
+            project=wandb_project,
             # https://docs.wandb.ai/guides/track/launch#init-start-error
             settings=wandb.Settings(start_method="fork"),
             name=run_name,
@@ -281,7 +283,7 @@ def train_wrenformer(
 
         model.epoch += 1
 
-        if wandb_project:
+        if wandb_path:
             wandb.log({"training": train_metrics, "validation": val_metrics})
 
     # get test set predictions
@@ -334,12 +336,12 @@ def train_wrenformer(
             torch.save(checkpoint_dict, checkpoint_path)
         if checkpoint == "wandb":
             assert (
-                wandb_project and wandb.run is not None
+                wandb_path and wandb.run is not None
             ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
             torch.save(checkpoint_dict, f"{wandb.run.dir}/checkpoint.pth")
 
     # record test set metrics and scatter/ROC plots to wandb
-    if wandb_project:
+    if wandb_path:
         wandb.run.summary["test"] = test_metrics
         table_cols = [id_col, target_col, pred_col]
         if robust:

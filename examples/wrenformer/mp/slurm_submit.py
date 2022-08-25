@@ -62,7 +62,7 @@ train_wrenformer_on_df(
     {embedding_aggregations=},
     {batch_size=},
     {swa_start=},
-    wandb_project="mp",
+    wandb_path="aviary/mp",
 )
 """
 

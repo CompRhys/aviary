@@ -64,7 +64,7 @@ def train_wrenformer_on_matbench(
         target_col=target,
         task_type=task_type,
         # set to None to disable logging
-        wandb_project=kwargs.pop("wandb_project", "mp-wbm"),
+        wandb_path=kwargs.pop("aviary/wandb_path", "mp-wbm"),
         id_col=id_col,
         run_params={
             "dataset": dataset_name,
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             timestamp=timestamp,
             fold=0,
             epochs=25,
-            wandb_project=None,
+            wandb_path=None,
             verbose=True,
         )
         print(f"{test_metrics = }")

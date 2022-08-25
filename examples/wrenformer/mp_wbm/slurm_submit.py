@@ -65,7 +65,7 @@ train_wrenformer_on_df(
     {scheduler=},
     {embedding_aggregations=},
     {batch_size=},
-    wandb_project="mp-wbm",
+    wandb_path="aviary/mp-wbm",
 )
 """
 
