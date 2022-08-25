@@ -806,3 +806,12 @@ def get_metrics(
     metrics = {key: round(float(val), prec) for key, val in metrics.items()}
 
     return metrics
+
+
+def as_dict_handler(obj: Any) -> dict[str, Any] | None:
+    """Use as default_handler kwarg to json.dump() or pandas.to_json()."""
+    try:
+        return obj.as_dict()  # all MSONable objects implement as_dict()
+    except AttributeError:
+
+        return None  # replace unhandled objects with None in serialized data

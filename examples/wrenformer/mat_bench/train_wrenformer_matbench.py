@@ -9,21 +9,21 @@ from matbench.task import MatbenchTask
 
 from aviary.core import TaskType
 from aviary.wrenformer.utils import merge_json_on_disk
-from examples.mat_bench import DATA_PATHS, MODULE_DIR
-from examples.wrenformer import run_wrenformer
+from examples.wrenformer.mat_bench import DATA_PATHS, MODULE_DIR
+from examples.wrenformer.train_wrenformer import train_wrenformer
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
 
 
-def run_wrenformer_on_matbench(
+def train_wrenformer_on_matbench(
     model_name: str,
     dataset_name: str,
     fold: Literal[0, 1, 2, 3, 4],
     timestamp: str,
     **kwargs,
 ) -> dict[str, float]:
-    """Run a single matbench task.
+    """Train a Wrenformer on a single Matbench task.
 
     Args:
         model_name (str): Can be any string to describe particular Roost/Wren variants. Include
@@ -35,7 +35,7 @@ def run_wrenformer_on_matbench(
         timestamp (str): Timestamp to append to the names of JSON files for model predictions
             and performance scores. If the files already exist, results from different datasets
             or folds will be merged in.
-        kwargs: Additional keyword arguments are passed to run_wrenformer(). See its doc string.
+        kwargs: Additional keyword arguments are passed to train_wrenformer().
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -57,7 +57,7 @@ def run_wrenformer_on_matbench(
     train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
     test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
-    test_metrics, run_params, test_df = run_wrenformer(
+    test_metrics, run_params, test_df = train_wrenformer(
         run_name=run_name,
         train_df=train_df,
         test_df=test_df,
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     try:
         # for testing and debugging
-        test_metrics = run_wrenformer_on_matbench(
+        test_metrics = train_wrenformer_on_matbench(
             model_name=f"roostformer-{dataset_name}-tmp",
             dataset_name=dataset_name,
             timestamp=timestamp,

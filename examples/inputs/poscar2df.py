@@ -8,9 +8,9 @@ from pymatgen.core import Composition, Structure
 from tqdm.autonotebook import tqdm
 
 from aviary.cgcnn.utils import get_cgcnn_input
-from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_spglib
+from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_from_spglib
 
-tqdm.pandas()  # prime progress_apply functionality
+tqdm.pandas()  # prime progress_map functionality
 
 final_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -20,14 +20,11 @@ E_vasp_list = []
 meta_list = []
 ht_paths = []
 
-for f in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
-    task_id = f.split("/")[-1].split(".")[0]
+for filepath in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
+    task_id = filepath.split("/")[-1].split(".")[0]
 
-    with open(f) as s:
-        s = s.read()
-        struct = Structure.from_str(s, fmt="poscar")
-
-        lines = s.split("\n")
+    with open(filepath) as file_handle:
+        lines = file_handle.readlines()
 
         num = lines[6].split()
         E_vasp_per_atom = float(lines[0].split()[0]) / sum(int(a) for a in num)
@@ -36,6 +33,7 @@ for f in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
         meta_data = "[" + lines[0].split("[")[-1]
 
     idx_list.append(task_id)
+    struct = Structure.from_file(file_handle)
     structs.append(struct)
     E_vasp_list.append(E_vasp_per_atom)
     ht_paths.append(ht_path)
@@ -55,7 +53,7 @@ print("\n~~~~ LOAD DATA ~~~~")
 # Remove duplicated ID's keeping lowest energy
 # NOTE this is a bug in TAATA we really shouldn't have to do this
 df = df.sort_values(by=["material_id", "E_vasp_per_atom"], ascending=True)
-df = df[~df["material_id"].duplicated(keep="first")]
+df = df.drop_duplicates(subset="material_id", keep="first")
 
 
 # %%
@@ -63,14 +61,14 @@ df = df[~df["material_id"].duplicated(keep="first")]
 print(f"Number of points in dataset: {len(df)}")
 
 symlib = "spglib"  # takes ~ 15mins
-df["wyckoff"] = df["final_structure"].progress_apply(get_aflow_label_spglib)
+df["wyckoff"] = df.final_structure.progress_map(get_aflow_label_from_spglib)
 
-lattice, sites = zip(*df["final_structure"].progress_apply(get_cgcnn_input))
+lattice, sites = zip(*df.final_structure.progress_map(get_cgcnn_input))
 
-df["composition"] = df["final_structure"].apply(lambda x: x.composition.reduced_formula)
-df["nelements"] = df["final_structure"].apply(lambda x: len(x.composition.elements))
-df["volume"] = df["final_structure"].apply(lambda x: x.volume)
-df["nsites"] = df["final_structure"].apply(lambda x: x.num_sites)
+df["composition"] = df.final_structure.map(lambda x: x.composition.reduced_formula)
+df["nelements"] = df.final_structure.map(lambda x: len(x.composition.elements))
+df["volume"] = df.final_structure.map(lambda x: x.volume)
+df["nsites"] = df.final_structure.map(lambda x: x.num_sites)
 
 df["lattice"] = lattice
 df["sites"] = sites
@@ -82,7 +80,7 @@ df_el = df[df["nelements"] == 1]
 df_el = df_el.sort_values(by=["composition", "E_vasp_per_atom"], ascending=True)
 el_refs = {
     c.composition.elements[0]: e
-    for c, e in zip(df_el["final_structure"], df_el["E_vasp_per_atom"])
+    for c, e in zip(df_el.final_structure, df_el.E_vasp_per_atom)
 }
 
 
@@ -94,16 +92,16 @@ def get_formation_energy(args, el_refs):
     return energy - ref_e / c.num_atoms
 
 
-df["E_f"] = df[["composition", "E_vasp_per_atom"]].apply(
+df["E_f"] = df[["composition", "E_vasp_per_atom"]].map(
     partial(get_formation_energy, el_refs=el_refs), axis=1
 )
 
 
 # %%
 # Remove invalid Wyckoff Sequences
-df["nwyckoff"] = df["wyckoff"].apply(count_wyckoff_positions)
+df["nwyckoff"] = df["wyckoff"].map(count_wyckoff_positions)
 
-df = df[~df["wyckoff"].str.contains("Invalid")]
+df = df.query("'Invalid' not in wyckoff")
 print(f"Valid Wyckoff representation {len(df)}")
 
 

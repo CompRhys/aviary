@@ -15,19 +15,19 @@ class InMemoryDataLoader:
 
     Args:
         *tensors: List of arrays or tensors. Must all have the same length in dimension 0.
+        collate_fn (Callable): Should accept variadic list of tensors and
+            output a minibatch of data ready for model consumption.
         batch_size (int, optional): Usually 64, 128 or 256. Can be larger for test set loaders
             to speedup inference. Defaults to 64.
         shuffle (bool, optional): If True, shuffle the data *in-place* whenever an
             iterator is created from this object. Defaults to False.
-        collate_fn (Callable, optional): Should accept variadic list of tensors and
-            output a minibatch of data ready for model consumption. Defaults to tuple().
     """
 
     # each item must be indexable (usually torch.tensor, np.array or pd.Series)
     tensors: list[Tensor | np.ndarray]
+    collate_fn: Callable
     batch_size: int = 64
     shuffle: bool = False
-    collate_fn: Callable = tuple
 
     def __post_init__(self):
         self.dataset_len = len(self.tensors[0])

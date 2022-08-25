@@ -59,7 +59,7 @@ cry_param_dict = {
 remove_digits = str.maketrans("", "", digits)
 
 
-def get_aflow_label_aflow(
+def get_aflow_label_from_aflow(
     struct: Structure,
     aflow_executable: str = None,
     errors: Literal["raise", "annotate", "ignore"] = "raise",
@@ -111,10 +111,10 @@ def get_aflow_label_aflow(
     aflow_label = aflow_proto["aflow_prototype_label"]
 
     # check that multiplicities satisfy original composition
-    _, _, spg_no, *wyks = aflow_label.split("_")
-    elems = sorted(el.symbol for el in struct.composition)
+    _, _, spg_num, *wyckoff_letters = aflow_label.split("_")
+    elements = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
-    for el, wyk_letters_per_elem in zip(elems, wyks):
+    for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
 
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_per_elem = re.sub(
@@ -123,12 +123,12 @@ def get_aflow_label_aflow(
         sep_el_wyks = [
             "".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)
         ]
-        elem_dict[el] = sum(
-            float(wyckoff_multiplicity_dict[spg_no][w]) * float(n)
+        elem_dict[elem] = sum(
+            float(wyckoff_multiplicity_dict[spg_num][w]) * float(n)
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
         )
 
-    full_label = f"{aflow_label}:{'-'.join(elems)}"
+    full_label = f"{aflow_label}:{'-'.join(elements)}"
 
     observed_formula = Composition(elem_dict).reduced_formula
     expected_formula = struct.composition.reduced_formula
@@ -144,7 +144,7 @@ def get_aflow_label_aflow(
     return full_label
 
 
-def get_aflow_label_spglib(
+def get_aflow_label_from_spglib(
     struct: Structure,
     errors: Literal["raise", "annotate", "ignore"] = "ignore",
 ) -> str:
@@ -159,28 +159,30 @@ def get_aflow_label_spglib(
     Returns:
         str: AFLOW prototype label
     """
-    spga = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
-    aflow_label_with_chemsys = get_aflow_label_from_spga(spga, errors)
+    spg_analyzer = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
+    aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(spg_analyzer, errors)
 
     # try again with refined structure if it initially fails
     # NOTE structures with magmoms fail unless all have same magmom
     if "Invalid" in aflow_label_with_chemsys:
-        spga = SpacegroupAnalyzer(
-            spga.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
+        spg_analyzer = SpacegroupAnalyzer(
+            spg_analyzer.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
         )
-        aflow_label_with_chemsys = get_aflow_label_from_spga(spga, errors)
+        aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
+            spg_analyzer, errors
+        )
 
     return aflow_label_with_chemsys
 
 
-def get_aflow_label_from_spga(
-    spga: SpacegroupAnalyzer,
+def get_aflow_label_from_spg_analyzer(
+    spg_analyzer: SpacegroupAnalyzer,
     errors: Literal["raise", "annotate", "ignore"] = "raise",
 ) -> str:
     """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
-        spga (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
+        spg_analyzer (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
         errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
             'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
             with 'invalid <reason>: '.
@@ -195,24 +197,28 @@ def get_aflow_label_from_spga(
     Returns:
         str: AFLOW prototype labels
     """
-    spg_no = spga.get_space_group_number()
-    sym_struct = spga.get_symmetrized_structure()
+    spg_num = spg_analyzer.get_space_group_number()
+    sym_struct = spg_analyzer.get_symmetrized_structure()
 
-    equivs = [
+    equivalent_wyckoff_labels = [
         (len(s), s[0].species_string, wyk_letter.translate(remove_digits))
         for s, wyk_letter in zip(
             sym_struct.equivalent_sites, sym_struct.wyckoff_symbols
         )
     ]
-    equivs = sorted(equivs, key=lambda x: (x[1], x[2]))
+    equivalent_wyckoff_labels = sorted(
+        equivalent_wyckoff_labels, key=lambda x: (x[1], x[2])
+    )
 
     # check that multiplicities satisfy original composition
     elem_dict = {}
     elem_wyks = []
-    for el, g in groupby(equivs, key=lambda x: x[1]):  # sort alphabetically by element
+    for el, g in groupby(
+        equivalent_wyckoff_labels, key=lambda x: x[1]
+    ):  # sort alphabetically by element
         lg = list(g)
         elem_dict[el] = sum(
-            float(wyckoff_multiplicity_dict[str(spg_no)][e[2]]) for e in lg
+            float(wyckoff_multiplicity_dict[str(spg_num)][e[2]]) for e in lg
         )
         wyks = ""
         for wyk, w in groupby(
@@ -222,21 +228,21 @@ def get_aflow_label_from_spga(
             wyks += f"{len(lw)}{wyk}"
         elem_wyks.append(wyks)
 
-    # canonicalise the possible wyckoff letter sequences
-    canonical = canonicalise_elem_wyks("_".join(elem_wyks), spg_no)
+    # canonicalize the possible wyckoff letter sequences
+    canonical = canonicalize_elem_wyks("_".join(elem_wyks), spg_num)
 
-    # get pearson symbol
-    cry_sys = spga.get_crystal_system()
-    spg_sym = spga.get_space_group_symbol()
+    # get Pearson symbol
+    cry_sys = spg_analyzer.get_crystal_system()
+    spg_sym = spg_analyzer.get_space_group_symbol()
     centering = "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
-    num_sites_conventional = len(spga.get_symmetry_dataset()["std_types"])
-    pearson = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
+    num_sites_conventional = len(spg_analyzer.get_symmetry_dataset()["std_types"])
+    pearson_symbol = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
 
     prototype_form = prototype_formula(sym_struct.composition)
 
     chem_sys = sym_struct.composition.chemical_system
     aflow_label_with_chemsys = (
-        f"{prototype_form}_{pearson}_{spg_no}_{canonical}:{chem_sys}"
+        f"{prototype_form}_{pearson_symbol}_{spg_num}_{canonical}:{chem_sys}"
     )
 
     observed_formula = Composition(elem_dict).reduced_formula
@@ -253,20 +259,20 @@ def get_aflow_label_from_spga(
     return aflow_label_with_chemsys
 
 
-def canonicalise_elem_wyks(elem_wyks: str, spg_no: int) -> str:
-    """Given an element ordering, canonicalise the associated Wyckoff positions
+def canonicalize_elem_wyks(elem_wyks: str, spg_num: int) -> str:
+    """Given an element ordering, canonicalize the associated Wyckoff positions
     based on the alphabetical weight of equivalent choices of origin.
 
     Args:
         elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff positions
-        spg_no (int): International space group number.
+        spg_num (int): International space group number.
 
     Returns:
-        str: Canonicalised Wren Wyckoff encoding.
+        str: Canonicalized Wren Wyckoff encoding.
     """
     isopointal = []
 
-    for trans in relab_dict[str(spg_no)]:
+    for trans in relab_dict[str(spg_num)]:
         t = str.maketrans(trans)
         isopointal.append(elem_wyks.translate(t))
 
@@ -293,7 +299,7 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
     Returns:
         tuple: containing
         - str: sorted Wyckoff position substring for AFLOW-style prototype label
-        - int: integer score to rank order when canonicalising
+        - int: integer score to rank order when canonicalizing
     """
     score = 0
     sorted_el_wyks = []
@@ -331,10 +337,10 @@ def prototype_formula(composition: Composition) -> str:
     if all(x == int(x) for x in composition.values()):
         reduced /= gcd(*(int(i) for i in composition.values()))
 
-    amts = [amt for _, amt in sorted(reduced.items(), key=lambda x: str(x[0]))]
+    amounts = [reduced[key] for key in sorted(reduced, key=str)]
 
     anon = ""
-    for e, amt in zip(ascii_uppercase, amts):
+    for e, amt in zip(ascii_uppercase, amounts):
         if amt == 1:
             amt_str = ""
         elif abs(amt % 1) < 1e-8:
@@ -394,34 +400,30 @@ def count_crystal_dof(aflow_label: str) -> int:
         sep_el_wyks = [
             "".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)
         ]
-        try:
-            num_params += sum(
-                float(n) * param_dict[spg][k]
-                for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
-            )
-        except ValueError:
-            print(f"sep_el_wyks = {sep_el_wyks}")
-            raise
+        num_params += sum(
+            float(n) * param_dict[spg][k]
+            for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
+        )
 
     return int(num_params)
 
 
 def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
-    """Get a canonicalised string for the prototype.
+    """Get a canonicalized string for the prototype.
 
     Args:
         aflow_label (str): AFLOW-style prototype label with appended chemical system
 
     Returns:
-        str: Canonicalised AFLOW-style prototype label with appended chemical system
+        str: Canonicalized AFLOW-style prototype label with appended chemical system
     """
     aflow_label, _ = aflow_label.split(":")
-    anom, pearson, spg, *wyckoffs = aflow_label.split("_")
+    anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
 
     # TODO: this really needs some comments to explain what's going on - @janosh
     subst = r"\g<1>1"
-    anom = re.sub(r"([A-z](?![0-9]))", subst, anom)
-    anom_list = ["".join(g) for _, g in groupby(anom, str.isalpha)]
+    anonymous_formula = re.sub(r"([A-z](?![0-9]))", subst, anonymous_formula)
+    anom_list = ["".join(g) for _, g in groupby(anonymous_formula, str.isalpha)]
     counts = [int(x) for x in anom_list[1::2]]
     dummy = anom_list[0::2]
 
@@ -431,7 +433,7 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])
 
     if len(s_counts) == len(set(s_counts)):
-        cs_wyks = canonicalise_elem_wyks(s_wyks, int(spg))
+        cs_wyks = canonicalize_elem_wyks(s_wyks, int(spg))
         return "_".join((c_anom, pearson, spg, cs_wyks))
     # credit Stef: https://stackoverflow.com/a/70126643/5517459
     valid_permutations = [

@@ -247,8 +247,8 @@ class BaseModelClass(nn.Module, ABC):
         )
 
         # *_ discards identifiers like material_id and formula which we don't need when training
-        # disable=None means suppress output in non-tty (e.g. CI/log files) but keep in tty mode
-        # https://git.io/JnBOi
+        # tqdm(disable=None) means suppress output in non-tty (e.g. CI/log files) but keep in
+        # terminal (i.e. tty mode) https://git.io/JnBOi
         for inputs, targets_list, *_ in tqdm(
             data_loader, disable=None if pbar else True
         ):

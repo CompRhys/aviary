@@ -7,19 +7,19 @@ from aviary.wren.utils import (
     count_crystal_dof,
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
-    get_aflow_label_aflow,
-    get_aflow_label_spglib,
+    get_aflow_label_from_aflow,
+    get_aflow_label_from_spglib,
     get_isopointal_proto_from_aflow,
 )
 
 from .conftest import TEST_DIR
 
 
-def test_get_aflow_label_spglib():
+def test_get_aflow_label_from_spglib():
     """Check that spglib gives correct Aflow label for esseneite"""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
-    assert get_aflow_label_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    assert get_aflow_label_from_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
 
 
 @pytest.mark.parametrize(
@@ -51,7 +51,7 @@ def test_count_crystal_dof():
     ],
 )
 def test_get_isopointal_proto(aflow_label, expected):
-    """Get a recanonicalised prototype string without chemical system"""
+    """Get a recanonicalized prototype string without chemical system"""
     assert get_isopointal_proto_from_aflow(aflow_label) == expected
 
 
@@ -72,10 +72,10 @@ aflow_cli = which("aflow")
 
 
 @pytest.mark.skipif(aflow_cli is None, reason="aflow CLI not installed")
-def test_get_aflow_label_aflow():
+def test_get_aflow_label_from_aflow():
     """Check we extract corred correct aflow label for esseneite from  Aflow CLI"""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
-    out = get_aflow_label_aflow(struct, aflow_cli)
+    out = get_aflow_label_from_aflow(struct, aflow_cli)
     expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
     assert out == expected

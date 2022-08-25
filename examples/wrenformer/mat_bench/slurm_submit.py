@@ -34,7 +34,7 @@ python_script = f"""import os
 from datetime import datetime
 from itertools import product
 
-from examples.mat_bench.run_wrenformer import run_wrenformer_on_matbench
+from examples.mat_bench.train_wrenformer import train_wrenformer_on_matbench
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
@@ -47,7 +47,7 @@ print(f"{{job_array_id=}}")
 dataset_name, fold = list(product({datasets}, {folds}))[job_array_id]
 print(f"{{dataset_name=}}\\n{{fold=}}")
 
-run_wrenformer_on_matbench(
+train_wrenformer_on_matbench(
     {model_name=},
     dataset_name=dataset_name,
     {timestamp=},
