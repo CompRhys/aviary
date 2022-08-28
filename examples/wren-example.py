@@ -45,9 +45,12 @@ def main(  # noqa: C901
     weight_decay=1e-6,
     batch_size=128,
     workers=0,
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device=None,
     **kwargs,
 ):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"The model will run on the {args.device} device")
 
     if not len(targets) == len(tasks) == len(losses):
         raise AssertionError
@@ -465,18 +468,10 @@ def input_parser():
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
 
-    args.device = (
-        torch.device("cuda")
-        if (not args.disable_cuda) and torch.cuda.is_available()
-        else torch.device("cpu")
-    )
-
     return args
 
 
 if __name__ == "__main__":
     args = input_parser()
-
-    print(f"The model will run on the {args.device} device")
 
     raise SystemExit(main(**vars(args)))

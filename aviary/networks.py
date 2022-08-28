@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 import torch.nn as nn
 from torch import Tensor
 
@@ -11,7 +13,7 @@ class SimpleNetwork(nn.Module):
         self,
         input_dim: int,
         output_dim: int,
-        hidden_layer_dims: list[int],
+        hidden_layer_dims: Sequence[int],
         activation: type[nn.Module] = nn.LeakyReLU,
         batchnorm: bool = False,
     ) -> None:
@@ -72,7 +74,7 @@ class ResidualNetwork(nn.Module):
         self,
         input_dim: int,
         output_dim: int,
-        hidden_layer_dims: list[int],
+        hidden_layer_dims: Sequence[int],
         activation: type[nn.Module] = nn.ReLU,
         batchnorm: bool = False,
     ) -> None:
@@ -88,7 +90,7 @@ class ResidualNetwork(nn.Module):
         """
         super().__init__()
 
-        dims = [input_dim] + hidden_layer_dims
+        dims = [input_dim] + list(hidden_layer_dims)
 
         self.fcs = nn.ModuleList(
             nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)

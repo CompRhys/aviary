@@ -41,7 +41,7 @@ for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskit
 
 # %%
 # takes ~30 sec
-for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskites)):
+for struct in tqdm(df_perovskites.structure, total=len(df_perovskites)):
     get_aflow_label_from_spglib(struct)
 
 

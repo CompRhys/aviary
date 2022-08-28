@@ -43,9 +43,13 @@ def main(  # noqa: C901
     weight_decay=1e-6,
     batch_size=128,
     workers=0,
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device=None,
     **kwargs,
 ):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"The model will run on the {args.device} device")
+
     if not len(targets) == len(tasks) == len(losses):
         raise AssertionError
 

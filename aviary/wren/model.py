@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,20 +26,20 @@ class Wren(BaseModelClass):
     def __init__(
         self,
         robust: bool,
-        n_targets: list[int],
+        n_targets: Sequence[int],
         elem_emb_len: int,
         sym_emb_len: int,
         elem_fea_len: int = 32,
         sym_fea_len: int = 32,
         n_graph: int = 3,
         elem_heads: int = 1,
-        elem_gate: list[int] = [256],
-        elem_msg: list[int] = [256],
+        elem_gate: Sequence[int] = (256,),
+        elem_msg: Sequence[int] = (256,),
         cry_heads: int = 3,
-        cry_gate: list[int] = [256],
-        cry_msg: list[int] = [256],
-        trunk_hidden: list[int] = [1024, 512],
-        out_hidden: list[int] = [256, 128, 64],
+        cry_gate: Sequence[int] = (256,),
+        cry_msg: Sequence[int] = (256,),
+        trunk_hidden: Sequence[int] = (1024, 512),
+        out_hidden: Sequence[int] = (256, 128, 64),
         **kwargs,
     ) -> None:
         """_summary_
@@ -157,11 +159,11 @@ class DescriptorNetwork(nn.Module):
         sym_fea_len: int = 32,
         n_graph: int = 3,
         elem_heads: int = 1,
-        elem_gate: list[int] = [256],
-        elem_msg: list[int] = [256],
+        elem_gate: Sequence[int] = (256,),
+        elem_msg: Sequence[int] = (256,),
         cry_heads: int = 1,
-        cry_gate: list[int] = [256],
-        cry_msg: list[int] = [256],
+        cry_gate: Sequence[int] = (256,),
+        cry_msg: Sequence[int] = (256,),
     ):
         """Message passing section of the Roost model.
 

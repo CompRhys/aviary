@@ -29,13 +29,13 @@ class Wrenformer(BaseModelClass):
 
     def __init__(
         self,
-        n_targets: list[int],
+        n_targets: Sequence[int],
         n_features: int,
         d_model: int = 128,
         n_attn_layers: int = 6,
         n_attn_heads: int = 4,
-        trunk_hidden: list[int] = [1024, 512],
-        out_hidden: list[int] = [256, 128, 64],
+        trunk_hidden: Sequence[int] = (1024, 512),
+        out_hidden: Sequence[int] = (256, 128, 64),
         robust: bool = False,
         embedding_aggregations: Sequence[str] = ("mean",),
         **kwargs,
@@ -101,7 +101,7 @@ class Wrenformer(BaseModelClass):
             mask (BoolTensor): Indicates which tensor entries are sequence padding.
                 mask[i,j] = True means batch index i, sequence index j is not allowed to
                 attend, False means it participates in self-attention.
-            equivalence_counts (list[int], optional): Only needed for Wrenformer,
+            equivalence_counts (Sequence[int], optional): Only needed for Wrenformer,
                 not Roostformer. Length of slices of features in the batch dimension
                 originating from equivalent Wyckoff sets. Those are averaged to reduce
                 dim=0 of features back to batch_size.
@@ -116,7 +116,7 @@ class Wrenformer(BaseModelClass):
 
         if len(args) == 1:
             # if forward() got a 3rd arg, we're running as Wrenformer, not Roostformer
-            equivalence_counts: list[int] = args[0]
+            equivalence_counts: Sequence[int] = args[0]
             # average over equivalent Wyckoff sets in a given material (brings dim 0 of
             # features back to batch_size)
             equiv_embeddings = embeddings.split(equivalence_counts, dim=0)

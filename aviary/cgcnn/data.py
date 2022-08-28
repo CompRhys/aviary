@@ -118,11 +118,15 @@ class CrystalGraphData(Dataset):
         if self.max_num_nbr is not None:
             _self_idx, _nbr_idx, _nbr_dist = [], [], []
 
-            for i, g in groupby(zip(self_idx, nbr_idx, nbr_dist), key=lambda x: x[0]):
-                s, n, d = zip(*sorted(g, key=lambda x: x[2]))
-                _self_idx.extend(s[: self.max_num_nbr])
-                _nbr_idx.extend(n[: self.max_num_nbr])
-                _nbr_dist.extend(d[: self.max_num_nbr])
+            for _, group in groupby(
+                zip(self_idx, nbr_idx, nbr_dist), key=lambda x: x[0]
+            ):
+                self_idx, neighbor_idx, neighbor_dist = zip(
+                    *sorted(group, key=lambda x: x[2])
+                )
+                _self_idx.extend(self_idx[: self.max_num_nbr])
+                _nbr_idx.extend(neighbor_idx[: self.max_num_nbr])
+                _nbr_dist.extend(neighbor_dist[: self.max_num_nbr])
 
             self_idx = np.array(_self_idx)
             nbr_idx = np.array(_nbr_idx)

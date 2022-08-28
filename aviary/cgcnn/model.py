@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,7 +25,7 @@ class CrystalGraphConvNet(BaseModelClass):
     def __init__(
         self,
         robust: bool,
-        n_targets: list[int],
+        n_targets: Sequence[int],
         elem_emb_len: int,
         nbr_fea_len: int,
         elem_fea_len: int = 64,

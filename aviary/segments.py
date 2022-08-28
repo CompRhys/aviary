@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 import torch
 import torch.nn as nn
 from torch import LongTensor, Tensor
@@ -97,8 +99,8 @@ class MessageLayer(nn.Module):
         self,
         msg_fea_len: int,
         num_msg_heads: int,
-        msg_gate_layers: list[int],
-        msg_net_layers: list[int],
+        msg_gate_layers: Sequence[int],
+        msg_net_layers: Sequence[int],
     ) -> None:
         """Initialise MessageLayer
 
