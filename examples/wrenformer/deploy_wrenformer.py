@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 import pandas as pd
 import torch
-import wandb
+import wandb.apis.public
 from tqdm import tqdm
 
 from aviary import ROOT
@@ -136,7 +136,7 @@ def make_ensemble_predictions(
 
 
 def deploy_wandb_checkpoints(
-    runs: list[wandb.sdk.wandb_run.Run],
+    runs: list[wandb.apis.public.Run],
     df: pd.DataFrame,
     input_col: str,
     target_col: str,
@@ -146,7 +146,7 @@ def deploy_wandb_checkpoints(
     makes predictions on some dataset, prints ensemble metrics and stores predictions to CSV.
 
     Args:
-        runs (list[wandb.sdk.wandb_run.Run]): List of WandB runs to download model checkpoints from
+        runs (list[wandb.apis.public.Run]): List of WandB runs to download model checkpoints from
             which are then loaded into memory to generate predictions for the input_col in df.
         df (pd.DataFrame): Test dataset on which to make predictions.
 
@@ -155,10 +155,9 @@ def deploy_wandb_checkpoints(
             predictions and uncertainties. The 2nd dataframe holds ensemble performance metrics
             like mean and standard deviation of MAE/RMSE.
     """
-    print(
-        f"Loading checkpoints for the following {len(runs)} run ID(s):\n"
-        f"{', '.join(run.id for run in runs)}\n"
-    )
+    print(f"Loading checkpoints for the following {len(runs)} run ID(s):")
+    for idx, run in enumerate(runs, 1):
+        print(f"{idx:>3}: {run.url}")
 
     checkpoint_paths: list[str] = []
     for run in runs:

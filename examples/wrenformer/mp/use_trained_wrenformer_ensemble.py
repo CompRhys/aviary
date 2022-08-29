@@ -39,9 +39,3 @@ df, ensemble_metrics = deploy_wandb_checkpoints(
 )
 
 df.to_csv(f"{ROOT}/examples/wrenformer/mp/{today}-ensemble-predictions.csv")
-df = pd.read_csv(f"{ROOT}/examples/wrenformer/mp/ensemble-predictions.csv")
-
-
-df.plot.scatter(x=target_col, y="e_form_pred_ens")
-
-df.e_form.hist(bins=100)
