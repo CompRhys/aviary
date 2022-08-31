@@ -79,8 +79,14 @@ Please note that for speed/demonstration purposes this example runs on only ~68 
 
 We also provide some notebooks that show more a more pythonic way to interact with the codebase, these examples make use of the TAATA dataset examined in the `wren` manuscript:
 
-* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Roost In Colab" valign="middle"></a> &nbsp;-&nbsp; `roost`,
-* <a href="https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Wren In Colab" valign="middle"></a> &nbsp;-&nbsp; `wren`,
+|           |                                                                                                                              |                                                                                                  |                                                                                                            |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| **Roost** | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb) | [![View on GitHub]](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb) | [![Launch Binder]](https://mybinder.org/v2/gh/CompRhys/aviary/main?labpath=examples/notebooks/Roost.ipynb) |
+| **Wren**  | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)  | [![View on GitHub]](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)  | [![Launch Binder]](https://mybinder.org/v2/gh/CompRhys/aviary/main?labpath=examples/notebooks/Wren.ipynb)  |
+
+[Launch Binder]: https://mybinder.org/badge_logo.svg
+[Open in Google Colab]: https://colab.research.google.com/assets/colab-badge.svg
+[View on GitHub]: https://img.shields.io/badge/View-GitHub-darkblue?logo=github
 
 ## Cite This Work
 

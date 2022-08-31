@@ -70,3 +70,4 @@ repos:
     rev: 0.6.0
     hooks:
       - id: nbstripout
+        args: [--drop-empty-cells, --keep-output]

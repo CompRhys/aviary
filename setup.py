@@ -41,8 +41,6 @@ setup(
         "scikit_learn",
         "tensorboard",
         "typing_extensions;python_version<'3.8'",
-        "protobuf<4.21.0",  # temporary fix this issue:
-        # https://github.com/PyTorchLightning/pytorch-lightning/issues/13159
     ],
     extras_require={
         "test": ["pytest", "pytest-cov", "matminer"],
