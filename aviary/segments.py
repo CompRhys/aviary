@@ -11,7 +11,7 @@ from aviary.networks import SimpleNetwork
 
 
 class AttentionPooling(nn.Module):
-    """Softmax attention layer"""
+    """Softmax attention layer. Currently unused."""
 
     def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
         """Initialize softmax attention layer.

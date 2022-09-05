@@ -71,7 +71,7 @@ slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 # %%
 slurm_cmd = f"""sbatch
     --partition ampere
-    --account LEE-JR769-SL2-GPU
+    --account LEE-SL3-GPU
     --time 8:0:0
     --nodes 1
     --gpus-per-node 1
@@ -89,5 +89,5 @@ with open(submit_script, "w") as file:
 
 
 # %% submit slurm job
-result = subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
+subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
 print(f"\n{submit_script = }")

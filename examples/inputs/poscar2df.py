@@ -60,7 +60,7 @@ df = df.drop_duplicates(subset="material_id", keep="first")
 # Count number of datapoints
 print(f"Number of points in dataset: {len(df)}")
 
-symlib = "spglib"  # takes ~ 15mins
+# takes ~ 15mins
 df["wyckoff"] = df.final_structure.progress_map(get_aflow_label_from_spglib)
 
 lattice, sites = zip(*df.final_structure.progress_map(get_cgcnn_input))

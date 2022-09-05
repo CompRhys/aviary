@@ -7,6 +7,7 @@ import wandb
 
 from aviary import ROOT
 from examples.wrenformer.deploy_wrenformer import deploy_wandb_checkpoints
+from examples.wrenformer.mp_wbm import MODULE_DIR
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-23"
@@ -26,6 +27,7 @@ df = pd.read_json(data_path)
 df = df.sample(frac=1, random_state=0)
 train_df = df.sample(frac=1 - test_size, random_state=0)  # unused
 test_df = df.drop(train_df.index)
+target_col = "e_form"
 
 wandb.login()
 wandb_api = wandb.Api()
@@ -34,10 +36,10 @@ wandb_runs = wandb_api.runs(
 )
 
 test_df, ensemble_metrics = deploy_wandb_checkpoints(
-    wandb_runs, test_df, input_col="wyckoff", target_col="e_form"
+    wandb_runs, test_df, input_col="wyckoff", target_col=target_col
 )
 
-test_df.to_csv(f"{ROOT}/examples/wrenformer/mp_wbm/{today}-ensemble-predictions.csv")
+df.to_csv(f"{MODULE_DIR}/{today}-wrenformer-preds-{target_col}.csv")
 
 # print output:
 # Predicting with 10 model checkpoint(s)

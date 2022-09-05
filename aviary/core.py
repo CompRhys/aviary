@@ -380,7 +380,7 @@ class BaseModelClass(nn.Module, ABC):
         return targets, predictions, ids
 
     @torch.no_grad()
-    def featurise(self, data_loader: DataLoader) -> np.ndarray:
+    def featurize(self, data_loader: DataLoader) -> np.ndarray:
         """Generate features for a list of composition strings. When using Roost,
         this runs only the message-passing part of the model without the ResNet.
 
@@ -390,9 +390,10 @@ class BaseModelClass(nn.Module, ABC):
         Returns:
             np.array: 2d array of features
         """
-        err_msg = f"{self} needs to be fitted before it can be used for featurisation"
         if self.epoch <= 0:
-            raise AssertionError(err_msg)
+            raise AssertionError(
+                f"{self} needs to be fitted before it can be used for featurization"
+            )
 
         self.eval()  # ensure model is in evaluation mode
         features = []

@@ -160,7 +160,7 @@ def deploy_wandb_checkpoints(
         print(f"{idx:>3}: {run.url}")
 
     checkpoint_paths: list[str] = []
-    for run in runs:
+    for run in tqdm(runs):
         run_path = "/".join(run.path)
         checkpoint_dir = f"{ROOT}/.wandb_checkpoints/{run_path}"
         os.makedirs(checkpoint_dir, exist_ok=True)

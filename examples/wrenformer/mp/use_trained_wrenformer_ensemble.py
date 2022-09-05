@@ -5,8 +5,8 @@ from datetime import datetime
 import pandas as pd
 import wandb
 
-from aviary import ROOT
 from examples.wrenformer.deploy_wrenformer import deploy_wandb_checkpoints
+from examples.wrenformer.mp import MODULE_DIR
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-08-15"
@@ -18,10 +18,8 @@ stores predictions to CSV.
 """
 
 today = f"{datetime.now():%Y-%m-%d}"
-
-data_path = (  # download wbm-steps-summary.csv (23.31 MB)
-    "https://figshare.com/ndownloader/files/36714216?private_link=ff0ad14505f9624f0c05"
-)
+# download wbm-steps-summary.csv (23.31 MB)
+data_path = "https://figshare.com/files/36714216?private_link=ff0ad14505f9624f0c05"
 df = pd.read_csv(data_path).set_index("material_id")
 
 
@@ -38,4 +36,4 @@ df, ensemble_metrics = deploy_wandb_checkpoints(
     runs, df, input_col="wyckoff", target_col=target_col
 )
 
-df.to_csv(f"{ROOT}/examples/wrenformer/mp/{today}-ensemble-predictions.csv")
+df.to_csv(f"{MODULE_DIR}/{today}-wrenformer-preds-{target_col}.csv")

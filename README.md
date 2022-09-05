@@ -86,7 +86,7 @@ We also provide some notebooks that show more a more pythonic way to interact wi
 
 [Launch Binder]: https://mybinder.org/badge_logo.svg
 [Open in Google Colab]: https://colab.research.google.com/assets/colab-badge.svg
-[View on GitHub]: https://img.shields.io/badge/View-GitHub-darkblue?logo=github
+[View on GitHub]: https://img.shields.io/badge/View%20on-GitHub-darkblue?logo=github
 
 ## Cite This Work
 

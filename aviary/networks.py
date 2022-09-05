@@ -15,7 +15,7 @@ class SimpleNetwork(nn.Module):
         output_dim: int,
         hidden_layer_dims: Sequence[int],
         activation: type[nn.Module] = nn.LeakyReLU,
-        batchnorm: bool = False,
+        batch_norm: bool = False,
     ) -> None:
         """Create a simple feed forward neural network
 
@@ -25,17 +25,17 @@ class SimpleNetwork(nn.Module):
             hidden_layer_dims (list[int]): List of hidden layer sizes
             activation (type[nn.Module], optional): Which activation function to use.
                 Defaults to nn.LeakyReLU.
-            batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
+            batch_norm (bool, optional): Whether to use batch_norm. Defaults to False.
         """
         super().__init__()
 
-        dims = [input_dim] + hidden_layer_dims
+        dims = [input_dim] + list(hidden_layer_dims)
 
         self.fcs = nn.ModuleList(
             nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
         )
 
-        if batchnorm:
+        if batch_norm:
             self.bns = nn.ModuleList(
                 nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)
             )
@@ -76,7 +76,7 @@ class ResidualNetwork(nn.Module):
         output_dim: int,
         hidden_layer_dims: Sequence[int],
         activation: type[nn.Module] = nn.ReLU,
-        batchnorm: bool = False,
+        batch_norm: bool = False,
     ) -> None:
         """Create a feed forward neural network with skip connections
 
@@ -86,7 +86,7 @@ class ResidualNetwork(nn.Module):
             hidden_layer_dims (list[int]): List of hidden layer sizes
             activation (type[nn.Module], optional): Which activation function to use.
                 Defaults to nn.LeakyReLU.
-            batchnorm (bool, optional): Whether to use batchnorm. Defaults to False.
+            batch_norm (bool, optional): Whether to use batch_norm. Defaults to False.
         """
         super().__init__()
 
@@ -96,7 +96,7 @@ class ResidualNetwork(nn.Module):
             nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
         )
 
-        if batchnorm:
+        if batch_norm:
             self.bns = nn.ModuleList(
                 nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)
             )

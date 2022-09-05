@@ -32,7 +32,7 @@ def df_matbench_phonons():
 
 @pytest.fixture(scope="session")
 def df_matbench_jdft2d():
-    """Returns the dataframe for the Matbench experimental band gap task."""
+    """Returns the dataframe for the Matbench experimental band gap task. Currently unused."""
 
     df = load_dataset("matbench_jdft2d")
     df["material_id"] = [f"mb_jdft2d_{i+1}" for i in range(len(df))]

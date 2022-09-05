@@ -7,7 +7,8 @@ from aviary import ROOT
 from examples.wrenformer.mp import MODULE_DIR
 
 """
-Write a Python job file and sbatch it using subprocess.run()
+Write a Python job file and sbatch it using subprocess.run() to train a Wrenformer
+ensemble of size n_folds on target_col.
 """
 
 __author__ = "Janosh Riebesell"
@@ -22,11 +23,11 @@ optimizer = "AdamW"
 lr = 3e-4
 n_folds = 10
 df_or_path = f"{ROOT}/datasets/2022-08-13-mp-all-energies.json.gz"
-target_col = "formation_energy_per_atom"
+target_col = "energy_per_atom"
 task_type = "regression"
 checkpoint = "wandb"  # None | 'local' | 'wandb'
 batch_size = 128
-model_name = f"wrenformer-robust-{epochs=}"
+model_name = f"wrenformer-robust-{epochs=}-{target_col}"
 swa_start = None
 
 
@@ -77,7 +78,7 @@ slurm_setup = ". /etc/profile.d/modules.sh; module load rhel8/default-amp;"
 # %%
 slurm_cmd = f"""sbatch
     --partition ampere
-    --account LEE-JR769-SL2-GPU
+    --account LEE-SL3-GPU
     --time 8:0:0
     --nodes 1
     --gpus-per-node 1
@@ -95,5 +96,5 @@ with open(submit_script, "w") as file:
 
 
 # %% submit slurm job
-result = subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
+subprocess.run(slurm_cmd.replace("\n    ", " "), check=True, shell=True)
 print(f"\n{submit_script = }")
