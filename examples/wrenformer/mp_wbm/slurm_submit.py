@@ -4,7 +4,6 @@ import subprocess
 from datetime import datetime
 
 from aviary import ROOT
-from examples.wrenformer.mp_wbm import MODULE_DIR
 
 """
 Write a Python job file and sbatch it using subprocess.run() to train a Wrenformer
@@ -34,7 +33,8 @@ batch_size = 128
 model_name = f"wrenformer-robust-{epochs=}"
 
 
-os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
+log_dir = f"{os.path.dirname(__file__)}/job-logs"
+os.makedirs(log_dir, exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
 python_script = f"""import os

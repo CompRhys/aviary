@@ -1,4 +1,6 @@
 # %%
+import os
+
 import pandas as pd
 from matminer.datasets import load_dataset
 from monty.json import MontyDecoder
@@ -9,7 +11,7 @@ from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.wren.utils import get_aflow_label_from_aflow, get_aflow_label_from_spglib
-from examples.mat_bench import DATA_PATHS
+from examples.wrenformer.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-05-17"
@@ -21,6 +23,8 @@ to be more accurate. Materials Project uses Spglib so our spacegroups should be
 identical to theirs. CCSD has their own algorithm and we found both Aflow and Spglib
 occasionally disagree with their results.
 """
+
+MODULE_DIR = os.path.dirname(__file__)
 
 
 # %%

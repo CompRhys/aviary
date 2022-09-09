@@ -28,7 +28,7 @@ def make_ensemble_predictions(
     print_metrics: bool = True,
     warn_target_mismatch: bool = False,
     embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
-    batch_size: int = 512,
+    batch_size: int = 1024,
     pbar: bool = True,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Make predictions using an ensemble of Wrenformer models.
@@ -67,6 +67,7 @@ def make_ensemble_predictions(
         input_col=input_col,
         batch_size=batch_size,
         embedding_type=embedding_type,
+        shuffle=False,  # False is default but best be explicit
     )
 
     # tqdm(disable=None) means suppress output in non-tty (e.g. CI/log files) but keep in

@@ -25,7 +25,7 @@ According to Rhys, Wren could run 500 epochs in 5.5 h on a P100 training on 120k
 ```py
 import pandas as pd
 from aviary.wren.utils import count_wyckoff_positions
-from examples.mat_bench import DATA_PATHS
+from examples.wrenformer.mat_bench import DATA_PATHS
 
 df = pd.read_json(DATA_PATHS["matbench_mp_e_form"])
 

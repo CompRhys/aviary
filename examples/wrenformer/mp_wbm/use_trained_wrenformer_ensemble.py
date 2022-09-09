@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 import pandas as pd
 import wandb
 
 from aviary import ROOT
-from examples.wrenformer.deploy_wrenformer import deploy_wandb_checkpoints
-from examples.wrenformer.mp_wbm import MODULE_DIR
+from aviary.wrenformer.deploy import deploy_wandb_checkpoints
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-23"
@@ -39,7 +39,7 @@ test_df, ensemble_metrics = deploy_wandb_checkpoints(
     wandb_runs, test_df, input_col="wyckoff", target_col=target_col
 )
 
-df.to_csv(f"{MODULE_DIR}/{today}-wrenformer-preds-{target_col}.csv")
+df.to_csv(f"{os.path.dirname(__file__)}/{today}-wrenformer-preds-{target_col}.csv")
 
 # print output:
 # Predicting with 10 model checkpoint(s)

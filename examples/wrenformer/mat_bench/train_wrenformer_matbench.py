@@ -8,12 +8,14 @@ import pandas as pd
 from matbench.task import MatbenchTask
 
 from aviary.core import TaskType
+from aviary.wrenformer.train import train_wrenformer
 from aviary.wrenformer.utils import merge_json_on_disk
-from examples.wrenformer.mat_bench import DATA_PATHS, MODULE_DIR
-from examples.wrenformer.train_wrenformer import train_wrenformer
+from examples.wrenformer.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
+
+MODULE_DIR = os.path.dirname(__file__)
 
 
 def train_wrenformer_on_matbench(

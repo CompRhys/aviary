@@ -147,10 +147,12 @@ def train_wrenformer(
         embedding_type=embedding_type,
     )
     train_loader = df_to_in_mem_dataloader(
-        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs
+        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore
     )
 
-    test_loader = df_to_in_mem_dataloader(test_df, batch_size=512, **data_loader_kwargs)
+    test_loader = df_to_in_mem_dataloader(
+        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore
+    )
 
     # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
     # element type (usually 200-dim matscholar embeddings) and Wyckoff position (see

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -130,7 +130,7 @@ def df_to_in_mem_dataloader(
     id_col: str = None,
     embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
     device: str = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> InMemoryDataLoader:
     """Construct an InMemoryDataLoader with Wrenformer batch collation from a dataframe.
     Can also be used for Roostformer.

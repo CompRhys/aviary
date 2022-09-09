@@ -5,7 +5,7 @@ from datetime import datetime
 
 from matbench.metadata import mbv01_metadata
 
-from examples.mat_bench import DATA_PATHS, MODULE_DIR
+from examples.wrenformer.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell, Rokas Elijosius"
 __date__ = "2022-04-25"
@@ -27,14 +27,15 @@ else:
     # deploy Wren on structure tasks only
     datasets = [k for k, v in mbv01_metadata.items() if v.input_type == "structure"]
 
-os.makedirs(log_dir := f"{MODULE_DIR}/job-logs", exist_ok=True)
+log_dir = f"{os.path.dirname(__file__)}/job-logs"
+os.makedirs(log_dir, exist_ok=True)
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
 python_script = f"""import os
 from datetime import datetime
 from itertools import product
 
-from examples.mat_bench.train_wrenformer import train_wrenformer_on_matbench
+from examples.wrenformer.mat_bench.train_wrenformer import train_wrenformer_on_matbench
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]

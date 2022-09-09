@@ -14,8 +14,8 @@ from pymatviz.utils import add_identity_line
 from sklearn.metrics import r2_score, roc_auc_score
 
 from aviary.wrenformer.utils import recursive_dict_merge
-from examples.mat_bench import DATA_PATHS
-from examples.mat_bench.plotting_functions import (
+from examples.wrenformer.mat_bench import DATA_PATHS
+from examples.wrenformer.mat_bench.plotting_functions import (
     dataset_labels_html,
     error_heatmap,
     plot_leaderboard,
