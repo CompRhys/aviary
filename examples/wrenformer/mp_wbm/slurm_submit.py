@@ -20,17 +20,13 @@ n_attn_layers = 3
 embedding_aggregations = ("mean",)
 optimizer = "AdamW"
 lr = 3e-4
-scheduler = (
-    "ReduceLROnPlateau",
-    {"factor": 0.25, "patience": 5, "verbose": True, "min_lr": 1e-7},
-)
 n_folds = 1
 df_or_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 target = "e_form"
 task_type = "regression"
 checkpoint = None  # None | 'local' | 'wandb'
 batch_size = 128
-model_name = f"wrenformer-robust-{epochs=}"
+run_name = f"wrenformer-robust-{epochs=}"
 
 
 log_dir = f"{os.path.dirname(__file__)}/job-logs"
@@ -40,19 +36,19 @@ timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 python_script = f"""import os
 from datetime import datetime
 
-from examples.wrenformer.train_wrenformer import train_wrenformer_on_df
+from aviary.wrenformer.train import train_wrenformer_on_df
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
-print("{model_name=}")
+print("{run_name=}")
 print("{df_or_path=}")
 
 job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
 train_wrenformer_on_df(
-    {model_name=},
+    {run_name=},
     {target=},
     {df_or_path=},
     {timestamp=},
@@ -63,7 +59,6 @@ train_wrenformer_on_df(
     {checkpoint=},
     {optimizer=},
     learning_rate={lr},
-    {scheduler=},
     {embedding_aggregations=},
     {batch_size=},
     wandb_path="aviary/mp-wbm",
@@ -71,7 +66,7 @@ train_wrenformer_on_df(
 """
 
 
-submit_script = f"{log_dir}/{timestamp}-{model_name}.py"
+submit_script = f"{log_dir}/{timestamp}-{run_name}.py"
 
 # prepend into sbatch script to source module command and load default env
 # for Ampere GPU partition before actual job command
@@ -87,8 +82,8 @@ slurm_cmd = f"""sbatch
     --gpus-per-node 1
     --chdir {log_dir}
     --array 0-{n_folds - 1}
-    --out {timestamp}-{model_name}-%A-%a.log
-    --job-name {model_name}
+    --out {timestamp}-{run_name}-%A-%a.log
+    --job-name {run_name}
     --wrap '{slurm_setup} python {submit_script}'
 """
 

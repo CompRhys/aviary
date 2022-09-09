@@ -56,6 +56,7 @@ def train_wrenformer(
     swa_lr: float = None,
     embedding_aggregations: Sequence[str] = ("mean",),
     verbose: bool = False,
+    wandb_kwargs: dict[str, Any] = None,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Core training function for Wrenformer. Handles checkpointing and metric logging.
     Wrapped by other functions like train_wrenformer_on_matbench() for specific datasets.
@@ -86,14 +87,17 @@ def train_wrenformer(
             torch.load(checkpoint.name)
             ```
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
-            hyperparams. Will be logged to wandb. Can be anything really. Defaults to {}.
+            model_params. Will be logged to wandb. Can be anything really. Defaults to {}.
         optimizer (str | tuple[str, dict]): Name of a torch.optim.Optimizer class like 'Adam',
             'AdamW', 'SGD', etc. Can be a string or a string and dict with params to pass to the
             class. Defaults to 'AdamW'.
         scheduler (str | tuple[str, dict]): Name of a torch.optim.lr_scheduler class like
             'LambdaLR', 'StepLR', 'CosineAnnealingLR', etc. Defaults to 'LambdaLR'. Can be a string
-            or a string and dict with params to pass to the class. E.g.
-            ('CosineAnnealingLR', {'T_max': n_epochs}).
+            to create a scheduler with all its default values or tuple[str, dict] with custom params
+            to pass to the class. E.g. ('CosineAnnealingLR', {'T_max': n_epochs}).
+            See https://stackoverflow.com/a/2121918 about pickle errors when trying to load a
+            LambdaLR scheduler from a torch.save() checkpoint created prior to this file having
+            been renamed.
         learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
         batch_size (int): The mini-batch size during training. Defaults to 128.
         swa_start (float | None): When to start using stochastic weight averaging during training.
@@ -104,6 +108,9 @@ def train_wrenformer(
             by the transformer encoder before passing into the ResidualNetwork. One or more of
             ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
         verbose (bool): Whether to print progress and metrics to stdout. Defaults to False.
+        wandb_kwargs (dict[str, Any]): Kwargs to pass to wandb.init() like
+            dict(tags=['ensemble-id-1']). Should not include keys config, project, entity as
+            they're already set by this function.
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
@@ -244,6 +251,7 @@ def train_wrenformer(
             settings=wandb.Settings(start_method="fork"),
             name=run_name,
             config=run_params,
+            **wandb_kwargs,
         )
 
     for epoch in range(epochs):
@@ -330,8 +338,12 @@ def train_wrenformer(
             "metrics": test_metrics,
             "run_name": run_name,
             "normalizer_dict": normalizer_dict,
-            "run_params": run_params,
+            "run_params": run_params.copy(),
         }
+        if scheduler_name == "LambdaLR":
+            checkpoint_dict["run_params"]["lr_scheduler"].pop("params")
+            # exclude lr_lambda from pickled checkpoint since it causes errors when
+            # torch.load()-ing a checkpoint and the file defining lr_lambda() was renamed
         if checkpoint == "local":
             os.makedirs(f"{ROOT}/models", exist_ok=True)
             checkpoint_path = f"{ROOT}/models/{timestamp}-{run_name}.pth"
@@ -373,7 +385,7 @@ def train_wrenformer(
 
 
 def train_wrenformer_on_df(
-    model_name: str,
+    run_name: str,
     df_or_path: str | pd.DataFrame,
     target_col: str,
     id_col: str = "material_id",
@@ -385,9 +397,9 @@ def train_wrenformer_on_df(
     splitting, then delegates to train_wrenformer().
 
     Args:
-        model_name (str): Can be any string to describe particular Roost/Wren variants. Include
-            'robust' to use a robust loss function and have the model learn to predict an aleatoric
-            uncertainty.
+        run_name (str): A string to describe the training run. Should usually contain model type
+            (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
+            have the model learn to predict an aleatoric uncertainty.
         df_or_path (str): Path to a data file to load with pandas.read_json().
         timestamp (str): Will prefix the names of model checkpoint files and other output files.
         folds (tuple[int, int] | None): If not None, split the data into n_folds[0] folds and use
@@ -401,8 +413,6 @@ def train_wrenformer_on_df(
     Returns:
         dict[str, float]: The model's test set metrics.
     """
-    run_name = f"{model_name}-mp-{target_col}"
-
     if isinstance(df_or_path, str):
         df = pd.read_json(df_or_path).set_index(id_col, drop=False)
     else:

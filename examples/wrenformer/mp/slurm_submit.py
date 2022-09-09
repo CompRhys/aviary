@@ -22,13 +22,13 @@ optimizer = "AdamW"
 lr = 3e-4
 n_folds = 10
 df_or_path = f"{ROOT}/datasets/2022-08-13-mp-all-energies.json.gz"
-target_col = "energy_per_atom"
+target_col = "formation_energy_per_atom"
 task_type = "regression"
 checkpoint = "wandb"  # None | 'local' | 'wandb'
 batch_size = 128
-model_name = f"wrenformer-robust-{epochs=}-{target_col}"
+run_name = f"wrenformer-robust-{epochs=}-{target_col}"
 swa_start = None
-
+wandb_kwargs = dict(tags=["wrenformer-ensemble-id-4"])
 
 log_dir = f"{os.path.dirname(__file__)}/job-logs"
 os.makedirs(log_dir, exist_ok=True)
@@ -37,19 +37,19 @@ timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 python_script = f"""import os
 from datetime import datetime
 
-from examples.wrenformer.train_wrenformer import train_wrenformer_on_df
+from aviary.wrenformer.train import train_wrenformer_on_df
 
 print(f"Job started running {{datetime.now():%Y-%m-%d@%H-%M}}")
 job_id = os.environ["SLURM_JOB_ID"]
 print(f"{{job_id=}}")
-print("{model_name=}")
+print("{run_name=}")
 print("{df_or_path=}")
 
 job_array_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 print(f"{{job_array_id=}}")
 
 train_wrenformer_on_df(
-    {model_name=},
+    {run_name=},
     {target_col=},
     {df_or_path=},
     {timestamp=},
@@ -64,11 +64,12 @@ train_wrenformer_on_df(
     {batch_size=},
     {swa_start=},
     wandb_path="aviary/mp",
+    {wandb_kwargs=},
 )
 """
 
 
-submit_script = f"{log_dir}/{timestamp}-{model_name}.py"
+submit_script = f"{log_dir}/{timestamp}-{run_name}.py"
 
 # prepend into sbatch script to source module command and load default env
 # for Ampere GPU partition before actual job command
@@ -84,8 +85,8 @@ slurm_cmd = f"""sbatch
     --gpus-per-node 1
     --chdir {log_dir}
     --array 0-{n_folds - 1}
-    --out {timestamp}-{model_name}-%A-%a.log
-    --job-name {model_name}
+    --out {timestamp}-{run_name}-%A-%a.log
+    --job-name {run_name}
     --wrap '{slurm_setup} python {submit_script}'
 """
 

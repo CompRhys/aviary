@@ -31,15 +31,18 @@ target_col = "e_form"
 
 wandb.login()
 wandb_api = wandb.Api()
-wandb_runs = wandb_api.runs(
-    "aviary/mp-wbm", filters={"tags": {"$in": ["ensemble-id-2"]}}
-)
+ensemble_id = "ensemble-id-2"
+runs = wandb_api.runs("aviary/mp-wbm", filters={"tags": {"$in": [ensemble_id]}})
+
+assert len(runs) == 10, f"Expected 10 runs, got {len(runs)} for {ensemble_id=}"
 
 test_df, ensemble_metrics = deploy_wandb_checkpoints(
-    wandb_runs, test_df, input_col="wyckoff", target_col=target_col
+    runs, test_df, input_col="wyckoff", target_col=target_col
 )
 
-df.to_csv(f"{os.path.dirname(__file__)}/{today}-wrenformer-preds-{target_col}.csv")
+test_df.round(6).to_csv(
+    f"{os.path.dirname(__file__)}/{today}-{ensemble_id}-preds-{target_col}.csv"
+)
 
 # print output:
 # Predicting with 10 model checkpoint(s)

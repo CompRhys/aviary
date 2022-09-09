@@ -75,9 +75,13 @@ def make_ensemble_predictions(
     for idx, checkpoint_path in tqdm(
         enumerate(tqdm(checkpoint_paths), 1), disable=None if pbar else True
     ):
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load checkpoint {checkpoint_path}") from exc
 
         model_params = checkpoint["model_params"]
+
         target_name, task_type = list(model_params["task_dict"].items())[0]
         assert task_type in ("regression", "classification"), f"invalid {task_type = }"
         if warn_target_mismatch and target_name != target_col:
@@ -156,12 +160,12 @@ def deploy_wandb_checkpoints(
             predictions and uncertainties. The 2nd dataframe holds ensemble performance metrics
             like mean and standard deviation of MAE/RMSE.
     """
-    print(f"Loading checkpoints for the following {len(runs)} run ID(s):")
+    print(f"Using checkpoints from {len(runs)} run(s):")
     for idx, run in enumerate(runs, 1):
         print(f"{idx:>3}: {run.url}")
 
     checkpoint_paths: list[str] = []
-    for run in tqdm(runs):
+    for run in tqdm(runs, desc="Downloading model checkpoints"):
         run_path = "/".join(run.path)
         checkpoint_dir = f"{ROOT}/.wandb_checkpoints/{run_path}"
         os.makedirs(checkpoint_dir, exist_ok=True)
