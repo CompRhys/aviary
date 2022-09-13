@@ -59,7 +59,6 @@ def make_ensemble_predictions(
     # TODO: Add support for predicting all tasks a multi-task models was trained on. Currently only
     # handles single targets. Low priority as multi-tasking is rarely used.
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Pytorch running on {device=}")
 
     data_loader = df_to_in_mem_dataloader(
         df=df,
@@ -72,6 +71,7 @@ def make_ensemble_predictions(
 
     # tqdm(disable=None) means suppress output in non-tty (e.g. CI/log files) but keep in
     # terminal (i.e. tty mode) https://git.io/JnBOi
+    print(f"Pytorch running on {device=}")
     for idx, checkpoint_path in tqdm(
         enumerate(tqdm(checkpoint_paths), 1), disable=None if pbar else True
     ):
@@ -170,7 +170,7 @@ def deploy_wandb_checkpoints(
     ), f"Runs have differing targets, first {run_target=}"
 
     if target_col != run_target:
-        print(f"Warning: {target_col=} does not match {run_target=}")
+        print(f"\nWarning: {target_col=} does not match {run_target=}")
 
     checkpoint_paths: list[str] = []
     for run in tqdm(runs, desc="Downloading model checkpoints"):

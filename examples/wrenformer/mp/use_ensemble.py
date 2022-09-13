@@ -1,3 +1,4 @@
+# %%
 from __future__ import annotations
 
 import os
@@ -17,14 +18,17 @@ formation energies, then makes predictions on some dataset, prints ensemble metr
 stores predictions to CSV.
 """
 
+module_dir = os.path.dirname(__file__)
 today = f"{datetime.now():%Y-%m-%d}"
+
+
+# %%
 # download wbm-steps-summary.csv (23.31 MB)
-data_path = "https://figshare.com/files/36714216?private_link=ff0ad14505f9624f0c05"
+data_path = "https://figshare.com/files/37515634?private_link=ff0ad14505f9624f0c05"
 df = pd.read_csv(data_path).set_index("material_id")
 
 
 target_col = "e_form_per_atom"
-df[target_col] = df.e_form / df.n_sites
 
 wandb.login()
 wandb_api = wandb.Api()
@@ -37,6 +41,4 @@ df, ensemble_metrics = deploy_wandb_checkpoints(
     runs, df, input_col="wyckoff", target_col=target_col
 )
 
-df.round(6).to_csv(
-    f"{os.path.dirname(__file__)}/{today}-{ensemble_id}-preds-{target_col}.csv"
-)
+df.round(6).to_csv(f"{module_dir}/{today}-{ensemble_id}-preds-{target_col}.csv")

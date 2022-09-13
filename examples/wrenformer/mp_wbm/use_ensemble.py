@@ -18,8 +18,8 @@ the MP+WBM formation energies and makes predictions on the test set, then prints
 ensemble metrics and stores predictions to CSV.
 """
 
+module_dir = os.path.dirname(__file__)
 today = f"{datetime.now():%Y-%m-%d}"
-
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 test_size = 0.05
 df = pd.read_json(data_path)
@@ -40,9 +40,7 @@ test_df, ensemble_metrics = deploy_wandb_checkpoints(
     runs, test_df, input_col="wyckoff", target_col=target_col
 )
 
-test_df.round(6).to_csv(
-    f"{os.path.dirname(__file__)}/{today}-{ensemble_id}-preds-{target_col}.csv"
-)
+test_df.round(6).to_csv(f"{module_dir}/{today}-{ensemble_id}-preds-{target_col}.csv")
 
 # print output:
 # Predicting with 10 model checkpoint(s)
