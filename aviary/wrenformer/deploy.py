@@ -164,6 +164,14 @@ def deploy_wandb_checkpoints(
     for idx, run in enumerate(runs, 1):
         print(f"{idx:>3}: {run.url}")
 
+    run_target = runs[0].config["target"]
+    assert all(
+        run_target == run.config["target"] for run in runs
+    ), f"Runs have differing targets, first {run_target=}"
+
+    if target_col != run_target:
+        print(f"Warning: {target_col=} does not match {run_target=}")
+
     checkpoint_paths: list[str] = []
     for run in tqdm(runs, desc="Downloading model checkpoints"):
         run_path = "/".join(run.path)

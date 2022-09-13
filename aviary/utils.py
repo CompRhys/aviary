@@ -4,6 +4,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+from types import ModuleType
 from typing import Any, Callable, Iterable
 
 import numpy as np
@@ -815,3 +816,26 @@ def as_dict_handler(obj: Any) -> dict[str, Any] | None:
     except AttributeError:
 
         return None  # replace unhandled objects with None in serialized data
+
+
+def update_module_path_in_pickled_object(
+    pickle_path: str, old_module_path: str, new_module: ModuleType
+) -> None:
+    """Update a python module's dotted path in a pickle dump if the
+    corresponding file was renamed.
+
+    Implements the advice in https://stackoverflow.com/a/2121918.
+    Posted at https://stackoverflow.com/a/73696259.
+
+    Args:
+        pickle_path (str): Path to the pickled object.
+        old_module_path (str): The old.dotted.path.to.renamed.module.
+        new_module (ModuleType): from new.location import module.
+    """
+    sys.modules[old_module_path] = new_module
+
+    dic = torch.load(pickle_path, map_location="cpu")
+
+    del sys.modules[old_module_path]
+
+    torch.save(dic, pickle_path)
