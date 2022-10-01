@@ -68,10 +68,7 @@ def train_wrenformer_on_matbench(
         # set to None to disable logging
         wandb_path=kwargs.pop("aviary/wandb_path", "mp-wbm"),
         id_col=id_col,
-        run_params={
-            "dataset": dataset_name,
-            "fold": fold,
-        },
+        run_params=dict(dataset=dataset_name, fold=fold),
         **kwargs,
     )
 

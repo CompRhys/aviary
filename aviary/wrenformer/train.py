@@ -236,7 +236,8 @@ def train_wrenformer(
         run_params["timestamp"] = timestamp
     for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
         if x in os.environ:
-            run_params[x] = os.environ[x]
+            run_params[x.lower()] = os.environ[x]
+            print(f"{x}={os.environ[x]}")
 
     if wandb_path:
         import wandb
@@ -245,7 +246,7 @@ def train_wrenformer(
             wandb.login()
         wandb_entity, wandb_project = wandb_path.split("/")
         wandb.init(
-            entity=wandb_entity,  # run will be added to this entity/project
+            entity=wandb_entity,
             project=wandb_project,
             # https://docs.wandb.ai/guides/track/launch#init-start-error
             settings=wandb.Settings(start_method="fork"),
@@ -441,10 +442,6 @@ def train_wrenformer_on_df(
         train_df = df.sample(frac=1 - test_size, random_state=0)
         test_df = df.drop(train_df.index)
 
-    run_params = {}
-    if isinstance(df_or_path, str):
-        run_params["data_path"] = df_or_path
-
     test_metrics, *_ = train_wrenformer(
         run_name=run_name,
         train_df=train_df,
@@ -452,7 +449,6 @@ def train_wrenformer_on_df(
         target_col=target_col,
         task_type="regression",
         id_col=id_col,
-        run_params=run_params,
         **kwargs,
     )
 
