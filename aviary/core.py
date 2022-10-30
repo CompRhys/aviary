@@ -16,7 +16,7 @@ from torch import BoolTensor, Tensor
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.data import InMemoryDataLoader

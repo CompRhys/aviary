@@ -302,7 +302,7 @@ def train_ensemble(
         epochs (int): Number of epochs to train for.
         train_set (Subset): Dataloader containing training data.
         val_set (Subset): Dataloader containing validation data.
-        log (bool): Whether to log intermediate metrics to tensorboard.
+        log (bool): Whether to log intermediate metrics to Tensorboard.
         data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
@@ -578,7 +578,7 @@ def print_metrics_regression(targets: np.ndarray, preds: np.ndarray, **kwargs) -
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
     r2 = r2_score(
-        np.repeat(targets[:, np.newaxis], ensemble_folds, axis=1),
+        np.repeat(targets[:, None], ensemble_folds, axis=1),
         preds.T,
         multioutput="raw_values",
     )

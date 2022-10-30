@@ -150,7 +150,7 @@ class MessageLayer(nn.Module):
         msg_self_fea = node_prev_features[self_idx, :]
         message = torch.cat([msg_self_fea, msg_nbr_fea], dim=1)
 
-        # sum selectivity over the neighbours to get node updates
+        # sum selectivity over the neighbors to get node updates
         head_features = []
         for attn_head in self.pooling:
             out_msg = attn_head(message, index=self_idx, weights=node_nbr_weights)

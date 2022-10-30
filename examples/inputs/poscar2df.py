@@ -5,7 +5,7 @@ from functools import partial
 
 import pandas as pd
 from pymatgen.core import Composition, Structure
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from aviary.cgcnn.utils import get_cgcnn_input
 from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_from_spglib
