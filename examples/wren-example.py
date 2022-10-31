@@ -17,7 +17,7 @@ def main(  # noqa: C901
     tasks,
     losses,
     robust,
-    elem_emb="matscholar200",
+    elem_embedding="matscholar200",
     sym_emb="bra-alg-off",
     model_name="wren",
     sym_fea_len=32,
@@ -94,7 +94,7 @@ def main(  # noqa: C901
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
     dataset = WyckoffData(
-        df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+        df=df, elem_embedding=elem_embedding, sym_emb=sym_emb, task_dict=task_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
@@ -113,7 +113,10 @@ def main(  # noqa: C901
 
             print(f"using independent test set: {test_path}")
             test_set = WyckoffData(
-                df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+                df=df,
+                elem_embedding=elem_embedding,
+                sym_emb=sym_emb,
+                task_dict=task_dict,
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -136,7 +139,10 @@ def main(  # noqa: C901
 
             print(f"using independent validation set: {val_path}")
             val_set = WyckoffData(
-                df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+                df=df,
+                elem_embedding=elem_embedding,
+                sym_emb=sym_emb,
+                task_dict=task_dict,
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:

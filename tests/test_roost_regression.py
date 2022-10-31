@@ -8,7 +8,7 @@ from aviary.utils import get_metrics, results_multitask, train_ensemble
 
 
 def test_roost_regression(df_matbench_phonons):
-    elem_emb = "matscholar200"
+    elem_embedding = "matscholar200"
     target_name = "last phdos peak"
     task = "regression"
     losses = ["L1"]
@@ -38,7 +38,7 @@ def test_roost_regression(df_matbench_phonons):
     loss_dict = dict(zip([target_name], losses))
 
     dataset = CompositionData(
-        df=df_matbench_phonons, elem_emb=elem_emb, task_dict=task_dict
+        df=df_matbench_phonons, elem_embedding=elem_embedding, task_dict=task_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len

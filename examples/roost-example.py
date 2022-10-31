@@ -17,7 +17,7 @@ def main(  # noqa: C901
     tasks,
     losses,
     robust,
-    elem_emb="matscholar200",
+    elem_embedding="matscholar200",
     model_name="roost",
     elem_fea_len=64,
     n_graph=3,
@@ -89,7 +89,7 @@ def main(  # noqa: C901
     # NOTE do not use default_na as "NaN" is a valid material
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-    dataset = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
+    dataset = CompositionData(df=df, elem_embedding=elem_embedding, task_dict=task_dict)
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
 
@@ -105,7 +105,9 @@ def main(  # noqa: C901
             df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
 
             print(f"using independent test set: {test_path}")
-            test_set = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
+            test_set = CompositionData(
+                df=df, elem_embedding=elem_embedding, task_dict=task_dict
+            )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
             raise ValueError("test-size must be non-zero to evaluate model")
@@ -126,7 +128,9 @@ def main(  # noqa: C901
             df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
 
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(df=df, elem_emb=elem_emb, task_dict=task_dict)
+            val_set = CompositionData(
+                df=df, elem_embedding=elem_embedding, task_dict=task_dict
+            )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
             if val_size == 0.0 and evaluate:

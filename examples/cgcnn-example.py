@@ -17,7 +17,7 @@ def main(  # noqa: C901
     tasks,
     losses,
     robust,
-    elem_emb="cgcnn92",
+    elem_embedding="cgcnn92",
     model_name="cgcnn",
     n_graph=4,
     elem_fea_len=64,
@@ -103,7 +103,7 @@ def main(  # noqa: C901
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[], comment="#")
 
     dataset = CrystalGraphData(
-        df=df, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
+        df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
@@ -122,7 +122,7 @@ def main(  # noqa: C901
 
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                df=df, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
+                df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -145,7 +145,7 @@ def main(  # noqa: C901
 
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                df=df, elem_emb=elem_emb, task_dict=task_dict, **dist_dict
+                df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:

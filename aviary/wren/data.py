@@ -24,7 +24,7 @@ class WyckoffData(Dataset):
         self,
         df: pd.DataFrame,
         task_dict: dict[str, str],
-        elem_emb: str = "matscholar200",
+        elem_embedding: str = "matscholar200",
         sym_emb: str = "bra-alg-off",
         inputs: str = "wyckoff",
         identifiers: Sequence[str] = ("material_id", "composition", "wyckoff"),
@@ -35,8 +35,9 @@ class WyckoffData(Dataset):
             df (pd.DataFrame): Pandas dataframe holding input and target values.
             task_dict (dict[str, "regression" | "classification"]): Map from target names to task
                 type for multi-task learning.
-            elem_emb (str, optional): One of "matscholar200", "cgcnn92", "megnet16", "onehot112" or
-                path to a file with custom element embeddings. Defaults to "matscholar200".
+            elem_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16",
+                "onehot112" or path to a file with custom element embeddings.
+                Defaults to "matscholar200".
             sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or "spg-alg-off".
             inputs (str, optional): df columns to be used for featurisation.
                 Defaults to "wyckoff".
@@ -51,12 +52,12 @@ class WyckoffData(Dataset):
         self.identifiers = list(identifiers)
         self.df = df
 
-        if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
-            elem_emb = f"{PKG_DIR}/embeddings/element/{elem_emb}.json"
-        elif not os.path.exists(elem_emb):
-            raise AssertionError(f"{elem_emb} does not exist!")
+        if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
+        elif not os.path.exists(elem_embedding):
+            raise AssertionError(f"{elem_embedding} does not exist!")
 
-        with open(elem_emb) as f:
+        with open(elem_embedding) as f:
             self.elem_features = json.load(f)
 
         self.elem_emb_len = len(list(self.elem_features.values())[0])
