@@ -65,6 +65,7 @@ def print_walltime(
     start_desc: str = "",
     end_desc: str = "",
     newline: bool = True,
+    min_run_time: float = 1,
 ) -> Generator[None, None, None]:
     """Context manager and decorator that prints the wall time of its lifetime.
 
@@ -73,6 +74,8 @@ def print_walltime(
         end_desc (str): Text to print when exiting context. Will be followed by 'took
             {duration} sec'. i.e. f"{end_desc} took 1.23 sec". Defaults to ''.
         newline (bool): Whether to print a newline after start_desc. Defaults to True.
+        min_run_time (float): Minimum wall time in seconds below which nothing will be
+            printed. Defaults to 1.
     """
     start_time = time.perf_counter()
     if start_desc:
@@ -82,4 +85,6 @@ def print_walltime(
         yield
     finally:
         run_time = time.perf_counter() - start_time
-        print(f"{end_desc} took {run_time:.2f} sec")
+        # don't print on immediate failures
+        if run_time > min_run_time:
+            print(f"{end_desc} took {run_time:.2f} sec")
