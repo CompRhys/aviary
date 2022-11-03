@@ -338,7 +338,7 @@ def input_parser():
         help="Loss function if regression (default: 'L1')",
     )
 
-    # optimiser inputs
+    # optimizer inputs
     parser.add_argument(
         "--epochs",
         default=100,
@@ -349,7 +349,7 @@ def input_parser():
     parser.add_argument(
         "--robust",
         action="store_true",
-        help="Specifies whether to use hetroskedastic loss variants",
+        help="Specifies whether to use heteroscedastic loss variants",
     )
     parser.add_argument(
         "--optim",
@@ -446,7 +446,7 @@ def input_parser():
     # misc
     parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--log", action="store_true", help="Log training metrics to tensorboard"
+        "--log", action="store_true", help="Log training metrics to TensorBoard"
     )
 
     args = parser.parse_args()

@@ -205,7 +205,7 @@ class BaseModelClass(nn.Module, ABC):
             pass
 
         if isinstance(writer, SummaryWriter):
-            writer.close()  # close tensorboard SummaryWriter at end of training
+            writer.close()  # close TensorBoard SummaryWriter at end of training
 
     def evaluate(
         self,

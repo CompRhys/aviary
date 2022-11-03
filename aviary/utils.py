@@ -159,7 +159,7 @@ def initialize_optim(
     Returns:
         tuple[Optimizer, _LRScheduler]: Optimizer and scheduler for given model
     """
-    # Select Optimiser
+    # Select optimizer
     optimizer: Optimizer
     if optim == "SGD":
         optimizer = SGD(
@@ -302,7 +302,7 @@ def train_ensemble(
         epochs (int): Number of epochs to train for.
         train_set (Subset): Dataloader containing training data.
         val_set (Subset): Dataloader containing validation data.
-        log (bool): Whether to log intermediate metrics to Tensorboard.
+        log (bool): Whether to log intermediate metrics to TensorBoard.
         data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
