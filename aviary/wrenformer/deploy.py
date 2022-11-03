@@ -175,7 +175,7 @@ def deploy_wandb_checkpoints(
     checkpoint_paths: list[str] = []
     for run in tqdm(runs, desc="Downloading model checkpoints"):
         run_path = "/".join(run.path)
-        checkpoint_dir = f"{ROOT}/.wandb_checkpoints/{run_path}"
+        checkpoint_dir = f"{ROOT}/wandb/checkpoints/{run_path}"
         os.makedirs(checkpoint_dir, exist_ok=True)
 
         checkpoint_path = f"{checkpoint_dir}/checkpoint.pth"
