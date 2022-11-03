@@ -58,13 +58,9 @@ df_or_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
 checkpoint = "wandb"  # None | 'local' | 'wandb'
 batch_size = 128
 swa_start = None
-
-slurm_job_id = os.environ.get("SLURM_JOB_ID")
 slurm_array_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 
 print(f"Job started running {datetime.now():%Y-%m-%d@%H-%M}")
-print(f"{slurm_job_id=}")
-print(f"{slurm_array_task_id=}")
 print(f"{run_name=}")
 print(f"{df_or_path=}")
 
