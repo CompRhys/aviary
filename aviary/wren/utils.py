@@ -291,7 +291,7 @@ def canonicalize_elem_wyks(elem_wyks: str, spg_num: int) -> str:
 
 
 def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
-    """_summary_
+    """Determines the order or Wyckoff positions when canonicalizing Aflow labels.
 
     Args:
         wyks (str): Wyckoff position substring from AFLOW-style prototype label

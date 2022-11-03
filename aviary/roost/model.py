@@ -39,7 +39,7 @@ class Roost(BaseModelClass):
         out_hidden: Sequence[int] = (256, 128, 64),
         **kwargs,
     ) -> None:
-        """_summary_
+        """Composition-only model.
 
         Args:
             robust (bool): If True, the number of model outputs is doubled. 2nd output for each
@@ -54,14 +54,13 @@ class Roost(BaseModelClass):
                 Defaults to 3.
             elem_heads (int, optional): Number of parallel attention heads per message passing
                 operation. Defaults to 3.
-            elem_gate (list[int], optional): _description_. Defaults to [256].
-            elem_msg (list[int], optional): _description_. Defaults to [256].
+            elem_gate (list[int], optional): _description_. Defaults to (256,).
+            elem_msg (list[int], optional): _description_. Defaults to (256,).
             cry_heads (int, optional): _description_. Defaults to 3.
-            cry_gate (list[int], optional): _description_. Defaults to [256].
-            cry_msg (list[int], optional): _description_. Defaults to [256].
-            trunk_hidden (list[int], optional): _description_. Defaults to [1024, 512].
-            out_hidden (list[int], optional): _description_. Defaults to [256, 128, 64].
-
+            cry_gate (list[int], optional): _description_. Defaults to (256,).
+            cry_msg (list[int], optional): _description_. Defaults to (256,).
+            trunk_hidden (list[int], optional): _description_. Defaults to (1024, 512).
+            out_hidden (list[int], optional): _description_. Defaults to (256, 128, 64).
         """
         super().__init__(robust=robust, **kwargs)
 
@@ -143,18 +142,20 @@ class DescriptorNetwork(nn.Module):
         cry_gate: Sequence[int] = (256,),
         cry_msg: Sequence[int] = (256,),
     ) -> None:
-        """_summary_
+        """Bundles n_graph message passing layers followed by cry_heads weighted attention pooling
+        layers.
 
         Args:
-            elem_emb_len (int): _description_
-            elem_fea_len (int, optional): _description_. Defaults to 64.
-            n_graph (int, optional): _description_. Defaults to 3.
-            elem_heads (int, optional): _description_. Defaults to 3.
-            elem_gate (list[int], optional): _description_. Defaults to [256].
-            elem_msg (list[int], optional): _description_. Defaults to [256].
+            elem_emb_len (int): Element embedding length.
+            elem_fea_len (int, optional): Element feature length. Defaults to 64.
+            n_graph (int, optional): Number of message-passing layers. Defaults to 3.
+            elem_heads (int, optional): Message-passing heads in each MP layer. Defaults to 3.
+            elem_gate (list[int], optional): Message gate layers in each MP layer.
+                Defaults to (256,).
+            elem_msg (list[int], optional): _description_. Defaults to (256,).
             cry_heads (int, optional): _description_. Defaults to 3.
-            cry_gate (list[int], optional): _description_. Defaults to [256].
-            cry_msg (list[int], optional): _description_. Defaults to [256].
+            cry_gate (list[int], optional): _description_. Defaults to (256,).
+            cry_msg (list[int], optional): _description_. Defaults to (256,).
         """
         super().__init__()
 
@@ -214,9 +215,9 @@ class DescriptorNetwork(nn.Module):
 
         # generate crystal features by pooling the elemental features
         head_fea = []
-        for attnhead in self.cry_pool:
+        for attn_head in self.cry_pool:
             head_fea.append(
-                attnhead(elem_fea, index=cry_elem_idx, weights=elem_weights)
+                attn_head(elem_fea, index=cry_elem_idx, weights=elem_weights)
             )
 
         return torch.mean(torch.stack(head_fea), dim=0)

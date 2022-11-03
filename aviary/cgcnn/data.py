@@ -65,8 +65,10 @@ class CrystalGraphData(Dataset):
 
         for key, value in self.elem_features.items():
             self.elem_features[key] = np.array(value, dtype=float)
-
-        self.elem_emb_len = len(list(self.elem_features.values())[0])
+            if not hasattr(self, "elem_emb_len"):
+                self.elem_emb_len = len(value)
+            elif self.elem_emb_len != len(value):
+                raise ValueError("Element embedding length mismatch!")
 
         self.gdf = GaussianDistance(dmin=dmin, dmax=radius, step=step)
         self.nbr_fea_dim = self.gdf.embedding_size
@@ -210,12 +212,12 @@ def collate_batch(
     batch_nbr_idx = []
     crystal_atom_idx = []
     batch_targets = []
-    batch_cry_ids = []
+    batch_material_ids = []
     base_idx = 0
 
     # TODO: unpacking (inputs, target, comp, material_id) doesn't appear to match the doc string
     # for dataset_list, what about nbr_idx and comp?
-    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
+    for idx, (inputs, target, *material_id) in enumerate(dataset_list):
         atom_fea, nbr_dist, self_idx, nbr_idx = inputs
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
@@ -230,9 +232,9 @@ def collate_batch(
         # mapping from atoms to crystals
         crystal_atom_idx.extend([idx] * n_i)
 
-        # batch the targets and ids
+        # batch the targets and material_ids
         batch_targets.append(target)
-        batch_cry_ids.append(cry_ids)
+        batch_material_ids.append(material_id)
 
         # increment the id counter
         base_idx += n_i
@@ -249,7 +251,7 @@ def collate_batch(
         tuple(
             torch.stack(b_target, dim=0).to(device) for b_target in zip(*batch_targets)
         ),
-        *zip(*batch_cry_ids),
+        *zip(*batch_material_ids),
     )
 
 
@@ -273,7 +275,7 @@ class GaussianDistance:
     def __init__(
         self, dmin: float, dmax: float, step: float, var: float = None
     ) -> None:
-        """_summary_
+        """Used by CGCNN to featurize neighbor atom distances.
 
         Args:
             dmin (float): Minimum interatomic distance
