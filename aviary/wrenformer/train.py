@@ -41,6 +41,7 @@ def train_wrenformer(
     test_df: pd.DataFrame,
     target_col: str,
     epochs: int,
+    embedding_type: str,
     timestamp: str = None,
     input_col: str = None,
     id_col: str = "material_id",
@@ -129,14 +130,10 @@ def train_wrenformer(
 
     if "wren" in run_name.lower():
         input_col = input_col or "wyckoff"
-        embedding_type = "wyckoff"
+        embedding_type = embedding_type or "wyckoff"
     elif "roost" in run_name.lower():
         input_col = input_col or "composition"
-        embedding_type = "composition"
-    else:
-        raise ValueError(
-            f"{run_name = } must contain 'roost' or 'wren' (case insensitive)"
-        )
+        embedding_type = embedding_type or "composition"
 
     robust = "robust" in run_name.lower()
     loss_func = (
@@ -206,32 +203,32 @@ def train_wrenformer(
         swa_model = torch.optim.swa_utils.AveragedModel(model)
         swa_scheduler = torch.optim.swa_utils.SWALR(optimizer_instance, swa_lr=swa_lr)
 
-    run_params = {
-        "epochs": epochs,
-        "learning_rate": learning_rate,
-        "optimizer": dict(name=optimizer_name, params=optimizer_params),
-        "lr_scheduler": dict(name=scheduler_name, params=scheduler_params),
-        "batch_size": batch_size,
-        "n_attn_layers": n_attn_layers,
-        "target": target_col,
-        "robust": robust,
-        "embedding_len": embedding_len,
-        "losses": loss_dict,
-        "train_df": dict(shape=train_df.shape, columns=", ".join(train_df)),
-        "test_df": dict(shape=test_df.shape, columns=", ".join(test_df)),
-        "trainable_params": model.num_params,
-        "task_type": task_type,
-        "swa": dict(
+    run_params = dict(
+        epochs=epochs,
+        learning_rate=learning_rate,
+        optimizer=dict(name=optimizer_name, params=optimizer_params),
+        lr_scheduler=dict(name=scheduler_name, params=scheduler_params),
+        batch_size=batch_size,
+        n_attn_layers=n_attn_layers,
+        target=target_col,
+        robust=robust,
+        embedding_len=embedding_len,
+        losses=loss_dict,
+        train_df=dict(shape=train_df.shape, columns=", ".join(train_df)),
+        test_df=dict(shape=test_df.shape, columns=", ".join(test_df)),
+        trainable_params=model.num_params,
+        task_type=task_type,
+        swa=dict(
             start=swa_start,
             epochs=int(swa_start * epochs),
             learning_rate=swa_lr,
         )
         if swa_start
         else None,
-        "embedding_aggregations": ",".join(embedding_aggregations),
-        "checkpoint": checkpoint,
+        embedding_aggregations=",".join(embedding_aggregations),
+        checkpoint=checkpoint,
         **(run_params or {}),
-    }
+    )
     if timestamp:
         run_params["timestamp"] = timestamp
     for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
@@ -252,7 +249,7 @@ def train_wrenformer(
             settings=wandb.Settings(start_method="fork"),
             name=run_name,
             config=run_params,
-            **wandb_kwargs,
+            **wandb_kwargs or {},
         )
 
     for epoch in range(epochs):
@@ -308,23 +305,21 @@ def train_wrenformer(
     inference_model.eval()
 
     with torch.no_grad():
-        predictions = torch.cat(
-            [inference_model(*inputs)[0] for inputs, *_ in test_loader]
-        )
+        preds = torch.cat([inference_model(*inputs)[0] for inputs, *_ in test_loader])
 
     if robust:
-        predictions, aleat_log_std = predictions.chunk(2, dim=1)
-        aleat_std = aleat_log_std.exp().cpu().numpy().squeeze()
-        test_df["aleat_std"] = aleat_std.tolist()
+        preds, aleat_log_std = preds.chunk(2, dim=1)
+        aleatoric_std = aleat_log_std.exp().cpu().numpy().squeeze()
+        test_df["aleatoric_std"] = aleatoric_std.tolist()
     if task_type == clf_key:
-        predictions = predictions.softmax(dim=1)
+        preds = preds.softmax(dim=1)
 
-    predictions = predictions.cpu().numpy().squeeze()
+    preds = preds.cpu().numpy().squeeze()
     targets = test_df[target_col]
     pred_col = f"{target_col}_pred"
-    test_df[pred_col] = predictions.tolist()  # requires shuffle=False for test_loader
+    test_df[pred_col] = preds.tolist()  # requires shuffle=False for test_loader
 
-    test_metrics = get_metrics(targets, predictions, task_type)
+    test_metrics = get_metrics(targets, preds, task_type)
     test_metrics["test_size"] = len(test_df)
 
     # save model checkpoint
@@ -360,24 +355,24 @@ def train_wrenformer(
         wandb.run.summary["test"] = test_metrics
         table_cols = [id_col, target_col, pred_col]
         if robust:
-            table_cols.append("aleat_std")
+            table_cols.append("aleatoric_std")
         table = wandb.Table(dataframe=test_df[table_cols])
-        wandb.log({"test_set_predictions": table})
+        wandb.log({"test_set_preds": table})
         if task_type == reg_key:
             from sklearn.metrics import r2_score
 
-            MAE = np.abs(targets - predictions).mean()
-            R2 = r2_score(targets, predictions)
+            MAE = np.abs(targets - preds).mean()
+            R2 = r2_score(targets, preds)
             title = f"{run_name}\n{MAE=:.2f}\n{R2=:.2f}"
             scatter_plot = wandb.plot.scatter(table, target_col, pred_col, title=title)
             wandb.log({"true_pred_scatter": scatter_plot})
         elif task_type == clf_key:
             from sklearn.metrics import accuracy_score, roc_auc_score
 
-            ROCAUC = roc_auc_score(targets, predictions[:, 1])
-            accuracy = accuracy_score(targets, predictions.argmax(axis=1))
+            ROCAUC = roc_auc_score(targets, preds[:, 1])
+            accuracy = accuracy_score(targets, preds.argmax(axis=1))
             title = f"{run_name}\n{accuracy=:.2f}\n{ROCAUC=:.2f}"
-            roc_curve = wandb.plot.roc_curve(targets, predictions)
+            roc_curve = wandb.plot.roc_curve(targets, preds)
             wandb.log({"roc_curve": roc_curve})
 
         wandb.finish()

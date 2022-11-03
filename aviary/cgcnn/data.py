@@ -50,7 +50,7 @@ class CrystalGraphData(Dataset):
             step (float, optional): increment size of Gaussian basis. Defaults to 0.2.
         """
         self.task_dict = task_dict
-        self.identifiers = identifiers
+        self.identifiers = list(identifiers)
 
         self.radius = radius
         self.max_num_nbr = max_num_nbr
@@ -93,6 +93,7 @@ class CrystalGraphData(Dataset):
         isolated = {*all_isolated, *some_isolated}  # set union
         if len(isolated) > 0:
             # drop the data points that do not give rise to dense crystal graphs
+            # TODO next line requires identifiers[0] == df.index, bad assumption
             self.df = self.df.drop(index=isolated)
 
             print(f"dropping {len(isolated)} data points:")

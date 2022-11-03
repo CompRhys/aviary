@@ -70,4 +70,5 @@ train_wrenformer_on_df(
     batch_size=batch_size,
     swa_start=swa_start,
     wandb_path="aviary/mp-wbm",
+    embedding_type="composition" if "roost" in run_name.lower() else "wyckoff",
 )

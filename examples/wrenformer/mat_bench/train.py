@@ -66,7 +66,7 @@ def train_wrenformer_on_matbench(
         target_col=target,
         task_type=task_type,
         # set to None to disable logging
-        wandb_path=kwargs.pop("aviary/wandb_path", "mp-wbm"),
+        wandb_path=kwargs.pop("wandb_path", "janosh/matbench"),
         id_col=id_col,
         run_params=dict(dataset=dataset_name, fold=fold),
         **kwargs,

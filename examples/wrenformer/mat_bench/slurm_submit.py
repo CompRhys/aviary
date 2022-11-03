@@ -21,12 +21,11 @@ __date__ = "2022-04-25"
 # %%
 epochs = 300
 target_col = "e_form"
-run_name = f"wrenformer-robust-{epochs=}-{target_col}"
+run_name = f"roost-robust-{epochs=}-{target_col}"
 folds = list(range(5))
 today = f"{datetime.now():%Y-%m-%d}"
-model_name = f"wrenformer-robust-{epochs=}"
 
-if "roost" in model_name.lower():
+if "roost" in run_name.lower():
     # deploy Roost on all tasks
     datasets = list(DATA_PATHS)
 else:
@@ -64,14 +63,11 @@ print(f"Job started running {datetime.now():%Y-%m-%d@%H-%M}")
 print(f"{run_name=}")
 print(f"{df_or_path=}")
 
-print(f"Job started running {datetime.now():%Y-%m-%d@%H-%M}")
-print("{model_name=}")
-
-dataset_name, fold = list(product({datasets}, {folds}))[slurm_array_task_id]
-print(f"{dataset_name=}\\n{fold=}")
+dataset_name, fold = list(product(datasets, folds))[slurm_array_task_id]
+print(f"{dataset_name=}\n{fold=}")
 
 train_wrenformer_on_matbench(
-    model_name=model_name,
+    model_name=run_name,
     dataset_name=dataset_name,
     timestamp=f"{datetime.now():%Y-%m-%d@%H-%M-%S}",
     fold=fold,
@@ -80,4 +76,5 @@ train_wrenformer_on_matbench(
     checkpoint=checkpoint,
     learning_rate=learning_rate,
     embedding_aggregations=embedding_aggregations,
+    embedding_type="composition" if "roost" in run_name.lower() else "wyckoff",
 )
