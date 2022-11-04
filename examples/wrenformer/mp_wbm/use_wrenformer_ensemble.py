@@ -7,7 +7,7 @@ import pandas as pd
 import wandb
 
 from aviary import ROOT
-from aviary.wrenformer.deploy import deploy_wandb_checkpoints
+from aviary.deploy import predict_from_wandb_checkpoints
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-23"
@@ -36,7 +36,7 @@ runs = wandb_api.runs("aviary/mp-wbm", filters={"tags": {"$in": [ensemble_id]}})
 
 assert len(runs) == 10, f"Expected 10 runs, got {len(runs)} for {ensemble_id=}"
 
-test_df, ensemble_metrics = deploy_wandb_checkpoints(
+test_df, ensemble_metrics = predict_from_wandb_checkpoints(
     runs, test_df, input_col="wyckoff", target_col=target_col
 )
 
