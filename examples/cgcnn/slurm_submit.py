@@ -15,7 +15,7 @@ from aviary.core import TaskType
 from aviary.train import df_train_test_split, train_model
 
 """
-Train a Wrenformer ensemble of size n_folds on target_col of df_or_path.
+Train a Wrenformer ensemble of size n_folds on target_col of data_path.
 """
 
 __author__ = "Janosh Riebesell"

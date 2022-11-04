@@ -211,8 +211,6 @@ def train_model(
         )
 
     for epoch in tqdm(range(epochs), disable=None, desc="Training epoch"):
-        if verbose:
-            print(f"Epoch {epoch + 1}/{epochs}")
 
         train_metrics = model.evaluate(
             train_loader,

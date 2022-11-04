@@ -46,8 +46,9 @@ learning_rate = 3e-4
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm-1k-samples.json.gz"
 batch_size = 128
 slurm_array_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 
-print(f"Job started running {datetime.now():%Y-%m-%d@%H-%M}")
+print(f"Job started running {timestamp}")
 print(f"{run_name=}")
 print(f"{data_path=}")
 
@@ -67,7 +68,7 @@ train_wrenformer(
     test_df=test_df,
     target_col=target_col,
     task_type="regression",
-    timestamp=f"{datetime.now():%Y-%m-%d@%H-%M-%S}",
+    timestamp=timestamp,
     epochs=epochs,
     checkpoint="wandb",  # None | 'local' | 'wandb',
     learning_rate=learning_rate,
