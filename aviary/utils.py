@@ -4,6 +4,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+from pickle import PickleError
 from types import ModuleType
 from typing import Any, Callable, Iterable
 
@@ -832,9 +833,15 @@ def update_module_path_in_pickled_object(
         old_module_path (str): The old.dotted.path.to.renamed.module.
         new_module (ModuleType): from new.location import module.
     """
+    if not os.path.isfile(pickle_path):
+        raise FileNotFoundError(pickle_path)
+
     sys.modules[old_module_path] = new_module
 
-    dic = torch.load(pickle_path, map_location="cpu")
+    try:
+        dic = torch.load(pickle_path, map_location="cpu")
+    except Exception as exc:
+        raise PickleError(pickle_path) from exc
 
     del sys.modules[old_module_path]
 
