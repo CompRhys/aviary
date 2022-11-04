@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.core import Normalizer, TaskType
+from aviary.core import BaseModelClass, Normalizer, TaskType, np_softmax
+from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
 from aviary.utils import get_metrics
 from aviary.wrenformer.data import df_to_in_mem_dataloader
@@ -16,7 +19,7 @@ from aviary.wrenformer.model import Wrenformer
 from aviary.wrenformer.utils import print_walltime
 
 __author__ = "Janosh Riebesell"
-__date__ = "2022-06-12"
+__date__ = "2022-10-29"
 
 
 torch.manual_seed(0)  # ensure reproducible results
@@ -33,50 +36,44 @@ def lr_lambda(epoch: int) -> float:
     return min((epoch + 1) ** (-0.5), (epoch + 1) * warmup_steps ** (-1.5))
 
 
-@print_walltime(end_desc="train_wrenformer()")
-def train_wrenformer_old(
-    run_name: str,
-    task_type: TaskType,
-    train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
-    target_col: str,
+@print_walltime(end_desc="train_model()")
+def train_model(
     epochs: int,
-    embedding_type: str,
-    timestamp: str = None,
-    input_col: str = None,
-    id_col: str = "material_id",
-    n_attn_layers: int = 4,
-    wandb_path: str = None,
+    model: BaseModelClass,
+    run_name: str,
+    target_col: str,
+    task_type: TaskType,
+    test_loader: DataLoader | InMemoryDataLoader,
+    train_loader: DataLoader | InMemoryDataLoader,
     checkpoint: Literal["local", "wandb"] | None = None,
-    run_params: dict[str, Any] = None,
-    optimizer: str | tuple[str, dict] = "AdamW",
-    scheduler: str | tuple[str, dict] = "LambdaLR",
+    id_col: str = "material_id",
     learning_rate: float = 1e-4,
-    batch_size: int = 128,
-    swa_start: float = None,
+    model_params: dict[str, Any] = None,
+    optimizer: str | tuple[str, dict] = "AdamW",
+    robust: bool = False,
+    run_params: dict[str, Any] = None,
+    scheduler: str | tuple[str, dict] = "LambdaLR",
     swa_lr: float = None,
-    embedding_aggregations: Sequence[str] = ("mean",),
+    swa_start: float = None,
+    test_df: pd.DataFrame = None,
+    timestamp: str = None,
     verbose: bool = False,
     wandb_kwargs: dict[str, Any] = None,
+    wandb_path: str = None,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
-    """Core training function for Wrenformer. Handles checkpointing and metric logging.
+    """Core training function. Handles checkpointing and metric logging.
     Wrapped by other functions like train_wrenformer_on_matbench() for specific datasets.
 
     Args:
-        run_name (str): Can be any string to describe the Roost/Wren variant being trained.
-            Include 'robust' to use a robust loss function and have the model learn to
-            predict an aleatoric uncertainty.
+        run_name (str): A string to describe the training run. Should usually contain model type
+            (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
+            have the model learn to predict an aleatoric uncertainty.
         task_type ('regression' | 'classification'): What type of task to train the model for.
-        train_df (pd.DataFrame): Dataframe containing the training data.
-        test_df (pd.DataFrame): Dataframe containing the test data.
         target_col (str): Name of df column containing the target values.
-        input_col (str): Name of df column containing the input values. Defaults to 'wyckoff' if
-            'wren' in run_name else 'composition'.
         id_col (str): Name of df column containing material IDs.
         epochs (int): How many epochs to train for. Defaults to 100.
-        timestamp (str): Will be included in run_params and used as file name prefix for model
-            checkpoints and result files. Defaults to None.
-        n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
+        timestamp (str): Will prefix the names of model checkpoint files and other output files.
+            Will also be included in run_params. Defaults to None.
         wandb_path (str | None): Path to Weights and Biases project where to log this run formatted
             as '<entity>/<project>'. Defaults to None which means logging is disabled.
         checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
@@ -100,12 +97,10 @@ def train_wrenformer_old(
             LambdaLR scheduler from a torch.save() checkpoint created prior to this file having
             been renamed.
         learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
-        batch_size (int): The mini-batch size during training. Defaults to 128.
         swa_start (float | None): When to start using stochastic weight averaging during training.
             Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
             None to disable SWA. Defaults to None. Proposed in https://arxiv.org/abs/1803.05407.
         swa_lr (float): Learning rate for SWA scheduler. Defaults to learning_rate.
-        embedding_aggregations (list[str]): Aggregations to apply to the learned embedding returned
             by the transformer encoder before passing into the ResidualNetwork. One or more of
             ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
         verbose (bool): Whether to print progress and metrics to stdout. Defaults to False.
@@ -128,14 +123,6 @@ def train_wrenformer_old(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
 
-    if "wren" in run_name.lower():
-        input_col = input_col or "wyckoff"
-        embedding_type = embedding_type or "wyckoff"
-    elif "roost" in run_name.lower():
-        input_col = input_col or "composition"
-        embedding_type = embedding_type or "composition"
-
-    robust = "robust" in run_name.lower()
     loss_func = (
         (RobustL1Loss if robust else torch.nn.L1Loss())
         if task_type == reg_key
@@ -144,37 +131,13 @@ def train_wrenformer_old(
     loss_dict = {target_col: (task_type, loss_func)}
     normalizer_dict = {target_col: Normalizer() if task_type == reg_key else None}
 
-    data_loader_kwargs = dict(
-        target_col=target_col,
-        input_col=input_col,
-        id_col=id_col,
-        embedding_type=embedding_type,
-    )
-    train_loader = df_to_in_mem_dataloader(
-        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore
-    )
-
-    test_loader = df_to_in_mem_dataloader(
-        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore
-    )
-
     # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
     # element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
     # 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or element) in the material
-    embedding_len = train_loader.tensors[0][0].shape[-1]
-    # Roost and Wren embedding size resp.
-    assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
+    # embedding_len = train_loader.tensors[0][0].shape[-1]
+    # # Roost and Wren embedding size resp.
+    # assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
 
-    model_params = dict(
-        # 1 for regression, n_classes for classification
-        n_targets=[1 if task_type == reg_key else train_df[target_col].max() + 1],
-        n_features=embedding_len,
-        task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
-        n_attn_layers=n_attn_layers,
-        robust=robust,
-        embedding_aggregations=embedding_aggregations,
-    )
-    model = Wrenformer(**model_params)
     model.to(device)
     if isinstance(optimizer, str):
         optimizer_name, optimizer_params = optimizer, None
@@ -208,14 +171,10 @@ def train_wrenformer_old(
         learning_rate=learning_rate,
         optimizer=dict(name=optimizer_name, params=optimizer_params),
         lr_scheduler=dict(name=scheduler_name, params=scheduler_params),
-        batch_size=batch_size,
-        n_attn_layers=n_attn_layers,
         target=target_col,
         robust=robust,
-        embedding_len=embedding_len,
+        # embedding_len=embedding_len,
         losses=loss_dict,
-        train_df=dict(shape=train_df.shape, columns=", ".join(train_df)),
-        test_df=dict(shape=test_df.shape, columns=", ".join(test_df)),
         trainable_params=model.num_params,
         task_type=task_type,
         swa=dict(
@@ -225,7 +184,6 @@ def train_wrenformer_old(
         )
         if swa_start
         else None,
-        embedding_aggregations=",".join(embedding_aggregations),
         checkpoint=checkpoint,
         **(run_params or {}),
     )
@@ -234,7 +192,7 @@ def train_wrenformer_old(
     for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
         if x in os.environ:
             run_params[x.lower()] = os.environ[x]
-            print(f"{x}={os.environ[x]}")
+    print(f"{run_params=}")
 
     if wandb_path:
         import wandb
@@ -252,7 +210,7 @@ def train_wrenformer_old(
             **wandb_kwargs or {},
         )
 
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs), disable=None, desc="Training epoch"):
         if verbose:
             print(f"Epoch {epoch + 1}/{epochs}")
 
@@ -305,19 +263,23 @@ def train_wrenformer_old(
     inference_model.eval()
 
     with torch.no_grad():
-        preds = torch.cat([inference_model(*inputs)[0] for inputs, *_ in test_loader])
+        preds = np.concatenate(
+            [inference_model(*inputs)[0].cpu().numpy() for inputs, _, _ in test_loader]
+        ).squeeze()
 
+    if test_df is None:
+        assert isinstance(test_loader, DataLoader)
+        test_df = test_loader.dataset.df
     if robust:
-        preds, aleat_log_std = preds.chunk(2, dim=1)
-        aleatoric_std = aleat_log_std.exp().cpu().numpy().squeeze()
-        test_df["aleatoric_std"] = aleatoric_std.tolist()
+        preds, aleatoric_log_std = preds.T
+        aleatoric_std = np.exp(aleatoric_log_std)
+        test_df["aleatoric_std"] = aleatoric_std
     if task_type == clf_key:
-        preds = preds.softmax(dim=1)
+        preds = np_softmax(preds).softmax(dim=1)
 
-    preds = preds.cpu().numpy().squeeze()
     targets = test_df[target_col]
     pred_col = f"{target_col}_pred"
-    test_df[pred_col] = preds.tolist()  # requires shuffle=False for test_loader
+    test_df[pred_col] = preds  # requires shuffle=False for test_loader
 
     test_metrics = get_metrics(targets, preds, task_type)
     test_metrics["test_size"] = len(test_df)
@@ -378,3 +340,141 @@ def train_wrenformer_old(
         wandb.finish()
 
     return test_metrics, run_params, test_df
+
+
+def train_wrenformer(
+    run_name: str,
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    target_col: str,
+    task_type: TaskType,
+    id_col: str = "material_id",
+    n_attn_layers: int = 4,
+    embedding_type: str = None,
+    input_col: str = None,
+    embedding_aggregations: tuple[str] = ("mean",),
+    batch_size: int = 128,
+    **kwargs,
+) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
+    """Train a Wrenformer model on a generic dataframe. This function handles the DataLoader
+    creation, then delegates to train_model().
+
+    Args:
+        run_name (str): A string to describe the training run. Should usually contain model type
+            (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
+            have the model learn to predict an aleatoric uncertainty.
+        df_or_path (str): Path to a data file to load with pandas.read_json().
+        timestamp (str): Will prefix the names of model checkpoint files and other output files.
+        n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
+        kwargs: Additional keyword arguments are passed to train_wrenformer().
+
+    Raises:
+        ValueError: On unknown dataset_name or invalid checkpoint.
+
+    Returns:
+        tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.
+            2nd dict are the run's hyperparameters. 3rd is a dataframe with test set predictions.
+    """
+    robust = "robust" in run_name.lower()
+
+    if "wren" in run_name.lower():
+        input_col = input_col or "wyckoff"
+        embedding_type = embedding_type or "wyckoff"
+    elif "roost" in run_name.lower():
+        input_col = input_col or "composition"
+        embedding_type = embedding_type or "composition"
+    if not input_col or not embedding_type:
+        raise ValueError(f"Missing {input_col=} or {embedding_type=} for {run_name=}")
+
+    data_loader_kwargs = dict(
+        target_col=target_col,
+        input_col=input_col,
+        id_col=id_col,
+        embedding_type=embedding_type,
+    )
+    train_loader = df_to_in_mem_dataloader(
+        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore
+    )
+
+    test_loader = df_to_in_mem_dataloader(
+        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore
+    )
+
+    # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
+    # element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
+    # 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or element) in the material
+    embedding_len = train_loader.tensors[0][0].shape[-1]
+    # Roost and Wren embedding size resp.
+    assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
+
+    model_params = dict(
+        # 1 for regression, n_classes for classification
+        n_targets=[1 if task_type == reg_key else train_df[target_col].max() + 1],
+        n_features=embedding_len,
+        task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
+        n_attn_layers=n_attn_layers,
+        robust=robust,
+        embedding_aggregations=embedding_aggregations,
+    )
+    model = Wrenformer(**model_params)
+
+    return train_model(
+        id_col=id_col,
+        model=model,
+        run_name=run_name,
+        target_col=target_col,
+        task_type="regression",
+        test_loader=test_loader,
+        train_loader=train_loader,
+        robust=robust,
+        test_df=test_df,
+        **kwargs,
+    )
+
+
+def df_train_test_split(
+    df: pd.DataFrame,
+    folds: tuple[int, int] | None = None,
+    test_size: float | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split a DataFrame into train and test sets.
+
+    Args:
+        df (pd.DataFrame): DataFrame to split
+        folds (tuple[int, int] | None, optional): If not None, split the data into
+            n_folds[0] folds and use fold with index n_folds[1] as the test set. E.g.
+            (10, 0) will create a 90/10 split and use first 10% as the test set.
+        test_size (float | None, optional): Fraction of dataframe rows to use as test
+            set. Defaults to None.
+
+    Raises:
+        ValueError: If folds and test_size are both passed or both None.
+            Or if not 0 < test_size < 1 or not 1 < n_folds <= 10.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: _description_
+    """
+    # shuffle samples for random train/test split
+    df = df.sample(frac=1, random_state=0)
+
+    if folds:
+        n_folds, test_fold_idx = folds
+        assert 1 < n_folds <= 10, f"{n_folds = } must be between 2 and 10"
+        assert (
+            0 <= test_fold_idx < n_folds
+        ), f"{test_fold_idx = } must be between 0 and {n_folds - 1}"
+
+        df_splits: list[pd.DataFrame] = np.array_split(df, n_folds)
+        test_df = df_splits.pop(test_fold_idx)
+        train_df = pd.concat(df_splits)
+    elif test_size:
+        assert 0 < test_size < 1, f"{test_size = } must be between 0 and 1"
+
+        train_df = df.sample(frac=1 - test_size, random_state=0)
+        test_df = df.drop(train_df.index)
+    else:
+        raise ValueError(f"Specify either {folds=} or {test_size=}")
+    if folds and test_size:
+        raise ValueError(f"Specify either {folds=} or {test_size=}, not both")
+
+    return train_df, test_df

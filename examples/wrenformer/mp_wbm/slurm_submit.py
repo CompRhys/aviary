@@ -2,14 +2,14 @@
 import os
 from datetime import datetime
 
+import pandas as pd
 from matbench_discovery.slurm import slurm_submit_python
 
 from aviary import ROOT
-from aviary.wrenformer.train import train_wrenformer_on_df
+from aviary.train import df_train_test_split, train_wrenformer
 
 """
-Train a Wrenformer
-ensemble of size n_folds on target_col of df_or_path.
+Train a Wrenformer ensemble of size n_folds on target_col of data_path.
 """
 
 __author__ = "Janosh Riebesell"
@@ -17,9 +17,9 @@ __date__ = "2022-06-13"
 
 
 # %%
-epochs = 300
+epochs = 30
 target_col = "e_form"
-run_name = f"wrenformer-robust-{epochs=}-{target_col}"
+run_name = f"wrenformer-robust-mp+wbm-{epochs=}-{target_col}"
 n_folds = 10
 today = f"{datetime.now():%Y-%m-%d}"
 dataset = "mp"
@@ -32,7 +32,7 @@ slurm_submit_python(
     time="8:0:0",
     array=f"1-{n_folds}",
     log_dir=log_dir,
-    slurm_flags=("--nodes 1", "--gpus-per-node 1"),
+    slurm_flags=("--nodes", "1", "--gpus-per-node", "1"),
     # prepend into sbatch script to source module command and load default env
     # for Ampere GPU partition before actual job command
     pre_cmd=". /etc/profile.d/modules.sh; module load rhel8/default-amp;",
@@ -40,35 +40,38 @@ slurm_submit_python(
 
 
 # %%
-n_attn_layers = 3
-embedding_aggregations = ("mean",)
-optimizer = "AdamW"
 learning_rate = 3e-4
-df_or_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
-checkpoint = "wandb"  # None | 'local' | 'wandb'
+# data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm.json.gz"
+# for faster testing/debugging
+data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm-1k-samples.json.gz"
 batch_size = 128
-swa_start = None
 slurm_array_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
 
 print(f"Job started running {datetime.now():%Y-%m-%d@%H-%M}")
 print(f"{run_name=}")
-print(f"{df_or_path=}")
+print(f"{data_path=}")
 
-train_wrenformer_on_df(
-    run_name=run_name,
-    target_col=target_col,
-    df_or_path=df_or_path,
-    timestamp=f"{datetime.now():%Y-%m-%d@%H-%M-%S}",
-    test_size=0.05,
-    # folds=(n_folds, slurm_array_task_id),
-    epochs=epochs,
-    n_attn_layers=n_attn_layers,
-    checkpoint=checkpoint,
-    optimizer=optimizer,
-    learning_rate=learning_rate,
-    embedding_aggregations=embedding_aggregations,
+df = pd.read_json(data_path).set_index("material_id", drop=False)
+assert target_col in df
+train_df, test_df = df_train_test_split(df, test_size=0.3)
+
+run_params = dict(
     batch_size=batch_size,
-    swa_start=swa_start,
+    train_df=dict(shape=train_df.shape, columns=", ".join(train_df)),
+    test_df=dict(shape=test_df.shape, columns=", ".join(test_df)),
+)
+
+train_wrenformer(
+    run_name=run_name,
+    train_df=train_df,
+    test_df=test_df,
+    target_col=target_col,
+    task_type="regression",
+    timestamp=f"{datetime.now():%Y-%m-%d@%H-%M-%S}",
+    epochs=epochs,
+    checkpoint="wandb",  # None | 'local' | 'wandb',
+    learning_rate=learning_rate,
+    batch_size=batch_size,
     wandb_path="aviary/mp-wbm",
-    embedding_type="composition" if "roost" in run_name.lower() else "wyckoff",
+    run_params=run_params,
 )

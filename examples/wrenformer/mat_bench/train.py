@@ -8,7 +8,7 @@ import pandas as pd
 from matbench.task import MatbenchTask
 
 from aviary.core import TaskType
-from aviary.wrenformer.train import train_wrenformer
+from aviary.train import train_wrenformer
 from aviary.wrenformer.utils import merge_json_on_disk
 from examples.wrenformer.mat_bench import DATA_PATHS
 

@@ -13,6 +13,7 @@ import torch
 from pymatgen.core import Structure
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from aviary import PKG_DIR
 
@@ -76,11 +77,15 @@ class CrystalGraphData(Dataset):
         self.df = df
         self.structure_col = structure_col
 
-        print("Pre-check that all structures are valid, i.e. none have isolated atoms.")
         all_isolated = []
         some_isolated = []
 
-        for material_id, struct in zip(self.df[identifiers[0]], self.df[structure_col]):
+        for material_id, struct in tqdm(
+            zip(self.df[identifiers[0]], self.df[structure_col]),
+            total=len(df),
+            desc="Pre-check that all structures are valid, i.e. none have isolated atoms.",
+            disable=None,
+        ):
             self_idx, nbr_idx, _ = get_structure_neighbor_info(
                 struct, radius, max_num_nbr
             )
@@ -96,9 +101,9 @@ class CrystalGraphData(Dataset):
             # TODO next line requires identifiers[0] == df.index, bad assumption
             self.df = self.df.drop(index=isolated)
 
-            print(f"dropping {len(isolated)} data points:")
+            print(f"dropping {len(isolated):,} data points:")
             print(f"all atoms in these structure are isolated: {all_isolated}")
-            print(f"these structure have some isolated atoms: {some_isolated}")
+            print(f"some atoms in these structure are isolated: {some_isolated}")
 
         self.n_targets = []
         for target, task_type in self.task_dict.items():
@@ -129,6 +134,7 @@ class CrystalGraphData(Dataset):
             - list[str | int]: identifiers like material_id, composition
         """
         # NOTE sites must be given in fractional coordinates
+        # TODO try if converting to np array speeds this up due to np's faster indexing
         row = self.df.iloc[idx]
         struct = row[self.structure_col]
         material_id = row[self.identifiers[0]]

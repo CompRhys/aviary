@@ -1,4 +1,4 @@
-from aviary.wrenformer.train import train_wrenformer
+from aviary.train import train_wrenformer
 
 
 def test_wrenformer_regression(df_matbench_phonons_wyckoff):
