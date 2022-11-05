@@ -773,7 +773,7 @@ def save_results_dict(
 def get_metrics(
     targets: np.ndarray | pd.Series,
     predictions: np.ndarray | pd.Series,
-    type: Literal["regression", "classification"],
+    type: TaskType,
     prec: int = 4,
 ) -> dict:
     """Get performance metrics for model predictions.
@@ -791,6 +791,9 @@ def get_metrics(
             f1, rocauc for classification.
     """
     metrics = {}
+    nans = np.isnan(targets) | np.isnan(predictions)
+    # r2_score() and roc_auc_score() don't auto-handle NaNs
+    targets, predictions = targets[~nans], predictions[~nans]
 
     if type == "regression":
         metrics["MAE"] = np.abs(targets - predictions).mean()

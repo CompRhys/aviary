@@ -38,44 +38,41 @@ def lr_lambda(epoch: int) -> float:
 
 @print_walltime(end_desc="train_model()")
 def train_model(
-    epochs: int,
-    model: BaseModelClass,
     run_name: str,
+    model: BaseModelClass,
+    epochs: int,
     target_col: str,
     task_type: TaskType,
-    test_loader: DataLoader | InMemoryDataLoader,
     train_loader: DataLoader | InMemoryDataLoader,
+    test_loader: DataLoader | InMemoryDataLoader,
     checkpoint: Literal["local", "wandb"] | None = None,
     id_col: str = "material_id",
     learning_rate: float = 1e-4,
     model_params: dict[str, Any] = None,
-    optimizer: str | tuple[str, dict] = "AdamW",
-    robust: bool = False,
     run_params: dict[str, Any] = None,
+    optimizer: str | tuple[str, dict] = "AdamW",
     scheduler: str | tuple[str, dict] = "LambdaLR",
-    swa_lr: float = None,
     swa_start: float = None,
+    swa_lr: float = None,
     test_df: pd.DataFrame = None,
     timestamp: str = None,
     verbose: bool = False,
-    wandb_kwargs: dict[str, Any] = None,
     wandb_path: str = None,
+    wandb_kwargs: dict[str, Any] = None,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Core training function. Handles checkpointing and metric logging.
-    Wrapped by other functions like train_wrenformer_on_matbench() for specific datasets.
+    Wrapped by other functions like train_wrenformer() for specific datasets.
 
     Args:
         run_name (str): A string to describe the training run. Should usually contain model type
             (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
             have the model learn to predict an aleatoric uncertainty.
-        task_type ('regression' | 'classification'): What type of task to train the model for.
-        target_col (str): Name of df column containing the target values.
-        id_col (str): Name of df column containing material IDs.
+        model (BaseModelClass): A model instance subclassing aviary.core.BaseModelClass.
         epochs (int): How many epochs to train for. Defaults to 100.
-        timestamp (str): Will prefix the names of model checkpoint files and other output files.
-            Will also be included in run_params. Defaults to None.
-        wandb_path (str | None): Path to Weights and Biases project where to log this run formatted
-            as '<entity>/<project>'. Defaults to None which means logging is disabled.
+        target_col (str): Name of df column containing the target values.
+        task_type ('regression' | 'classification'): What type of task to train the model for.
+        test_loader (DataLoader | InMemoryDataLoader): Test data.
+        train_loader (DataLoader | InMemoryDataLoader): Train data.
         checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
             dicts to disk (local) or upload to WandB. Defaults to None.
             To later copy a wandb checkpoint file to cwd and use it:
@@ -84,6 +81,10 @@ def train_model(
             checkpoint = wandb.restore("checkpoint.pth", run_path)
             torch.load(checkpoint.name)
             ```
+        id_col (str): Name of df column containing material IDs. Defaults to 'material_id'.
+        learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
+        model_params (dict): Arguments passed to model class. E.g. dict(n_attn_layers=6,
+            embedding_aggregation=("mean", "std")) for Wrenformer.
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             model_params. Will be logged to wandb. Can be anything really. Defaults to {}.
         optimizer (str | tuple[str, dict]): Name of a torch.optim.Optimizer class like 'Adam',
@@ -96,14 +97,19 @@ def train_model(
             See https://stackoverflow.com/a/2121918 about pickle errors when trying to load a
             LambdaLR scheduler from a torch.save() checkpoint created prior to this file having
             been renamed.
-        learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
         swa_start (float | None): When to start using stochastic weight averaging during training.
             Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
             None to disable SWA. Defaults to None. Proposed in https://arxiv.org/abs/1803.05407.
         swa_lr (float): Learning rate for SWA scheduler. Defaults to learning_rate.
             by the transformer encoder before passing into the ResidualNetwork. One or more of
             ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
+        test_df (pd.DataFrame): Test data as a DataFrame. Model preds will be inserted as new
+            column and df returned.
+        timestamp (str): Will prefix the names of model checkpoint files and other output files.
+            Will also be included in run_params. Defaults to None.
         verbose (bool): Whether to print progress and metrics to stdout. Defaults to False.
+        wandb_path (str | None): Path to Weights and Biases project where to log this run formatted
+            as '<entity>/<project>'. Defaults to None which means logging is disabled.
         wandb_kwargs (dict[str, Any]): Kwargs to pass to wandb.init() like
             dict(tags=['ensemble-id-1']). Should not include keys config, project, entity as
             they're already set by this function.
@@ -120,6 +126,7 @@ def train_model(
     if checkpoint == "wandb" and not wandb_path:
         raise ValueError(f"Cannot save checkpoint to wandb if {wandb_path=}")
 
+    robust = "robust" in run_name.lower()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Pytorch running on {device=}")
 
@@ -342,32 +349,34 @@ def train_model(
 
 def train_wrenformer(
     run_name: str,
-    train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
     target_col: str,
     task_type: TaskType,
-    id_col: str = "material_id",
-    n_attn_layers: int = 4,
-    embedding_type: str = None,
-    input_col: str = None,
-    embedding_aggregations: tuple[str] = ("mean",),
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
     batch_size: int = 128,
+    embedding_type: str = None,
+    id_col: str = "material_id",
+    input_col: str = None,
+    model_params: dict[str, Any] = None,
     **kwargs,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
-    """Train a Wrenformer model on a generic dataframe. This function handles the DataLoader
-    creation, then delegates to train_model().
+    """Train a Wrenformer model on a dataframe. This function handles the DataLoader creation,
+    then delegates to train_model().
 
     Args:
         run_name (str): A string to describe the training run. Should usually contain model type
             (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
             have the model learn to predict an aleatoric uncertainty.
-        df_or_path (str): Path to a data file to load with pandas.read_json().
-        timestamp (str): Will prefix the names of model checkpoint files and other output files.
-        n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 4.
-        kwargs: Additional keyword arguments are passed to train_wrenformer().
-
-    Raises:
-        ValueError: On unknown dataset_name or invalid checkpoint.
+        target_col (str): Column name in train_df and test_df containing target values.
+        task_type ('regression' | 'classification'): What type of task to train the model for.
+        train_df (pd.DataFrame): Training set dataframe.
+        test_df (pd.DataFrame): Test set dataframe.
+        batch_size (int, optional): Batch size for training. Defaults to 128.
+        embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use.
+            Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name.
+        model_params (dict): Passed to Wrenformer class. E.g. dict(n_attn_layers=6,
+            embedding_aggregation=("mean", "std")).
+        kwargs: Additional keyword arguments are passed to train_model().
 
     Returns:
         tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.
@@ -410,13 +419,12 @@ def train_wrenformer(
         n_targets=[1 if task_type == reg_key else train_df[target_col].max() + 1],
         n_features=embedding_len,
         task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
-        n_attn_layers=n_attn_layers,
         robust=robust,
-        embedding_aggregations=embedding_aggregations,
+        **model_params or {},
     )
     model = Wrenformer(**model_params)
 
-    return train_model(
+    test_metrics, run_params, test_df = train_model(
         id_col=id_col,
         model=model,
         run_name=run_name,
@@ -424,10 +432,11 @@ def train_wrenformer(
         task_type="regression",
         test_loader=test_loader,
         train_loader=train_loader,
-        robust=robust,
         test_df=test_df,
         **kwargs,
     )
+
+    return test_metrics, run_params, test_df
 
 
 def df_train_test_split(
