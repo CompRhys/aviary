@@ -4,7 +4,7 @@ import gc
 import os
 import shutil
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections import defaultdict
 from typing import Any, Callable, Mapping
 
@@ -403,15 +403,6 @@ class BaseModelClass(nn.Module, ABC):
             features.append(output)
 
         return np.vstack(features)
-
-    @abstractmethod
-    def forward(self, *x) -> tuple[Tensor, ...]:
-        """Forward pass through the model.
-
-        Raises:
-            NotImplementedError: Raise error if child class doesn't implement forward
-        """
-        raise NotImplementedError("forward() is not defined!")
 
     @property
     def num_params(self) -> int:

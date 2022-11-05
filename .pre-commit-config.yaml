@@ -2,7 +2,6 @@
 
 ci:
   autoupdate_schedule: quarterly
-  skip: [mypy]
 
 repos:
   - repo: https://github.com/PyCQA/isort
