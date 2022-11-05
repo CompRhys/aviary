@@ -85,7 +85,7 @@ model_params = dict(
     task_dict={target_col: task_type},  # e.g. {'exfoliation_en': 'regression'}
     robust=robust,
 )
-model = CrystalGraphConvNet(**model_params)
+model = CrystalGraphConvNet(**model_params)  # type: ignore
 
 run_params = dict(
     batch_size=batch_size,

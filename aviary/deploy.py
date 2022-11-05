@@ -22,7 +22,7 @@ __date__ = "2022-08-25"
 def make_ensemble_predictions(
     checkpoint_paths: list[str],
     data_loader: DataLoader | InMemoryDataLoader,
-    model_class: type[BaseModelClass],
+    model_cls: type[BaseModelClass],
     df: pd.DataFrame,
     target_col: str = None,
     device: str = None,
@@ -35,7 +35,7 @@ def make_ensemble_predictions(
     Args:
         checkpoint_paths (list[str]): File paths to model checkpoints created with torch.save().
         data_loader (DataLoader | InMemoryDataLoader): Data loader to use for predictions.
-        model_class (type[BaseModelClass]): Model class to use for predictions.
+        model_cls (type[BaseModelClass]): Model class to use for predictions.
         df (pd.DataFrame): Dataframe to make predictions on. Will be returned with additional
             columns holding model predictions (and uncertainties for robust models) for each
             model checkpoint.
@@ -79,7 +79,7 @@ def make_ensemble_predictions(
                 f"Warning: {target_col = } does not match {target_name = } in checkpoint. "
                 "If this is not by accident, disable this warning by passing warn_target=False."
             )
-        model = model_class(**model_params)
+        model = model_cls(**model_params)
         model.to(device)
 
         model.load_state_dict(checkpoint["model_state"])
