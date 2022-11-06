@@ -13,10 +13,9 @@ from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, np_softmax
 from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
-from aviary.utils import get_metrics
+from aviary.utils import get_metrics, print_walltime
 from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
-from aviary.wrenformer.utils import print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-10-29"

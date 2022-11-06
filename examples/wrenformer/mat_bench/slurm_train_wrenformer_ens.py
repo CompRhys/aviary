@@ -11,8 +11,8 @@ from matbench_discovery.slurm import slurm_submit_python
 
 from aviary.core import TaskType
 from aviary.train import train_wrenformer
-from aviary.wrenformer.utils import merge_json_on_disk
 from examples.wrenformer.mat_bench import DATA_PATHS
+from examples.wrenformer.mat_bench.utils import merge_json_on_disk
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"

@@ -13,7 +13,7 @@ from tqdm import tqdm
 from aviary import ROOT
 from aviary.core import BaseModelClass
 from aviary.data import InMemoryDataLoader
-from aviary.utils import get_metrics
+from aviary.utils import get_metrics, print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-08-25"
@@ -131,6 +131,7 @@ def make_ensemble_predictions(
     return df
 
 
+@print_walltime(end_desc="predict_from_wandb_checkpoints")
 def predict_from_wandb_checkpoints(
     runs: list[wandb.apis.public.Run], **kwargs: Any
 ) -> tuple[pd.DataFrame, pd.DataFrame]:

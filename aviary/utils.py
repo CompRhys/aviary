@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
 from types import ModuleType
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Generator, Iterable
 
 import numpy as np
 import pandas as pd
@@ -56,7 +58,7 @@ def initialize_model(
         transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
 
     Returns:
-        BaseModelClass: An initialised model of type model_class.
+        BaseModelClass: An initialized model of type model_class.
     """
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
@@ -814,11 +816,10 @@ def get_metrics(
 
 
 def as_dict_handler(obj: Any) -> dict[str, Any] | None:
-    """Use as default_handler kwarg to json.dump() or pandas.to_json()."""
+    """Pass this func as json.dump(handler=) or as pandas.to_json(default_handler=)."""
     try:
         return obj.as_dict()  # all MSONable objects implement as_dict()
     except AttributeError:
-
         return None  # replace unhandled objects with None in serialized data
 
 
@@ -849,3 +850,33 @@ def update_module_path_in_pickled_object(
     del sys.modules[old_module_path]
 
     torch.save(dic, pickle_path)
+
+
+@contextmanager
+def print_walltime(
+    start_desc: str = "",
+    end_desc: str = "",
+    newline: bool = True,
+    min_run_time: float = 1,
+) -> Generator[None, None, None]:
+    """Context manager and decorator that prints the wall time of its lifetime.
+
+    Args:
+        start_desc (str): Text to print when entering context. Defaults to ''.
+        end_desc (str): Text to print when exiting context. Will be followed by 'took
+            {duration} sec'. i.e. f"{end_desc} took 1.23 sec". Defaults to ''.
+        newline (bool): Whether to print a newline after start_desc. Defaults to True.
+        min_run_time (float): Minimum wall time in seconds below which nothing will be
+            printed. Defaults to 1.
+    """
+    start_time = time.perf_counter()
+    if start_desc:
+        print(start_desc, end="\n" if newline else "")
+
+    try:
+        yield
+    finally:
+        run_time = time.perf_counter() - start_time
+        # don't print on immediate failures
+        if run_time > min_run_time:
+            print(f"{end_desc} took {run_time:.2f} sec")
