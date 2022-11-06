@@ -791,7 +791,7 @@ def get_metrics(
             f1, rocauc for classification.
     """
     metrics = {}
-    nans = np.isnan(targets) | np.isnan(predictions)
+    nans = np.isnan(np.column_stack([targets, predictions])).any(axis=1)
     # r2_score() and roc_auc_score() don't auto-handle NaNs
     targets, predictions = targets[~nans], predictions[~nans]
 

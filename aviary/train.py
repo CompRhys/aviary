@@ -276,15 +276,18 @@ def train_model(
         assert isinstance(test_loader, DataLoader)
         test_df = test_loader.dataset.df
     if robust:
-        preds, aleatoric_log_std = preds.T
-        aleatoric_std = np.exp(aleatoric_log_std)
-        test_df["aleatoric_std"] = aleatoric_std
+        preds, aleatoric_log_std = np.split(preds, 2, axis=1)
+        df_std = pd.DataFrame(np.exp(aleatoric_log_std)).add_prefix("aleatoric_std_")
+        test_df[df_std.columns] = df_std
     if task_type == clf_key:
-        preds = np_softmax(preds).softmax(dim=1)
+        preds = np_softmax(preds, axis=1)
 
     targets = test_df[target_col]
     pred_col = f"{target_col}_pred"
-    test_df[pred_col] = preds  # requires shuffle=False for test_loader
+    # preds can have shape (n_samples, n_classes) if doing multi-class classification so
+    # use df to merge all columns into test_df
+    df_preds = pd.DataFrame(preds).add_prefix(f"{pred_col}_")
+    test_df[df_preds.columns] = df_preds  # requires shuffle=False for test_loader
 
     test_metrics = get_metrics(targets, preds, task_type)
     test_metrics["test_size"] = len(test_df)
@@ -429,7 +432,7 @@ def train_wrenformer(
         model=model,
         run_name=run_name,
         target_col=target_col,
-        task_type="regression",
+        task_type=task_type,
         test_loader=test_loader,
         train_loader=train_loader,
         test_df=test_df,
