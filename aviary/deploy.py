@@ -101,32 +101,30 @@ def make_ensemble_predictions(
     df[f"{target_col}_pred_ens"] = ensemble_preds = df_preds.mean(axis=1)
     df[f"{target_col}_epistemic_std_ens"] = epistemic_std = df_preds.std(axis=1)
 
-    if df.columns.str.startswith("aleatoric_std_").sum() > 0:
+    if df.columns.str.startswith("aleatoric_std_").any():
         aleatoric_std = df.filter(regex=r"aleatoric_std_\d").mean(axis=1)
         df[f"{target_col}_aleatoric_std_ens"] = aleatoric_std
         df[f"{target_col}_total_std_ens"] = (
             epistemic_std**2 + aleatoric_std**2
         ) ** 0.5
 
-    if target_col and print_metrics:
+    if target_col:
         targets = df[target_col]
-        all_model_metrics = pd.DataFrame(
-            [
-                get_metrics(targets, df_preds[pred_col], task_type)
-                for pred_col in df_preds
-            ],
-            index=df_preds.columns,
-        )
+        all_model_metrics = [
+            get_metrics(targets, df_preds[col], task_type) for col in df_preds
+        ]
+        df_metrics = pd.DataFrame(all_model_metrics, index=df_preds.columns)
 
-        print("\nSingle model performance:")
-        print(all_model_metrics.describe().round(4).loc[["mean", "std"]])
+        if print_metrics:
+            print("\nSingle model performance:")
+            print(df_metrics.describe().round(4).loc[["mean", "std"]])
 
-        ensemble_metrics = get_metrics(targets, ensemble_preds, task_type)
+            ensemble_metrics = get_metrics(targets, ensemble_preds, task_type)
 
-        print("\nEnsemble performance:")
-        for key, val in ensemble_metrics.items():
-            print(f"{key:<8} {val:.3}")
-        return df, all_model_metrics
+            print("\nEnsemble performance:")
+            for key, val in ensemble_metrics.items():
+                print(f"{key:<8} {val:.3}")
+        return df, df_metrics
 
     return df
 
