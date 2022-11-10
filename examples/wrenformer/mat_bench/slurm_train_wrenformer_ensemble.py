@@ -27,7 +27,8 @@ Train a Wrenformer ensemble of size n_folds on collection of Matbench datasets.
 # %%
 epochs = 300
 folds = list(range(5))
-today = f"{datetime.now():%Y-%m-%d}"
+timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
+today = timestamp.split("@")[0]
 # job_name unlike run_name doesn't include dataset and fold since not yet known without
 # SLURM_ARRAY_TASK_ID
 job_name = f"matbench-wrenformer-robust-{epochs=}"
@@ -56,7 +57,6 @@ slurm_submit_python(
 
 # %%
 slurm_array_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 35))
-timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 print(f"Job started running {timestamp}")
 
 dataset_name, fold = list(product(datasets, folds))[slurm_array_task_id]

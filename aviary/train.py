@@ -45,7 +45,6 @@ def train_model(
     train_loader: DataLoader | InMemoryDataLoader,
     test_loader: DataLoader | InMemoryDataLoader,
     checkpoint: Literal["local", "wandb"] | None = None,
-    id_col: str = "material_id",
     learning_rate: float = 1e-4,
     model_params: dict[str, Any] = None,
     run_params: dict[str, Any] = None,
@@ -80,7 +79,6 @@ def train_model(
             checkpoint = wandb.restore("checkpoint.pth", run_path)
             torch.load(checkpoint.name)
             ```
-        id_col (str): Name of df column containing material IDs. Defaults to 'material_id'.
         learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
         model_params (dict): Arguments passed to model class. E.g. dict(n_attn_layers=6,
             embedding_aggregation=("mean", "std")) for Wrenformer.
@@ -276,20 +274,24 @@ def train_model(
         test_df = test_loader.dataset.df
     if robust:
         preds, aleatoric_log_std = np.split(preds, 2, axis=1)
-        df_std = pd.DataFrame(np.exp(aleatoric_log_std)).add_prefix("aleatoric_std_")
+        preds = preds.squeeze()
+        aleatoric_std = np.exp(aleatoric_log_std.squeeze())
+        df_std = pd.DataFrame(aleatoric_std, index=test_df.index).add_prefix(
+            "aleatoric_std_"
+        )
         test_df[df_std.columns] = df_std
     if task_type == clf_key:
         preds = np_softmax(preds, axis=1)
 
     targets = test_df[target_col]
-    pred_col = f"{target_col}_pred"
     # preds can have shape (n_samples, n_classes) if doing multi-class classification so
     # use df to merge all columns into test_df
-    df_preds = pd.DataFrame(preds).add_prefix(f"{pred_col}_")
+    df_preds = pd.DataFrame(preds, index=test_df.index).add_prefix(
+        f"{target_col}_pred_"
+    )
     test_df[df_preds.columns] = df_preds  # requires shuffle=False for test_loader
 
     test_metrics = get_metrics(targets, preds, task_type)
-    test_metrics["test_size"] = len(test_df)
 
     # save model checkpoint
     if checkpoint is not None:
@@ -322,25 +324,26 @@ def train_model(
     # record test set metrics and scatter/ROC plots to wandb
     if wandb_path:
         wandb.run.summary["test"] = test_metrics
-        table_cols = [id_col, target_col, pred_col]
-        if robust:
-            table_cols.append("aleatoric_std")
-        table = wandb.Table(dataframe=test_df[table_cols])
-        wandb.log({"test_set_preds": table})
+        wandb_table = wandb.Table(dataframe=test_df.filter(regex="^((?!structure).)"))
         if task_type == reg_key:
             from sklearn.metrics import r2_score
 
             MAE = np.abs(targets - preds).mean()
             R2 = r2_score(targets, preds)
-            title = f"{run_name}\n{MAE=:.2f}\n{R2=:.2f}"
-            scatter_plot = wandb.plot.scatter(table, target_col, pred_col, title=title)
+            title = f"{run_name}\n{MAE=:.4}\n{R2=:.4}"
+            scatter_plot = wandb.plot.scatter(
+                wandb_table,
+                target_col,
+                test_df.filter(like="_pred_").columns[0],
+                title=title,
+            )
             wandb.log({"true_pred_scatter": scatter_plot})
         elif task_type == clf_key:
             from sklearn.metrics import accuracy_score, roc_auc_score
 
             ROCAUC = roc_auc_score(targets, preds[:, 1])
             accuracy = accuracy_score(targets, preds.argmax(axis=1))
-            title = f"{run_name}\n{accuracy=:.2f}\n{ROCAUC=:.2f}"
+            title = f"{run_name}\n{accuracy=:.4}\n{ROCAUC=:.4}"
             roc_curve = wandb.plot.roc_curve(targets, preds)
             wandb.log({"roc_curve": roc_curve})
 
@@ -427,7 +430,6 @@ def train_wrenformer(
     model = Wrenformer(**model_params)
 
     test_metrics, run_params, test_df = train_model(
-        id_col=id_col,
         model=model,
         run_name=run_name,
         target_col=target_col,
@@ -435,6 +437,8 @@ def train_wrenformer(
         test_loader=test_loader,
         train_loader=train_loader,
         test_df=test_df,
+        model_params=model_params,
+        run_params=kwargs.get("run_params", {}) | data_loader_kwargs,
         **kwargs,
     )
 
