@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 import pandas as pd
-from matbench_discovery.slurm import slurm_submit_python
+from matbench_discovery.slurm import slurm_submit
 from pymatgen.core import Structure
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -34,7 +34,7 @@ timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
 today = timestamp.split("@")[0]
 log_dir = f"{os.path.dirname(__file__)}/{today}-{run_name}"
 
-slurm_submit_python(
+slurm_submit(
     job_name=run_name,
     partition="ampere",
     account="LEE-SL3-GPU",

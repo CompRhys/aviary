@@ -7,7 +7,7 @@ import pandas as pd
 import wandb
 from matbench.metadata import mbv01_metadata
 from matbench.task import MatbenchTask
-from matbench_discovery.slurm import slurm_submit_python
+from matbench_discovery.slurm import slurm_submit
 
 from aviary.core import TaskType
 from aviary.train import train_wrenformer
@@ -41,7 +41,7 @@ else:
     # deploy Wren on structure tasks only
     datasets = [k for k, v in mbv01_metadata.items() if v.input_type == "structure"]
 
-slurm_submit_python(
+slurm_submit(
     job_name=job_name,
     partition="ampere",
     account="LEE-SL3-GPU",
