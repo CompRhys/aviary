@@ -70,7 +70,9 @@ def make_ensemble_predictions(
         except Exception as exc:
             raise RuntimeError(f"Failed to load checkpoint {checkpoint_path}") from exc
 
-        model_params = checkpoint["model_params"]
+        model_params = checkpoint.get("model_params")
+        if model_params is None:
+            raise ValueError(f"model_params not found in {checkpoint_path=}")
 
         target_name, task_type = list(model_params["task_dict"].items())[0]
         assert task_type in ("regression", "classification"), f"invalid {task_type = }"

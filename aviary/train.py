@@ -295,6 +295,8 @@ def train_model(
 
     # save model checkpoint
     if checkpoint is not None:
+        if model_params is None:
+            raise ValueError("Must provide model_params to save checkpoint, got None")
         checkpoint_dict = {
             "model_params": model_params,
             "model_state": inference_model.state_dict(),
