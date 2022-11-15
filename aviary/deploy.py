@@ -59,8 +59,8 @@ def make_ensemble_predictions(
     # handles single targets. Low priority as multi-tasking is rarely used.
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    # tqdm(disable=None) means suppress output in non-tty (e.g. CI/log files) but keep in
-    # terminal (i.e. tty mode) https://git.io/JnBOi
+    # tqdm(disable=None) means suppress output in CI/log files but keep in terminal
+    # (i.e. tty mode) https://git.io/JnBOi
     print(f"Pytorch running on {device=}")
     for idx, checkpoint_path in tqdm(
         enumerate(tqdm(checkpoint_paths), 1), disable=None if pbar else True

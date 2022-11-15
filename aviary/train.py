@@ -440,7 +440,7 @@ def train_wrenformer(
         train_loader=train_loader,
         test_df=test_df,
         model_params=model_params,
-        run_params=kwargs.get("run_params", {}) | data_loader_kwargs,
+        run_params=kwargs.pop("run_params", {}) | data_loader_kwargs,
         **kwargs,
     )
 
