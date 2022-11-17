@@ -332,12 +332,11 @@ def train_model(
 
             MAE = np.abs(targets - preds).mean()
             R2 = r2_score(targets, preds)
-            title = f"{run_name}\n{MAE=:.4}\n{R2=:.4}"
-            scatter_plot = wandb.plot.scatter(
-                wandb_table,
-                target_col,
-                test_df.filter(like="_pred_").columns[0],
-                title=title,
+            scatter_plot = wandb.plot_table(
+                vega_spec_name="janosh/scatter-parity",
+                data_table=wandb_table,
+                fields=dict(x=target_col, y=test_df.filter(like="_pred_").columns[0]),
+                string_fields={"title": f"{run_name}\n{MAE=:.4}\n{R2=:.4}"},
             )
             wandb.log({"true_pred_scatter": scatter_plot})
         elif task_type == clf_key:
@@ -346,7 +345,7 @@ def train_model(
             ROCAUC = roc_auc_score(targets, preds[:, 1])
             accuracy = accuracy_score(targets, preds.argmax(axis=1))
             title = f"{run_name}\n{accuracy=:.4}\n{ROCAUC=:.4}"
-            roc_curve = wandb.plot.roc_curve(targets, preds)
+            roc_curve = wandb.plot.roc_curve(targets, preds, title=title)
             wandb.log({"roc_curve": roc_curve})
 
         wandb.finish()
