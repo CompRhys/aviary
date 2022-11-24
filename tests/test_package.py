@@ -13,7 +13,7 @@ __date__ = "2022-05-25"
 
 
 @pytest.mark.skipif(
-    not os.path.exists(package_sources_path),
+    not os.path.isfile(package_sources_path),
     reason="No aviary.egg-info/SOURCES.txt file, run pip install . to create it",
 )
 def test_egg_sources():

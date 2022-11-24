@@ -50,7 +50,7 @@ class CompositionData(Dataset):
 
         if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-        elif not os.path.exists(elem_embedding):
+        elif not os.path.isfile(elem_embedding):
             raise AssertionError(f"{elem_embedding} does not exist!")
 
         with open(elem_embedding) as f:

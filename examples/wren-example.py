@@ -87,7 +87,7 @@ def main(  # noqa: C901
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    if not os.path.exists(data_path):
+    if not os.path.isfile(data_path):
         raise AssertionError(f"{data_path} does not exist!")
     # NOTE make sure to use dense datasets,
     # NOTE do not use default_na as "NaN" is a valid material composition
@@ -105,7 +105,7 @@ def main(  # noqa: C901
     if evaluate:
         if test_path:
 
-            if not os.path.exists(test_path):
+            if not os.path.isfile(test_path):
                 raise AssertionError(f"{test_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
@@ -131,7 +131,7 @@ def main(  # noqa: C901
     if train:
         if val_path:
 
-            if not os.path.exists(val_path):
+            if not os.path.isfile(val_path):
                 raise AssertionError(f"{val_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material

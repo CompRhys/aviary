@@ -58,7 +58,7 @@ class CrystalGraphData(Dataset):
 
         if elem_embedding in ("matscholar200", "cgcnn92", "megnet16", "onehot112"):
             elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-        elif not os.path.exists(elem_embedding):
+        elif not os.path.isfile(elem_embedding):
             raise ValueError(f"{elem_embedding} does not exist!")
 
         with open(elem_embedding) as f:
@@ -71,8 +71,8 @@ class CrystalGraphData(Dataset):
             elif self.elem_emb_len != len(value):
                 raise ValueError("Element embedding length mismatch!")
 
-        self.gdf = GaussianDistance(dmin=dmin, dmax=radius, step=step)
-        self.nbr_fea_dim = self.gdf.embedding_size
+        self.gaussian_dist_func = GaussianDistance(dmin=dmin, dmax=radius, step=step)
+        self.nbr_fea_dim = self.gaussian_dist_func.embedding_size
 
         self.df = df
         self.structure_col = structure_col
@@ -163,7 +163,7 @@ class CrystalGraphData(Dataset):
         if set(self_idx) != set(range(len(struct))):
             raise ValueError(f"At least one atom in {material_id} is isolated")
 
-        nbr_dist = self.gdf.expand(nbr_dist)
+        nbr_dist = self.gaussian_dist_func.expand(nbr_dist)
 
         atom_fea_t = Tensor(atom_features)
         nbr_dist_t = Tensor(nbr_dist)
@@ -185,11 +185,11 @@ class CrystalGraphData(Dataset):
 
 
 def collate_batch(
-    dataset_list: tuple[
+    samples: tuple[
         tuple[Tensor, Tensor, LongTensor, LongTensor],
         list[Tensor | LongTensor],
         list[str | int],
-    ],
+    ]
 ) -> tuple[Any, ...]:
     """Collate a list of data and return a batch for predicting crystal properties.
 
@@ -209,7 +209,6 @@ def collate_batch(
         tuple[
             tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched CGCNN model inputs,
             tuple[Tensor | LongTensor]: Target values for different tasks,
-            # TODO this last tuple is unpacked how to do type hint?
             *tuple[str | int]: identifiers like material_id, composition
         ]
     """
@@ -224,7 +223,7 @@ def collate_batch(
 
     # TODO: unpacking (inputs, target, comp, material_id) doesn't appear to match the doc string
     # for dataset_list, what about nbr_idx and comp?
-    for idx, (inputs, target, *material_id) in enumerate(dataset_list):
+    for idx, (inputs, target, *material_id) in enumerate(samples):
         atom_fea, nbr_dist, self_idx, nbr_idx = inputs
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
