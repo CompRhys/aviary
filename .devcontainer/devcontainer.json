@@ -1,7 +1,7 @@
 {
   "image": "mcr.microsoft.com/devcontainers/universal:2",
   "waitFor": "onCreateCommand",
-  "updateContentCommand": "pip install -e .",
+  "updateContentCommand": "pip install torch==1.13.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu && pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.0+cpu.html && pip install -e .",
   "customizations": {
     "codespaces": {
       "openFiles": ["examples/notebooks/wren-example.ipynb"]
