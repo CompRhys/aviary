@@ -87,7 +87,7 @@ We also provide some notebooks that show more a more pythonic way to interact wi
 [Launch Binder]: https://mybinder.org/badge_logo.svg
 [Open in Google Colab]: https://colab.research.google.com/assets/colab-badge.svg
 [Launch Codespace]: https://img.shields.io/badge/Launch-Codespace-darkblue?logo=github
-[codespace url]: https://janosh-cuddly-invention-wv6wgwv5vxvf5xq6.github.dev
+[codespace url]: https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=411272553
 
 ## Cite This Work
 
