@@ -69,7 +69,10 @@ class CrystalGraphData(Dataset):
             if not hasattr(self, "elem_emb_len"):
                 self.elem_emb_len = len(value)
             elif self.elem_emb_len != len(value):
-                raise ValueError("Element embedding length mismatch!")
+                raise ValueError(
+                    f"Element embedding length mismatch: len({key})="
+                    f"{len(value)}, expected {self.elem_emb_len}"
+                )
 
         self.gaussian_dist_func = GaussianDistance(dmin=dmin, dmax=radius, step=step)
         self.nbr_fea_dim = self.gaussian_dist_func.embedding_size
@@ -77,8 +80,7 @@ class CrystalGraphData(Dataset):
         self.df = df
         self.structure_col = structure_col
 
-        all_isolated = []
-        some_isolated = []
+        all_isolated, some_isolated = [], []
 
         for idx, struct in tqdm(
             zip(self.df.index, self.df[structure_col]),
@@ -112,6 +114,8 @@ class CrystalGraphData(Dataset):
             elif task_type == "classification":
                 n_classes = max(self.df[target].values) + 1
                 self.n_targets.append(n_classes)
+            else:
+                raise ValueError(f"Unexpected {task_type=}")
 
     def __len__(self) -> int:
         return len(self.df)

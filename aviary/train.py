@@ -336,7 +336,7 @@ def train_model(
                 vega_spec_name="janosh/scatter-parity",
                 data_table=wandb_table,
                 fields=dict(x=target_col, y=test_df.filter(like="_pred_").columns[0]),
-                string_fields={"title": f"{run_name}\n{MAE=:.4}\n{R2=:.4}"},
+                string_fields=dict(title=f"{run_name}\n{MAE=:.4}\n{R2=:.4}"),
             )
             wandb.log({"true_pred_scatter": scatter_plot})
         elif task_type == clf_key:
