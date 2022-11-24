@@ -325,7 +325,7 @@ def train_model(
 
     # record test set metrics and scatter/ROC plots to wandb
     if wandb_path:
-        wandb.run.summary["test"] = test_metrics
+        wandb.run.summary["test"] = test_metrics  # type: ignore[union-attr]
         wandb_table = wandb.Table(dataframe=test_df.filter(regex="^((?!structure).)"))
         if task_type == reg_key:
             from sklearn.metrics import r2_score

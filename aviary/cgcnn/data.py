@@ -95,15 +95,15 @@ class CrystalGraphData(Dataset):
             if set(self_idx) != set(range(len(struct))):
                 some_isolated.append(material_id)
 
-        isolated = {*all_isolated, *some_isolated}  # set union
+        isolated = set(all_isolated + some_isolated)
         if len(isolated) > 0:
             # drop the data points that do not give rise to dense crystal graphs
             # TODO next line requires identifiers[0] == df.index, bad assumption
             self.df = self.df.drop(index=isolated)
 
-            print(f"dropping {len(isolated):,} data points:")
-            print(f"all atoms in these structure are isolated: {all_isolated}")
-            print(f"some atoms in these structure are isolated: {some_isolated}")
+            print(f"dropping {len(isolated):,} structures:")
+            print(f"{len(all_isolated)} have only isolated atoms: {all_isolated}")
+            print(f"{len(some_isolated)} have some isolated atoms: {some_isolated}")
 
         self.n_targets = []
         for target, task_type in self.task_dict.items():

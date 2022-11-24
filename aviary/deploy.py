@@ -176,4 +176,5 @@ def predict_from_wandb_checkpoints(
 
     df, ensemble_metrics = make_ensemble_predictions(checkpoint_paths, **kwargs)
 
-    return df, ensemble_metrics
+    # round to save disk space and speed up cloud storage uploads
+    return df.round(6), ensemble_metrics

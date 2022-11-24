@@ -11,6 +11,7 @@ from typing import Any, Callable, Mapping
 import numpy as np
 import torch
 import torch.nn as nn
+import wandb
 from sklearn.metrics import f1_score
 from torch import BoolTensor, Tensor
 from torch.nn.functional import softmax
@@ -25,11 +26,6 @@ if sys.version_info < (3, 8):
     from typing_extensions import Literal
 else:
     from typing import Literal
-
-try:
-    import wandb
-except ImportError:
-    wandb = None  # type: ignore
 
 
 TaskType = Literal["regression", "classification"]
@@ -197,8 +193,6 @@ class BaseModelClass(nn.Module, ABC):
                 gc.collect()
 
                 if writer == "wandb":
-                    if wandb is None:
-                        raise ImportError("wandb not installed. Run pip install wandb")
                     wandb.log({"train": train_metrics, "validation": val_metrics})
 
         except KeyboardInterrupt:
