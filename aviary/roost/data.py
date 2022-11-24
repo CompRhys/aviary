@@ -135,7 +135,7 @@ class CompositionData(Dataset):
 
 
 def collate_batch(
-    dataset_list: tuple[
+    samples: tuple[
         tuple[Tensor, Tensor, LongTensor, LongTensor],
         list[Tensor | LongTensor],
         list[str | int],
@@ -144,7 +144,7 @@ def collate_batch(
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point where each tuple contains:
+        samples (list): list of tuples for each data point where each tuple contains:
             (elem_fea, nbr_fea, nbr_idx, target)
             - elem_fea (Tensor):  _description_
             - nbr_fea (Tensor):
@@ -172,7 +172,7 @@ def collate_batch(
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
+    for i, (inputs, target, *cry_ids) in enumerate(samples):
         elem_weights, elem_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal

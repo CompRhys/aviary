@@ -194,16 +194,16 @@ def collate_batch(
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list[tuple]): for each data point: (atom_fea, nbr_dist, nbr_idx, target)
+        samples (list[tuple]): for each data point a tuple containing:
             tuple[
-                - atom_fea (Tensor): _description_
-                - nbr_dist (Tensor):
-                - self_idx (LongTensor):
-                - nbr_idx (LongTensor):
+                atom_fea (Tensor): atom features
+                nbr_dist (Tensor): distance between neighboring atoms
+                self_idx (LongTensor): indices of atoms in the structure
+                nbr_idx (LongTensor): indices of neighboring atoms
             ]
-            - target (Tensor | LongTensor): target values containing floats for regression or
+            target (Tensor | LongTensor): target values containing floats for regression or
                 integers as class labels for classification
-            - material_id: str or int
+            identifiers: str or int
 
     Returns:
         tuple[
@@ -218,12 +218,10 @@ def collate_batch(
     batch_nbr_idx = []
     crystal_atom_idx = []
     batch_targets = []
-    batch_material_ids = []
+    batch_identifiers = []
     base_idx = 0
 
-    # TODO: unpacking (inputs, target, comp, material_id) doesn't appear to match the doc string
-    # for dataset_list, what about nbr_idx and comp?
-    for idx, (inputs, target, *material_id) in enumerate(samples):
+    for idx, (inputs, target, *identifiers) in enumerate(samples):
         atom_fea, nbr_dist, self_idx, nbr_idx = inputs
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
 
@@ -238,9 +236,9 @@ def collate_batch(
         # mapping from atoms to crystals
         crystal_atom_idx.extend([idx] * n_i)
 
-        # batch the targets and material_ids
+        # batch the targets and identifiers
         batch_targets.append(target)
-        batch_material_ids.append(material_id)
+        batch_identifiers.append(identifiers)
 
         # increment the id counter
         base_idx += n_i
@@ -257,7 +255,7 @@ def collate_batch(
         tuple(
             torch.stack(b_target, dim=0).to(device) for b_target in zip(*batch_targets)
         ),
-        *zip(*batch_material_ids),
+        *zip(*batch_identifiers),
     )
 
 

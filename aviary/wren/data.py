@@ -165,7 +165,7 @@ class WyckoffData(Dataset):
 
 
 def collate_batch(
-    dataset_list: tuple[
+    samples: tuple[
         tuple[Tensor, Tensor, Tensor, LongTensor, LongTensor],
         list[Tensor | LongTensor],
         list[str | int],
@@ -175,7 +175,7 @@ def collate_batch(
     crystal properties.
 
     Args:
-        dataset_list ([tuple]): list of tuples for each data point.
+        samples ([tuple]): list of tuples for each data point.
             (elem_fea, nbr_fea, nbr_idx, target)
 
             elem_fea (Tensor): Node features from atom type and Wyckoff letter
@@ -205,7 +205,7 @@ def collate_batch(
 
     aug_count = 0
     cry_base_idx = 0
-    for idx, (inputs, target, *cry_ids) in enumerate(dataset_list):
+    for idx, (inputs, target, *cry_ids) in enumerate(samples):
         mult_weights, elem_fea, sym_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal
