@@ -3,7 +3,7 @@ import os
 
 import pandas as pd
 from matminer.datasets import load_dataset
-from monty.json import MontyDecoder
+from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatviz import sankey_from_2_df_cols, spacegroup_sunburst
 from pymatviz.utils import get_crystal_sys
@@ -30,8 +30,9 @@ MODULE_DIR = os.path.dirname(__file__)
 # %%
 df_perovskites = pd.read_json(DATA_PATHS["matbench_perovskites"]).set_index("mbid")
 df_perovskites = df_perovskites.rename(columns={"wyckoff": "spglib_wyckoff"})
-decode = MontyDecoder().decode
-df_perovskites.structure = [decode(struct) for struct in df_perovskites.structure]
+df_perovskites["structure"] = [
+    Structure.from_dict(struct) for struct in df_perovskites.structure
+]
 
 
 # %%

@@ -22,14 +22,14 @@ else:
 
 module_dir = dirname(abspath(__file__))
 
-with open(join(module_dir, "wp-mult.json")) as file:
+with open(join(module_dir, "wyckoff-position-multiplicities.json")) as file:
     # dictionary mapping Wyckoff letters in a given space group to their multiplicity
     wyckoff_multiplicity_dict = json.load(file)
 
-with open(join(module_dir, "wp-params.json")) as file:
+with open(join(module_dir, "wyckoff-position-params.json")) as file:
     param_dict = json.load(file)
 
-with open(join(module_dir, "wp-relab.json")) as file:
+with open(join(module_dir, "wyckoff-position-relabelings.json")) as file:
     relab_dict = json.load(file)
 
 relab_dict = {
@@ -135,7 +135,7 @@ def get_aflow_label_from_aflow(
     if observed_formula != expected_formula:
         if errors == "raise":
             raise ValueError(
-                f"Invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
+                f"invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
                 f"to be {expected_formula}"
             )
         elif errors == "annotate":
@@ -163,8 +163,8 @@ def get_aflow_label_from_spglib(
     aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(spg_analyzer, errors)
 
     # try again with refined structure if it initially fails
-    # NOTE structures with magmoms fail unless all have same magmom
-    if "Invalid" in aflow_label_with_chemsys:
+    # NOTE structures with magmoms fail unless all have same magnetic moment
+    if "invalid" in aflow_label_with_chemsys:
         spg_analyzer = SpacegroupAnalyzer(
             spg_analyzer.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
         )
@@ -291,7 +291,7 @@ def canonicalize_elem_wyks(elem_wyks: str, spg_num: int) -> str:
 
 
 def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
-    """_summary_
+    """Determines the order or Wyckoff positions when canonicalizing Aflow labels.
 
     Args:
         wyks (str): Wyckoff position substring from AFLOW-style prototype label

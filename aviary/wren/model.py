@@ -42,7 +42,7 @@ class Wren(BaseModelClass):
         out_hidden: Sequence[int] = (256, 128, 64),
         **kwargs,
     ) -> None:
-        """_summary_
+        """Composition plus symmetry model.
 
         Args:
             robust (bool): If True, the number of model outputs is doubled. 2nd output for each

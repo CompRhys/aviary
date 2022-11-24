@@ -17,7 +17,7 @@ def main(  # noqa: C901
     tasks,
     losses,
     robust,
-    elem_emb="matscholar200",
+    elem_embedding="matscholar200",
     sym_emb="bra-alg-off",
     model_name="wren",
     sym_fea_len=32,
@@ -87,14 +87,14 @@ def main(  # noqa: C901
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    if not os.path.exists(data_path):
+    if not os.path.isfile(data_path):
         raise AssertionError(f"{data_path} does not exist!")
     # NOTE make sure to use dense datasets,
     # NOTE do not use default_na as "NaN" is a valid material composition
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
     dataset = WyckoffData(
-        df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+        df=df, elem_embedding=elem_embedding, sym_emb=sym_emb, task_dict=task_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len
@@ -105,7 +105,7 @@ def main(  # noqa: C901
     if evaluate:
         if test_path:
 
-            if not os.path.exists(test_path):
+            if not os.path.isfile(test_path):
                 raise AssertionError(f"{test_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
@@ -113,7 +113,10 @@ def main(  # noqa: C901
 
             print(f"using independent test set: {test_path}")
             test_set = WyckoffData(
-                df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+                df=df,
+                elem_embedding=elem_embedding,
+                sym_emb=sym_emb,
+                task_dict=task_dict,
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0.0:
@@ -128,7 +131,7 @@ def main(  # noqa: C901
     if train:
         if val_path:
 
-            if not os.path.exists(val_path):
+            if not os.path.isfile(val_path):
                 raise AssertionError(f"{val_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
@@ -136,7 +139,10 @@ def main(  # noqa: C901
 
             print(f"using independent validation set: {val_path}")
             val_set = WyckoffData(
-                df=df, elem_emb=elem_emb, sym_emb=sym_emb, task_dict=task_dict
+                df=df,
+                elem_embedding=elem_embedding,
+                sym_emb=sym_emb,
+                task_dict=task_dict,
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
@@ -345,7 +351,7 @@ def input_parser():
         help="Loss function if regression (default: 'L1')",
     )
 
-    # optimiser inputs
+    # optimizer inputs
     parser.add_argument(
         "--epochs",
         default=100,
@@ -356,7 +362,7 @@ def input_parser():
     parser.add_argument(
         "--robust",
         action="store_true",
-        help="Specifies whether to use hetroskedastic loss variants",
+        help="Specifies whether to use heteroscedastic loss variants",
     )
     parser.add_argument(
         "--optim",
@@ -460,7 +466,7 @@ def input_parser():
     # misc
     parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
-        "--log", action="store_true", help="Log training metrics to tensorboard"
+        "--log", action="store_true", help="Log training metrics to TensorBoard"
     )
 
     args = parser.parse_args()

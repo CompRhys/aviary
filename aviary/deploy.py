@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Literal
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import torch
 import wandb.apis.public
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.core import BaseModelClass
-from aviary.utils import get_metrics
-from aviary.wrenformer.data import df_to_in_mem_dataloader
-from aviary.wrenformer.model import Wrenformer
+from aviary.data import InMemoryDataLoader
+from aviary.utils import get_metrics, print_walltime
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-08-25"
@@ -20,21 +21,21 @@ __date__ = "2022-08-25"
 
 def make_ensemble_predictions(
     checkpoint_paths: list[str],
+    data_loader: DataLoader | InMemoryDataLoader,
+    model_cls: type[BaseModelClass],
     df: pd.DataFrame,
     target_col: str = None,
-    input_col: str = "wyckoff",
-    model_class: type[BaseModelClass] = Wrenformer,
     device: str = None,
     print_metrics: bool = True,
     warn_target_mismatch: bool = False,
-    embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
-    batch_size: int = 1024,
     pbar: bool = True,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
-    """Make predictions using an ensemble of Wrenformer models.
+    """Make predictions using an ensemble of models.
 
     Args:
         checkpoint_paths (list[str]): File paths to model checkpoints created with torch.save().
+        data_loader (DataLoader | InMemoryDataLoader): Data loader to use for predictions.
+        model_cls (type[BaseModelClass]): Model class to use for predictions.
         df (pd.DataFrame): Dataframe to make predictions on. Will be returned with additional
             columns holding model predictions (and uncertainties for robust models) for each
             model checkpoint.
@@ -47,10 +48,8 @@ def make_ensemble_predictions(
             if target_col is not None.
         warn_target_mismatch (bool, optional): Whether to warn if target_col != target_name from
             model checkpoint. Defaults to False.
-        embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use depending on
-            using Wren-/Roostformer ensemble. Defaults to "wyckoff".
-        batch_size (int, optional): Batch size for data loader. Defaults to 512. Can be large to
-            speedup inference.
+        pbar (bool, optional): Whether to show progress bar running over checkpoints.
+            Defaults to True.
 
     Returns:
         pd.DataFrame: Input dataframe with added columns for model and ensemble predictions. If
@@ -60,17 +59,8 @@ def make_ensemble_predictions(
     # handles single targets. Low priority as multi-tasking is rarely used.
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    data_loader = df_to_in_mem_dataloader(
-        df=df,
-        target_col=target_col,
-        input_col=input_col,
-        batch_size=batch_size,
-        embedding_type=embedding_type,
-        shuffle=False,  # False is default but best be explicit
-    )
-
-    # tqdm(disable=None) means suppress output in non-tty (e.g. CI/log files) but keep in
-    # terminal (i.e. tty mode) https://git.io/JnBOi
+    # tqdm(disable=None) means suppress output in CI/log files but keep in terminal
+    # (i.e. tty mode) https://git.io/JnBOi
     print(f"Pytorch running on {device=}")
     for idx, checkpoint_path in tqdm(
         enumerate(tqdm(checkpoint_paths), 1), disable=None if pbar else True
@@ -80,7 +70,9 @@ def make_ensemble_predictions(
         except Exception as exc:
             raise RuntimeError(f"Failed to load checkpoint {checkpoint_path}") from exc
 
-        model_params = checkpoint["model_params"]
+        model_params = checkpoint.get("model_params")
+        if model_params is None:
+            raise ValueError(f"model_params not found in {checkpoint_path=}")
 
         target_name, task_type = list(model_params["task_dict"].items())[0]
         assert task_type in ("regression", "classification"), f"invalid {task_type = }"
@@ -89,71 +81,66 @@ def make_ensemble_predictions(
                 f"Warning: {target_col = } does not match {target_name = } in checkpoint. "
                 "If this is not by accident, disable this warning by passing warn_target=False."
             )
-        model = model_class(**model_params)
+        model = model_cls(**model_params)
         model.to(device)
 
         model.load_state_dict(checkpoint["model_state"])
 
         with torch.no_grad():
-            predictions = torch.cat([model(*inputs)[0] for inputs, *_ in data_loader])
+            preds = np.concatenate(
+                [model(*inputs)[0].cpu().numpy() for inputs, *_ in data_loader]
+            ).squeeze()
 
         if model.robust:
-            predictions, aleat_log_std = predictions.chunk(2, dim=1)
-            aleat_std = aleat_log_std.exp().cpu().numpy().squeeze()
-            df[f"aleatoric_std_{idx}"] = aleat_std.tolist()
+            preds, aleat_log_std = preds.T
+            aleatoric_std = np.exp(aleat_log_std)
+            df[f"aleatoric_std_{idx}"] = aleatoric_std
 
-        predictions = predictions.cpu().numpy().squeeze()
         pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
-        df[pred_col] = predictions.tolist()
+        df[pred_col] = preds
 
     df_preds = df.filter(regex=r"_pred_\d")
     df[f"{target_col}_pred_ens"] = ensemble_preds = df_preds.mean(axis=1)
     df[f"{target_col}_epistemic_std_ens"] = epistemic_std = df_preds.std(axis=1)
 
-    if df.columns.str.startswith("aleatoric_std_").sum() > 0:
+    if df.columns.str.startswith("aleatoric_std_").any():
         aleatoric_std = df.filter(regex=r"aleatoric_std_\d").mean(axis=1)
         df[f"{target_col}_aleatoric_std_ens"] = aleatoric_std
         df[f"{target_col}_total_std_ens"] = (
             epistemic_std**2 + aleatoric_std**2
         ) ** 0.5
 
-    if target_col and print_metrics:
+    if target_col:
         targets = df[target_col]
-        all_model_metrics = pd.DataFrame(
-            [
-                get_metrics(targets, df_preds[pred_col], task_type)
-                for pred_col in df_preds
-            ],
-            index=df_preds.columns,
-        )
+        all_model_metrics = [
+            get_metrics(targets, df_preds[col], task_type) for col in df_preds
+        ]
+        df_metrics = pd.DataFrame(all_model_metrics, index=df_preds.columns)
 
-        print("\nSingle model performance:")
-        print(all_model_metrics.describe().round(4).loc[["mean", "std"]])
+        if print_metrics:
+            print("\nSingle model performance:")
+            print(df_metrics.describe().round(4).loc[["mean", "std"]])
 
-        ensemble_metrics = get_metrics(targets, ensemble_preds, task_type)
+            ensemble_metrics = get_metrics(targets, ensemble_preds, task_type)
 
-        print("\nEnsemble performance:")
-        for key, val in ensemble_metrics.items():
-            print(f"{key:<8} {val:.3}")
-        return df, all_model_metrics
+            print("\nEnsemble performance:")
+            for key, val in ensemble_metrics.items():
+                print(f"{key:<8} {val:.3}")
+        return df, df_metrics
 
     return df
 
 
-def deploy_wandb_checkpoints(
-    runs: list[wandb.apis.public.Run],
-    df: pd.DataFrame,
-    input_col: str,
-    target_col: str,
-    **kwargs: Any,
+@print_walltime(end_desc="predict_from_wandb_checkpoints")
+def predict_from_wandb_checkpoints(
+    runs: list[wandb.apis.public.Run], **kwargs: Any
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Function that downloads and caches checkpoints for an ensemble of Wrenformer models, then
+    """Function that downloads and caches checkpoints for an ensemble of models, then
     makes predictions on some dataset, prints ensemble metrics and stores predictions to CSV.
 
     Args:
         runs (list[wandb.apis.public.Run]): List of WandB runs to download model checkpoints from
             which are then loaded into memory to generate predictions for the input_col in df.
-        df (pd.DataFrame): Test dataset on which to make predictions.
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Original input dataframe with added columns for model
@@ -169,13 +156,14 @@ def deploy_wandb_checkpoints(
         run_target == run.config["target"] for run in runs
     ), f"Runs have differing targets, first {run_target=}"
 
-    if target_col != run_target:
+    target_col = kwargs.get("target_col")
+    if target_col and target_col != run_target:
         print(f"\nWarning: {target_col=} does not match {run_target=}")
 
     checkpoint_paths: list[str] = []
     for run in tqdm(runs, desc="Downloading model checkpoints"):
         run_path = "/".join(run.path)
-        checkpoint_dir = f"{ROOT}/.wandb_checkpoints/{run_path}"
+        checkpoint_dir = f"{ROOT}/wandb/checkpoints/{run_path}"
         os.makedirs(checkpoint_dir, exist_ok=True)
 
         checkpoint_path = f"{checkpoint_dir}/checkpoint.pth"
@@ -186,8 +174,7 @@ def deploy_wandb_checkpoints(
             continue
         wandb.restore("checkpoint.pth", root=checkpoint_dir, run_path=run_path)
 
-    df, ensemble_metrics = make_ensemble_predictions(
-        checkpoint_paths, df=df, input_col=input_col, target_col=target_col, **kwargs
-    )
+    df, ensemble_metrics = make_ensemble_predictions(checkpoint_paths, **kwargs)
 
-    return df, ensemble_metrics
+    # round to save disk space and speed up cloud storage uploads
+    return df.round(6), ensemble_metrics

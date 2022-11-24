@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import json
-import time
-from contextlib import contextmanager
-from typing import Generator, Literal
+from typing import Literal
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-05-10"
@@ -58,28 +56,3 @@ def merge_json_on_disk(
             non_serializable_handler if on_non_serializable == "annotate" else None
         )
         json.dump(dct, file, default=default, indent=2)
-
-
-@contextmanager
-def print_walltime(
-    start_desc: str = "",
-    end_desc: str = "",
-    newline: bool = True,
-) -> Generator[None, None, None]:
-    """Context manager and decorator that prints the wall time of its lifetime.
-
-    Args:
-        start_desc (str): Text to print when entering context. Defaults to ''.
-        end_desc (str): Text to print when exiting context. Will be followed by 'took
-            {duration} sec'. i.e. f"{end_desc} took 1.23 sec". Defaults to ''.
-        newline (bool): Whether to print a newline after start_desc. Defaults to True.
-    """
-    start_time = time.perf_counter()
-    if start_desc:
-        print(start_desc, end="\n" if newline else "")
-
-    try:
-        yield
-    finally:
-        run_time = time.perf_counter() - start_time
-        print(f"{end_desc} took {run_time:.2f} sec")

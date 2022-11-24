@@ -10,7 +10,7 @@
 
 </h4>
 
-The aim of `aviary` is to contain multiple models for materials discovery under a common interface, overtime we hope to add more models with a particular focus on coordinate free deep learning models.
+The aim of `aviary` is to contain multiple models for materials discovery under a common interface, overtime we hope to add more models with a particularly focus on coordinate free deep learning models.
 
 ## `conda` Installation
 

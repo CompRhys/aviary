@@ -22,7 +22,7 @@ class CompositionData(Dataset):
         self,
         df: pd.DataFrame,
         task_dict: dict[str, str],
-        elem_emb: str = "matscholar200",
+        elem_embedding: str = "matscholar200",
         inputs: str = "composition",
         identifiers: Sequence[str] = ("material_id", "composition"),
     ):
@@ -32,8 +32,9 @@ class CompositionData(Dataset):
             df (pd.DataFrame): Pandas dataframe holding input and target values.
             task_dict (dict[str, "regression" | "classification"]): Map from target names to task
                 type.
-            elem_emb (str, optional): One of "matscholar200", "cgcnn92", "megnet16", "onehot112" or
-                path to a file with custom embeddings. Defaults to "matscholar200".
+            elem_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16",
+                "onehot112" or path to a file with custom element embeddings.
+                Defaults to "matscholar200".
             inputs (str, optional): df column name holding material compositions.
                 Defaults to "composition".
             identifiers (list, optional): df columns for distinguishing data points. Will be
@@ -47,12 +48,12 @@ class CompositionData(Dataset):
         self.identifiers = list(identifiers)
         self.df = df
 
-        if elem_emb in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
-            elem_emb = f"{PKG_DIR}/embeddings/element/{elem_emb}.json"
-        elif not os.path.exists(elem_emb):
-            raise AssertionError(f"{elem_emb} does not exist!")
+        if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
+        elif not os.path.isfile(elem_embedding):
+            raise AssertionError(f"{elem_embedding} does not exist!")
 
-        with open(elem_emb) as f:
+        with open(elem_embedding) as f:
             self.elem_features = json.load(f)
 
         self.elem_emb_len = len(list(self.elem_features.values())[0])
@@ -134,7 +135,7 @@ class CompositionData(Dataset):
 
 
 def collate_batch(
-    dataset_list: tuple[
+    samples: tuple[
         tuple[Tensor, Tensor, LongTensor, LongTensor],
         list[Tensor | LongTensor],
         list[str | int],
@@ -143,7 +144,7 @@ def collate_batch(
     """Collate a list of data and return a batch for predicting crystal properties.
 
     Args:
-        dataset_list (list): list of tuples for each data point where each tuple contains:
+        samples (list): list of tuples for each data point where each tuple contains:
             (elem_fea, nbr_fea, nbr_idx, target)
             - elem_fea (Tensor):  _description_
             - nbr_fea (Tensor):
@@ -171,7 +172,7 @@ def collate_batch(
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, (inputs, target, *cry_ids) in enumerate(dataset_list):
+    for i, (inputs, target, *cry_ids) in enumerate(samples):
         elem_weights, elem_fea, self_idx, nbr_idx = inputs
 
         # number of atoms for this crystal

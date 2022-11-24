@@ -133,7 +133,7 @@ def df_to_in_mem_dataloader(
     **kwargs: Any,
 ) -> InMemoryDataLoader:
     """Construct an InMemoryDataLoader with Wrenformer batch collation from a dataframe.
-    Can also be used for Roostformer.
+    Can also be used for Roostformer. Does not (currently) work with other models like CGCNN/Wren.
 
     Args:
         df (pd.DataFrame): Expected to have columns input_col, target_col, id_col.

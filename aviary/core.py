@@ -4,19 +4,20 @@ import gc
 import os
 import shutil
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections import defaultdict
 from typing import Any, Callable, Mapping
 
 import numpy as np
 import torch
 import torch.nn as nn
+import wandb
 from sklearn.metrics import f1_score
 from torch import BoolTensor, Tensor
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.data import InMemoryDataLoader
@@ -25,11 +26,6 @@ if sys.version_info < (3, 8):
     from typing_extensions import Literal
 else:
     from typing import Literal
-
-try:
-    import wandb
-except ImportError:
-    wandb = None  # type: ignore
 
 
 TaskType = Literal["regression", "classification"]
@@ -197,15 +193,13 @@ class BaseModelClass(nn.Module, ABC):
                 gc.collect()
 
                 if writer == "wandb":
-                    if wandb is None:
-                        raise ImportError("wandb not installed. Run pip install wandb")
                     wandb.log({"train": train_metrics, "validation": val_metrics})
 
         except KeyboardInterrupt:
             pass
 
         if isinstance(writer, SummaryWriter):
-            writer.close()  # close tensorboard SummaryWriter at end of training
+            writer.close()  # close TensorBoard SummaryWriter at end of training
 
     def evaluate(
         self,
@@ -403,15 +397,6 @@ class BaseModelClass(nn.Module, ABC):
             features.append(output)
 
         return np.vstack(features)
-
-    @abstractmethod
-    def forward(self, *x) -> tuple[Tensor, ...]:
-        """Forward pass through the model.
-
-        Raises:
-            NotImplementedError: Raise error if child class doesn't implement forward
-        """
-        raise NotImplementedError("forward() is not defined!")
 
     @property
     def num_params(self) -> int:

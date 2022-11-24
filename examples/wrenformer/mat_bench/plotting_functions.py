@@ -18,13 +18,15 @@ pio.templates.default = "plotly_white"
 
 
 def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
-    """Scale the errors in a Matbench dataframe with columns for tasks and rows for
-    different models. Missing entries are fine.
+    """Scale the errors in a Matbench dataframe.
+
+    Args:
+        df (pd.DataFrame): Dataframe with unscaled errors for matbench tasks across columns and
+            models along rows. Missing entries are fine.
 
     Returns:
         pd.DataFrame: Dataframe with scaled errors
     """
-
     # make scaled data for heatmap coloring
     # scale regression problems by mad/mae
     def scale_regr_task(series: pd.Series, mad: float) -> pd.Series:
@@ -79,13 +81,13 @@ def plot_leaderboard(df: pd.DataFrame, html_path: str = None, **kwargs: Any) -> 
     """Generate the Matbench scaled errors graph seen on
     https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
 
-        Args:
-            df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
-                models. Missing entries are fine.
-            html_path (str): HTML file path where to save the plotly figure.
+    Args:
+        df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
+            models. Missing entries are fine.
+        html_path (str): HTML file path where to save the plotly figure.
 
-        Returns:
-            Figure: Plotly graph objects Figure instance
+    Returns:
+        Figure: Plotly graph objects Figure instance
     """
     df = df.rename(dataset_labels_html)
     # deep copy df so we don't modify the original
@@ -200,7 +202,15 @@ def annotate_fig(fig: Figure, **kwargs) -> None:
 
 
 def plotly_roc(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Figure:
+    """Plot a ROC curve with accuracy and ROCAUC annotation.
 
+    Args:
+        y_true (np.ndarray): True labels.
+        y_pred_proba (np.ndarray): Predicted class probabilities.
+
+    Returns:
+        Figure: Plotly Figure instance.
+    """
     false_pos_rate, true_pos_rate, _ = roc_curve(y_true, y_pred_proba)
 
     labels = dict(x="False Positive Rate", y="True Positive Rate")

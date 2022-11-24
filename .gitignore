@@ -23,7 +23,6 @@ models/
 
 # HPC
 slurm-*.out
-csd3/
 plots/
 datasets/
 pds/
@@ -35,5 +34,5 @@ examples/**/model_preds/
 examples/**/model_scores/
 examples/**/job-logs/
 examples/**/artifacts/
+examples/**/*.csv
 wandb/
-.wandb_checkpoints/

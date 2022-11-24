@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime
+from pickle import PickleError
 from types import ModuleType
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Generator, Iterable
 
 import numpy as np
 import pandas as pd
@@ -55,7 +58,7 @@ def initialize_model(
         transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
 
     Returns:
-        BaseModelClass: An initialised model of type model_class.
+        BaseModelClass: An initialized model of type model_class.
     """
     robust = model_params["robust"]
     n_targets = model_params["n_targets"]
@@ -159,7 +162,7 @@ def initialize_optim(
     Returns:
         tuple[Optimizer, _LRScheduler]: Optimizer and scheduler for given model
     """
-    # Select Optimiser
+    # Select optimizer
     optimizer: Optimizer
     if optim == "SGD":
         optimizer = SGD(
@@ -302,7 +305,7 @@ def train_ensemble(
         epochs (int): Number of epochs to train for.
         train_set (Subset): Dataloader containing training data.
         val_set (Subset): Dataloader containing validation data.
-        log (bool): Whether to log intermediate metrics to tensorboard.
+        log (bool): Whether to log intermediate metrics to TensorBoard.
         data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
@@ -578,7 +581,7 @@ def print_metrics_regression(targets: np.ndarray, preds: np.ndarray, **kwargs) -
     mse = np.mean(np.square(res), axis=1)
     rmse = np.sqrt(mse)
     r2 = r2_score(
-        np.repeat(targets[:, np.newaxis], ensemble_folds, axis=1),
+        np.repeat(targets[:, None], ensemble_folds, axis=1),
         preds.T,
         multioutput="raw_values",
     )
@@ -772,7 +775,7 @@ def save_results_dict(
 def get_metrics(
     targets: np.ndarray | pd.Series,
     predictions: np.ndarray | pd.Series,
-    type: Literal["regression", "classification"],
+    type: TaskType,
     prec: int = 4,
 ) -> dict:
     """Get performance metrics for model predictions.
@@ -790,6 +793,9 @@ def get_metrics(
             f1, rocauc for classification.
     """
     metrics = {}
+    nans = np.isnan(np.column_stack([targets, predictions])).any(axis=1)
+    # r2_score() and roc_auc_score() don't auto-handle NaNs
+    targets, predictions = targets[~nans], predictions[~nans]
 
     if type == "regression":
         metrics["MAE"] = np.abs(targets - predictions).mean()
@@ -810,11 +816,10 @@ def get_metrics(
 
 
 def as_dict_handler(obj: Any) -> dict[str, Any] | None:
-    """Use as default_handler kwarg to json.dump() or pandas.to_json()."""
+    """Pass this func as json.dump(handler=) or as pandas.to_json(default_handler=)."""
     try:
         return obj.as_dict()  # all MSONable objects implement as_dict()
     except AttributeError:
-
         return None  # replace unhandled objects with None in serialized data
 
 
@@ -832,10 +837,46 @@ def update_module_path_in_pickled_object(
         old_module_path (str): The old.dotted.path.to.renamed.module.
         new_module (ModuleType): from new.location import module.
     """
+    if not os.path.isfile(pickle_path):
+        raise FileNotFoundError(pickle_path)
+
     sys.modules[old_module_path] = new_module
 
-    dic = torch.load(pickle_path, map_location="cpu")
+    try:
+        dic = torch.load(pickle_path, map_location="cpu")
+    except Exception as exc:
+        raise PickleError(pickle_path) from exc
 
     del sys.modules[old_module_path]
 
     torch.save(dic, pickle_path)
+
+
+@contextmanager
+def print_walltime(
+    start_desc: str = "",
+    end_desc: str = "",
+    newline: bool = True,
+    min_run_time: float = 1,
+) -> Generator[None, None, None]:
+    """Context manager and decorator that prints the wall time of its lifetime.
+
+    Args:
+        start_desc (str): Text to print when entering context. Defaults to ''.
+        end_desc (str): Text to print when exiting context. Will be followed by 'took
+            {duration} sec'. i.e. f"{end_desc} took 1.23 sec". Defaults to ''.
+        newline (bool): Whether to print a newline after start_desc. Defaults to True.
+        min_run_time (float): Minimum wall time in seconds below which nothing will be
+            printed. Defaults to 1.
+    """
+    start_time = time.perf_counter()
+    if start_desc:
+        print(start_desc, end="\n" if newline else "")
+
+    try:
+        yield
+    finally:
+        run_time = time.perf_counter() - start_time
+        # don't print on immediate failures
+        if run_time > min_run_time:
+            print(f"{end_desc} took {run_time:.2f} sec")

@@ -8,7 +8,7 @@ from aviary.utils import get_metrics, results_multitask, train_ensemble
 
 
 def test_cgcnn_clf(df_matbench_phonons):
-    elem_emb = "cgcnn92"
+    elem_embedding = "cgcnn92"
     targets = ["phdos_clf"]
     task = "classification"
     losses = ["CSE"]
@@ -40,7 +40,7 @@ def test_cgcnn_clf(df_matbench_phonons):
     loss_dict = dict(zip(targets, losses))
 
     dataset = CrystalGraphData(
-        df=df_matbench_phonons, elem_emb=elem_emb, task_dict=task_dict
+        df=df_matbench_phonons, elem_embedding=elem_embedding, task_dict=task_dict
     )
     n_targets = dataset.n_targets
     elem_emb_len = dataset.elem_emb_len

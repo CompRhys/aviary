@@ -8,7 +8,7 @@ from aviary.wren.model import Wren
 
 
 def test_wren_clf(df_matbench_phonons_wyckoff):
-    elem_emb = "matscholar200"
+    elem_embedding = "matscholar200"
     sym_emb = "bra-alg-off"
     targets = ["phdos_clf"]
     task = "classification"
@@ -41,7 +41,7 @@ def test_wren_clf(df_matbench_phonons_wyckoff):
 
     dataset = WyckoffData(
         df=df_matbench_phonons_wyckoff,
-        elem_emb=elem_emb,
+        elem_embedding=elem_embedding,
         sym_emb=sym_emb,
         task_dict=task_dict,
     )

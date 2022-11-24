@@ -1,11 +1,10 @@
 # %%
 import glob
 import os
-from functools import partial
 
 import pandas as pd
 from pymatgen.core import Composition, Structure
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from aviary.cgcnn.utils import get_cgcnn_input
 from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_from_spglib
@@ -84,17 +83,27 @@ el_refs = {
 }
 
 
-def get_formation_energy(args, el_refs):
-    comp, energy = args
+def get_formation_energy(comp: str, energy: float, el_refs: dict[str, float]) -> float:
+    """Compute formation energy per atom for formula/energy pair and elemental references.
+
+    Args:
+        comp (str): Formula string
+        energy (float): energy per atom in eV
+        el_refs (dict[str, float]): elemental reference energies
+
+    Returns:
+        float: formation energy per atom in eV
+    """
     c = Composition(comp)
     # NOTE our references use energies_per_atom for energy
     ref_e = sum(c[el] * el_refs[el] for el in c.elements)
     return energy - ref_e / c.num_atoms
 
 
-df["E_f"] = df[["composition", "E_vasp_per_atom"]].map(
-    partial(get_formation_energy, el_refs=el_refs), axis=1
-)
+df["E_f"] = [
+    get_formation_energy(row.composition, row.E_vasp_per_atom, el_refs=el_refs)
+    for row in df.itertuples()
+]
 
 
 # %%

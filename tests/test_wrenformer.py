@@ -1,4 +1,4 @@
-from aviary.wrenformer.train import train_wrenformer
+from aviary.train import train_wrenformer
 
 
 def test_wrenformer_regression(df_matbench_phonons_wyckoff):
@@ -12,7 +12,7 @@ def test_wrenformer_regression(df_matbench_phonons_wyckoff):
         test_df=test_df,
         target_col="last phdos peak",
         task_type="regression",
-        n_attn_layers=2,
+        model_params=dict(n_attn_layers=2),
         epochs=30,
     )
 
