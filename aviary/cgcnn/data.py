@@ -80,8 +80,8 @@ class CrystalGraphData(Dataset):
         all_isolated = []
         some_isolated = []
 
-        for material_id, struct in tqdm(
-            zip(self.df[identifiers[0]], self.df[structure_col]),
+        for idx, struct in tqdm(
+            zip(self.df.index, self.df[structure_col]),
             total=len(df),
             desc="Pre-check that all structures are valid, i.e. none have isolated atoms.",
             disable=None,
@@ -89,11 +89,11 @@ class CrystalGraphData(Dataset):
             self_idx, nbr_idx, _ = get_structure_neighbor_info(
                 struct, radius, max_num_nbr
             )
-
+            mat_ids = self.df.loc[idx][self.identifiers]
             if 0 in (len(self_idx), len(nbr_idx)):
-                all_isolated.append(material_id)
-            if set(self_idx) != set(range(len(struct))):
-                some_isolated.append(material_id)
+                all_isolated.append(mat_ids)
+            elif set(self_idx) != set(range(len(struct))):
+                some_isolated.append(mat_ids)
 
         isolated = set(all_isolated + some_isolated)
         if len(isolated) > 0:
