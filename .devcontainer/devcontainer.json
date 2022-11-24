@@ -4,7 +4,7 @@
   "updateContentCommand": "pip install -e .",
   "customizations": {
     "codespaces": {
-      "openFiles": ["examples/wren-example.ipynb"]
+      "openFiles": ["examples/notebooks/wren-example.ipynb"]
     },
     "vscode": {
       "extensions": ["ms-toolsai.jupyter", "ms-python.python"]
