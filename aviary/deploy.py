@@ -78,8 +78,8 @@ def make_ensemble_predictions(
         assert task_type in ("regression", "classification"), f"invalid {task_type = }"
         if warn_target_mismatch and target_name != target_col:
             print(
-                f"Warning: {target_col = } does not match {target_name = } in checkpoint. "
-                "If this is not by accident, disable this warning by passing warn_target=False."
+                f"Warning: {target_col = } does not match {target_name = } in checkpoint. If this "
+                "is not by accident, disable this warning by passing warn_target_mismatch=False."
             )
         model = model_cls(**model_params)
         model.to(device)
