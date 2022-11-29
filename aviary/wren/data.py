@@ -57,8 +57,8 @@ class WyckoffData(Dataset):
         elif not os.path.isfile(elem_embedding):
             raise AssertionError(f"{elem_embedding} does not exist!")
 
-        with open(elem_embedding) as f:
-            self.elem_features = json.load(f)
+        with open(elem_embedding) as emb_file:
+            self.elem_features = json.load(emb_file)
 
         self.elem_emb_len = len(list(self.elem_features.values())[0])
 
@@ -67,8 +67,8 @@ class WyckoffData(Dataset):
         elif not os.path.isfile(sym_emb):
             raise AssertionError(f"{sym_emb} does not exist!")
 
-        with open(sym_emb) as f:
-            self.sym_features = json.load(f)
+        with open(sym_emb) as sym_file:
+            self.sym_features = json.load(sym_file)
 
         self.sym_emb_len = len(list(list(self.sym_features.values())[0].values())[0])
 

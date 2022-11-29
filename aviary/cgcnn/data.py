@@ -61,8 +61,8 @@ class CrystalGraphData(Dataset):
         elif not os.path.isfile(elem_embedding):
             raise ValueError(f"{elem_embedding} does not exist!")
 
-        with open(elem_embedding) as f:
-            self.elem_features = json.load(f)
+        with open(elem_embedding) as file:
+            self.elem_features = json.load(file)
 
         for key, value in self.elem_features.items():
             self.elem_features[key] = np.array(value, dtype=float)
@@ -80,7 +80,7 @@ class CrystalGraphData(Dataset):
         self.df = df
         self.structure_col = structure_col
 
-        all_isolated, some_isolated = [], []
+        all_isolated, some_isolated = {}, {}
 
         for idx, struct in tqdm(
             zip(self.df.index, self.df[structure_col]),
@@ -91,21 +91,21 @@ class CrystalGraphData(Dataset):
             self_idx, nbr_idx, _ = get_structure_neighbor_info(
                 struct, radius, max_num_nbr
             )
-            mat_ids = self.df.loc[idx][self.identifiers]
+            material_ids = ", ".join(self.df.loc[idx][self.identifiers])
             if 0 in (len(self_idx), len(nbr_idx)):
-                all_isolated.append(mat_ids)
+                all_isolated[idx] = material_ids
             elif set(self_idx) != set(range(len(struct))):
-                some_isolated.append(mat_ids)
+                some_isolated[idx] = material_ids
 
-        isolated = set(all_isolated + some_isolated)
+        isolated = set(all_isolated) | set(some_isolated)
         if len(isolated) > 0:
             # drop the data points that do not give rise to dense crystal graphs
-            # TODO next line requires identifiers[0] == df.index, bad assumption
             self.df = self.df.drop(index=isolated)
 
             print(f"dropping {len(isolated):,} structures:")
-            print(f"{len(all_isolated)} have only isolated atoms: {all_isolated}")
-            print(f"{len(some_isolated)} have some isolated atoms: {some_isolated}")
+            for type, ids in (("only", all_isolated), ("some", some_isolated)):
+                joined_ids = "\n  ".join(ids.values())
+                print(f"{len(ids)} have {type} isolated atoms:\n{joined_ids}")
 
         self.n_targets = []
         for target, task_type in self.task_dict.items():

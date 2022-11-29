@@ -53,8 +53,8 @@ class CompositionData(Dataset):
         elif not os.path.isfile(elem_embedding):
             raise AssertionError(f"{elem_embedding} does not exist!")
 
-        with open(elem_embedding) as f:
-            self.elem_features = json.load(f)
+        with open(elem_embedding) as file:
+            self.elem_features = json.load(file)
 
         self.elem_emb_len = len(list(self.elem_features.values())[0])
 
