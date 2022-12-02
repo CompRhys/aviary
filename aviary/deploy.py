@@ -10,7 +10,6 @@ import wandb.apis.public
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from aviary import ROOT
 from aviary.core import BaseModelClass
 from aviary.data import InMemoryDataLoader
 from aviary.utils import get_metrics, print_walltime
@@ -57,6 +56,9 @@ def make_ensemble_predictions(
     """
     # TODO: Add support for predicting all tasks a multi-task models was trained on. Currently only
     # handles single targets. Low priority as multi-tasking is rarely used.
+    if not checkpoint_paths:
+        raise ValueError(f"{checkpoint_paths=} must not be empty")
+
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     # tqdm(disable=None) means suppress output in CI/log files but keep in terminal
@@ -132,7 +134,7 @@ def make_ensemble_predictions(
 
 @print_walltime(end_desc="predict_from_wandb_checkpoints")
 def predict_from_wandb_checkpoints(
-    runs: list[wandb.apis.public.Run], **kwargs: Any
+    runs: list[wandb.apis.public.Run], cache_dir: str, **kwargs: Any
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Function that downloads and caches checkpoints for an ensemble of models, then
     makes predictions on some dataset, prints ensemble metrics and stores predictions to CSV.
@@ -140,6 +142,7 @@ def predict_from_wandb_checkpoints(
     Args:
         runs (list[wandb.apis.public.Run]): List of WandB runs to download model checkpoints from
             which are then loaded into memory to generate predictions for the input_col in df.
+        cache_dir (str): Directory to cache downloaded checkpoints in.
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Original input dataframe with added columns for model
@@ -147,8 +150,6 @@ def predict_from_wandb_checkpoints(
             like mean and standard deviation of MAE/RMSE.
     """
     print(f"Using checkpoints from {len(runs)} run(s):")
-    for idx, run in enumerate(runs, 1):
-        print(f"{idx:>3}: {run.url}")
 
     run_target = runs[0].config["target"]
     assert all(
@@ -160,18 +161,21 @@ def predict_from_wandb_checkpoints(
         print(f"\nWarning: {target_col=} does not match {run_target=}")
 
     checkpoint_paths: list[str] = []
-    for run in tqdm(runs, desc="Downloading model checkpoints"):
+
+    for idx, run in enumerate(runs, 1):
         run_path = "/".join(run.path)
-        checkpoint_dir = f"{ROOT}/wandb/checkpoints/{run_path}"
-        os.makedirs(checkpoint_dir, exist_ok=True)
+        out_dir = f"{cache_dir}/{run_path}"
+        os.makedirs(out_dir, exist_ok=True)
 
-        checkpoint_path = f"{checkpoint_dir}/checkpoint.pth"
+        checkpoint_path = f"{out_dir}/checkpoint.pth"
         checkpoint_paths.append(checkpoint_path)
+        print(f"{idx:>3}/{len(runs)}: {run.url}\n\t{checkpoint_path}")
 
-        # download checkpoint from wandb if not already present
-        if os.path.isfile(checkpoint_path):
-            continue
-        wandb.restore("checkpoint.pth", root=checkpoint_dir, run_path=run_path)
+        with open(f"{out_dir}/run.md", "w") as md_file:
+            md_file.write(f"[{run.name}]({run.url})\n")
+
+        if not os.path.isfile(checkpoint_path):
+            run.file("checkpoint.pth").download(root=out_dir)
 
     df, ensemble_metrics = make_ensemble_predictions(checkpoint_paths, **kwargs)
 

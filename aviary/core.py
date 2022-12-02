@@ -335,7 +335,7 @@ class BaseModelClass(nn.Module, ABC):
         """Make model predictions.
 
         Args:
-            data_loader (DataLoader): Iterator that yields minibatches with the same data
+            data_loader (DataLoader): Iterator that yields mini-batches with the same data
                 format used in fit(). To speed up inference, batch size can be set much
                 larger than during training.
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
