@@ -27,7 +27,7 @@ class CrystalGraphData(Dataset):
         task_dict: dict[str, str],
         elem_embedding: str = "cgcnn92",
         structure_col: str = "structure",
-        identifiers: Sequence[str] = ("material_id",),
+        identifiers: Sequence[str] = (),
         radius: float = 5,
         max_num_nbr: int = 12,
         dmin: float = 0,
@@ -44,7 +44,7 @@ class CrystalGraphData(Dataset):
                 Defaults to "matscholar200".
             structure_col (str, optional): df column holding pymatgen Structure objects as input.
             identifiers (list[str], optional): df columns for distinguishing data points. Will be
-                copied over into the model's output CSV. Defaults to ("material_id",).
+                copied over into the model's output CSV. Defaults to ().
             radius (float, optional): Cut-off radius for neighborhood. Defaults to 5.
             max_num_nbr (int, optional): maximum number of neighbors to consider. Defaults to 12.
             dmin (float, optional): minimum distance in Gaussian basis. Defaults to 0.
@@ -82,16 +82,14 @@ class CrystalGraphData(Dataset):
 
         all_isolated, some_isolated = {}, {}
 
+        desc = "Pre-check that all structures are valid, i.e. none have isolated atoms."
         for idx, struct in tqdm(
-            zip(self.df.index, self.df[structure_col]),
-            total=len(df),
-            desc="Pre-check that all structures are valid, i.e. none have isolated atoms.",
-            disable=None,
+            self.df[structure_col].items(), total=len(df), desc=desc, disable=None
         ):
             self_idx, nbr_idx, _ = get_structure_neighbor_info(
                 struct, radius, max_num_nbr
             )
-            material_ids = ", ".join(self.df.loc[idx][self.identifiers])
+            material_ids = [idx, *self.df.loc[idx][self.identifiers]]
             if 0 in (len(self_idx), len(nbr_idx)):
                 all_isolated[idx] = material_ids
             elif set(self_idx) != set(range(len(struct))):
@@ -104,8 +102,8 @@ class CrystalGraphData(Dataset):
 
             print(f"dropping {len(isolated):,} structures:")
             for type, ids in (("only", all_isolated), ("some", some_isolated)):
-                joined_ids = "\n  ".join(ids.values())
-                print(f"{len(ids)} have {type} isolated atoms:\n{joined_ids}")
+                joined_ids = "\n\t".join(map(str, ids.values()))
+                print(f"  {len(ids)} have {type} isolated atoms:\n\t{joined_ids}")
 
         self.n_targets = []
         for target, task_type in self.task_dict.items():
@@ -141,7 +139,7 @@ class CrystalGraphData(Dataset):
         # TODO try if converting to np array speeds this up due to np's faster indexing
         row = self.df.iloc[idx]
         struct = row[self.structure_col]
-        material_id = row[self.identifiers[0]]
+        material_ids = [self.df.index[idx], *row[self.identifiers]]
 
         # atom features for disordered sites
         site_atoms = [atom.species.as_dict() for atom in struct]
@@ -159,13 +157,13 @@ class CrystalGraphData(Dataset):
         )
 
         if len(self_idx) == 0:
-            raise ValueError(f"All atoms in {material_id} are isolated")
+            raise ValueError(f"All atoms in {material_ids} are isolated")
         if len(nbr_idx) == 0:
             raise ValueError(
-                f"Empty nbr_idx. This should not be triggered but was for {material_id}"
+                f"Empty nbr_idx. This should not be triggered but was for {material_ids}"
             )
         if set(self_idx) != set(range(len(struct))):
-            raise ValueError(f"At least one atom in {material_id} is isolated")
+            raise ValueError(f"At least one atom in {material_ids} is isolated")
 
         nbr_dist = self.gaussian_dist_func.expand(nbr_dist)
 
@@ -181,11 +179,7 @@ class CrystalGraphData(Dataset):
             elif task_type == "classification":
                 targets.append(LongTensor([row[target]]))
 
-        return (
-            (atom_fea_t, nbr_dist_t, self_idx_t, nbr_idx_t),
-            targets,
-            *row[self.identifiers],
-        )
+        return ((atom_fea_t, nbr_dist_t, self_idx_t, nbr_idx_t), targets, *material_ids)
 
 
 def collate_batch(
@@ -227,7 +221,7 @@ def collate_batch(
 
     for idx, (inputs, target, *identifiers) in enumerate(samples):
         atom_fea, nbr_dist, self_idx, nbr_idx = inputs
-        n_i = atom_fea.shape[0]  # number of atoms for this crystal
+        n_sites = atom_fea.shape[0]  # number of atoms for this crystal
 
         # batch the features together
         batch_atom_fea.append(atom_fea)
@@ -238,14 +232,14 @@ def collate_batch(
         batch_nbr_idx.append(nbr_idx + base_idx)
 
         # mapping from atoms to crystals
-        crystal_atom_idx.extend([idx] * n_i)
+        crystal_atom_idx.extend([idx] * n_sites)
 
         # batch the targets and identifiers
         batch_targets.append(target)
         batch_identifiers.append(identifiers)
 
         # increment the id counter
-        base_idx += n_i
+        base_idx += n_sites
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     atom_fea = torch.cat(batch_atom_fea, dim=0).to(device)

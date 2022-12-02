@@ -68,7 +68,7 @@ def make_ensemble_predictions(
         try:
             checkpoint = torch.load(checkpoint_path, map_location=device)
         except Exception as exc:
-            raise RuntimeError(f"Failed to load checkpoint {checkpoint_path}") from exc
+            raise RuntimeError(f"Failed to load {checkpoint_path=}") from exc
 
         model_params = checkpoint.get("model_params")
         if model_params is None:
@@ -93,8 +93,7 @@ def make_ensemble_predictions(
 
         if model.robust:
             preds, aleat_log_std = preds.T
-            aleatoric_std = np.exp(aleat_log_std)
-            df[f"aleatoric_std_{idx}"] = aleatoric_std
+            df[f"aleatoric_std_{idx}"] = aleatoric_std = np.exp(aleat_log_std)
 
         pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
         df[pred_col] = preds

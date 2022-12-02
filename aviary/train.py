@@ -134,9 +134,11 @@ def train_model(
     )
     loss_dict = {target_col: (task_type, loss_func)}
     normalizer_dict = {target_col: Normalizer() if task_type == reg_key else None}
+    # TODO consider actually fitting the normalizer, currently just passed into model.evaluate()
+    # to match function signature
 
     # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
-    # element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
+    # element type (usually 200-dim Matscholar embeddings) and Wyckoff position (see
     # 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or element) in the material
     # embedding_len = train_loader.tensors[0][0].shape[-1]
     # # Roost and Wren embedding size resp.
@@ -181,16 +183,17 @@ def train_model(
         losses=loss_dict,
         trainable_params=model.num_params,
         task_type=task_type,
-        swa=dict(
-            start=swa_start,
-            epochs=int(swa_start * epochs),
-            learning_rate=swa_lr,
-        )
-        if swa_start
-        else None,
         checkpoint=checkpoint,
         **(run_params or {}),
     )
+    if swa_start:
+        run_params["swa"] = dict(
+            start=swa_start, epochs=int(swa_start * epochs), learning_rate=swa_lr
+        )
+    if task_type == reg_key and hasattr(train_loader, "df"):
+        train_df = getattr(train_loader, "df", train_loader.dataset.df)  # type: ignore
+        targets = train_df[target_col]
+        run_params["dummy_mae"] = (targets - targets.mean()).abs().mean()
     if timestamp:
         run_params["timestamp"] = timestamp
     for x in ("SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"):
@@ -266,7 +269,7 @@ def train_model(
 
     with torch.no_grad():
         preds = np.concatenate(
-            [inference_model(*inputs)[0].cpu().numpy() for inputs, _, _ in test_loader]
+            [inference_model(*inputs)[0].cpu().numpy() for inputs, *_ in test_loader]
         ).squeeze()
 
     if test_df is None:
@@ -297,22 +300,22 @@ def train_model(
     if checkpoint is not None:
         if model_params is None:
             raise ValueError("Must provide model_params to save checkpoint, got None")
-        checkpoint_dict = {
-            "model_params": model_params,
-            "model_state": inference_model.state_dict(),
-            "optimizer_state": optimizer_instance.state_dict(),
-            "scheduler_state": lr_scheduler.state_dict(),
-            "loss_dict": loss_dict,
-            "epoch": epochs,
-            "metrics": test_metrics,
-            "run_name": run_name,
-            "normalizer_dict": normalizer_dict,
-            "run_params": run_params.copy(),
-        }
+        checkpoint_dict = dict(
+            model_params=model_params,
+            model_state=inference_model.state_dict(),
+            optimizer_state=optimizer_instance.state_dict(),
+            scheduler_state=lr_scheduler.state_dict(),
+            loss_dict=loss_dict,
+            epoch=epochs,
+            metrics=test_metrics,
+            run_name=run_name,
+            normalizer_dict=normalizer_dict,
+            run_params=run_params.copy(),
+        )
         if scheduler_name == "LambdaLR":
-            checkpoint_dict["run_params"]["lr_scheduler"].pop("params")
             # exclude lr_lambda from pickled checkpoint since it causes errors when
             # torch.load()-ing a checkpoint and the file defining lr_lambda() was renamed
+            checkpoint_dict["run_params"]["lr_scheduler"].pop("params")
         if checkpoint == "local":
             os.makedirs(f"{ROOT}/models", exist_ok=True)
             checkpoint_path = f"{ROOT}/models/{timestamp}-{run_name}.pth"

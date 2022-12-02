@@ -37,10 +37,10 @@ This will install the library in an editable state allowing for advanced users t
 
 ## `pip` Installation
 
-Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). To `pip install` it, make sure you replace `1.11.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
+Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). To `pip install` it, make sure you replace `1.13.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
 
 ```sh
-pip install torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+cpu.html
+pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
 
 pip install -U git+https://github.com/CompRhys/aviary  # install aviary itself
 
