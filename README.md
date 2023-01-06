@@ -54,7 +54,7 @@ pip install -e ./aviary
 To test the input files generation and cleaning/canonicalization please run:
 
 ```sh
-python examples/inputs/poscar2df.py
+python examples/inputs/poscar_to_df.py
 ```
 
 This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` file used for the next example.

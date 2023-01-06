@@ -332,7 +332,7 @@ class BaseModelClass(nn.Module, ABC):
     def predict(
         self, data_loader: DataLoader | InMemoryDataLoader, verbose: bool = False
     ) -> tuple:
-        """Make model predictions.
+        """Make model predictions. Supports multi-tasking.
 
         Args:
             data_loader (DataLoader): Iterator that yields mini-batches with the same data
@@ -341,10 +341,13 @@ class BaseModelClass(nn.Module, ABC):
             verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
 
         Returns:
-            3-tuple containing:
-            - tuple[Tensor, ...]: Tuple of target Tensors
-            - tuple[Tensor, ...]: Tuple of prediction Tensors
-            - tuple[str, ...]: Tuple of identifiers
+            3 tuples where tuple items correspond to different multitask targets.
+            - tuple[np.array, ...]: Tuple of target Tensors
+            - tuple[np.array, ...]: Tuple of prediction Tensors
+            - tuple[list[str], ...]: Tuple of identifiers
+        If single task, tuple will have length 1. Use this code to unpack:
+        targets, preds, ids = model.predict(data_loader)
+        targets, preds, ids = targets[0], preds[0], ids[0]
         """
         test_ids = []
         test_targets = []

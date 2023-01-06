@@ -116,7 +116,7 @@ def make_ensemble_predictions(
         all_model_metrics = [
             get_metrics(targets, df_preds[col], task_type) for col in df_preds
         ]
-        df_metrics = pd.DataFrame(all_model_metrics, index=df_preds.columns)
+        df_metrics = pd.DataFrame(all_model_metrics, index=list(df_preds))
 
         if print_metrics:
             print("\nSingle model performance:")

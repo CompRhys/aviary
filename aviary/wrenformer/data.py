@@ -63,14 +63,15 @@ with open(f"{PKG_DIR}/embeddings/element/matscholar200.json") as file:
 
 
 def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
-    """Concatenate matscholar element and Wyckoff set embeddings while handling
+    """Concatenate Matscholar element embeddings with Wyckoff set embeddings and handle
     augmentation of equivalent Wyckoff sets.
 
     Args:
         wyckoff_str (str): Aflow-style Wyckoff string.
 
     Returns:
-        Tensor: Shape (n_equiv_wyksets, n_wyckoff_sites, n_features).
+        Tensor: Shape (n_equiv_wyksets, n_wyckoff_sites, n_features) where n_features =
+            200 + 444 for Matscholar and Wyckoff embeddings respectively.
     """
     parsed_output = parse_aflow_wyckoff_str(wyckoff_str)
     spg_num, wyckoff_site_multiplicities, elements, augmented_wyckoffs = parsed_output

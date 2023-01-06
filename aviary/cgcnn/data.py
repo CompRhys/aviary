@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import functools
 import itertools
 import json
@@ -255,20 +254,6 @@ def collate_batch(
         ),
         *zip(*batch_identifiers),
     )
-
-
-def parse_cgcnn(cell, sites):
-    """Parse str representation into lists"""
-    cell = np.array(ast.literal_eval(str(cell)), dtype=float)
-    elems = []
-    coords = []
-    for site in ast.literal_eval(str(sites)):
-        ele, pos = site.split(" @ ")
-        elems.append(ele)
-        coords.append(pos.split(" "))
-
-    coords = np.array(coords, dtype=float)
-    return cell, elems, coords
 
 
 class GaussianDistance:
