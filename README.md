@@ -13,29 +13,6 @@
 
 The aim of `aviary` is to contain multiple models for materials discovery under a common interface, overtime we hope to add more models with a particularly focus on coordinate free deep learning models.
 
-## `conda` Installation
-
-To use `aviary` you need to create an environment with the correct dependencies. The easiest way to get up and running is to use `anaconda`.
-A `cudatoolkit=11.1` environment is provided in `environment-gpu-cu111.yml` allowing a working environment to be created with:
-
-```bash
-conda env create -f environment-gpu-cu111.yml
-```
-
-If you are not using `cudatoolkit=11.1` or do not have access to a GPU this setup will not work for you. If so please check the following pages [PyTorch](https://pytorch.org/get-started/locally), [PyTorch-Scatter](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) for how to install the core packages.
-
-The code was developed and tested on Linux Mint 19.1 Tessa. It should work with other operating systems but it has not been tested for such use.
-
-Once you have setup an environment with the correct dependencies you can install `aviary` using the following commands from the top of the directory:
-
-```bash
-conda activate aviary
-python setup.py sdist
-pip install -e .
-```
-
-This will install the library in an editable state allowing for advanced users to make changes as desired.
-
 ## `pip` Installation
 
 Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). To `pip install` it, make sure you replace `1.13.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
