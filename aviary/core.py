@@ -3,10 +3,9 @@ from __future__ import annotations
 import gc
 import os
 import shutil
-import sys
 from abc import ABC
 from collections import defaultdict
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping
 
 import numpy as np
 import torch
@@ -21,12 +20,6 @@ from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.data import InMemoryDataLoader
-
-if sys.version_info < (3, 8):
-    from typing_extensions import Literal
-else:
-    from typing import Literal
-
 
 TaskType = Literal["regression", "classification"]
 

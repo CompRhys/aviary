@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
 from types import ModuleType
-from typing import Any, Callable, Generator, Iterable
+from typing import Any, Callable, Generator, Iterable, Literal
 
 import numpy as np
 import pandas as pd
@@ -31,11 +31,6 @@ from torch.utils.tensorboard import SummaryWriter
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import RobustL1Loss, RobustL2Loss
-
-if sys.version_info < (3, 8):
-    from typing_extensions import Literal
-else:
-    from typing import Literal
 
 
 def initialize_model(

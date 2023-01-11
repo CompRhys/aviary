@@ -11,7 +11,6 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(include=["aviary*"]),
     classifiers=[
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -34,7 +33,7 @@ setup(
     # if any package at most 2 levels under the aviary namespace contains *.json files,
     # include them in the package
     package_data={"aviary": ["**/*.json", "**/**/*.json"]},
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
         "numpy",
         "pandas",
@@ -44,7 +43,6 @@ setup(
         "torch_scatter",
         "torch",
         "tqdm",
-        "typing_extensions;python_version<'3.8'",
         "wandb",
     ],
     extras_require={

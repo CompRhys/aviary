@@ -3,22 +3,16 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-import sys
 from itertools import chain, groupby, permutations, product
 from operator import itemgetter
 from os.path import abspath, dirname, join
 from shutil import which
 from string import ascii_uppercase, digits
+from typing import Literal
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-
-if sys.version_info < (3, 8):
-    from typing_extensions import Literal
-else:
-    from typing import Literal
-
 
 module_dir = dirname(abspath(__file__))
 
