@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import itertools
 import json
-import os
 from typing import Any, Sequence
 
 import numpy as np
@@ -57,8 +56,6 @@ class CrystalGraphData(Dataset):
 
         if elem_embedding in ("matscholar200", "cgcnn92", "megnet16", "onehot112"):
             elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-        elif not os.path.isfile(elem_embedding):
-            raise ValueError(f"{elem_embedding} does not exist!")
 
         with open(elem_embedding) as file:
             self.elem_features = json.load(file)

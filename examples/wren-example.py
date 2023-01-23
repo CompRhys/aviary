@@ -1,5 +1,4 @@
 import argparse
-import os
 
 import pandas as pd
 import torch
@@ -87,8 +86,6 @@ def main(  # noqa: C901
     task_dict = dict(zip(targets, tasks))
     loss_dict = dict(zip(targets, losses))
 
-    if not os.path.isfile(data_path):
-        raise AssertionError(f"{data_path} does not exist!")
     # NOTE make sure to use dense datasets,
     # NOTE do not use default_na as "NaN" is a valid material composition
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
@@ -104,9 +101,6 @@ def main(  # noqa: C901
 
     if evaluate:
         if test_path:
-
-            if not os.path.isfile(test_path):
-                raise AssertionError(f"{test_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
             df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
@@ -130,9 +124,6 @@ def main(  # noqa: C901
 
     if train:
         if val_path:
-
-            if not os.path.isfile(val_path):
-                raise AssertionError(f"{val_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
             df = pd.read_csv(val_path, keep_default_na=False, na_values=[])

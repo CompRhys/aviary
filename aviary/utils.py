@@ -59,7 +59,7 @@ def initialize_model(
     n_targets = model_params["n_targets"]
 
     if fine_tune is not None:
-        print(f"Use material_nn and output_nn from '{fine_tune}' as a starting point")
+        print(f"Use material_nn and output_nn from {fine_tune=} as a starting point")
         checkpoint = torch.load(fine_tune, map_location=device)
 
         # update the task disk to fine tuning task
@@ -84,7 +84,7 @@ def initialize_model(
     elif transfer is not None:
         # TODO rewrite/remove transfer option as it is not used/doesn't work as detailed
         print(
-            f"Use material_nn from '{transfer}' as a starting point and "
+            f"Use material_nn from {transfer=} as a starting point and "
             "train the output_nn from scratch"
         )
         checkpoint = torch.load(transfer, map_location=device)
@@ -100,7 +100,7 @@ def initialize_model(
         model.load_state_dict(model_dict)
 
     elif resume:
-        print(f"Resuming training from '{resume}'")
+        print(f"Resuming training from {resume=}")
         checkpoint = torch.load(resume, map_location=device)
 
         model = model_class(**checkpoint["model_params"])
@@ -482,17 +482,15 @@ def results_multitask(  # noqa: C901
             resume = f"{ROOT}/models/{model_name}/{eval_type}-r{ens_idx}.pth.tar"
             print(f"Evaluating Model {ens_idx + 1}/{ensemble_folds}")
 
-        if not os.path.isfile(resume):
-            raise FileNotFoundError(f"no checkpoint found at '{resume}'")
         checkpoint = torch.load(resume, map_location=device)
 
         if checkpoint["model_params"]["robust"] != robust:
-            raise ValueError(f"robustness of checkpoint '{resume}' is not {robust}")
+            raise ValueError(f"robustness of checkpoint {resume=} is not {robust}")
 
         chkpt_task_dict = checkpoint["model_params"]["task_dict"]
         if chkpt_task_dict != task_dict:
             raise ValueError(
-                f"task_dict {chkpt_task_dict} of checkpoint '{resume}' does not match provided "
+                f"task_dict {chkpt_task_dict} of checkpoint {resume=} does not match provided "
                 f"task_dict {task_dict}"
             )
 
@@ -553,7 +551,7 @@ def results_multitask(  # noqa: C901
 
     if print_results:
         for target_name, task_type in task_dict.items():
-            print(f"\nTask: '{target_name}' on test set")
+            print(f"\nTask: {target_name=} on test set")
             if task_type == "regression":
                 print_metrics_regression(**results_dict[target_name])  # type: ignore
             elif task_type == "classification":
@@ -764,7 +762,7 @@ def save_results_dict(
 
     csv_path = f"results/{file_name}.csv"
     df.to_csv(csv_path, index=False)
-    print(f"\nSaved model predictions to '{csv_path}'")
+    print(f"\nSaved model predictions to {csv_path!r}")
 
 
 def get_metrics(

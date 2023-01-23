@@ -54,17 +54,17 @@ class SimpleNetwork(nn.Module):
         return self.fc_out(x)
 
     def reset_parameters(self) -> None:
-        """Reinitialise network weights using PyTorch defaults"""
+        """Reinitialize network weights using PyTorch defaults"""
         for fc in self.fcs:
             fc.reset_parameters()
 
         self.fc_out.reset_parameters()
 
     def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(input_dim={self.fcs[0].in_features}, "
-            f"output_dim={self.fc_out.out_features}, activation={type(self.acts[0]).__name__})"
-        )
+        input_dim = self.fcs[0].in_features
+        output_dim = self.fc_out.out_features
+        activation = type(self.acts[0]).__name__
+        return f"{type(self).__name__}({input_dim=}, {output_dim=}, {activation=})"
 
 
 class ResidualNetwork(nn.Module):
@@ -121,7 +121,7 @@ class ResidualNetwork(nn.Module):
         return self.fc_out(x)
 
     def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(input_dim={self.fcs[0].in_features}, "
-            f"output_dim={self.fc_out.out_features}, activation={type(self.acts[0]).__name__})"
-        )
+        input_dim = self.fcs[0].in_features
+        output_dim = self.fc_out.out_features
+        activation = type(self.acts[0]).__name__
+        return f"{type(self).__name__}({input_dim=}, {output_dim=}, {activation=})"

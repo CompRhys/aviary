@@ -1,8 +1,8 @@
 import argparse
-import os
 
 import pandas as pd
 import torch
+from pymatgen.core import Structure
 from sklearn.model_selection import train_test_split as split
 
 from aviary import ROOT
@@ -96,11 +96,10 @@ def main(  # noqa: C901
         "step": step,
     }
 
-    if not os.path.isfile(data_path):
-        raise AssertionError(f"{data_path} does not exist!")
     # NOTE make sure to use dense datasets, here do not use the default na
     # as they can clash with "NaN" which is a valid material
-    df = pd.read_csv(data_path, keep_default_na=False, na_values=[], comment="#")
+    df = pd.read_json(data_path)
+    df["structure"] = df.structure.map(Structure.from_dict)
 
     dataset = CrystalGraphData(
         df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
@@ -113,12 +112,10 @@ def main(  # noqa: C901
 
     if evaluate:
         if test_path:
-
-            if not os.path.isfile(test_path):
-                raise AssertionError(f"{test_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
-            df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
+            df = pd.read_json(test_path)
+            df["structure"] = df.structure.map(Structure.from_dict)
 
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
@@ -136,12 +133,10 @@ def main(  # noqa: C901
 
     if train:
         if val_path:
-
-            if not os.path.isfile(val_path):
-                raise AssertionError(f"{val_path} does not exist!")
             # NOTE make sure to use dense datasets,
             # NOTE do not use default_na as "NaN" is a valid material
-            df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
+            df = pd.read_json(val_path)
+            df["structure"] = df.structure.map(Structure.from_dict)
 
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
@@ -511,7 +506,5 @@ def input_parser():
 
 if __name__ == "__main__":
     args = input_parser()
-
-    print(f"The model will run on the {args.device} device")
 
     raise SystemExit(main(**vars(args)))

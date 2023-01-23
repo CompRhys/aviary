@@ -47,7 +47,7 @@ class AttentionPooling(nn.Module):
 
     def __repr__(self) -> str:
         gate_nn, message_nn = self.gate_nn, self.message_nn
-        return f"{type(self).__name__}(gate_nn={gate_nn}, message_nn={message_nn})"
+        return f"{type(self).__name__}({gate_nn=}, {message_nn=})"
 
 
 class WeightedAttentionPooling(nn.Module):
@@ -89,7 +89,7 @@ class WeightedAttentionPooling(nn.Module):
 
     def __repr__(self) -> str:
         pow, gate_nn, message_nn = float(self.pow), self.gate_nn, self.message_nn
-        return f"{type(self).__name__}(pow={pow:.3}, gate_nn={gate_nn}, message_nn={message_nn})"
+        return f"{type(self).__name__}(pow={pow:.3}, {gate_nn=}, {message_nn=})"
 
 
 class MessageLayer(nn.Module):
@@ -113,8 +113,8 @@ class MessageLayer(nn.Module):
         super().__init__()
 
         self._repr = (
-            f"{self._get_name()}(msg_fea_len={msg_fea_len}, num_msg_heads={num_msg_heads}, "
-            f"msg_gate_layers={msg_gate_layers}, msg_net_layers={msg_net_layers})"
+            f"{self._get_name()}({msg_fea_len=}, {num_msg_heads=}, {msg_gate_layers=}, "
+            f"{msg_net_layers=})"
         )
 
         # Pooling and Output

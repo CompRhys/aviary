@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import json
-import os
 import re
 from itertools import groupby
 from typing import Any, Sequence
@@ -54,8 +53,6 @@ class WyckoffData(Dataset):
 
         if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
             elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-        elif not os.path.isfile(elem_embedding):
-            raise AssertionError(f"{elem_embedding} does not exist!")
 
         with open(elem_embedding) as emb_file:
             self.elem_features = json.load(emb_file)
@@ -64,8 +61,6 @@ class WyckoffData(Dataset):
 
         if sym_emb in ["bra-alg-off", "spg-alg-off"]:
             sym_emb = f"{PKG_DIR}/embeddings/wyckoff/{sym_emb}.json"
-        elif not os.path.isfile(sym_emb):
-            raise AssertionError(f"{sym_emb} does not exist!")
 
         with open(sym_emb) as sym_file:
             self.sym_features = json.load(sym_file)
