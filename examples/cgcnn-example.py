@@ -227,7 +227,7 @@ def main(  # noqa: C901
         }
         data_params.update(data_reset)
 
-        return results_multitask(
+        results_multitask(
             model_class=CrystalGraphConvNet,
             model_name=model_name,
             run_id=run_id,
