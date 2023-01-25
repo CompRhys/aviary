@@ -149,4 +149,12 @@ print(f"Less than {vol_lim} A^3 per site: {len(df_wyk)}")
 
 fields = ["material_id", "composition", "E_f", "wyckoff"]  # , "lattice", "sites"]
 
-df_wyk[fields].to_csv(final_dir + "/examples.csv", index=False)
+df_wyk[["material_id", "composition", "E_f", "wyckoff"]].to_csv(
+    final_dir + "/examples.csv", index=False
+)
+
+df_wyk["structure"] = df_wyk["final_structure"].map(lambda x: x.as_dict())
+
+df_wyk[["material_id", "composition", "E_f", "wyckoff", "structure"]].to_json(
+    final_dir + "/examples.json"
+)
