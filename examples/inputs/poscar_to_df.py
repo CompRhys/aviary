@@ -6,7 +6,6 @@ import pandas as pd
 from pymatgen.core import Composition, Structure
 from tqdm import tqdm
 
-from aviary.cgcnn.utils import get_cgcnn_input
 from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_from_spglib
 
 tqdm.pandas()  # prime progress_map functionality
@@ -22,8 +21,10 @@ ht_paths = []
 for filepath in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
     task_id = filepath.split("/")[-1].split(".")[0]
 
-    with open(filepath) as file_handle:
-        lines = file_handle.readlines()
+    with open(filepath) as file_contents:
+        file_str = file_contents.read()
+        struct = Structure.from_str(file_str, fmt="poscar")
+        lines = file_str.splitlines()
 
         num = lines[6].split()
         E_vasp_per_atom = float(lines[0].split()[0]) / sum(int(a) for a in num)
@@ -32,7 +33,6 @@ for filepath in glob.glob(final_dir + "/raw/*.poscar", recursive=True):
         meta_data = "[" + lines[0].split("[")[-1]
 
     idx_list.append(task_id)
-    struct = Structure.from_file(file_handle)
     structs.append(struct)
     E_vasp_list.append(E_vasp_per_atom)
     ht_paths.append(ht_path)
@@ -62,15 +62,15 @@ print(f"Number of points in dataset: {len(df)}")
 # takes ~ 15mins
 df["wyckoff"] = df.final_structure.progress_map(get_aflow_label_from_spglib)
 
-lattice, sites = zip(*df.final_structure.progress_map(get_cgcnn_input))
+# lattice, sites = zip(*df.final_structure.progress_map(get_cgcnn_input))
 
 df["composition"] = df.final_structure.map(lambda x: x.composition.reduced_formula)
 df["nelements"] = df.final_structure.map(lambda x: len(x.composition.elements))
 df["volume"] = df.final_structure.map(lambda x: x.volume)
 df["nsites"] = df.final_structure.map(lambda x: x.num_sites)
 
-df["lattice"] = lattice
-df["sites"] = sites
+# df["lattice"] = lattice
+# df["sites"] = sites
 
 
 # %%
@@ -147,6 +147,6 @@ vol_lim = 500
 df_wyk = df_wyk[df_wyk["volume"] / df_wyk["nsites"] < vol_lim]
 print(f"Less than {vol_lim} A^3 per site: {len(df_wyk)}")
 
-fields = ["material_id", "composition", "E_f", "wyckoff", "lattice", "sites"]
+fields = ["material_id", "composition", "E_f", "wyckoff"]  # , "lattice", "sites"]
 
 df_wyk[fields].to_csv(final_dir + "/examples.csv", index=False)
