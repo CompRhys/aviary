@@ -242,7 +242,6 @@ def input_parser():
     # data inputs
     parser.add_argument(
         "--data-path",
-        default="datasets/roost/expt-non-metals.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )

@@ -249,7 +249,6 @@ def input_parser():
     # data inputs
     parser.add_argument(
         "--data-path",
-        default="datasets/examples/examples.csv",
         metavar="PATH",
         help="Path to main data set/training set",
     )
@@ -464,6 +463,12 @@ def input_parser():
 
     if args.model_name is None:
         args.model_name = f"{args.data_id}_s-{args.data_seed}_t-{args.sample}"
+
+    args.device = (
+        torch.device("cuda")
+        if (not args.disable_cuda) and torch.cuda.is_available()
+        else torch.device("cpu")
+    )
 
     return args
 

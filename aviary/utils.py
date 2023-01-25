@@ -544,7 +544,7 @@ def results_multitask(  # noqa: C901
     # TODO cleaner way to get identifier names
     if save_results:
         save_results_dict(
-            dict(zip(test_loader.dataset.identifiers, ids)),
+            dict(zip(test_loader.dataset.identifiers, *ids)),
             results_dict,
             model_name,
         )
