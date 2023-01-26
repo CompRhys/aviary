@@ -35,9 +35,11 @@ To test the input files generation and cleaning/canonicalization please run:
 python examples/inputs/poscar_to_df.py
 ```
 
-This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` file used for the next example.
-The raw files have been selected to ensure that the subset contains all the correct endpoints for the 5 elemental species in the `Hf-N-Ti-Zr-Zn` chemical system.
-All the models used share can be run on the input file produced by this example code. To test each of the three models provided please run:
+This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` and `datasets/examples/examples.json` files used for the next example.
+For the coordinate-free `roost` and `wren` models where the inputs are easily expressed as strings we use csv inputs.
+For the structure-based `cgcnn` model we first construct `pymatgen` structures from the raw POSCAR files then determine their dictionary serialisations before saving in a json format.
+The raw POSCAR files have been selected to ensure that the subset contains all the correct endpoints for the 5 elemental species in the `Hf-N-Ti-Zr-Zn` chemical system.
+To test each of the three models provided please run:
 
 ```sh
 python examples/roost-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
@@ -51,7 +53,8 @@ python examples/wren-example.py --train --evaluate --data-path examples/inputs/e
 python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/examples.json --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 
-Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts have been used for all experiments conducted.
+Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts were used for all experiments conducted as part of the development and publication of these models.
+Consequently understanding these examples will ensure that you are able to deploy the models as intended for your own research.
 
 ## Notebooks
 
