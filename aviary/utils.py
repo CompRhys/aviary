@@ -474,7 +474,6 @@ def results_multitask(  # noqa: C901
         )
 
     for ens_idx in range(ensemble_folds):
-
         if ensemble_folds == 1:
             resume = f"{ROOT}/models/{model_name}/{eval_type}-r{run_id}.pth.tar"
             print("Evaluating Model")
@@ -650,7 +649,6 @@ def print_metrics_classification(
     target_ohe[np.arange(targets.size), targets] = 1
 
     for j, y_logit in enumerate(logits):
-
         y_pred = np.argmax(y_logit, axis=1)
 
         acc[j] = accuracy_score(targets, y_pred)
@@ -723,7 +721,6 @@ def save_results_dict(
 
     for target_name in results_dict:
         for col, data in results_dict[target_name].items():
-
             # NOTE we save pre_logits rather than logits due to fact
             # that with the heteroskedastic setup we want to be able to
             # sample from the Gaussian distributed pre_logits we parameterise.

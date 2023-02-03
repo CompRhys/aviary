@@ -18,7 +18,7 @@ pio.templates.default = "plotly_white"
 
 
 def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
-    """Scale the errors in a Matbench dataframe.
+    """Scale the errors in a Matbench dataframe for comparability in heatmaps.
 
     Args:
         df (pd.DataFrame): Dataframe with unscaled errors for matbench tasks across columns and
@@ -27,9 +27,9 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Dataframe with scaled errors
     """
-    # make scaled data for heatmap coloring
-    # scale regression problems by mad/mae
+
     def scale_regr_task(series: pd.Series, mad: float) -> pd.Series:
+        # scale regression problems by mad/mae
         mask = series > 0.0
         mask_iix = np.where(mask)
         series.iloc[mask_iix] = series.iloc[mask_iix] / mad
@@ -38,20 +38,21 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
 
     def scale_clf_task(series: pd.Series) -> pd.Series:
         mask = series > 0.0
-        mask_iix = np.where(mask)
-        series.iloc[mask_iix] = 1 - (series.iloc[mask_iix] - 0.5) / 0.5
+        mask_idx = np.where(mask)
+        series.iloc[mask_idx] = 1 - (series.iloc[mask_idx] - 0.5) / 0.5
         series.loc[~mask] = np.nan
         return series
 
     scaled_df = df.copy(deep=True).T
-    for task in scaled_df:
-        task_type = mbv01_metadata[task].task_type
-        assert task_type in [REG_KEY, CLF_KEY], f"Unknown {task_type = } for {task = }"
+    for dataset in scaled_df:
+        task_type = mbv01_metadata[dataset].task_type
+        if task_type not in [REG_KEY, CLF_KEY]:
+            raise ValueError(f"Unknown {task_type = } for {dataset = }")
         if task_type == REG_KEY:
-            task_mad = mbv01_metadata[task].mad
-            scaled_df[task] = scale_regr_task(scaled_df[task], task_mad)
+            task_mad = mbv01_metadata[dataset].mad
+            scaled_df[dataset] = scale_regr_task(scaled_df[dataset], task_mad)
         elif task_type == CLF_KEY:
-            scaled_df[task] = scale_clf_task(scaled_df[task])
+            scaled_df[dataset] = scale_clf_task(scaled_df[dataset])
 
     return scaled_df.T
 

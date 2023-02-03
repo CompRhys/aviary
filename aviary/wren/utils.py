@@ -109,7 +109,6 @@ def get_aflow_label_from_aflow(
     elements = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
     for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
-
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_per_elem = re.sub(
             r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem

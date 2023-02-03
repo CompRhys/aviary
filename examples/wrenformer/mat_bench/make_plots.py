@@ -1,6 +1,7 @@
 # %%
 import json
 import logging
+import re
 from collections import defaultdict
 from datetime import datetime
 from glob import glob
@@ -57,14 +58,12 @@ for idx, dirname in enumerate(glob(f"{bench_dir}/*"), 1):
 
 
 # %% --- Load our scores ---
-our_score_files = sorted(
-    glob("model_scores/*.json"), key=lambda s: s.split("-2022-")[-1]
-)
+our_score_files = sorted(glob("model_scores/*.json"), key=lambda s: s.split("@")[0])
 
 for idx, filename in enumerate(our_score_files, 1):
-    model_name, date = filename.split("/")[-1].split("-2022-")
-    date = date.split("@")[0]
-    print(f"{idx}. {date=} {model_name}")
+    date, model_name = re.split(r"@\d\d-\d\d-", filename.split("/")[-1])
+
+    print(f"{idx}.  {date}  {model_name}")
 
     with open(filename) as file:
         data = json.load(file)

@@ -2,7 +2,6 @@ from aviary.train import train_wrenformer
 
 
 def test_wrenformer_regression(df_matbench_phonons_wyckoff):
-
     train_df = df_matbench_phonons_wyckoff.sample(frac=0.8, random_state=0)
     test_df = df_matbench_phonons_wyckoff.drop(train_df.index)
 
@@ -22,7 +21,6 @@ def test_wrenformer_regression(df_matbench_phonons_wyckoff):
 
 
 def test_wrenformer_classification(df_matbench_phonons_wyckoff):
-
     train_df = df_matbench_phonons_wyckoff.sample(frac=0.8, random_state=0)
     test_df = df_matbench_phonons_wyckoff.drop(train_df.index)
 

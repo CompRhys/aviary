@@ -207,7 +207,6 @@ def main(  # noqa: C901
         )
 
     if evaluate:
-
         data_reset = {
             "batch_size": 16 * batch_size,  # faster model inference
             "shuffle": False,  # need fixed data order due to ensembling
