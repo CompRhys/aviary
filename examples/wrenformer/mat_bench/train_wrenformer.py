@@ -32,7 +32,7 @@ today = timestamp.split("@")[0]
 # job_name unlike run_name doesn't include dataset and fold since not yet known without
 # SLURM_ARRAY_TASK_ID
 job_name = f"matbench-wrenformer-robust-{epochs=}"
-log_dir = f"{os.path.dirname(__file__)}/{today}-{job_name}"
+out_dir = f"{os.path.dirname(__file__)}/{today}-{job_name}"
 
 if "roost" in job_name.lower():
     # deploy Roost on all tasks
@@ -47,7 +47,7 @@ slurm_submit(
     account="LEE-SL3-GPU",
     time="8:0:0",
     array=f"0-{len(datasets) * len(folds) - 1}",
-    log_dir=log_dir,
+    out_dir=out_dir,
     slurm_flags=("--nodes", "1", "--gpus-per-node", "1"),
     # prepend into sbatch script to source module command and load default env
     # for Ampere GPU partition before actual job command
@@ -80,7 +80,7 @@ train_df = matbench_task.get_train_and_val_data(fold, as_type="df")
 test_df = matbench_task.get_test_data(fold, as_type="df", include_target=True)
 
 test_metrics, run_params, test_df = train_wrenformer(
-    checkpoint="wandb",  # None | 'local' | 'wandb'
+    checkpoint=None,  # None | 'local' | 'wandb'
     run_name=run_name,
     train_df=train_df,
     test_df=test_df,

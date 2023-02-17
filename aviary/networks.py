@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, nn
 
 
 class SimpleNetwork(nn.Module):

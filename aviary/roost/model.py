@@ -3,9 +3,8 @@ from __future__ import annotations
 from typing import Sequence
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch import LongTensor, Tensor
+from torch import LongTensor, Tensor, nn
 
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork

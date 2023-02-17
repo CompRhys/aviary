@@ -27,7 +27,7 @@ with open(join(module_dir, "wyckoff-position-relabelings.json")) as file:
     relab_dict = json.load(file)
 
 relab_dict = {
-    spg: [{int(k): l for k, l in val.items()} for val in vals]
+    spg: [{int(key): line for key, line in val.items()} for val in vals]
     for spg, vals in relab_dict.items()
 }
 

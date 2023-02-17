@@ -274,12 +274,12 @@ def parse_aflow_wyckoff_str(
         # Separate out pairs of Wyckoff letters and their number of occurrences
         sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)]
 
-        for n, l in zip(sep_n_wyks[0::2], sep_n_wyks[1::2]):
-            m = int(n)
-            elements.extend([el] * m)
-            wyckoff_set.extend([l] * m)
+        # Add the Wyckoff letter and its multiplicity to the list
+        for mult, letter in zip(map(int, sep_n_wyks[0::2]), sep_n_wyks[1::2]):
+            elements.extend([el] * mult)
+            wyckoff_set.extend([letter] * mult)
             wyckoff_site_multiplicities.extend(
-                [float(wyckoff_multiplicity_dict[spg_num][l])] * m
+                [float(wyckoff_multiplicity_dict[spg_num][letter])] * mult
             )
 
     # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of high
