@@ -52,6 +52,7 @@ class CrystalGraphConvNet(BaseModelClass):
                 Defaults to 1.
             n_hidden (int, optional): Number of hidden layers after trunk for each task.
                 Defaults to 1.
+            **kwargs: Additional keyword arguments to pass to BaseModelClass.
         """
         super().__init__(robust=robust, **kwargs)
 
@@ -93,7 +94,7 @@ class CrystalGraphConvNet(BaseModelClass):
         nbr_idx: LongTensor,
         crystal_atom_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
-        """Forward pass
+        """Forward pass.
 
         Args:
             atom_fea (Tensor): Atom features from atom type
@@ -144,7 +145,7 @@ class DescriptorNetwork(nn.Module):
         self_idx: LongTensor,
         nbr_idx: LongTensor,
     ) -> Tensor:
-        """Forward pass
+        """Forward pass.
 
         Args:
             atom_fea (Tensor): Atom features from atom type
@@ -192,7 +193,7 @@ class CGCNNConv(nn.Module):
         self_idx: LongTensor,
         nbr_idx: LongTensor,
     ) -> Tensor:
-        """Forward pass
+        """Forward pass.
 
         Args:
             atom_in_fea (Tensor): Atom hidden features before convolution

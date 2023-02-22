@@ -31,8 +31,7 @@ class CrystalGraphData(Dataset):
         dmin: float = 0,
         step: float = 0.2,
     ):
-        """Data class for CGCNN models. CrystalGraphData featurizes crystal structures into
-        neighborhood graphs
+        """Featurize crystal structures into neighborhood graphs with this data class for CGCNN.
 
         Args:
             df (pd.Dataframe): Pandas dataframe holding input and target values.
@@ -118,9 +117,10 @@ class CrystalGraphData(Dataset):
         df_repr = f"cols=[{', '.join(self.df)}], len={len(self.df)}"
         return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
-    @functools.lru_cache(maxsize=None)  # Cache loaded structures
+    # Cache loaded structures
+    @functools.lru_cache(maxsize=None)  # noqa: B019
     def __getitem__(self, idx: int):
-        """Get an entry out of the Dataset
+        """Get an entry out of the Dataset.
 
         Args:
             idx (int): index of entry in Dataset
@@ -259,7 +259,7 @@ class GaussianDistance:
     def __init__(
         self, dmin: float, dmax: float, step: float, var: float = None
     ) -> None:
-        """Used by CGCNN to featurize neighbor atom distances.
+        """Featurize neighbor atom distances for use in CGCNN structure graph.
 
         Args:
             dmin (float): Minimum interatomic distance
@@ -285,7 +285,7 @@ class GaussianDistance:
         self.var = var
 
     def expand(self, distances: np.ndarray) -> np.ndarray:
-        """Apply Gaussian distance filter to a numpy distance array
+        """Apply Gaussian distance filter to a numpy distance array.
 
         Args:
             distances (ArrayLike): A distance matrix of any shape.
@@ -304,7 +304,10 @@ def get_structure_neighbor_info(
     """Get neighbors for every site.
 
     Args:
-        crystal (Structure): pymatgen Structure to get neighbors for
+        struct (Structure): pymatgen Structure to get neighbors for
+        radius (float, optional): Radius to search for neighbors. Defaults to 5.
+        max_num_nbr (int, optional): Maximum number of neighbors to return. Defaults
+            to 12.
 
     Returns:
         tuple containing:

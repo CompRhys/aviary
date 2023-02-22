@@ -82,9 +82,9 @@ class WyckoffData(Dataset):
         df_repr = f"cols=[{', '.join(self.df.columns)}], len={len(self.df)}"
         return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
-    @functools.lru_cache(maxsize=None)
+    @functools.lru_cache(maxsize=None)  # noqa: B019
     def __getitem__(self, idx: int):
-        """Get an entry out of the Dataset
+        """Get an entry out of the Dataset.
 
         Args:
             idx (int): index of entry in Dataset

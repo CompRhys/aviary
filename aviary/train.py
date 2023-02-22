@@ -382,9 +382,14 @@ def train_wrenformer(
         batch_size (int, optional): Batch size for training. Defaults to 128.
         embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use.
             Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name.
+        id_col (str, optional): Column name in train_df and test_df containing unique IDs for
+            each sample. Defaults to "material_id".
+        input_col (str, optional): Column name in train_df and test_df containing input values.
+            Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name which default
+            to 'wyckoff' and 'composition' respectively.
         model_params (dict): Passed to Wrenformer class. E.g. dict(n_attn_layers=6,
             embedding_aggregation=("mean", "std")).
-        kwargs: Additional keyword arguments are passed to train_model().
+        **kwargs: Additional keyword arguments are passed to train_model().
 
     Returns:
         tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.

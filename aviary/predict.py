@@ -136,13 +136,14 @@ def make_ensemble_predictions(
 def predict_from_wandb_checkpoints(
     runs: list[wandb.apis.public.Run], cache_dir: str, **kwargs: Any
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Function that downloads and caches checkpoints for an ensemble of models, then
-    makes predictions on some dataset, prints ensemble metrics and stores predictions to CSV.
+    """Download and cache checkpoints for an ensemble of models, then make predictions on some
+    dataset. Finally print ensemble metrics and store predictions to CSV.
 
     Args:
         runs (list[wandb.apis.public.Run]): List of WandB runs to download model checkpoints from
             which are then loaded into memory to generate predictions for the input_col in df.
         cache_dir (str): Directory to cache downloaded checkpoints in.
+        **kwargs: Additional keyword arguments to pass to make_ensemble_predictions().
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Original input dataframe with added columns for model

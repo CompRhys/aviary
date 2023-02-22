@@ -58,10 +58,10 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
 
 
 dataset_labels = {
-    "matbench_steels": "σᵧ Steel alloys",
+    "matbench_steels": "oᵧ Steel alloys",
     "matbench_jdft2d": "Eˣ 2D Materials",
     "matbench_phonons": "ωᵐᵃˣ Phonons",
-    "matbench_dielectric": "𝑛",
+    "matbench_dielectric": "n",
     "matbench_expt_gap": "Eᵍ Experimental",
     "matbench_expt_is_metal": "Expt. Metallicity Clf",
     "matbench_glass": "Metallic Glass Clf",
@@ -86,6 +86,7 @@ def plot_leaderboard(df: pd.DataFrame, html_path: str = None, **kwargs: Any) -> 
         df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
             models. Missing entries are fine.
         html_path (str): HTML file path where to save the plotly figure.
+        **kwargs: Additional keyword arguments to pass to plotly.express.scatter.
 
     Returns:
         Figure: Plotly graph objects Figure instance
@@ -146,8 +147,11 @@ def error_heatmap(
     performance but works with unscaled errors too.
 
     Args:
-        df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
+        df_err (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
                 models. Missing entries are fine.
+        log (bool, optional): Whether to log10 the errors before plotting. Defaults to False.
+        prec (int, optional): Number of decimal places to round the errors to. Defaults to 3.
+        **kwargs: Additional keyword arguments to pass to plotly.express.imshow().
 
     Returns:
         Figure: Plotly graph objects Figure instance

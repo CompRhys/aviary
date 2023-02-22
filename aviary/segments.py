@@ -24,7 +24,7 @@ class AttentionPooling(nn.Module):
         self.message_nn = message_nn
 
     def forward(self, x: Tensor, index: Tensor) -> Tensor:
-        """Forward pass
+        """Forward pass.
 
         Args:
             x (Tensor): Input features for nodes
@@ -50,10 +50,10 @@ class AttentionPooling(nn.Module):
 
 
 class WeightedAttentionPooling(nn.Module):
-    """Weighted softmax attention layer"""
+    """Weighted softmax attention layer."""
 
     def __init__(self, gate_nn: nn.Module, message_nn: nn.Module) -> None:
-        """Initialize softmax attention layer
+        """Initialize softmax attention layer.
 
         Args:
             gate_nn (nn.Module): Neural network to calculate attention scalars
@@ -65,7 +65,7 @@ class WeightedAttentionPooling(nn.Module):
         self.pow = torch.nn.Parameter(torch.randn(1))
 
     def forward(self, x: Tensor, index: Tensor, weights: Tensor) -> Tensor:
-        """Forward pass
+        """Forward pass.
 
         Args:
             x (Tensor): Input features for nodes
@@ -92,7 +92,7 @@ class WeightedAttentionPooling(nn.Module):
 
 
 class MessageLayer(nn.Module):
-    """MessageLayer to propagate information between nodes in graph"""
+    """MessageLayer to propagate information between nodes in graph."""
 
     def __init__(
         self,
@@ -101,7 +101,7 @@ class MessageLayer(nn.Module):
         msg_gate_layers: Sequence[int],
         msg_net_layers: Sequence[int],
     ) -> None:
-        """Initialise MessageLayer
+        """Initialise MessageLayer.
 
         Args:
             msg_fea_len (int): Number of input features
@@ -132,7 +132,7 @@ class MessageLayer(nn.Module):
         self_idx: LongTensor,
         neighbor_idx: LongTensor,
     ) -> Tensor:
-        """Forward pass
+        """Forward pass.
 
         Args:
             node_weights (Tensor): The fractional weights of elements in their materials

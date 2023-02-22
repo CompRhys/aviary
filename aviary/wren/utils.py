@@ -420,7 +420,7 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     counts = [int(x) for x in anom_list[1::2]]
     dummy = anom_list[0::2]
 
-    s_counts, s_wyks_tup = list(zip(*list(sorted(zip(counts, wyckoffs)))))
+    s_counts, s_wyks_tup = list(zip(*sorted(zip(counts, wyckoffs))))
     subst = r"1\g<1>"
     s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks_tup))
     c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])

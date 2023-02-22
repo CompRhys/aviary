@@ -55,7 +55,7 @@ class BaseModelClass(nn.Module, ABC):
 
         self.model_params: dict[str, Any] = {"task_dict": task_dict}
 
-    def fit(  # noqa: C901
+    def fit(
         self,
         train_loader: DataLoader | InMemoryDataLoader,
         val_loader: DataLoader | InMemoryDataLoader,
@@ -425,7 +425,7 @@ class Normalizer:
         self.std = torch.std(tensor, dim, keepdim)
 
     def norm(self, tensor: Tensor) -> Tensor:
-        """Normalize a Tensor
+        """Normalize a Tensor.
 
         Args:
             tensor (Tensor): Tensor to be normalized
@@ -439,7 +439,7 @@ class Normalizer:
         """Restore normalized Tensor to original.
 
         Args:
-            tensor (Tensor): Tensor to be restored
+            normed_tensor (Tensor): Tensor to be restored
 
         Returns:
             Tensor: Restored Tensor
@@ -447,7 +447,7 @@ class Normalizer:
         return normed_tensor * self.std + self.mean
 
     def state_dict(self) -> dict[str, Tensor]:
-        """Dictionary storing Normalizer parameters
+        """Get Normalizer parameters mean and std.
 
         Returns:
             dict[str, Tensor]: Dictionary storing Normalizer parameters.
@@ -455,7 +455,7 @@ class Normalizer:
         return {"mean": self.mean, "std": self.std}
 
     def load_state_dict(self, state_dict: dict[str, Tensor]) -> None:
-        """Overwrite Normalizer parameters given a new state_dict
+        """Overwrite Normalizer parameters given a new state_dict.
 
         Args:
             state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
@@ -465,7 +465,7 @@ class Normalizer:
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Tensor]) -> Normalizer:
-        """Create a new Normalizer given a state_dict
+        """Create a new Normalizer given a state_dict.
 
         Args:
             state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
