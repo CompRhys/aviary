@@ -11,7 +11,7 @@ from torch import Tensor
 class InMemoryDataLoader:
     """In-memory DataLoader using array/tensor slicing to generate whole batches at
     once instead of sample-by-sample.
-    Source: https://discuss.pytorch.org/t/27014/6
+    Source: https://discuss.pytorch.org/t/27014/6.
 
     Args:
         *tensors: List of arrays or tensors. Must all have the same length in dimension 0.

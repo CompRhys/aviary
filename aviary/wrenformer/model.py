@@ -12,7 +12,7 @@ from aviary.networks import ResidualNetwork
 
 class Wrenformer(BaseModelClass):
     """Crabnet-inspired re-implementation of Wren as a transformer.
-    https://github.com/anthony-wang/CrabNet
+    https://github.com/anthony-wang/CrabNet.
 
     Wrenformer consists of a transformer encoder who's job it is to generate an informative
     embedding given a material's composition and Wyckoff positions (think crystal symmetries).
@@ -62,6 +62,7 @@ class Wrenformer(BaseModelClass):
             embedding_aggregations (list[str]): Aggregations to apply to the learned embedding
                 returned by the transformer encoder before passing into the ResidualNetwork. One or
                 more of ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
+            **kwargs: Additional keyword arguments passed to BaseModelClass.
         """
         super().__init__(robust=robust, **kwargs)
 
@@ -100,9 +101,12 @@ class Wrenformer(BaseModelClass):
             mask (BoolTensor): Indicates which tensor entries are sequence padding.
                 mask[i,j] = True means batch index i, sequence index j is not allowed to
                 attend, False means it participates in self-attention.
-            equivalence_counts (Sequence[int], optional): Only needed for Wrenformer,
-                not Roostformer. Length of slices of features in the batch dimension
-                originating from equivalent Wyckoff sets. Those are averaged to reduce
+            *args: Additional arguments are only needed for Wrenformer,
+                not Roostformer. So if not present, we're running as Roostformer.
+                Else only first item in args is used as equivalence_counts (Sequence[int]) which
+                determine the length of slices in the batch dimension originating from
+                equivalent Wyckoff sets. Features for equivalent Wyckoff sets are averaged to remove
+                ambiguity in assigning Wyckoff letters to Wyckoff positions. This averaging reduces
                 dim=0 of features back to batch_size.
 
         Returns:

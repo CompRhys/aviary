@@ -42,7 +42,7 @@ def initialize_model(
     transfer: str = None,
     **kwargs,
 ) -> BaseModelClass:
-    """Initialise a model
+    """Initialise a model.
 
     Args:
         model_class (BaseModelClass): Which model class to initialize.
@@ -51,6 +51,7 @@ def initialize_model(
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
         fine_tune (str, optional): Path to model checkpoint to fine tune. Defaults to None.
         transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
+        **kwargs: Additional keyword arguments (will be ignored).
 
     Returns:
         BaseModelClass: An initialized model of type model_class.
@@ -152,6 +153,7 @@ def initialize_optim(
         milestones (Iterable, optional): When to decay learning rate. Defaults to ().
         gamma (float, optional): Multiplier for learning rate decay. Defaults to 0.3.
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
+        **kwargs: Additional keyword arguments (will be ignored).
 
 
     Returns:
@@ -199,7 +201,7 @@ def initialize_losses(
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        loss_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss type.
+        loss_name_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss type.
         robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
 
     Returns:
@@ -245,7 +247,7 @@ def init_normalizers(
     device: type[torch.device] | Literal["cuda", "cpu"],
     resume: str = None,
 ) -> dict[str, Normalizer | None]:
-    """Initialise a Normalizer to scale the output targets
+    """Initialise a Normalizer to scale the output targets.
 
     Args:
         task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
@@ -410,7 +412,7 @@ def train_ensemble(
 
 # TODO find a better name for this function @janosh
 @torch.no_grad()
-def results_multitask(  # noqa: C901
+def results_multitask(
     model_class: BaseModelClass,
     model_name: str,
     run_id: int,
@@ -427,6 +429,7 @@ def results_multitask(  # noqa: C901
     """Take an ensemble of models and evaluate their performance on the test set.
 
     Args:
+        model_class (BaseModelClass): Which model class to initialize.
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
@@ -772,7 +775,7 @@ def get_metrics(
 
     Args:
         targets (np.array): Ground truth values.
-        preds (np.array): Model predictions. Should be class probabilities for classification
+        predictions (np.array): Model predictions. Should be class probabilities for classification
             (i.e. output model after applying softmax/sigmoid). Same shape as targets for
             regression, and [len(targets), n_classes] for classification.
         type ('regression' | 'classification'): Task type.

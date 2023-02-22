@@ -6,7 +6,7 @@ from torch import Tensor, nn
 
 
 class SimpleNetwork(nn.Module):
-    """Simple Feed Forward Neural Network"""
+    """Simple Feed Forward Neural Network."""
 
     def __init__(
         self,
@@ -16,7 +16,7 @@ class SimpleNetwork(nn.Module):
         activation: type[nn.Module] = nn.LeakyReLU,
         batch_norm: bool = False,
     ) -> None:
-        """Create a simple feed forward neural network
+        """Create a simple feed forward neural network.
 
         Args:
             input_dim (int): Number of input features
@@ -28,7 +28,7 @@ class SimpleNetwork(nn.Module):
         """
         super().__init__()
 
-        dims = [input_dim] + list(hidden_layer_dims)
+        dims = [input_dim, *list(hidden_layer_dims)]
 
         self.fcs = nn.ModuleList(
             nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
@@ -46,14 +46,14 @@ class SimpleNetwork(nn.Module):
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass through network"""
+        """Forward pass through network."""
         for fc, bn, act in zip(self.fcs, self.bns, self.acts):
             x = act(bn(fc(x)))
 
         return self.fc_out(x)
 
     def reset_parameters(self) -> None:
-        """Reinitialize network weights using PyTorch defaults"""
+        """Reinitialize network weights using PyTorch defaults."""
         for fc in self.fcs:
             fc.reset_parameters()
 
@@ -67,7 +67,7 @@ class SimpleNetwork(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    """Feed forward Residual Neural Network"""
+    """Feed forward Residual Neural Network."""
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class ResidualNetwork(nn.Module):
         activation: type[nn.Module] = nn.ReLU,
         batch_norm: bool = False,
     ) -> None:
-        """Create a feed forward neural network with skip connections
+        """Create a feed forward neural network with skip connections.
 
         Args:
             input_dim (int): Number of input features
@@ -89,7 +89,7 @@ class ResidualNetwork(nn.Module):
         """
         super().__init__()
 
-        dims = [input_dim] + list(hidden_layer_dims)
+        dims = [input_dim, *list(hidden_layer_dims)]
 
         self.fcs = nn.ModuleList(
             nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
@@ -113,7 +113,7 @@ class ResidualNetwork(nn.Module):
         self.fc_out = nn.Linear(dims[-1], output_dim)
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass through network"""
+        """Forward pass through network."""
         for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
             x = act(bn(fc(x))) + res_fc(x)
 

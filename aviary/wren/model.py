@@ -67,6 +67,7 @@ class Wren(BaseModelClass):
             cry_msg (list[int], optional): _description_. Defaults to [256].
             trunk_hidden (list[int], optional): _description_. Defaults to [1024, 512].
             out_hidden (list[int], optional): _description_. Defaults to [256, 128, 64].
+            **kwargs: Additional keyword arguments to pass to BaseModelClass.
         """
         super().__init__(robust=robust, **kwargs)
 
@@ -223,7 +224,7 @@ class DescriptorNetwork(nn.Module):
         cry_elem_idx: LongTensor,
         aug_cry_idx: LongTensor,
     ) -> Tensor:
-        """Forward pass
+        """Forward pass.
 
         Args:
             elem_weights (Tensor): Fractional weight of each Element in its stoichiometry

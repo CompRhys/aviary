@@ -11,7 +11,7 @@ from aviary.cgcnn.model import CrystalGraphConvNet
 from aviary.utils import results_multitask, train_ensemble
 
 
-def main(  # noqa: C901
+def main(  # noqa: D103
     data_path,
     targets,
     tasks,
@@ -67,12 +67,10 @@ def main(  # noqa: C901
     if test_path:
         test_size = 0.0
 
-    if not (test_path and val_path):
-        if test_size + val_size >= 1.0:
-            raise AssertionError(
-                f"'test_size'({test_size}) "
-                f"plus 'val_size'({val_size}) must be less than 1"
-            )
+    if not (test_path and val_path) and test_size + val_size >= 1.0:
+        raise AssertionError(
+            f"'test_size'({test_size}) plus 'val_size'({val_size}) must be less than 1"
+        )
 
     if ensemble > 1 and (fine_tune or transfer):
         raise NotImplementedError(
@@ -241,9 +239,7 @@ def main(  # noqa: C901
 
 
 def input_parser():
-    """
-    parse input
-    """
+    """Parse input."""
     parser = argparse.ArgumentParser(description=("cgcnn"))
 
     # data inputs
