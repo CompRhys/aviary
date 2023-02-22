@@ -3,7 +3,7 @@ requires = ["setuptools>=61.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "matbench-discovery"
+name = "aviary"
 version = "0.1.0"
 description = "A collection of machine learning models for materials discovery"
 authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
