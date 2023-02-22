@@ -37,7 +37,7 @@ python examples/inputs/poscar_to_df.py
 
 This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` and `datasets/examples/examples.json` files used for the next example.
 For the coordinate-free `roost` and `wren` models where the inputs are easily expressed as strings we use csv inputs.
-For the structure-based `cgcnn` model we first construct `pymatgen` structures from the raw POSCAR files then determine their dictionary serialisations before saving in a json format.
+For the structure-based `cgcnn` model we first construct `pymatgen` structures from the raw POSCAR files then determine their dictionary serializations before saving in a json format.
 The raw POSCAR files have been selected to ensure that the subset contains all the correct endpoints for the 5 elemental species in the `Hf-N-Ti-Zr-Zn` chemical system.
 To test each of the three models provided please run:
 
@@ -77,7 +77,7 @@ If you use this code please cite the relevant work:
 `roost` - Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv]](https://arxiv.org/abs/1910.00617)
 
 ```tex
-@article{goodall2020predicting,
+@article{goodall_2020_predicting,
   title={Predicting materials properties without crystal structure: Deep representation learning from stoichiometry},
   author={Goodall, Rhys EA and Lee, Alpha A},
   journal={Nature Communications},
@@ -92,7 +92,7 @@ If you use this code please cite the relevant work:
 `wren` - Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining. [[Paper]](https://www.science.org/doi/10.1126/sciadv.abn4117) [[arXiv]](https://arxiv.org/abs/2106.11132)
 
 ```tex
-@article{goodall2022rapid,
+@article{goodall_2022_rapid,
   title={Rapid discovery of stable materials by coordinate-free coarse graining},
   author={Goodall, Rhys EA and Parackal, Abhijith S and Faber, Felix A and Armiento, Rickard and Lee, Alpha A},
   journal={Science Advances},
@@ -107,7 +107,7 @@ If you use this code please cite the relevant work:
 `cgcnn` - Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties. [[Paper]](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.120.145301) [[arXiv]](https://arxiv.org/abs/1710.10324)
 
 ```tex
-@article{xie2018crystal,
+@article{xie_2018_crystal,
   title={Crystal graph convolutional neural networks for an accurate and interpretable prediction of material properties},
   author={Xie, Tian and Grossman, Jeffrey C},
   journal={Physical review letters},

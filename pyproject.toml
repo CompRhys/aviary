@@ -1,3 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "matbench-discovery"
+version = "0.1.0"
+description = "A collection of machine learning models for materials discovery"
+authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
+readme = "README.md"
+license = { file = "license" }
+keywords = [
+    "Graph Neural Network",
+    "Machine Learning",
+    "Materials Science",
+    "Materials Discovery",
+    "Materials Informatics",
+    "Roost",
+    "Self-Attention",
+    "Transformer",
+    "Wren",
+    "Wyckoff positions",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pymatgen",
+    "scikit_learn",
+    "tensorboard",
+    "torch_scatter",
+    "torch",
+    "tqdm",
+    "wandb",
+]
+
+[project.urls]
+Repo = "https://github.com/CompRhys/aviary"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov", "matminer"]
+
+[tool.setuptools.packages]
+find = { include = ["aviary"] }
+
+[tool.setuptools.package-data]
+aviary = ["**/*.json", "**/**/*.json"]
+
+[tool.distutils.bdist_wheel]
+universal = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:warnings"
+
+[tool.mypy]
+no_implicit_optional = false
+
 [tool.ruff]
 line-length = 100
 target-version = "py38"
