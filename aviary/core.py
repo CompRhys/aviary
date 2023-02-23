@@ -251,7 +251,7 @@ class BaseModelClass(nn.Module, ABC):
 
                 if task == "regression":
                     assert normalizer is not None
-                    targets = normalizer.norm(targets).squeeze()
+                    targets = normalizer.norm(targets).squeeze()  # noqa: PLW2901
 
                     if self.robust:
                         preds, log_std = output.unbind(dim=1)
@@ -267,8 +267,8 @@ class BaseModelClass(nn.Module, ABC):
 
                 elif task == "classification":
                     if self.robust:
-                        output, log_std = output.chunk(2, dim=1)
-                        logits = sampled_softmax(output, log_std)
+                        pre_logits, log_std = output.chunk(2, dim=1)
+                        logits = sampled_softmax(pre_logits, log_std)
                         loss = loss_func(torch.log(logits), targets.squeeze())
                     else:
                         logits = softmax(output, dim=1)
@@ -276,7 +276,7 @@ class BaseModelClass(nn.Module, ABC):
                     preds = logits
 
                     logits = logits.data.cpu()
-                    targets = targets.data.cpu()
+                    targets = targets.data.cpu()  # noqa: PLW2901
 
                     acc = float((targets == logits.argmax(dim=1)).float().mean())
                     target_metrics["Accuracy"].append(acc)

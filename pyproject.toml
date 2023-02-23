@@ -10,41 +10,41 @@ authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
 readme = "README.md"
 license = { file = "license" }
 keywords = [
-    "Graph Neural Network",
-    "Machine Learning",
-    "Materials Science",
-    "Materials Discovery",
-    "Materials Informatics",
-    "Roost",
-    "Self-Attention",
-    "Transformer",
-    "Wren",
-    "Wyckoff positions",
+  "Graph Neural Network",
+  "Machine Learning",
+  "Materials Science",
+  "Materials Discovery",
+  "Materials Informatics",
+  "Roost",
+  "Self-Attention",
+  "Transformer",
+  "Wren",
+  "Wyckoff positions",
 ]
 classifiers = [
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Chemistry",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Physics",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Chemistry",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Physics",
 ]
 
 requires-python = ">=3.8"
 dependencies = [
-    "numpy",
-    "pandas",
-    "pymatgen",
-    "scikit_learn",
-    "tensorboard",
-    "torch_scatter",
-    "torch",
-    "tqdm",
-    "wandb",
+  "numpy",
+  "pandas",
+  "pymatgen",
+  "scikit_learn",
+  "tensorboard",
+  "torch_scatter",
+  "torch",
+  "tqdm",
+  "wandb",
 ]
 
 [project.urls]
@@ -90,14 +90,14 @@ select = [
   "YTT", # flake8-2020
 ]
 ignore = [
-  "B904",    # Within an except clause, raise exceptions with raise ... from err
-  "C408",    # Unnecessary dict call - rewrite as a literal
-  "D100",    # Missing docstring in public module
-  "D104",    # Missing docstring in public package
-  "D105",    # Missing docstring in magic method
-  "D107",    # Missing docstring in __init__
-  "D205",    # 1 blank line required between summary line and description
-  "E731",   # Do not assign a lambda expression, use a def
+  "B904", # Within an except clause, raise exceptions with raise ... from err
+  "C408", # Unnecessary dict call - rewrite as a literal
+  "D100", # Missing docstring in public module
+  "D104", # Missing docstring in public package
+  "D105", # Missing docstring in magic method
+  "D107", # Missing docstring in __init__
+  "D205", # 1 blank line required between summary line and description
+  "E731", # Do not assign a lambda expression, use a def
 ]
 pydocstyle.convention = "google"
 isort.known-third-party = ["wandb"]
