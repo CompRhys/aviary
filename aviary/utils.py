@@ -292,7 +292,7 @@ def train_ensemble(
     patience: int = None,
     verbose: bool = False,
 ) -> None:
-    """Convenience method to train multiple models in serial.
+    """Train multiple models that form an ensemble in serial with this convenience function.
 
     Args:
         model_class (BaseModelClass): Which model class to initialize.
