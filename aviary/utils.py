@@ -292,7 +292,7 @@ def train_ensemble(
     patience: int = None,
     verbose: bool = False,
 ) -> None:
-    """Convenience method to train multiple models in serial.
+    """Train multiple models that form an ensemble in serial with this convenience function.
 
     Args:
         model_class (BaseModelClass): Which model class to initialize.
@@ -327,12 +327,9 @@ def train_ensemble(
     else:
         val_loader = None
 
-    for j in range(ensemble_folds):
-        #  this allows us to run ensembles in parallel rather than in series
-        #  by specifying the run-id arg.
-        if ensemble_folds == 1:
-            j = run_id
-
+    #  this allows us to run ensembles in parallel rather than in series
+    #  by specifying the run-id arg.
+    for r_id in [run_id] if ensemble_folds == 1 else range(ensemble_folds):
         model = initialize_model(
             model_class=model_class,
             model_params=model_params,
@@ -363,7 +360,7 @@ def train_ensemble(
 
         if log:
             writer = SummaryWriter(
-                f"{ROOT}/runs/{model_name}/{model_name}-r{j}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
+                f"{ROOT}/runs/{model_name}/{model_name}-r{r_id}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
         else:
             writer = None
@@ -404,7 +401,7 @@ def train_ensemble(
             loss_dict=loss_func_dict,
             normalizer_dict=normalizer_dict,
             model_name=model_name,
-            run_id=j,
+            run_id=r_id,
             writer=writer,
             patience=patience,
         )
@@ -509,25 +506,25 @@ def results_multitask(
 
         y_test, outputs, *ids = model.predict(test_loader)
 
-        for preds, targets, (target_name, task_type), res_dict in zip(
+        for output, targets, (target_name, task_type), res_dict in zip(
             outputs, y_test, model.task_dict.items(), results_dict.values()
         ):
             if task_type == "regression":
                 normalizer = normalizer_dict[target_name]
                 assert isinstance(normalizer, Normalizer)
                 if model.robust:
-                    mean, log_std = preds.unbind(dim=1)
+                    mean, log_std = output.unbind(dim=1)
                     preds = normalizer.denorm(mean.data.cpu())
                     ale_std = torch.exp(log_std).data.cpu() * normalizer.std
                     res_dict["ale"][ens_idx, :] = ale_std.view(-1).numpy()  # type: ignore
                 else:
-                    preds = normalizer.denorm(preds.data.cpu())
+                    preds = normalizer.denorm(output.data.cpu())
 
                 res_dict["preds"][ens_idx, :] = preds.view(-1).numpy()  # type: ignore
 
             elif task_type == "classification":
                 if model.robust:
-                    mean, log_std = preds.chunk(2, dim=1)
+                    mean, log_std = output.chunk(2, dim=1)
                     logits = (
                         sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
                     )
@@ -535,7 +532,7 @@ def results_multitask(
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
                     res_dict["pre-logits_ale"].append(pre_logits_std)  # type: ignore
                 else:
-                    pre_logits = preds.data.cpu().numpy()
+                    pre_logits = output.data.cpu().numpy()
                     logits = pre_logits.softmax(1)
 
                 res_dict["pre-logits"].append(pre_logits)  # type: ignore

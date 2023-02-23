@@ -267,12 +267,14 @@ def parse_aflow_wyckoff_str(
 
     for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
         # normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_per_elem = re.sub(
+        wyk_letters_normalized = re.sub(
             r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
         )
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
-        sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)]
+        sep_n_wyks = [
+            "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
+        ]
 
         # Add the Wyckoff letter and its multiplicity to the list
         for mult, letter in zip(map(int, sep_n_wyks[0::2]), sep_n_wyks[1::2]):

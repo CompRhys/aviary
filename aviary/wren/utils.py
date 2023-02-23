@@ -110,11 +110,11 @@ def get_aflow_label_from_aflow(
     elem_dict = {}
     for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
         # normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_per_elem = re.sub(
+        wyk_letters_normalized = re.sub(
             r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
         )
         sep_el_wyks = [
-            "".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)
+            "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
         ]
         elem_dict[elem] = sum(
             float(wyckoff_multiplicity_dict[spg_num][w]) * float(n)
@@ -387,11 +387,11 @@ def count_crystal_dof(aflow_label: str) -> int:
 
     for wyk_letters_per_elem in wyks:
         # normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_per_elem = re.sub(
+        wyk_letters_normalized = re.sub(
             r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
         )
         sep_el_wyks = [
-            "".join(g) for _, g in groupby(wyk_letters_per_elem, str.isalpha)
+            "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
         ]
         num_params += sum(
             float(n) * param_dict[spg][k]
