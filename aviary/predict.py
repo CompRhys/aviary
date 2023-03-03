@@ -170,7 +170,7 @@ def predict_from_wandb_checkpoints(
 
         checkpoint_path = f"{out_dir}/checkpoint.pth"
         checkpoint_paths.append(checkpoint_path)
-        print(f"{idx:>3}/{len(runs)}: {run.url}\n\t{checkpoint_path}")
+        print(f"{idx:>3}/{len(runs)}: {run.url}\n\t{checkpoint_path}\n")
 
         with open(f"{out_dir}/run.md", "w") as md_file:
             md_file.write(f"[{run.name}]({run.url})\n")

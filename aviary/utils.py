@@ -546,6 +546,7 @@ def results_multitask(
             dict(zip(test_loader.dataset.identifiers, *ids)),
             results_dict,
             model_name,
+            f"-r{run_id}",
         )
 
     if print_results:
@@ -707,7 +708,10 @@ def print_metrics_classification(
 
 
 def save_results_dict(
-    ids: dict[str, list[str | int]], results_dict: dict[str, Any], model_name: str
+    ids: dict[str, list[str | int]],
+    results_dict: dict[str, Any],
+    model_name: str,
+    run_id: str = None,
 ) -> None:
     """Save the results to a file after model evaluation.
 
@@ -716,6 +720,7 @@ def save_results_dict(
             material ID, composition, ...) and its value a list of IDs.
         results_dict (dict[str, Any]): ): nested dictionary of results {name: {col: data}}
         model_name (str): ): The name given the model via the --model-name flag.
+        run_id (str): ): The run ID given to the model via the --run-id flag.
     """
     results = {}
 
@@ -753,11 +758,9 @@ def save_results_dict(
 
     df = pd.DataFrame({**ids, **results})
 
-    file_name = model_name.replace("/", "_")
-
     os.makedirs("results", exist_ok=True)
 
-    csv_path = f"results/{file_name}.csv"
+    csv_path = f"results/{model_name.replace('/', '_') + (run_id or '')}.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nSaved model predictions to {csv_path!r}")
 

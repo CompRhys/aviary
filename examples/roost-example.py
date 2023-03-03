@@ -29,7 +29,7 @@ def main(  # noqa: D103
     sample=1,
     test_size=0.2,
     test_path=None,
-    val_size=0.0,
+    val_size=0,
     val_path=None,
     resume=None,
     fine_tune=None,
@@ -58,7 +58,7 @@ def main(  # noqa: D103
         )
 
     if test_path:
-        test_size = 0.0
+        test_size = 0
 
     if not (test_path and val_path) and test_size + val_size >= 1.0:
         raise AssertionError(
@@ -101,7 +101,7 @@ def main(  # noqa: D103
                 df=df, elem_embedding=elem_embedding, task_dict=task_dict
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
-        elif test_size == 0.0:
+        elif test_size == 0:
             raise ValueError("test-size must be non-zero to evaluate model")
         else:
             print(f"using {test_size} of training set as test set")
@@ -122,14 +122,14 @@ def main(  # noqa: D103
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         else:
-            if val_size == 0.0 and evaluate:
+            if val_size == 0 and evaluate:
                 print("No validation set used, using test set for evaluation purposes")
                 # NOTE that when using this option care must be taken not to
                 # peak at the test-set. The only valid model to use is the one
                 # obtained after the final epoch where the epoch count is
                 # decided in advance of the experiment.
                 val_set = test_set
-            elif val_size == 0.0:
+            elif val_size == 0:
                 val_set = None
             else:
                 print(f"using {val_size} of training set as validation set")
@@ -246,7 +246,7 @@ def input_parser():
     )
     valid_group.add_argument(
         "--val-size",
-        default=0.0,
+        default=0,
         type=float,
         metavar="FLOAT",
         help="Proportion of data used for validation",

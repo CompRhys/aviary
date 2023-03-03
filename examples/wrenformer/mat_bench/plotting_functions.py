@@ -30,14 +30,14 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
 
     def scale_regr_task(series: pd.Series, mad: float) -> pd.Series:
         # scale regression problems by mad/mae
-        mask = series > 0.0
+        mask = series > 0
         mask_iix = np.where(mask)
         series.iloc[mask_iix] = series.iloc[mask_iix] / mad
         series.loc[~mask] = np.nan
         return series
 
     def scale_clf_task(series: pd.Series) -> pd.Series:
-        mask = series > 0.0
+        mask = series > 0
         mask_idx = np.where(mask)
         series.iloc[mask_idx] = 1 - (series.iloc[mask_idx] - 0.5) / 0.5
         series.loc[~mask] = np.nan
