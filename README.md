@@ -13,16 +13,25 @@
 
 The aim of `aviary` is to contain multiple models for materials discovery under a common interface, overtime we hope to add more models with a particularly focus on coordinate free deep learning models.
 
-## `pip` Installation
+## Installation
 
-Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). To `pip install` it, make sure you replace `1.13.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
+Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). `pip install` it with
 
 ```sh
 pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
+```
 
-pip install -U git+https://github.com/CompRhys/aviary  # install aviary itself
+Make sure you replace `1.13.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
 
-# or for an editable install
+Then install `aviary` from source with
+
+```sh
+pip install -U git+https://github.com/CompRhys/aviary
+```
+
+or for an editable install from local clone:
+
+```sh
 git clone https://github.com/CompRhys/aviary
 pip install -e ./aviary
 ```
