@@ -11,18 +11,27 @@
 
 </h4>
 
-The aim of `aviary` is to contain multiple models for materials discovery under a common interface, overtime we hope to add more models with a particularly focus on coordinate free deep learning models.
+The aim of `aviary` is to contain multiple models for materials discovery under a common interface, over time we hope to add more models with a particular focus on coordinate-free deep learning models.
 
-## `pip` Installation
+## Installation
 
-Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). To `pip install` it, make sure you replace `1.13.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
+Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). `pip install` it with
 
 ```sh
 pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
+```
 
-pip install -U git+https://github.com/CompRhys/aviary  # install aviary itself
+Make sure you replace `1.13.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
 
-# or for an editable install
+Then install `aviary` from source with
+
+```sh
+pip install -U git+https://github.com/CompRhys/aviary
+```
+
+or for an editable source install from a local clone:
+
+```sh
 git clone https://github.com/CompRhys/aviary
 pip install -e ./aviary
 ```
@@ -36,8 +45,8 @@ python examples/inputs/poscar_to_df.py
 ```
 
 This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` and `datasets/examples/examples.json` files used for the next example.
-For the coordinate-free `roost` and `wren` models where the inputs are easily expressed as strings we use csv inputs.
-For the structure-based `cgcnn` model we first construct `pymatgen` structures from the raw POSCAR files then determine their dictionary serializations before saving in a json format.
+For the coordinate-free `roost` and `wren` models where the inputs are easily expressed as strings we use CSV inputs.
+For the structure-based `cgcnn` model we first construct `pymatgen` structures from the raw POSCAR files then determine their dictionary serializations before saving in a JSON format.
 The raw POSCAR files have been selected to ensure that the subset contains all the correct endpoints for the 5 elemental species in the `Hf-N-Ti-Zr-Zn` chemical system.
 To test each of the three models provided please run:
 
@@ -53,8 +62,8 @@ python examples/wren-example.py --train --evaluate --data-path examples/inputs/e
 python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/examples.json --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 
-Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30s. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts were used for all experiments conducted as part of the development and publication of these models.
-Consequently understanding these examples will ensure that you are able to deploy the models as intended for your own research.
+Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30 sec. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts were used for all experiments conducted as part of the development and publication of these models.
+Consequently understanding these examples will ensure you can deploy the models as intended for your research.
 
 ## Notebooks
 

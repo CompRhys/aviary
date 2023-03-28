@@ -54,7 +54,7 @@ Repo = "https://github.com/CompRhys/aviary"
 test = ["pytest", "pytest-cov", "matminer"]
 
 [tool.setuptools.packages]
-find = { include = ["aviary"] }
+find = { include = ["aviary*"], exclude = ["tests*"] }
 
 [tool.setuptools.package-data]
 aviary = ["**/*.json", "**/**/*.json"]
@@ -74,7 +74,7 @@ target-version = "py38"
 line-length = 100
 select = [
   "B",   # flake8-bugbear
-  "C4",  # flake8-comprehensions
+  "C40", # flake8-comprehensions
   "D",   # pydocstyle
   "E",   # pycodestyle
   "F",   # pyflakes
