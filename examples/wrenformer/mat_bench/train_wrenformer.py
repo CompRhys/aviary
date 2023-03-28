@@ -56,7 +56,7 @@ slurm_submit(
 
 
 # %%
-slurm_array_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 35))
+slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "0"))
 print(f"Job started running {timestamp}")
 
 dataset_name, fold = list(product(datasets, folds))[slurm_array_task_id]

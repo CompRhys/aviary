@@ -46,7 +46,7 @@ learning_rate = 3e-4
 # for faster testing/debugging
 data_path = f"{ROOT}/datasets/2022-06-09-mp+wbm-1k-samples.json.gz"
 batch_size = 128
-slurm_array_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", 0))
+slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "0"))
 
 print(f"Job started running {timestamp}")
 print(f"{run_name=}")
