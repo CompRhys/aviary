@@ -7,7 +7,7 @@ import pandas as pd
 import wandb
 
 from aviary import ROOT
-from aviary.deploy import predict_from_wandb_checkpoints
+from aviary.predict import predict_from_wandb_checkpoints
 from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
 
@@ -32,10 +32,8 @@ train_df = df.sample(frac=1 - test_size, random_state=0)  # unused
 test_df = df.drop(train_df.index)
 target_col = "e_form"
 
-wandb.login()
-wandb_api = wandb.Api()
 ensemble_id = "ensemble-id-2"
-runs = wandb_api.runs("aviary/mp-wbm", filters={"tags": {"$in": [ensemble_id]}})
+runs = wandb.Api().runs("aviary/mp-wbm", filters={"tags": {"$in": [ensemble_id]}})
 
 assert len(runs) == 10, f"Expected 10 runs, got {len(runs)} for {ensemble_id=}"
 
