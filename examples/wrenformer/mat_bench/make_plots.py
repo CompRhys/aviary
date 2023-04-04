@@ -149,8 +149,7 @@ for file_path in our_pred_files:
 # %%
 df_err = pd.DataFrame(recursive_dict_merge(our_scores, others_scores))
 df_err.index.name = "dataset"
-print(f"{df_err.shape=}")
-df_err
+print(f"{df_err=}")
 
 
 # %%
