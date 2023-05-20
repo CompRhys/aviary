@@ -58,10 +58,10 @@ def test_get_isopointal_proto(aflow_label, expected):
 @pytest.mark.parametrize(
     "aflow_label, expected",
     [
-        ["A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S", 1],
-        ["ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 2],
-        ["ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si", 3],
-        ["A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 3],
+        ("A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S", 1),
+        ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 2),
+        ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si", 3),
+        ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 3),
     ],
 )
 def test_count_distinct_wyckoff_letters(aflow_label, expected):

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
-import pandas as pd
 import torch
 from pymatgen.core import Composition
 from torch import LongTensor, Tensor, nn
@@ -12,6 +11,9 @@ from torch import LongTensor, Tensor, nn
 from aviary import PKG_DIR
 from aviary.data import InMemoryDataLoader
 from aviary.wren.data import parse_aflow_wyckoff_str
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def collate_batch(
@@ -177,7 +179,6 @@ def df_to_in_mem_dataloader(
         inputs[idx] = tensor.to(device)
 
     ids = (df[id_col] if id_col in df else df.index).to_numpy()
-    data_loader = InMemoryDataLoader(
+    return InMemoryDataLoader(
         [inputs, targets, ids], collate_fn=collate_batch, **kwargs
     )
-    return data_loader

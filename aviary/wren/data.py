@@ -4,16 +4,18 @@ import functools
 import json
 import re
 from itertools import groupby
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
-import pandas as pd
 import torch
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
 from aviary.wren.utils import relab_dict, wyckoff_multiplicity_dict
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class WyckoffData(Dataset):
@@ -38,7 +40,7 @@ class WyckoffData(Dataset):
                 "onehot112" or path to a file with custom element embeddings.
                 Defaults to "matscholar200".
             sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or "spg-alg-off".
-            inputs (str, optional): df columns to be used for featurisation.
+            inputs (str, optional): df columns to be used for featurization.
                 Defaults to "wyckoff".
             identifiers (list, optional): df columns for distinguishing data points. Will be
                 copied over into the model's output CSV. Defaults to ["material_id", "composition"].

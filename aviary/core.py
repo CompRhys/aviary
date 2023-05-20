@@ -5,7 +5,7 @@ import os
 import shutil
 from abc import ABC
 from collections import defaultdict
-from typing import Any, Callable, Literal, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Literal, Mapping
 
 import numpy as np
 import torch
@@ -13,12 +13,15 @@ import wandb
 from sklearn.metrics import f1_score
 from torch import BoolTensor, Tensor, nn
 from torch.nn.functional import softmax
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.data import InMemoryDataLoader
+
+if TYPE_CHECKING:
+    from torch.utils.data import DataLoader
+
+    from aviary.data import InMemoryDataLoader
 
 TaskType = Literal["regression", "classification"]
 

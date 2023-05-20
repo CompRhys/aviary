@@ -255,11 +255,11 @@ class DescriptorNetwork(nn.Module):
                 attnhead(elem_fea, index=cry_elem_idx, weights=elem_weights)
             )
 
-        cry_fea = scatter_mean(
+        crystal_features = scatter_mean(
             torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0
         )
 
-        return cry_fea
+        return crystal_features
 
     def __repr__(self) -> str:
         return (

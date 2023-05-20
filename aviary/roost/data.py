@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import functools
 import json
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
-import pandas as pd
 import torch
 from pymatgen.core import Composition
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class CompositionData(Dataset):

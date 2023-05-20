@@ -131,7 +131,7 @@ def get_aflow_label_from_aflow(
                 f"invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
                 f"to be {expected_formula}"
             )
-        elif errors == "annotate":
+        if errors == "annotate":
             return f"invalid multiplicities: {full_label}"
 
     return full_label
@@ -140,7 +140,9 @@ def get_aflow_label_from_aflow(
 def get_aflow_label_from_spglib(
     struct: Structure,
     errors: Literal["raise", "annotate", "ignore"] = "ignore",
-) -> str:
+    init_symprec: float = 0.1,
+    fallback_symprec: float = 1e-5,
+) -> str | None:
     """Get AFLOW prototype label for pymatgen Structure.
 
     Args:
@@ -148,22 +150,39 @@ def get_aflow_label_from_spglib(
         errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
             'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
             with 'invalid <reason>: '.
+        init_symprec (float): Initial symmetry precision for spglib. Defaults to 0.1.
+        fallback_symprec (float): Fallback symmetry precision for spglib if first
+            symmetry detection failed. Defaults to 1e-5.
 
     Returns:
-        str: AFLOW prototype label
+        str: AFLOW prototype label or None if errors='ignore' and symmetry detection
+            failed.
     """
-    spg_analyzer = SpacegroupAnalyzer(struct, symprec=0.1, angle_tolerance=5)
-    aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(spg_analyzer, errors)
-
-    # try again with refined structure if it initially fails
-    # NOTE structures with magmoms fail unless all have same magnetic moment
-    if "invalid" in aflow_label_with_chemsys:
+    try:
         spg_analyzer = SpacegroupAnalyzer(
-            spg_analyzer.get_refined_structure(), symprec=1e-5, angle_tolerance=-1
+            struct, symprec=init_symprec, angle_tolerance=5
         )
         aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
             spg_analyzer, errors
         )
+
+        # try again with refined structure if it initially fails
+        # NOTE structures with magmoms fail unless all have same magnetic moment
+        if "invalid" in aflow_label_with_chemsys:
+            spg_analyzer = SpacegroupAnalyzer(
+                spg_analyzer.get_refined_structure(),
+                symprec=fallback_symprec,
+                angle_tolerance=-1,
+            )
+            aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
+                spg_analyzer, errors
+            )
+
+    except ValueError as exc:
+        if errors == "raise":
+            raise
+        if errors == "annotate":
+            return f"invalid spglib: {exc}"
 
     return aflow_label_with_chemsys
 
@@ -246,7 +265,7 @@ def get_aflow_label_from_spg_analyzer(
                 f"Invalid WP multiplicities - {aflow_label_with_chemsys}, expected "
                 f"{observed_formula} to be {expected_formula}"
             )
-        elif errors == "annotate":
+        if errors == "annotate":
             return f"invalid multiplicities: {aflow_label_with_chemsys}"
 
     return aflow_label_with_chemsys
@@ -427,7 +446,7 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
 
     if len(s_counts) == len(set(s_counts)):
         cs_wyks = canonicalize_elem_wyks(s_wyks, int(spg))
-        return "_".join((c_anom, pearson, spg, cs_wyks))
+        return f"{c_anom}_{pearson}_{spg}_{cs_wyks}"
     # credit Stef: https://stackoverflow.com/a/70126643/5517459
     valid_permutations = [
         list(map(itemgetter(1), chain.from_iterable(p)))

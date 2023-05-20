@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
 import torch
-import wandb.apis.public
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from aviary.core import BaseModelClass
-from aviary.data import InMemoryDataLoader
 from aviary.utils import get_metrics, print_walltime
+
+if TYPE_CHECKING:
+    import wandb.apis.public
+    from torch.utils.data import DataLoader
+
+    from aviary.core import BaseModelClass
+    from aviary.data import InMemoryDataLoader
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-08-25"
