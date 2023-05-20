@@ -3,17 +3,19 @@ from __future__ import annotations
 import functools
 import itertools
 import json
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
-import pandas as pd
 import torch
-from pymatgen.core import Structure
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from aviary import PKG_DIR
+
+if TYPE_CHECKING:
+    import pandas as pd
+    from pymatgen.core import Structure
 
 
 class CrystalGraphData(Dataset):

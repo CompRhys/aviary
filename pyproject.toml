@@ -12,9 +12,9 @@ license = { file = "license" }
 keywords = [
   "Graph Neural Network",
   "Machine Learning",
-  "Materials Science",
   "Materials Discovery",
   "Materials Informatics",
+  "Materials Science",
   "Roost",
   "Self-Attention",
   "Transformer",
@@ -25,12 +25,12 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Topic :: Scientific/Engineering :: Chemistry",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Chemistry",
   "Topic :: Scientific/Engineering :: Physics",
 ]
 
@@ -41,8 +41,8 @@ dependencies = [
   "pymatgen",
   "scikit_learn",
   "tensorboard",
-  "torch_scatter",
   "torch",
+  "torch_scatter",
   "tqdm",
   "wandb",
 ]
@@ -51,13 +51,13 @@ dependencies = [
 Repo = "https://github.com/CompRhys/aviary"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "matminer"]
+test = ["matminer", "pytest", "pytest-cov"]
 
 [tool.setuptools.packages]
 find = { include = ["aviary*"], exclude = ["tests*"] }
 
 [tool.setuptools.package-data]
-aviary = ["**/*.json", "**/**/*.json"]
+aviary = ["**/**/*.json", "**/*.json"]
 
 [tool.distutils.bdist_wheel]
 universal = true
@@ -74,30 +74,45 @@ target-version = "py38"
 line-length = 100
 select = [
   "B",   # flake8-bugbear
-  "C40", # flake8-comprehensions
+  "C4",  # flake8-comprehensions
   "D",   # pydocstyle
-  "E",   # pycodestyle
+  "E",   # pycodestyle error
+  "EXE", # flake8-executable
   "F",   # pyflakes
+  "FLY", # flynt
   "I",   # isort
-  "PLE", # pylint error
-  "PLW", # pylint warning
+  "ICN", # flake8-import-conventions
+  "ISC", # flake8-implicit-str-concat
+  "PD",  # pandas-vet
+  "PIE", # flake8-pie
+  "PL",  # pylint
+  "PT",  # flake8-pytest-style
+  "PYI", # flakes8-pyi
   "Q",   # flake8-quotes
+  "RET", # flake8-return
+  "RSE", # flake8-raise
   "RUF", # Ruff-specific rules
   "SIM", # flake8-simplify
+  "TCH", # flake8-type-checking
   "TID", # tidy imports
   "UP",  # pyupgrade
-  "W",   # pycodestyle
+  "W",   # pycodestyle warning
   "YTT", # flake8-2020
 ]
 ignore = [
-  "B904", # Within an except clause, raise exceptions with raise ... from err
-  "C408", # Unnecessary dict call - rewrite as a literal
-  "D100", # Missing docstring in public module
-  "D104", # Missing docstring in public package
-  "D105", # Missing docstring in magic method
-  "D107", # Missing docstring in __init__
-  "D205", # 1 blank line required between summary line and description
-  "E731", # Do not assign a lambda expression, use a def
+  "B904",    # Within an except clause, raise exceptions with raise ... from err
+  "C408",    # Unnecessary dict call - rewrite as a literal
+  "D100",    # Missing docstring in public module
+  "D104",    # Missing docstring in public package
+  "D105",    # Missing docstring in magic method
+  "D107",    # Missing docstring in __init__
+  "D205",    # 1 blank line required between summary line and description
+  "E731",    # Do not assign a lambda expression, use a def
+  "PD901",   # pandas-df-variable-name
+  "PLC1901", # compare-to-empty-string
+  "PLR",     # pylint refactor
+  "PT006",   # pytest-parametrize-names-wrong-type
+  "RET504",  # unnecessary-assign
 ]
 pydocstyle.convention = "google"
 isort.known-third-party = ["wandb"]

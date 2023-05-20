@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -11,11 +11,13 @@ from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, np_softmax
-from aviary.data import InMemoryDataLoader
 from aviary.losses import RobustL1Loss
 from aviary.utils import get_metrics, print_walltime
 from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
+
+if TYPE_CHECKING:
+    from aviary.data import InMemoryDataLoader
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-10-29"
@@ -321,7 +323,7 @@ def train_model(
             torch.save(checkpoint_dict, checkpoint_path)
         if checkpoint == "wandb":
             assert (
-                wandb_path and wandb.run is not None
+                wandb.run is not None
             ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
             torch.save(checkpoint_dict, f"{wandb.run.dir}/checkpoint.pth")
 

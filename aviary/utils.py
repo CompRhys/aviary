@@ -7,8 +7,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
-from types import ModuleType
-from typing import Any, Callable, Generator, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal
 
 import numpy as np
 import pandas as pd
@@ -31,6 +30,9 @@ from torch.utils.tensorboard import SummaryWriter
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import RobustL1Loss, RobustL2Loss
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 
 def initialize_model(

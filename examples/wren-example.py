@@ -76,7 +76,7 @@ def main(  # noqa: D103
 
     if fine_tune and transfer:
         raise AssertionError(
-            "Cannot fine-tune and" " transfer checkpoint(s) at the same time."
+            "Cannot fine-tune and transfer checkpoint(s) at the same time."
         )
 
     # TODO CLI controls for loss dict.

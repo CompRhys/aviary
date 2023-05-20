@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Iterator
+from typing import TYPE_CHECKING, Callable, Iterator
 
 import numpy as np
-from torch import Tensor
+
+if TYPE_CHECKING:
+    from torch import Tensor
 
 
 @dataclass

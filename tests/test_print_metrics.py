@@ -41,8 +41,10 @@ def test_regression_metrics_ensemble(capsys):
     lines = out.split("\n")
     assert len(lines) == 10
     assert out.startswith("Model Performance Metrics:\nR2 Score: ")
-    assert lines[2].startswith("MAE: ") and "+/-" in lines[2]
-    assert lines[3].startswith("RMSE: ") and "+/-" in lines[3]
+    assert lines[2].startswith("MAE: ")
+    assert "+/-" in lines[2]
+    assert lines[3].startswith("RMSE: ")
+    assert "+/-" in lines[3]
     assert lines[5].startswith("Ensemble Performance Metrics:")
 
 
@@ -67,8 +69,12 @@ def test_classification_metrics_ensemble(capsys):
     lines = out.split("\n")
     assert len(lines) == 15
     assert out.startswith("\nModel Performance Metrics:\nAccuracy")
-    assert lines[3].startswith("ROC-AUC") and "+/-" in lines[3]
-    assert lines[4].startswith("Weighted Precision") and "+/-" in lines[4]
-    assert lines[5].startswith("Weighted Recall") and "+/-" in lines[5]
-    assert lines[6].startswith("Weighted F-score") and "+/-" in lines[6]
+    assert lines[3].startswith("ROC-AUC")
+    assert "+/-" in lines[3]
+    assert lines[4].startswith("Weighted Precision")
+    assert "+/-" in lines[4]
+    assert lines[5].startswith("Weighted Recall")
+    assert "+/-" in lines[5]
+    assert lines[6].startswith("Weighted F-score")
+    assert "+/-" in lines[6]
     assert lines[8].startswith("Ensemble Performance Metrics:")
