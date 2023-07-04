@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -78,7 +78,9 @@ dataset_labels_html = {
 }
 
 
-def plot_leaderboard(df: pd.DataFrame, html_path: str = None, **kwargs: Any) -> Figure:
+def plot_leaderboard(
+    df: pd.DataFrame, html_path: Optional[str] = None, **kwargs: Any
+) -> Figure:
     """Generate the Matbench scaled errors graph seen on
     https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
 

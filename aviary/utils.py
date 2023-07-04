@@ -39,9 +39,9 @@ def initialize_model(
     model_class: BaseModelClass,
     model_params: dict[str, Any],
     device: type[torch.device] | Literal["cuda", "cpu"],
-    resume: str = None,
-    fine_tune: str = None,
-    transfer: str = None,
+    resume: str | None = None,
+    fine_tune: str | None = None,
+    transfer: str | None = None,
     **kwargs,
 ) -> BaseModelClass:
     """Initialise a model.
@@ -140,7 +140,7 @@ def initialize_optim(
     device: type[torch.device] | Literal["cuda", "cpu"],
     milestones: Iterable = (),
     gamma: float = 0.3,
-    resume: str = None,
+    resume: str | None = None,
     **kwargs,
 ) -> tuple[Optimizer, _LRScheduler]:
     """Initialize Optimizer and Scheduler.
@@ -247,7 +247,7 @@ def initialize_losses(
 def init_normalizers(
     task_dict: dict[str, TaskType],
     device: type[torch.device] | Literal["cuda", "cpu"],
-    resume: str = None,
+    resume: str | None = None,
 ) -> dict[str, Normalizer | None]:
     """Initialise a Normalizer to scale the output targets.
 
@@ -291,7 +291,7 @@ def train_ensemble(
     restart_params: dict[str, Any],
     model_params: dict[str, Any],
     loss_dict: dict[str, Literal["L1", "L2", "CSE"]],
-    patience: int = None,
+    patience: int | None = None,
     verbose: bool = False,
 ) -> None:
     """Train multiple models that form an ensemble in serial with this convenience function.
@@ -713,7 +713,7 @@ def save_results_dict(
     ids: dict[str, list[str | int]],
     results_dict: dict[str, Any],
     model_name: str,
-    run_id: str = None,
+    run_id: str | None = None,
 ) -> None:
     """Save the results to a file after model evaluation.
 
