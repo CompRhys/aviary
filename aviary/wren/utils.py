@@ -55,7 +55,7 @@ remove_digits = str.maketrans("", "", digits)
 
 def get_aflow_label_from_aflow(
     struct: Structure,
-    aflow_executable: str = None,
+    aflow_executable: str | None = None,
     errors: Literal["raise", "annotate", "ignore"] = "raise",
 ) -> str:
     """Get Aflow prototype label for a pymatgen Structure. Make sure you're running a recent

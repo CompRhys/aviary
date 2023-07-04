@@ -129,10 +129,10 @@ def get_composition_embedding(formula: str) -> Tensor:
 def df_to_in_mem_dataloader(
     df: pd.DataFrame,
     input_col: str = "wyckoff",
-    target_col: str = None,
-    id_col: str = None,
+    target_col: str | None = None,
+    id_col: str | None = None,
     embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
-    device: str = None,
+    device: str | None = None,
     **kwargs: Any,
 ) -> InMemoryDataLoader:
     """Construct an InMemoryDataLoader with Wrenformer batch collation from a dataframe.

@@ -34,7 +34,7 @@ class BaseModelClass(nn.Module, ABC):
         task_dict: dict[str, TaskType],
         robust: bool,
         epoch: int = 0,
-        best_val_scores: dict[str, float] = None,
+        best_val_scores: dict[str, float] | None = None,
     ) -> None:
         """Store core model parameters.
 
@@ -72,7 +72,7 @@ class BaseModelClass(nn.Module, ABC):
         checkpoint: bool = True,
         writer: Literal["wandb"] | SummaryWriter | None = None,
         verbose: bool = True,
-        patience: int = None,
+        patience: int | None = None,
     ) -> None:
         """Ctrl-C interruptible training method.
 
@@ -546,7 +546,7 @@ def np_softmax(arr: np.ndarray, axis: int = -1) -> np.ndarray:
     return exp / exp.sum(axis=axis, keepdims=True)
 
 
-def np_one_hot(targets: np.ndarray, n_classes: int = None) -> np.ndarray:
+def np_one_hot(targets: np.ndarray, n_classes: int | None = None) -> np.ndarray:
     """Get a one-hot encoded version of an array of class labels.
 
     Args:

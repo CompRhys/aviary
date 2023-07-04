@@ -259,7 +259,7 @@ class GaussianDistance:
     """Expands the distance by Gaussian basis. Unit: angstrom."""
 
     def __init__(
-        self, dmin: float, dmax: float, step: float, var: float = None
+        self, dmin: float, dmax: float, step: float, var: float | None = None
     ) -> None:
         """Featurize neighbor atom distances for use in CGCNN structure graph.
 

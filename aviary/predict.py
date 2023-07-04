@@ -26,8 +26,8 @@ def make_ensemble_predictions(
     data_loader: DataLoader | InMemoryDataLoader,
     model_cls: type[BaseModelClass],
     df: pd.DataFrame,
-    target_col: str = None,
-    device: str = None,
+    target_col: str | None = None,
+    device: str | None = None,
     print_metrics: bool = True,
     warn_target_mismatch: bool = False,
     pbar: bool = True,
@@ -72,7 +72,7 @@ def make_ensemble_predictions(
     ):
         try:
             checkpoint = torch.load(checkpoint_path, map_location=device)
-        except Exception as exc:
+        except Exception as exc:  # noqa: PERF203
             raise RuntimeError(f"Failed to load {checkpoint_path=}") from exc
 
         model_params = checkpoint.get("model_params")

@@ -4,8 +4,8 @@ ci:
   autoupdate_schedule: quarterly
 
 repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.269
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.0.276
     hooks:
       - id: ruff
         args: [--fix]
@@ -22,10 +22,10 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.4
+    rev: v2.2.5
     hooks:
-    - id: codespell
-      exclude_types: [json]
+      - id: codespell
+        exclude_types: [json]
 
   - repo: https://github.com/psf/black
     rev: 23.3.0
@@ -33,7 +33,7 @@ repos:
       - id: black-jupyter
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.3.0
+    rev: v1.4.1
     hooks:
       - id: mypy
         exclude: (tests|examples)/
@@ -49,8 +49,3 @@ repos:
     hooks:
       - id: nbstripout
         args: [--drop-empty-cells, --keep-output]
-
-  - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.7.0
-    hooks:
-      - id: nbqa-ruff
