@@ -249,11 +249,10 @@ class DescriptorNetwork(nn.Module):
             elem_fea = graph_func(elem_weights, elem_fea, self_idx, nbr_idx)
 
         # generate crystal features by pooling the elemental features
-        head_fea = []
-        for attnhead in self.cry_pool:
-            head_fea.append(
-                attnhead(elem_fea, index=cry_elem_idx, weights=elem_weights)
-            )
+        head_fea = [
+            attnhead(elem_fea, index=cry_elem_idx, weights=elem_weights)
+            for attnhead in self.cry_pool
+        ]
 
         crystal_features = scatter_mean(
             torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0
