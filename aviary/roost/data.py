@@ -98,14 +98,14 @@ class CompositionData(Dataset):
 
         try:
             elem_fea = np.vstack([self.elem_features[element] for element in elements])
-        except AssertionError:
+        except AssertionError as exc:
             raise AssertionError(
                 f"{material_ids} ({composition}) contains element types not in embedding"
-            )
-        except ValueError:
+            ) from exc
+        except ValueError as exc:
             raise ValueError(
                 f"{material_ids} ({composition}) composition cannot be parsed into elements"
-            )
+            ) from exc
 
         nele = len(elements)
         self_idx = []
