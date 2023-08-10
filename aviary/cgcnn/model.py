@@ -129,6 +129,15 @@ class DescriptorNetwork(nn.Module):
         elem_fea_len: int = 64,
         n_graph: int = 4,
     ) -> None:
+        """Initialize DescriptorNetwork.
+
+        Args:
+            elem_emb_len (int): Number of atom features in the input.
+            nbr_fea_len (int): Number of bond features.
+            elem_fea_len (int, optional): Number of hidden atom features in the graph convolution
+                layers. Defaults to 64.
+            n_graph (int, optional): Number of graph convolution layers. Defaults to 4.
+        """
         super().__init__()
 
         self.embedding = nn.Linear(elem_emb_len, elem_fea_len)
@@ -222,6 +231,4 @@ class CGCNNConv(nn.Module):
         nbr_summed = scatter_add(nbr_msg, self_idx, dim=0)
 
         nbr_summed = self.bn2(nbr_summed)
-        out = self.softplus2(atom_in_fea + nbr_summed)
-
-        return out
+        return self.softplus2(atom_in_fea + nbr_summed)

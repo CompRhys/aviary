@@ -59,7 +59,7 @@ class WyckoffData(Dataset):
         with open(elem_embedding) as emb_file:
             self.elem_features = json.load(emb_file)
 
-        self.elem_emb_len = len(list(self.elem_features.values())[0])
+        self.elem_emb_len = len(next(iter(self.elem_features.values())))
 
         if sym_emb in ["bra-alg-off", "spg-alg-off"]:
             sym_emb = f"{PKG_DIR}/embeddings/wyckoff/{sym_emb}.json"
@@ -67,7 +67,9 @@ class WyckoffData(Dataset):
         with open(sym_emb) as sym_file:
             self.sym_features = json.load(sym_file)
 
-        self.sym_emb_len = len(list(list(self.sym_features.values())[0].values())[0])
+        self.sym_emb_len = len(
+            next(iter(next(iter(self.sym_features.values())).values()))
+        )
 
         self.n_targets = []
         for target, task in self.task_dict.items():

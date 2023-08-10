@@ -40,9 +40,7 @@ class AttentionPooling(nn.Module):
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-10)
 
         x = self.message_nn(x)
-        out = scatter_add(gate * x, index, dim=0)
-
-        return out
+        return scatter_add(gate * x, index, dim=0)
 
     def __repr__(self) -> str:
         gate_nn, message_nn = self.gate_nn, self.message_nn
@@ -82,9 +80,7 @@ class WeightedAttentionPooling(nn.Module):
         gate = gate / (scatter_add(gate, index, dim=0)[index] + 1e-10)
 
         x = self.message_nn(x)
-        out = scatter_add(gate * x, index, dim=0)
-
-        return out
+        return scatter_add(gate * x, index, dim=0)
 
     def __repr__(self) -> str:
         pow, gate_nn, message_nn = float(self.pow), self.gate_nn, self.message_nn

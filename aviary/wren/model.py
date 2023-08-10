@@ -236,7 +236,7 @@ class DescriptorNetwork(nn.Module):
             aug_cry_idx (Tensor): Mapping from the crystal idx to augmentation idx
 
         Returns:
-            Tensor: returns the crystal features of the materials in the batch
+            Tensor: crystal features of the materials in the batch
         """
         # embed the original features into the graph layer description
         elem_fea = self.elem_embed(elem_fea)
@@ -254,11 +254,9 @@ class DescriptorNetwork(nn.Module):
             for attnhead in self.cry_pool
         ]
 
-        crystal_features = scatter_mean(
+        return scatter_mean(
             torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0
         )
-
-        return crystal_features
 
     def __repr__(self) -> str:
         return (

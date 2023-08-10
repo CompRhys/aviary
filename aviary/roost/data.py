@@ -55,7 +55,7 @@ class CompositionData(Dataset):
         with open(elem_embedding) as file:
             self.elem_features = json.load(file)
 
-        self.elem_emb_len = len(list(self.elem_features.values())[0])
+        self.elem_emb_len = len(next(iter(self.elem_features.values())))
 
         self.n_targets = []
         for target, task in self.task_dict.items():
@@ -98,14 +98,14 @@ class CompositionData(Dataset):
 
         try:
             elem_fea = np.vstack([self.elem_features[element] for element in elements])
-        except AssertionError:
+        except AssertionError as exc:
             raise AssertionError(
                 f"{material_ids} ({composition}) contains element types not in embedding"
-            )
-        except ValueError:
+            ) from exc
+        except ValueError as exc:
             raise ValueError(
                 f"{material_ids} ({composition}) composition cannot be parsed into elements"
-            )
+            ) from exc
 
         nele = len(elements)
         self_idx = []

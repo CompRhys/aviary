@@ -805,9 +805,7 @@ def get_metrics(
         class1_probas = predictions[:, 1]
         metrics["ROCAUC"] = roc_auc_score(targets, class1_probas)
 
-    metrics = {key: round(float(val), prec) for key, val in metrics.items()}
-
-    return metrics
+    return {key: round(float(val), prec) for key, val in metrics.items()}
 
 
 def as_dict_handler(obj: Any) -> dict[str, Any] | None:

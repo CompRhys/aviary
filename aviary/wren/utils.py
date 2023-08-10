@@ -177,14 +177,12 @@ def get_aflow_label_from_spglib(
             aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
                 spg_analyzer, errors
             )
+        return aflow_label_with_chemsys
 
     except ValueError as exc:
-        if errors == "raise":
-            raise
         if errors == "annotate":
             return f"invalid spglib: {exc}"
-
-    return aflow_label_with_chemsys
+        raise  # we only get here if errors == "raise"
 
 
 def get_aflow_label_from_spg_analyzer(
@@ -297,9 +295,7 @@ def canonicalize_elem_wyks(elem_wyks: str, spg_num: int) -> str:
         scores.append(score)
         sorted_iso.append(sorted_el_wyks)
 
-    canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))[0][1]
-
-    return canonical
+    return sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))[0][1]
 
 
 def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
@@ -372,8 +368,6 @@ def count_wyckoff_positions(aflow_label: str) -> int:
     Returns:
         int: number of distinct Wyckoff positions
     """
-    num_wyk = 0
-
     aflow_label, _ = aflow_label.split(":")  # remove chemical system
     # discard prototype formula and spg symbol and spg number
     wyk_letters = aflow_label.split("_", maxsplit=3)[-1]
@@ -382,9 +376,7 @@ def count_wyckoff_positions(aflow_label: str) -> int:
     wyk_list = re.split("[A-z]", wyk_letters)[:-1]  # split on every letter
 
     # count 1 for letters without prefix
-    num_wyk = sum(1 if len(x) == 0 else int(x) for x in wyk_list)
-
-    return num_wyk
+    return sum(1 if len(x) == 0 else int(x) for x in wyk_list)
 
 
 def count_crystal_dof(aflow_label: str) -> int:
@@ -488,5 +480,4 @@ def count_distinct_wyckoff_letters(aflow_str: str) -> int:
     aflow_str, _ = aflow_str.split(":")  # drop chemical system
     _, _, _, wyckoff_letters = aflow_str.split("_", 3)  # drop prototype, Pearson, spg
     wyckoff_letters = wyckoff_letters.translate(remove_digits).replace("_", "")
-    n_uniq = len(set(wyckoff_letters))
-    return n_uniq
+    return len(set(wyckoff_letters))  # number of distinct Wyckoff letters

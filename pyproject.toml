@@ -105,19 +105,16 @@ select = [
   "YTT",  # flake8-2020
 ]
 ignore = [
-  "B904",    # Within an except clause, raise exceptions with raise ... from err
   "C408",    # Unnecessary dict call - rewrite as a literal
   "D100",    # Missing docstring in public module
   "D104",    # Missing docstring in public package
   "D105",    # Missing docstring in magic method
-  "D107",    # Missing docstring in __init__
   "D205",    # 1 blank line required between summary line and description
   "E731",    # Do not assign a lambda expression, use a def
   "PD901",   # pandas-df-variable-name
   "PLC1901", # compare-to-empty-string
   "PLR",     # pylint refactor
   "PT006",   # pytest-parametrize-names-wrong-type
-  "RET504",  # unnecessary-assign
 ]
 pydocstyle.convention = "google"
 isort.known-third-party = ["wandb"]

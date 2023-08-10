@@ -411,6 +411,7 @@ class Normalizer:
     """Normalize a Tensor and restore it later."""
 
     def __init__(self) -> None:
+        """Initialize Normalizer with mean 0 and std 1."""
         self.mean = torch.tensor(0)
         self.std = torch.tensor(1)
 
@@ -579,8 +580,7 @@ def masked_std(x: Tensor, mask: BoolTensor, dim: int = 0, eps: float = 1e-12) ->
     mean = masked_mean(x, mask, dim=dim)
     squared_diff = (x - mean.unsqueeze(dim=dim)) ** 2
     var = masked_mean(squared_diff, mask, dim=dim)
-    std = (var + eps).sqrt()
-    return std
+    return (var + eps).sqrt()
 
 
 def masked_mean(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:
