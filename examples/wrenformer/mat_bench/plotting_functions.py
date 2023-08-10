@@ -1,15 +1,19 @@
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import plotly.io as pio
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
 from matbench.metadata import mbv01_metadata as matbench_metadata
-from plotly.graph_objs._figure import Figure
 from sklearn.metrics import accuracy_score, auc, roc_curve
+
+if TYPE_CHECKING:
+    import pandas as pd
+    from plotly.graph_objs._figure import Figure
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"
@@ -79,7 +83,7 @@ dataset_labels_html = {
 
 
 def plot_leaderboard(
-    df: pd.DataFrame, html_path: Optional[str] = None, **kwargs: Any
+    df: pd.DataFrame, html_path: str | None = None, **kwargs: Any
 ) -> Figure:
     """Generate the Matbench scaled errors graph seen on
     https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.

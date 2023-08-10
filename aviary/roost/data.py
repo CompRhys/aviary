@@ -55,7 +55,7 @@ class CompositionData(Dataset):
         with open(elem_embedding) as file:
             self.elem_features = json.load(file)
 
-        self.elem_emb_len = len(list(self.elem_features.values())[0])
+        self.elem_emb_len = len(next(iter(self.elem_features.values())))
 
         self.n_targets = []
         for target, task in self.task_dict.items():
