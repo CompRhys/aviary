@@ -117,7 +117,6 @@ ignore = [
   "PLC1901", # compare-to-empty-string
   "PLR",     # pylint refactor
   "PT006",   # pytest-parametrize-names-wrong-type
-  "RET504",  # unnecessary-assign
 ]
 pydocstyle.convention = "google"
 isort.known-third-party = ["wandb"]

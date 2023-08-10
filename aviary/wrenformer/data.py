@@ -94,11 +94,9 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     )
     element_ratios = element_ratios.repeat(n_augments, 1, 1)
 
-    combined_features = torch.cat(
+    return torch.cat(  # combined features
         [element_ratios, element_features, symmetry_features], dim=-1
     ).float()
-
-    return combined_features
 
 
 def get_composition_embedding(formula: str) -> Tensor:
@@ -121,9 +119,8 @@ def get_composition_embedding(formula: str) -> Tensor:
     element_ratios = torch.tensor(elem_weights)
     element_features = torch.tensor(element_features)
 
-    combined_features = torch.cat([element_ratios, element_features], dim=1).float()
-
-    return combined_features
+    # combined features
+    return torch.cat([element_ratios, element_features], dim=1).float()
 
 
 def df_to_in_mem_dataloader(

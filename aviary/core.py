@@ -579,8 +579,7 @@ def masked_std(x: Tensor, mask: BoolTensor, dim: int = 0, eps: float = 1e-12) ->
     mean = masked_mean(x, mask, dim=dim)
     squared_diff = (x - mean.unsqueeze(dim=dim)) ** 2
     var = masked_mean(squared_diff, mask, dim=dim)
-    std = (var + eps).sqrt()
-    return std
+    return (var + eps).sqrt()
 
 
 def masked_mean(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:

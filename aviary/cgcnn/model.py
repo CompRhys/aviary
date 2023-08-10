@@ -222,6 +222,4 @@ class CGCNNConv(nn.Module):
         nbr_summed = scatter_add(nbr_msg, self_idx, dim=0)
 
         nbr_summed = self.bn2(nbr_summed)
-        out = self.softplus2(atom_in_fea + nbr_summed)
-
-        return out
+        return self.softplus2(atom_in_fea + nbr_summed)
