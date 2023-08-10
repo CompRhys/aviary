@@ -110,7 +110,6 @@ ignore = [
   "D100",    # Missing docstring in public module
   "D104",    # Missing docstring in public package
   "D105",    # Missing docstring in magic method
-  "D107",    # Missing docstring in __init__
   "D205",    # 1 blank line required between summary line and description
   "E731",    # Do not assign a lambda expression, use a def
   "PD901",   # pandas-df-variable-name

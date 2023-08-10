@@ -411,6 +411,7 @@ class Normalizer:
     """Normalize a Tensor and restore it later."""
 
     def __init__(self) -> None:
+        """Initialize Normalizer with mean 0 and std 1."""
         self.mean = torch.tensor(0)
         self.std = torch.tensor(1)
 
