@@ -177,14 +177,13 @@ def get_aflow_label_from_spglib(
             aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
                 spg_analyzer, errors
             )
+        return aflow_label_with_chemsys
 
     except ValueError as exc:
         if errors == "raise":
             raise
         if errors == "annotate":
             return f"invalid spglib: {exc}"
-
-    return aflow_label_with_chemsys
 
 
 def get_aflow_label_from_spg_analyzer(
