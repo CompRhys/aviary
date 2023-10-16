@@ -107,12 +107,12 @@ class CompositionData(Dataset):
                 f"{material_ids} ({composition}) composition cannot be parsed into elements"
             ) from exc
 
-        nele = len(elements)
+        n_elems = len(elements)
         self_idx = []
         nbr_idx = []
-        for i, _ in enumerate(elements):
-            self_idx += [i] * nele
-            nbr_idx += list(range(nele))
+        for idx in range(n_elems):
+            self_idx += [idx] * n_elems
+            nbr_idx += list(range(n_elems))
 
         # convert all data to tensors
         elem_weights = Tensor(weights)

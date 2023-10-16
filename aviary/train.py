@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, np_softmax
-from aviary.losses import RobustL1Loss
+from aviary.losses import robust_l1_loss
 from aviary.utils import get_metrics, print_walltime
 from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
@@ -130,7 +130,7 @@ def train_model(
     print(f"Pytorch running on {device=}")
 
     loss_func = (
-        (RobustL1Loss if robust else torch.nn.L1Loss())
+        (robust_l1_loss if robust else torch.nn.L1Loss())
         if task_type == reg_key
         else (torch.nn.NLLLoss() if robust else torch.nn.CrossEntropyLoss())
     )
@@ -193,7 +193,7 @@ def train_model(
             start=swa_start, epochs=int(swa_start * epochs), learning_rate=swa_lr
         )
     if task_type == reg_key and hasattr(train_loader, "df"):
-        train_df = getattr(train_loader, "df", train_loader.dataset.df)  # type: ignore
+        train_df = getattr(train_loader, "df", train_loader.dataset.df)  # type: ignore[union-attr]
         targets = train_df[target_col]
         run_params["dummy_mae"] = (targets - targets.mean()).abs().mean()
     if timestamp:
@@ -415,11 +415,11 @@ def train_wrenformer(
         embedding_type=embedding_type,
     )
     train_loader = df_to_in_mem_dataloader(
-        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore
+        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore[arg-type]
     )
 
     test_loader = df_to_in_mem_dataloader(
-        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore
+        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore[arg-type]
     )
 
     # embedding_len is the length of the embedding vector for a Wyckoff position encoding the

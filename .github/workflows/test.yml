@@ -2,10 +2,10 @@ name: Tests
 
 on:
   push:
-    paths: ['**/*.py', .github/workflows/test.yml]
+    paths: ["**/*.py", .github/workflows/test.yml]
     branches: [main]
   pull_request:
-    paths: ['**/*.py', .github/workflows/test.yml]
+    paths: ["**/*.py", .github/workflows/test.yml]
     branches: [main]
 
 jobs:
@@ -24,8 +24,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install torch==1.13.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
-          pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
+          pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
           pip install .[test]
 
       - name: Run Tests

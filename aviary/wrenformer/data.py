@@ -156,7 +156,7 @@ def df_to_in_mem_dataloader(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if embedding_type not in ["wyckoff", "composition"]:
+    if embedding_type not in ("wyckoff", "composition"):
         raise ValueError(f"{embedding_type = } must be 'wyckoff' or 'composition'")
 
     initial_embeddings = df[input_col].map(

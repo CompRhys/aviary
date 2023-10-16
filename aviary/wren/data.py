@@ -53,7 +53,7 @@ class WyckoffData(Dataset):
         self.identifiers = list(identifiers)
         self.df = df
 
-        if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+        if elem_embedding in ("matscholar200", "cgcnn92", "megnet16", "onehot112"):
             elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
 
         with open(elem_embedding) as emb_file:
@@ -61,7 +61,7 @@ class WyckoffData(Dataset):
 
         self.elem_emb_len = len(next(iter(self.elem_features.values())))
 
-        if sym_emb in ["bra-alg-off", "spg-alg-off"]:
+        if sym_emb in ("bra-alg-off", "spg-alg-off"):
             sym_emb = f"{PKG_DIR}/embeddings/wyckoff/{sym_emb}.json"
 
         with open(sym_emb) as sym_file:

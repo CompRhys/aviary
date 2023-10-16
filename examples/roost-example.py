@@ -10,7 +10,7 @@ from aviary.roost.model import Roost
 from aviary.utils import results_multitask, train_ensemble
 
 
-def main(  # noqa: D103
+def main(
     data_path,
     targets,
     tasks,
@@ -45,6 +45,7 @@ def main(  # noqa: D103
     device=None,
     **kwargs,
 ):
+    """Train and evaluate a Roost model."""
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"The model will run on the {args.device} device")
