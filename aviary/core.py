@@ -176,7 +176,12 @@ class BaseModelClass(nn.Module, ABC):
                     }
 
                     # TODO saving a model at each epoch may be slow?
-                    save_checkpoint(checkpoint_dict, False, model_name, run_id)
+                    save_checkpoint(
+                        checkpoint_dict,
+                        is_best=False,
+                        model_name=model_name,
+                        run_id=run_id,
+                    )
 
                     # TODO when to save best models? should this be done task-wise in
                     # the multi-task case?
