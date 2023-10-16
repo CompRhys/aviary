@@ -389,12 +389,12 @@ def count_crystal_dof(aflow_label: str) -> int:
     Returns:
         int: Number of free-parameters in given prototype
     """
-    num_params = 0
+    n_params = 0
 
     aflow_label, _ = aflow_label.split(":")  # chop off chemical system
     _, pearson, spg, *wyks = aflow_label.split("_")
 
-    num_params += cry_param_dict[pearson[0]]
+    n_params += cry_param_dict[pearson[0]]
 
     for wyk_letters_per_elem in wyks:
         # normalize Wyckoff letters to start with 1 if missing digit
@@ -404,12 +404,12 @@ def count_crystal_dof(aflow_label: str) -> int:
         sep_el_wyks = [
             "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
         ]
-        num_params += sum(
+        n_params += sum(
             float(n) * param_dict[spg][k]
             for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
         )
 
-    return int(num_params)
+    return n_params
 
 
 def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
@@ -455,7 +455,7 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     isopointal: list[str] = []
 
     for wyks_list in valid_permutations:
-        for trans in relab_dict[str(spg)]:
+        for trans in relab_dict[spg]:
             t = str.maketrans(trans)
             isopointal.append("_".join(wyks_list).translate(t))
 

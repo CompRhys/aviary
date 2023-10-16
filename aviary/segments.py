@@ -84,7 +84,7 @@ class WeightedAttentionPooling(nn.Module):
 
     def __repr__(self) -> str:
         pow, gate_nn, message_nn = float(self.pow), self.gate_nn, self.message_nn
-        return f"{type(self).__name__}(pow={pow:.3}, {gate_nn=}, {message_nn=})"
+        return f"{type(self).__name__}({pow=:.3}, {gate_nn=}, {message_nn=})"
 
 
 class MessageLayer(nn.Module):

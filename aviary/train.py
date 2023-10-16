@@ -193,7 +193,7 @@ def train_model(
             start=swa_start, epochs=int(swa_start * epochs), learning_rate=swa_lr
         )
     if task_type == reg_key and hasattr(train_loader, "df"):
-        train_df = getattr(train_loader, "df", train_loader.dataset.df)  # type: ignore
+        train_df = getattr(train_loader, "df", train_loader.dataset.df)  # type: ignore[union-attr]
         targets = train_df[target_col]
         run_params["dummy_mae"] = (targets - targets.mean()).abs().mean()
     if timestamp:
@@ -415,11 +415,11 @@ def train_wrenformer(
         embedding_type=embedding_type,
     )
     train_loader = df_to_in_mem_dataloader(
-        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore
+        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore[arg-type]
     )
 
     test_loader = df_to_in_mem_dataloader(
-        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore
+        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore[arg-type]
     )
 
     # embedding_len is the length of the embedding vector for a Wyckoff position encoding the

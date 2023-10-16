@@ -472,7 +472,7 @@ def results_multitask(
         results_dict[target_name] = defaultdict(
             list
             if task_type == "classification"
-            else lambda: np.zeros((ensemble_folds, len(test_set)))  # type: ignore
+            else lambda: np.zeros((ensemble_folds, len(test_set)))  # type: ignore[call-overload]
         )
 
     for ens_idx in range(ensemble_folds):
@@ -518,11 +518,11 @@ def results_multitask(
                     mean, log_std = output.unbind(dim=1)
                     preds = normalizer.denorm(mean.data.cpu())
                     ale_std = torch.exp(log_std).data.cpu() * normalizer.std
-                    res_dict["ale"][ens_idx, :] = ale_std.view(-1).numpy()  # type: ignore
+                    res_dict["ale"][ens_idx, :] = ale_std.view(-1).numpy()  # type: ignore[call-overload]
                 else:
                     preds = normalizer.denorm(output.data.cpu())
 
-                res_dict["preds"][ens_idx, :] = preds.view(-1).numpy()  # type: ignore
+                res_dict["preds"][ens_idx, :] = preds.view(-1).numpy()  # type: ignore[call-overload]
 
             elif task_type == "classification":
                 if model.robust:
@@ -532,13 +532,13 @@ def results_multitask(
                     )
                     pre_logits = mean.data.cpu().numpy()
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
-                    res_dict["pre-logits_ale"].append(pre_logits_std)  # type: ignore
+                    res_dict["pre-logits_ale"].append(pre_logits_std)  # type: ignore[union-attr]
                 else:
                     pre_logits = output.data.cpu().numpy()
                     logits = pre_logits.softmax(1)
 
-                res_dict["pre-logits"].append(pre_logits)  # type: ignore
-                res_dict["logits"].append(logits)  # type: ignore
+                res_dict["pre-logits"].append(pre_logits)  # type: ignore[union-attr]
+                res_dict["logits"].append(logits)  # type: ignore[union-attr]
 
             res_dict["targets"] = targets
 
@@ -555,9 +555,9 @@ def results_multitask(
         for target_name, task_type in task_dict.items():
             print(f"\nTask: {target_name=} on test set")
             if task_type == "regression":
-                print_metrics_regression(**results_dict[target_name])  # type: ignore
+                print_metrics_regression(**results_dict[target_name])  # type: ignore[arg-type]
             elif task_type == "classification":
-                print_metrics_classification(**results_dict[target_name])  # type: ignore
+                print_metrics_classification(**results_dict[target_name])  # type: ignore[arg-type]
 
     return results_dict
 

@@ -244,7 +244,7 @@ class BaseModelClass(nn.Module, ABC):
             # compute output
             outputs = self(*inputs)
 
-            mixed_loss: Tensor = 0  # type: ignore
+            mixed_loss: Tensor = 0  # type: ignore[assignment]
 
             for target_name, targets, output, normalizer in zip(
                 self.target_names, targets_list, outputs, normalizer_dict.values()

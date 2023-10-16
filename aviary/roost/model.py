@@ -76,7 +76,7 @@ class Roost(BaseModelClass):
             "cry_msg": cry_msg,
         }
 
-        self.material_nn = DescriptorNetwork(**desc_dict)  # type: ignore
+        self.material_nn = DescriptorNetwork(**desc_dict)  # type: ignore[arg-type]
 
         model_params = {
             "robust": robust,

@@ -91,7 +91,7 @@ class Wrenformer(BaseModelClass):
             ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
         )
 
-    def forward(  # type: ignore
+    def forward(  # type: ignore[override]
         self, features: Tensor, mask: BoolTensor, *args
     ) -> tuple[Tensor, ...]:
         """Forward pass through the Wrenformer.
