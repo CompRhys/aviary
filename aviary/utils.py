@@ -29,7 +29,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
-from aviary.losses import RobustL1Loss, RobustL2Loss
+from aviary.losses import robust_l1_loss, robust_l2_loss
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -224,9 +224,9 @@ def initialize_losses(
         elif task == "regression":
             if robust:
                 if loss_name_dict[name] == "L1":
-                    loss_func_dict[name] = (task, RobustL1Loss)
+                    loss_func_dict[name] = (task, robust_l1_loss)
                 elif loss_name_dict[name] == "L2":
-                    loss_func_dict[name] = (task, RobustL2Loss)
+                    loss_func_dict[name] = (task, robust_l2_loss)
                 else:
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"

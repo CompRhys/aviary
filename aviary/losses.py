@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 
 
-def RobustL1Loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> Tensor:
+def robust_l1_loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> Tensor:
     """Robust L1 loss using a Lorentzian prior. Trains the model to learn to predict aleatoric
     (per-sample) uncertainty.
 
@@ -21,7 +21,7 @@ def RobustL1Loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> Ten
     return torch.mean(loss)
 
 
-def RobustL2Loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> Tensor:
+def robust_l2_loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> Tensor:
     """Robust L2 loss using a Gaussian prior. Trains the model to learn to predict aleatoric
     (per-sample) uncertainty.
 

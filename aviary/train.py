@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, np_softmax
-from aviary.losses import RobustL1Loss
+from aviary.losses import robust_l1_loss
 from aviary.utils import get_metrics, print_walltime
 from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
@@ -130,7 +130,7 @@ def train_model(
     print(f"Pytorch running on {device=}")
 
     loss_func = (
-        (RobustL1Loss if robust else torch.nn.L1Loss())
+        (robust_l1_loss if robust else torch.nn.L1Loss())
         if task_type == reg_key
         else (torch.nn.NLLLoss() if robust else torch.nn.CrossEntropyLoss())
     )
