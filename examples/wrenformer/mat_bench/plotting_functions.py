@@ -25,8 +25,8 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
     """Scale the errors in a Matbench dataframe for comparability in heatmaps.
 
     Args:
-        df (pd.DataFrame): Dataframe with unscaled errors for matbench tasks across columns and
-            models along rows. Missing entries are fine.
+        df (pd.DataFrame): Dataframe with unscaled errors for matbench tasks across
+            columns and models along rows. Missing entries are fine.
 
     Returns:
         pd.DataFrame: Dataframe with scaled errors
@@ -89,8 +89,8 @@ def plot_leaderboard(
     https://matbench.materialsproject.org. Adapted from https://bit.ly/38fDdgt.
 
     Args:
-        df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
-            models. Missing entries are fine.
+        df (pd.DataFrame): Dataframe with columns for matbench tasks and rows for
+            different models. Missing entries are fine.
         html_path (str): HTML file path where to save the plotly figure.
         **kwargs: Additional keyword arguments to pass to plotly.express.scatter.
 
@@ -153,10 +153,12 @@ def error_heatmap(
     performance but works with unscaled errors too.
 
     Args:
-        df_err (pd.DataFrame): Dataframe with columns for matbench tasks and rows for different
-                models. Missing entries are fine.
-        log (bool, optional): Whether to log10 the errors before plotting. Defaults to False.
-        prec (int, optional): Number of decimal places to round the errors to. Defaults to 3.
+        df_err (pd.DataFrame): Dataframe with columns for matbench tasks and rows for
+            different models. Missing entries are fine.
+        log (bool, optional): Whether to log10 the errors before plotting. Defaults to
+            False.
+        prec (int, optional): Number of decimal places to round the errors to.
+            Defaults to 3.
         **kwargs: Additional keyword arguments to pass to plotly.express.imshow().
 
     Returns:

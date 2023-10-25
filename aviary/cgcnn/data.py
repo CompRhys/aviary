@@ -33,19 +33,22 @@ class CrystalGraphData(Dataset):
         dmin: float = 0,
         step: float = 0.2,
     ):
-        """Featurize crystal structures into neighborhood graphs with this data class for CGCNN.
+        """Featurize crystal structures into neighborhood graphs with this data class
+        for CGCNN.
 
         Args:
             df (pd.Dataframe): Pandas dataframe holding input and target values.
             task_dict ({target: task}): task dict for multi-task learning
-            elem_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16",
-                "onehot112" or path to a file with custom element embeddings.
-                Defaults to "matscholar200".
-            structure_col (str, optional): df column holding pymatgen Structure objects as input.
-            identifiers (list[str], optional): df columns for distinguishing data points. Will be
-                copied over into the model's output CSV. Defaults to ().
+            elem_embedding (str, optional): One of matscholar200, cgcnn92, megnet16,
+                onehot112 or path to a file with custom element embeddings.
+                Defaults to matscholar200.
+            structure_col (str, optional): df column holding pymatgen Structure objects
+                as input.
+            identifiers (list[str], optional): df columns for distinguishing data
+                points. Will be copied over into the model's output CSV. Defaults to ().
             radius (float, optional): Cut-off radius for neighborhood. Defaults to 5.
-            max_num_nbr (int, optional): maximum number of neighbors to consider. Defaults to 12.
+            max_num_nbr (int, optional): maximum number of neighbors to consider.
+                Defaults to 12.
             dmin (float, optional): minimum distance in Gaussian basis. Defaults to 0.
             step (float, optional): increment size of Gaussian basis. Defaults to 0.2.
         """
@@ -158,7 +161,7 @@ class CrystalGraphData(Dataset):
             raise ValueError(f"All atoms in {material_ids} are isolated")
         if len(nbr_idx) == 0:
             raise ValueError(
-                f"Empty nbr_idx. This should not be triggered but was for {material_ids}"
+                f"Empty nbr_idx. should not happen but did for {material_ids}"
             )
         if set(self_idx) != set(range(len(struct))):
             raise ValueError(f"At least one atom in {material_ids} is isolated")
@@ -185,7 +188,7 @@ def collate_batch(
         tuple[Tensor, Tensor, LongTensor, LongTensor],
         list[Tensor | LongTensor],
         list[str | int],
-    ]
+    ],
 ) -> tuple[Any, ...]:
     """Collate a list of data and return a batch for predicting crystal properties.
 
@@ -197,13 +200,14 @@ def collate_batch(
                 self_idx (LongTensor): indices of atoms in the structure
                 nbr_idx (LongTensor): indices of neighboring atoms
             ]
-            target (Tensor | LongTensor): target values containing floats for regression or
-                integers as class labels for classification
+            target (Tensor | LongTensor): target values containing floats for regression
+                or integers as class labels for classification
             identifiers: str or int
 
     Returns:
         tuple[
-            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched CGCNN model inputs,
+            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched CGCNN
+                model inputs,
             tuple[Tensor | LongTensor]: Target values for different tasks,
             *tuple[str | int]: identifiers like material_id, composition
         ]
@@ -267,11 +271,11 @@ class GaussianDistance:
             dmin (float): Minimum interatomic distance
             dmax (float): Maximum interatomic distance
             step (float): Step size for the Gaussian filter
-            var (float, optional): Variance of Gaussian basis. Defaults to step if not given.
+            var (float, optional): Variance of Gaussian basis. Defaults to step.
         """
         if dmin >= dmax:
             raise ValueError(
-                "Max radii must be larger than minimum radii for Gaussian basis expansion"
+                "Max radii must be > minimum radii for Gaussian basis expansion"
             )
         if dmax - dmin <= step:
             raise ValueError(
@@ -293,7 +297,8 @@ class GaussianDistance:
             distances (ArrayLike): A distance matrix of any shape.
 
         Returns:
-            np.ndarray: Expanded distance matrix with the last dimension of length len(self.filter)
+            np.ndarray: Expanded distance matrix with the last dimension of length
+                len(self.filter)
         """
         distances = np.array(distances)
 

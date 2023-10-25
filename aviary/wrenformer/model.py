@@ -14,16 +14,18 @@ class Wrenformer(BaseModelClass):
     """Crabnet-inspired re-implementation of Wren as a transformer.
     https://github.com/anthony-wang/CrabNet.
 
-    Wrenformer consists of a transformer encoder who's job it is to generate an informative
-    embedding given a material's composition and Wyckoff positions (think crystal symmetries).
-    Since the embedding is trainable, it is systematically improvable with more data.
-    Using this embedding, the residual output network regresses or classifies the targets.
+    Wrenformer consists of a transformer encoder who's job it is to generate an
+    informative embedding given a material's composition and Wyckoff positions (think
+    crystal symmetries). Since the embedding is trainable, it is systematically
+    improvable with more data. Using this embedding, the residual output network
+    regresses or classifies the targets.
 
     Can also be used as Roostformer by generating the input features with
-    get_composition_embedding() instead of wyckoff_embedding_from_aflow_str(). Model class,
-    collate_batch function and DataLoader stay the same.
+    get_composition_embedding() instead of wyckoff_embedding_from_aflow_str(). Model
+    class, collate_batch function and DataLoader stay the same.
 
-    See https://nature.com/articles/s41524-021-00545-1/tables/2 for default CrabNet hyperparams.
+    See https://nature.com/articles/s41524-021-00545-1/tables/2 for default CrabNet
+    hyperparams.
     """
 
     def __init__(
@@ -42,26 +44,29 @@ class Wrenformer(BaseModelClass):
         """Initialize the Wrenformer model.
 
         Args:
-            n_targets (list[int]): Number of targets to train on. 1 for regression or number of
-                classes for classification.
+            n_targets (list[int]): Number of targets to train on. 1 for regression or
+                number of classes for classification.
             n_features (int): Number of features in the input data (aka embedding size).
-            d_model (int): Dimension of the transformer layers. Determines size of the learned
-                embedding passed to the output NN. d_model should be increased for large datasets.
-                Defaults to 256.
-            n_attn_layers (int): Number of transformer encoder layers to use. Defaults to 3.
-            n_attn_heads (int): Number of attention heads to use in the transformer. d_model
-                needs to be divisible by this number. Defaults to 4.
-            trunk_hidden (list[int], optional): Number of hidden units in the trunk network which
-                is shared across tasks when multitasking. Defaults to [1024, 512].
-            out_hidden (list[int], optional): Number of hidden units in the output networks which
-                are task-specific. Defaults to [256, 128, 64].
-            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
-                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
-                the sample) which can be used with a robust loss function to attenuate the weighting
-                of uncertain samples.
-            embedding_aggregations (list[str]): Aggregations to apply to the learned embedding
-                returned by the transformer encoder before passing into the ResidualNetwork. One or
-                more of ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
+            d_model (int): Dimension of the transformer layers. Determines size of the
+                learned embedding passed to the output NN. d_model should be increased
+                for large datasets. Defaults to 256.
+            n_attn_layers (int): Number of transformer encoder layers to use. Defaults
+                to 3.
+            n_attn_heads (int): Number of attention heads to use in the transformer.
+                d_model needs to be divisible by this number. Defaults to 4.
+            trunk_hidden (list[int], optional): Number of hidden units in the trunk
+                network which is shared across tasks when multitasking. Defaults to
+                [1024, 512].
+            out_hidden (list[int], optional): Number of hidden units in the output
+                networks which are task-specific. Defaults to [256, 128, 64].
+            robust (bool): If True, the number of model outputs is doubled. 2nd output
+                for each target will be an estimate for the aleatoric uncertainty
+                (uncertainty inherent to the sample) which can be used with a robust
+                loss function to attenuate the weighting of uncertain samples.
+            embedding_aggregations (list[str]): Aggregations to apply to the learned
+                embedding returned by the transformer encoder before passing into the
+                ResidualNetwork. One or more of ['mean', 'std', 'sum', 'min', 'max'].
+                Defaults to ['mean'].
             **kwargs: Additional keyword arguments passed to BaseModelClass.
         """
         super().__init__(robust=robust, **kwargs)
@@ -81,7 +86,8 @@ class Wrenformer(BaseModelClass):
 
         self.embedding_aggregations = embedding_aggregations
         self.trunk_nn = ResidualNetwork(
-            # len(embedding_aggregations) = number of catted tensors in aggregated_embeddings below
+            # len(embedding_aggregations) = number of catted tensors in
+            # aggregated_embeddings below
             input_dim=len(embedding_aggregations) * d_model,
             output_dim=out_hidden[0],
             hidden_layer_dims=trunk_hidden,
@@ -103,11 +109,11 @@ class Wrenformer(BaseModelClass):
                 attend, False means it participates in self-attention.
             *args: Additional arguments are only needed for Wrenformer,
                 not Roostformer. So if not present, we're running as Roostformer.
-                Else only first item in args is used as equivalence_counts (Sequence[int]) which
-                determine the length of slices in the batch dimension originating from
-                equivalent Wyckoff sets. Features for equivalent Wyckoff sets are averaged to remove
-                ambiguity in assigning Wyckoff letters to Wyckoff positions. This averaging reduces
-                dim=0 of features back to batch_size.
+                Else only first item in args is used as equivalence_counts (list[int])
+                which determine the length of slices in the batch dimension originating
+                from equivalent Wyckoff sets. Features for equivalent Wyckoff sets are
+                averaged to remove ambiguity in assigning Wyckoff letters to Wyckoff
+                positions. This averaging reduces dim=0 of features back to batch_size.
 
         Returns:
             tuple[Tensor, ...]: Predictions for each batch of multitask targets.
@@ -129,8 +135,8 @@ class Wrenformer(BaseModelClass):
             # each split
             mask = torch.stack([t[0] for t in mask.split(equivalence_counts, dim=0)])
 
-        # aggregate all embedding sequences of a material corresponding to Wyckoff positions
-        # into a single vector Wyckoff embedding
+        # aggregate all embedding sequences of a material corresponding to Wyckoff
+        # positions into a single vector Wyckoff embedding
         # careful to ignore padded values when taking the mean
         inv_mask: torch.BoolTensor = ~mask[..., None]
 

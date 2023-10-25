@@ -71,7 +71,6 @@ no_implicit_optional = false
 
 [tool.ruff]
 target-version = "py38"
-line-length = 100
 include = ["**/pyproject.toml", "*.ipynb", "*.py", "*.pyi"]
 select = [
   "B",    # flake8-bugbear

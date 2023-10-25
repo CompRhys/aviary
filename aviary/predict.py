@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from __future__ import annotations
 
 import os
@@ -110,9 +111,7 @@ def make_ensemble_predictions(
     if df.columns.str.startswith("aleatoric_std_").any():
         aleatoric_std = df.filter(regex=r"aleatoric_std_\d").mean(axis=1)
         df[f"{target_col}_aleatoric_std_ens"] = aleatoric_std
-        df[f"{target_col}_total_std_ens"] = (
-            epistemic_std**2 + aleatoric_std**2
-        ) ** 0.5
+        df[f"{target_col}_total_std_ens"] = (epistemic_std**2 + aleatoric_std**2) ** 0.5
 
     if target_col:
         targets = df[target_col]

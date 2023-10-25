@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from __future__ import annotations
 
 import os
@@ -136,13 +137,13 @@ def train_model(
     )
     loss_dict = {target_col: (task_type, loss_func)}
     normalizer_dict = {target_col: Normalizer() if task_type == reg_key else None}
-    # TODO consider actually fitting the normalizer, currently just passed into model.evaluate()
-    # to match function signature
+    # TODO consider actually fitting the normalizer, currently just passed into
+    # model.evaluate() to match function signature
 
-    # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
-    # element type (usually 200-dim Matscholar embeddings) and Wyckoff position (see
-    # 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or element) in the material
-    # embedding_len = train_loader.tensors[0][0].shape[-1]
+    # embedding_len is the length of the embedding vector for a Wyckoff position
+    # encoding the element type (usually 200-dim Matscholar embeddings) and Wyckoff
+    # position (see 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or
+    # element) in the material embedding_len = train_loader.tensors[0][0].shape[-1]
     # # Roost and Wren embedding size resp.
     # assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
 
@@ -262,7 +263,8 @@ def train_model(
     if swa_start is not None:
         n_swa_epochs = int((1 - swa_start) * epochs)
         print(
-            f"Using SWA model with weights averaged over {n_swa_epochs} epochs ({swa_start = })"
+            f"Using SWA model with weights averaged over {n_swa_epochs} epochs "
+            f"({swa_start=})"
         )
 
     inference_model = swa_model if swa_start else model
@@ -315,7 +317,8 @@ def train_model(
         )
         if scheduler_name == "LambdaLR":
             # exclude lr_lambda from pickled checkpoint since it causes errors when
-            # torch.load()-ing a checkpoint and the file defining lr_lambda() was renamed
+            # torch.load()-ing a checkpoint and the file defining lr_lambda() was
+            # renamed
             checkpoint_dict["run_params"]["lr_scheduler"].pop("params")
         if checkpoint == "local":
             os.makedirs(f"{ROOT}/models", exist_ok=True)
@@ -370,32 +373,35 @@ def train_wrenformer(
     model_params: dict[str, Any] | None = None,
     **kwargs,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
-    """Train a Wrenformer model on a dataframe. This function handles the DataLoader creation,
-    then delegates to train_model().
+    """Train a Wrenformer model on a dataframe. This function handles the DataLoader
+    creation, then delegates to train_model().
 
     Args:
-        run_name (str): A string to describe the training run. Should usually contain model type
-            (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
-            have the model learn to predict an aleatoric uncertainty.
+        run_name (str): A string to describe the training run. Should usually contain
+            model type (Roost/Wren) and important params. Include 'robust' to use a
+            robust loss function and have the model learn to predict an aleatoric
+            uncertainty.
         target_col (str): Column name in train_df and test_df containing target values.
-        task_type ('regression' | 'classification'): What type of task to train the model for.
+        task_type ('regression' | 'classification'): What type of task to train the
+            model for.
         train_df (pd.DataFrame): Training set dataframe.
         test_df (pd.DataFrame): Test set dataframe.
         batch_size (int, optional): Batch size for training. Defaults to 128.
         embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use.
             Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name.
-        id_col (str, optional): Column name in train_df and test_df containing unique IDs for
-            each sample. Defaults to "material_id".
-        input_col (str, optional): Column name in train_df and test_df containing input values.
-            Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name which default
-            to 'wyckoff' and 'composition' respectively.
+        id_col (str, optional): Column name in train_df and test_df containing unique
+            IDs for each sample. Defaults to "material_id".
+        input_col (str, optional): Column name in train_df and test_df containing input
+            values. Defaults to None meaning auto-detect based on 'wren'/'roost' in
+            run_name which default to 'wyckoff' and 'composition' respectively.
         model_params (dict): Passed to Wrenformer class. E.g. dict(n_attn_layers=6,
             embedding_aggregation=("mean", "std")).
         **kwargs: Additional keyword arguments are passed to train_model().
 
     Returns:
-        tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.
-            2nd dict are the run's hyperparameters. 3rd is a dataframe with test set predictions.
+        tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set
+            metrics. 2nd dict are the run's hyperparameters. 3rd is a dataframe with
+            test set predictions.
     """
     robust = "robust" in run_name.lower()
 
@@ -415,16 +421,23 @@ def train_wrenformer(
         embedding_type=embedding_type,
     )
     train_loader = df_to_in_mem_dataloader(
-        train_df, batch_size=batch_size, shuffle=True, **data_loader_kwargs  # type: ignore[arg-type]
+        train_df,
+        batch_size=batch_size,
+        shuffle=True,
+        **data_loader_kwargs,  # type: ignore[arg-type]
     )
 
     test_loader = df_to_in_mem_dataloader(
-        test_df, batch_size=512, shuffle=False, **data_loader_kwargs  # type: ignore[arg-type]
+        test_df,
+        batch_size=512,
+        shuffle=False,
+        **data_loader_kwargs,  # type: ignore[arg-type]
     )
 
-    # embedding_len is the length of the embedding vector for a Wyckoff position encoding the
-    # element type (usually 200-dim matscholar embeddings) and Wyckoff position (see
-    # 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or element) in the material
+    # embedding_len is the length of the embedding vector for a Wyckoff position
+    # encoding the element type (usually 200-dim matscholar embeddings) and Wyckoff
+    # position (see 'bra-alg-off.json') + 1 for the weight of that Wyckoff position (or
+    # element) in the material
     embedding_len = train_loader.tensors[0][0].shape[-1]
     # Roost and Wren embedding size resp.
     assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
