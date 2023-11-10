@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import plotly.express as px
-import plotly.graph_objs as go
 import plotly.io as pio
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
@@ -115,16 +114,14 @@ def plot_leaderboard(
     )
 
     # add scatter for the best algorithms on scaled error
-    fig.add_trace(
-        go.Scatter(
-            mode="markers",
-            x=best_values.index,
-            y=best_values,
-            marker_color="yellow",
-            text=best_algos,
-            visible="legendonly",
-            name="Best algorithms",
-        )
+    fig.add_scatter(
+        mode="markers",
+        x=best_values.index,
+        y=best_values,
+        marker_color="yellow",
+        text=best_algos,
+        visible="legendonly",
+        name="Best algorithms",
     )
     fig.update_traces(marker_size=10)
     fig.update_xaxes(linecolor="grey", gridcolor="grey")

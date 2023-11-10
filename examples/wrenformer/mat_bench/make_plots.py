@@ -194,7 +194,7 @@ for y_col in y_cols:
     MAE = (df[y_col] - df[target]).abs().mean()
     pretty_title = y_col.replace("-", " ")
     R2 = r2_score(df[target], df[y_col])
-    labels[y_col] = f"{pretty_title}<br>{MAE = :.2f}, {R2 = :.2f}"
+    labels[y_col] = f"{pretty_title}<br>{MAE=:.2f}, {R2=:.2f}"
 
 fig = px.scatter(
     df.rename(columns=labels).reset_index(),
