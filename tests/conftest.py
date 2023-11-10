@@ -19,7 +19,7 @@ def df_matbench_phonons():
     """Returns the dataframe for the Matbench phonon DOS peak task."""
 
     df = load_dataset("matbench_phonons")
-    df["material_id"] = [f"mb_phdos_{i+1}" for i in range(len(df))]
+    df["material_id"] = [f"mb_phdos_{i + 1}" for i in range(len(df))]
     df = df.set_index("material_id", drop=False)
     df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
 
@@ -30,10 +30,10 @@ def df_matbench_phonons():
 
 @pytest.fixture(scope="session")
 def df_matbench_jdft2d():
-    """Returns the dataframe for the Matbench experimental band gap task. Currently unused."""
+    """Returns Matbench experimental band gap task dataframe. Currently unused."""
 
     df = load_dataset("matbench_jdft2d")
-    df["material_id"] = [f"mb_jdft2d_{i+1}" for i in range(len(df))]
+    df["material_id"] = [f"mb_jdft2d_{i + 1}" for i in range(len(df))]
     df = df.set_index("material_id", drop=False)
     df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
 

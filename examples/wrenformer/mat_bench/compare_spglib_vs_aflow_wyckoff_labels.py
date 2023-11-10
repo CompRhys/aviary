@@ -6,7 +6,7 @@ from matminer.datasets import load_dataset
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatviz import sankey_from_2_df_cols, spacegroup_sunburst
-from pymatviz.utils import get_crystal_sys
+from pymatviz.utils import crystal_sys_from_spg_num
 from tqdm import tqdm
 
 from aviary import ROOT
@@ -84,13 +84,13 @@ for src in ("aflow", "spglib"):
 # %%
 fig = spacegroup_sunburst(df_perovskites.spglib_spg)
 fig.update_layout(title=dict(text="Spglib Spacegroups", x=0.5, y=0.93))
-# fig.write_image(f"{MODULE_DIR}/plots/matbench_perovskites_aflow_sunburst.png", scale=2)
+# fig.write_image(f"{MODULE_DIR}/plots/matbench_perovskites_aflow_sunburst.pdf")
 
 
 # %%
 fig = spacegroup_sunburst(df_perovskites.aflow_spg, title="Aflow")
 fig.update_layout(title=dict(text="Aflow Spacegroups", x=0.5, y=0.85))
-# fig.write_image(f"{MODULE_DIR}/plots/matbench_perovskites_spglib_sunburst.png", scale=2)
+# fig.write_image(f"{MODULE_DIR}/plots/matbench_perovskites_spglib_sunburst.pdf")
 
 
 # %%
@@ -104,7 +104,7 @@ df_perovskites["spglib_spg_num"] = df_perovskites.structure.map(
 # %%
 for src in ("aflow", "spglib"):
     df_perovskites[f"{src}_crys_sys"] = df_perovskites[f"{src}_spg_num"].map(
-        get_crystal_sys
+        crystal_sys_from_spg_num
     )
 
 
