@@ -44,22 +44,22 @@ class Wren(BaseModelClass):
         """Composition plus symmetry model.
 
         Args:
-            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
-                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
-                the sample) which can be used with a robust loss function to attenuate the weighting
-                of uncertain samples.
-            n_targets (list[int]): Number of targets to train on. 1 for regression and number of
-                different class labels for classification.
+            robust (bool): If True, the number of model outputs is doubled. 2nd output
+                for each target will be an estimate for the aleatoric uncertainty (
+                uncertainty inherent to the sample) which can be used with a robust loss
+                function to attenuate the weighting of uncertain samples.
+            n_targets (list[int]): Number of targets to train on. 1 for regression and
+                number of different class labels for classification.
             elem_emb_len (int): Number of features in initial element embedding
             sym_emb_len (int): Number of features in initial Wyckoff letter embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode elements.
-                Defaults to 32.
-            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters.
-                Defaults to 32.
+            elem_fea_len (int, optional): Number of hidden features to use to encode
+                elements. Defaults to 32.
+            sym_fea_len (int, optional): Number of hidden features to use to encode
+                Wyckoff letters. Defaults to 32.
             n_graph (int, optional): Number of message passing operations to carry out.
                 Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message passing
-                operation. Defaults to 1.
+            elem_heads (int, optional): Number of parallel attention heads per message
+                passing operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): _description_. Defaults to 1.
@@ -170,14 +170,14 @@ class DescriptorNetwork(nn.Module):
         Args:
             elem_emb_len (int): Number of features in initial element embedding
             sym_emb_len (int): Number of features in initial Wyckoff letter embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode elements.
-                Defaults to 32.
-            sym_fea_len (int, optional): Number of hidden features to use to encode Wyckoff letters.
-                Defaults to 32.
+            elem_fea_len (int, optional): Number of hidden features to use to encode
+                elements. Defaults to 32.
+            sym_fea_len (int, optional): Number of hidden features to use to encode
+                Wyckoff letters. Defaults to 32.
             n_graph (int, optional): Number of message passing operations to carry out.
                 Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message passing
-                operation. Defaults to 1.
+            elem_heads (int, optional): Number of parallel attention heads per message
+                passing operation. Defaults to 1.
             elem_gate (list[int], optional): _description_. Defaults to [256].
             elem_msg (list[int], optional): _description_. Defaults to [256].
             cry_heads (int, optional): Number of attention heads. Defaults to 1.
@@ -227,9 +227,11 @@ class DescriptorNetwork(nn.Module):
         """Forward pass.
 
         Args:
-            elem_weights (Tensor): Fractional weight of each Element in its stoichiometry
+            elem_weights (Tensor): Fractional weight of each Element in its
+                stoichiometry
             elem_fea (Tensor): Element features of each of the N elements in the batch
-            sym_fea (Tensor): Wyckoff Position features of each of the N elements in the batch
+            sym_fea (Tensor): Wyckoff Position features of each of the N elements in the
+                batch
             self_idx (Tensor): Indices of the first element in each of the M pairs
             nbr_idx (Tensor): Indices of the second element in each of the M pairs
             cry_elem_idx (Tensor): Mapping from the elem idx to crystal idx

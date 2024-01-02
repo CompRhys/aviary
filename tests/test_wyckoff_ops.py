@@ -44,9 +44,9 @@ def test_count_crystal_dof():
     [
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", "ABC2D6_mC40_15_e_e_f_3f"),
         ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si", "ABC2D6_mC40_15_a_e_f_3f"),
-        # failure of this case means doesn't handle single element materials
+        # this case failing means doesn't handle single element materials
         ("A_tI8_141_ea:Ca", "A_tI8_141_ae"),  # not ea is non-canonical
-        # failure of this case means not reordering elements based on int but first digit
+        # this case failing means not reordering elements based on int but first digit
         ("A4BC20D2_oC108_41_2b_a_10b_b:B-Ca-H-N", "AB2C4D20_oC108_41_a_b_2b_10b"),
     ],
 )

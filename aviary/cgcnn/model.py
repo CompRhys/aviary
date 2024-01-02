@@ -37,17 +37,18 @@ class CrystalGraphConvNet(BaseModelClass):
         """Initialize CrystalGraphConvNet.
 
         Args:
-            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
-                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
-                the sample) which can be used with a robust loss function to attenuate the weighting
-                of uncertain samples.
+            robust (bool): If True, the number of model outputs is doubled. 2nd output
+                for each target will be an estimate for the aleatoric uncertainty
+                (uncertainty inherent to the sample) which can be used with a robust
+                loss function to attenuate the weighting of uncertain samples.
             n_targets (list[int]): Number of targets to train on
             elem_emb_len (int): Number of atom features in the input.
             nbr_fea_len (int): Number of bond features.
-            elem_fea_len (int, optional): Number of hidden atom features in the convolutional
-                layers. Defaults to 64.
+            elem_fea_len (int, optional): Number of hidden atom features in the
+                convolutional layers. Defaults to 64.
             n_graph (int, optional): Number of convolutional layers. Defaults to 4.
-            h_fea_len (int, optional): Number of hidden features after pooling. Defaults to 128.
+            h_fea_len (int, optional): Number of hidden features after pooling. Defaults
+                to 128.
             n_trunk (int, optional): Number of hidden layers in trunk after pooling.
                 Defaults to 1.
             n_hidden (int, optional): Number of hidden layers after trunk for each task.
@@ -120,7 +121,9 @@ class CrystalGraphConvNet(BaseModelClass):
 
 
 class DescriptorNetwork(nn.Module):
-    """The Descriptor Network is the message passing section of the CrystalGraphConvNet Model."""
+    """The Descriptor Network is the message passing section of the CrystalGraphConvNet
+    Model.
+    """
 
     def __init__(
         self,
@@ -134,8 +137,8 @@ class DescriptorNetwork(nn.Module):
         Args:
             elem_emb_len (int): Number of atom features in the input.
             nbr_fea_len (int): Number of bond features.
-            elem_fea_len (int, optional): Number of hidden atom features in the graph convolution
-                layers. Defaults to 64.
+            elem_fea_len (int, optional): Number of hidden atom features in the graph
+                convolution layers. Defaults to 64.
             n_graph (int, optional): Number of graph convolution layers. Defaults to 4.
         """
         super().__init__()

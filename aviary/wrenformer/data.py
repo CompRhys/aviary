@@ -24,8 +24,8 @@ def collate_batch(
 
     Args:
         features (tuple[Tensor]): Wyckoff embeddings
-        targets (list[Tensor | LongTensor]): For each multi-task objective, a float tensor
-            for regression or integer class labels for classification.
+        targets (list[Tensor | LongTensor]): For each multi-task objective, a float
+            tensor for regression or integer class labels for classification.
         ids (list[str | int]): Material identifiers. Can be anything
 
     Returns:
@@ -45,8 +45,8 @@ def collate_batch(
 
     padded_features = nn.utils.rnn.pad_sequence(restacked, batch_first=True)
 
-    # padded_features.shape = (batch_size * mean_n_equiv_wyksets, max_seq_len, n_features),
-    # so we mask sequence items that are all zero across feature dimension
+    # padded_features.shape = (batch_size * mean_n_equiv_wyksets, max_seq_len,
+    # n_features), so we mask sequence items that are all zero across feature dimension
     mask = (padded_features == 0).all(dim=2)
 
     # insert outer dimension corresponding to different multi-tasking objectives
@@ -133,16 +133,19 @@ def df_to_in_mem_dataloader(
     **kwargs: Any,
 ) -> InMemoryDataLoader:
     """Construct an InMemoryDataLoader with Wrenformer batch collation from a dataframe.
-    Can also be used for Roostformer. Does not (currently) work with other models like CGCNN/Wren.
+    Can also be used for Roostformer. Does not (currently) work with other models like
+    CGCNN/Wren.
 
     Args:
         df (pd.DataFrame): Expected to have columns input_col, target_col, id_col.
-        input_col (str): Column name holding the input values (Aflow Wyckoff labels or composition
-            strings) from which initial embeddings will be constructed. Defaults to "wyckoff".
-        target_col (str): Column name holding the target values. Defaults to None. Only leave this
-            empty if making predictions since target tensor will be set to list of Nones.
-        id_col (str): Column name holding sample IDs. Defaults to None. If None, IDs will be
-            the dataframe index.
+        input_col (str): Column name holding the input values (Aflow Wyckoff labels or
+            composition strings) from which initial embeddings will be constructed.
+            Defaults to "wyckoff".
+        target_col (str): Column name holding the target values. Defaults to None. Only
+            leave this empty if making predictions since target tensor will be set to
+            list of Nones.
+        id_col (str): Column name holding sample IDs. Defaults to None. If None, IDs
+            will be the dataframe index.
         embedding_type ('wyckoff' | 'composition'): Defaults to "wyckoff".
         device (str): torch.device to load tensors onto. Defaults to
             "cuda" if torch.cuda.is_available() else "cpu".

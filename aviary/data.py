@@ -16,11 +16,12 @@ class InMemoryDataLoader:
     Source: https://discuss.pytorch.org/t/27014/6.
 
     Args:
-        *tensors: List of arrays or tensors. Must all have the same length in dimension 0.
+        *tensors: List of arrays or tensors. Must all have the same length in
+            dimension 0.
         collate_fn (Callable): Should accept variadic list of tensors and
             output a minibatch of data ready for model consumption.
-        batch_size (int, optional): Usually 64, 128 or 256. Can be larger for test set loaders
-            to speedup inference. Defaults to 64.
+        batch_size (int, optional): Usually 64, 128 or 256. Can be larger for test set
+            loaders to speedup inference. Defaults to 64.
         shuffle (bool, optional): If True, shuffle the data *in-place* whenever an
             iterator is created from this object. Defaults to False.
     """

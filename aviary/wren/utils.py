@@ -58,9 +58,9 @@ def get_aflow_label_from_aflow(
     aflow_executable: str | None = None,
     errors: Literal["raise", "annotate", "ignore"] = "raise",
 ) -> str:
-    """Get Aflow prototype label for a pymatgen Structure. Make sure you're running a recent
-    version of the aflow CLI as there's been several breaking changes. This code was tested
-    under v3.2.12.
+    """Get Aflow prototype label for a pymatgen Structure. Make sure you're running a
+    recent version of the aflow CLI as there's been several breaking changes. This code
+    was tested under v3.2.12.
 
     Install guide: https://aflow.org/install-aflow/#install_aflow
         http://aflow.org/install-aflow/install-aflow.sh -o install-aflow.sh
@@ -128,8 +128,8 @@ def get_aflow_label_from_aflow(
     if observed_formula != expected_formula:
         if errors == "raise":
             raise ValueError(
-                f"invalid WP multiplicities - {aflow_label}, expected {observed_formula} "
-                f"to be {expected_formula}"
+                f"invalid WP multiplicities - {aflow_label}, expected "
+                f"{observed_formula} to be {expected_formula}"
             )
         if errors == "annotate":
             return f"invalid multiplicities: {full_label}"
@@ -380,8 +380,9 @@ def count_wyckoff_positions(aflow_label: str) -> int:
 
 
 def count_crystal_dof(aflow_label: str) -> int:
-    """Count number of free parameters coarse-grained in Wyckoff representation: how many
-    degrees of freedom would remain to optimize during a crystal structure relaxation.
+    """Count number of free parameters coarse-grained in Wyckoff representation: how
+    many degrees of freedom would remain to optimize during a crystal structure
+    relaxation.
 
     Args:
         aflow_label (str): AFLOW-style prototype label with appended chemical system

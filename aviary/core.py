@@ -39,14 +39,16 @@ class BaseModelClass(nn.Module, ABC):
         """Store core model parameters.
 
         Args:
-            task_dict (dict[str, TaskType]): Map target names to "regression" or "classification".
-            robust (bool): If True, the number of model outputs is doubled. 2nd output for each
-                target will be an estimate for the aleatoric uncertainty (uncertainty inherent to
-                the sample) which can be used with a robust loss function to attenuate the weighting
-                of uncertain samples.
-            epoch (int, optional): Epoch model training will begin/resume from. Defaults to 0.
-            best_val_scores (dict[str, float], optional): Validation score to use for early
-                stopping. Defaults to None.
+            task_dict (dict[str, TaskType]): Map target names to "regression" or
+                "classification".
+            robust (bool): If True, the number of model outputs is doubled. 2nd output
+                for each target will be an estimate for the aleatoric uncertainty
+                (uncertainty inherent to the sample) which can be used with a robust
+                loss function to attenuate the weighting of uncertain samples.
+            epoch (int, optional): Epoch model training will begin/resume from.
+                Defaults to 0.
+            best_val_scores (dict[str, float], optional): Validation score to use for
+                early stopping. Defaults to None.
         """
         super().__init__()
         self.task_dict = task_dict
@@ -79,18 +81,22 @@ class BaseModelClass(nn.Module, ABC):
         Args:
             train_loader (DataLoader): Dataloader containing training data.
             val_loader (DataLoader): Dataloader containing validation data.
-            optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter updates.
+            optimizer (torch.optim.Optimizer): Optimizer used to carry out parameter
+                updates.
             scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler used to adjust
                 Optimizer during training.
             epochs (int): Number of epochs to train for.
-            loss_dict (dict[str, nn.Module]): Dictionary of losses to apply for each task.
+            loss_dict (dict[str, nn.Module]): Dict of losses to apply for each task.
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
             model_name (str): String describing the model.
             run_id (int): Unique identifier of the model run.
-            checkpoint (bool, optional): Whether to save model checkpoints. Defaults to True.
-            writer (SummaryWriter, optional): TensorBoard writer for saving logs. Defaults to None.
-            verbose (bool, optional): Whether to print out intermediate results. Defaults to True.
+            checkpoint (bool, optional): Whether to save model checkpoints.
+                Defaults to True.
+            writer (SummaryWriter, optional): TensorBoard writer for saving logs.
+                Defaults to None.
+            verbose (bool, optional): Whether to print out intermediate results.
+                Defaults to True.
             patience (int, optional): Patience for early stopping. Defaults to None.
         """
         start_epoch = self.epoch
@@ -157,7 +163,8 @@ class BaseModelClass(nn.Module, ABC):
                         self.es_patience += 1
                         if patience and self.es_patience > patience:
                             print(
-                                "Stopping early due to lack of improvement on validation set"
+                                f"No improvement on validation set for {patience} "
+                                "epochs, stopping early"
                             )
                             break
 
@@ -214,20 +221,23 @@ class BaseModelClass(nn.Module, ABC):
         """Evaluate the model.
 
         Args:
-            data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit().
+            data_loader (DataLoader): PyTorch Dataloader with the same data format used
+                in fit().
             loss_dict (dict[str, tuple[TaskType, nn.Module]]): Dictionary of losses
                 to apply for each task.
             optimizer (torch.optim.Optimizer): PyTorch Optimizer
             normalizer_dict (dict[str, Normalizer]): Dictionary of Normalizers to apply
                 to each task.
-            action ("train" | "evaluate"], optional): Whether to track gradients depending on
-                whether we are carrying out a training or validation pass. Defaults to "train".
-            verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
+            action ("train" | "evaluate"], optional): Whether to track gradients
+                depending on whether we are carrying out a training or validation pass.
+                Defaults to "train".
+            verbose (bool, optional): Whether to print out intermediate results.
+                Defaults to False.
             pbar (bool, optional): Whether to display a progress bar. Defaults to False.
 
         Returns:
-            dict[str, dict["Loss" | "MAE" | "RMSE" | "Accuracy" | "F1", np.ndarray]]: nested
-                dictionary for each target of metrics averaged over an epoch.
+            dict[str, dict["Loss" | "MAE" | "RMSE" | "Accuracy" | "F1", np.ndarray]]:
+                nested dictionary for each target of metrics averaged over an epoch.
         """
         if action == "evaluate":
             self.eval()
@@ -240,9 +250,9 @@ class BaseModelClass(nn.Module, ABC):
             lambda: defaultdict(list)
         )
 
-        # *_ discards identifiers like material_id and formula which we don't need when training
-        # tqdm(disable=None) means suppress output in non-tty (e.g. CI/log files) but keep in
-        # terminal (i.e. tty mode) https://git.io/JnBOi
+        # *_ discards identifiers like material_id and formula which we don't need when
+        # training tqdm(disable=None) means suppress output in non-tty (e.g. CI/log
+        # files) but keep in terminal (i.e. tty mode) https://git.io/JnBOi
         for inputs, targets_list, *_ in tqdm(
             data_loader, disable=None if pbar else True
         ):
@@ -298,8 +308,8 @@ class BaseModelClass(nn.Module, ABC):
 
                 epoch_metrics[target_name]["Loss"].append(loss.cpu().item())
 
-                # NOTE multitasking currently just uses a direct sum of individual target losses
-                # this should be okay but is perhaps sub-optimal
+                # NOTE multitasking currently just uses a direct sum of individual
+                # target losses this should be okay but is perhaps sub-optimal
                 mixed_loss += loss
 
             if action == "train":
@@ -335,10 +345,11 @@ class BaseModelClass(nn.Module, ABC):
         """Make model predictions. Supports multi-tasking.
 
         Args:
-            data_loader (DataLoader): Iterator that yields mini-batches with the same data
-                format used in fit(). To speed up inference, batch size can be set much
-                larger than during training.
-            verbose (bool, optional): Whether to print out intermediate results. Defaults to False.
+            data_loader (DataLoader): Iterator that yields mini-batches with the same
+                data format used in fit(). To speed up inference, batch size can be set
+                much larger than during training.
+            verbose (bool, optional): Whether to print out intermediate results.
+                Defaults to False.
 
         Returns:
             3 tuples where tuple items correspond to different multitask targets.
@@ -382,7 +393,8 @@ class BaseModelClass(nn.Module, ABC):
         this runs only the message-passing part of the model without the ResNet.
 
         Args:
-            data_loader (DataLoader): PyTorch Dataloader with the same data format used in fit()
+            data_loader (DataLoader): PyTorch Dataloader with the same data format used
+                in fit()
 
         Returns:
             np.array: 2d array of features
@@ -409,7 +421,8 @@ class BaseModelClass(nn.Module, ABC):
     def __repr__(self) -> str:
         """Return model name with number of parameters and epochs trained."""
         n_params, n_epochs = self.num_params, self.epoch
-        return f"{type(self).__name__} with {n_params:,} trainable params at {n_epochs:,} epochs"
+        cls_name = type(self).__name__
+        return f"{cls_name} with {n_params:,} trainable params at {n_epochs:,} epochs"
 
 
 class Normalizer:
@@ -425,8 +438,8 @@ class Normalizer:
 
         Args:
             tensor (Tensor): Tensor to determine the mean and standard deviation over.
-            dim (int, optional): Which dimension to take mean and standard deviation over.
-                Defaults to 0.
+            dim (int, optional): Which dimension to take mean and standard deviation
+                over. Defaults to 0.
             keepdim (bool, optional): Whether to keep the reduced dimension in Tensor.
                 Defaults to False.
         """
@@ -495,7 +508,8 @@ def save_checkpoint(
     """Saves a checkpoint and overwrites the best model when is_best = True.
 
     Args:
-        state (dict[str, Any]): Model parameters and other stateful objects like optimizer.
+        state (dict[str, Any]): Model parameters and other stateful objects like
+            optimizer.
         is_best (bool): Whether the model is the best seen according to validation set.
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
@@ -542,7 +556,8 @@ def np_softmax(arr: np.ndarray, axis: int = -1) -> np.ndarray:
 
     Args:
         arr (np.ndarray): Arbitrary dimensional array.
-        axis (int, optional): Dimension over which to take softmax. Defaults to -1 (last).
+        axis (int, optional): Dimension over which to take softmax. Defaults to
+            -1 (last).
 
     Returns:
         np.ndarray: Same dimension as input array, but specified axis reduced

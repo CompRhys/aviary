@@ -34,16 +34,18 @@ class WyckoffData(Dataset):
 
         Args:
             df (pd.DataFrame): Pandas dataframe holding input and target values.
-            task_dict (dict[str, "regression" | "classification"]): Map from target names to task
-                type for multi-task learning.
-            elem_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16",
-                "onehot112" or path to a file with custom element embeddings.
-                Defaults to "matscholar200".
-            sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or "spg-alg-off".
+            task_dict (dict[str, "regression" | "classification"]): Map from target
+                names to task type for multi-task learning.
+            elem_embedding (str, optional): One of "matscholar200", "cgcnn92",
+                "megnet16", "onehot112" or path to a file with custom element
+                embeddings. Defaults to "matscholar200".
+            sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or
+                "spg-alg-off" or path to a file with custom symmetry embeddings.
             inputs (str, optional): df columns to be used for featurization.
                 Defaults to "wyckoff".
-            identifiers (list, optional): df columns for distinguishing data points. Will be
-                copied over into the model's output CSV. Defaults to ["material_id", "composition"].
+            identifiers (list, optional): df columns for distinguishing data points.
+                Will be copied over into the model's output CSV. Defaults to
+                ["material_id", "composition", "wyckoff"].
         """
         if len(identifiers) < 2:
             raise AssertionError("Two identifiers are required")
@@ -185,8 +187,7 @@ def collate_batch(
 
     Returns:
         tuple[
-            tuple[Tensor, Tensor, Tensor, LongTensor, LongTensor, LongTensor, LongTensor]:
-                batched Wren model inputs,
+            tuple[Tensor * 3, LongTensor * 4]: batched Wren model inputs,
             tuple[Tensor | LongTensor]: Target values for different tasks,
             *tuple[str | int]]: Identifiers like material_id, composition
         ]
@@ -288,9 +289,10 @@ def parse_aflow_wyckoff_str(
                 [float(wyckoff_multiplicity_dict[spg_num][letter])] * mult
             )
 
-    # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of high
-    # memory use. Can be turned off by commenting out the for loop and returning
-    # [wyckoff_set] instead of augmented_wyckoff_set. Wren should be able to learn anyway.
+    # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of
+    # high memory use. Can be turned off by commenting out the for loop and returning
+    # [wyckoff_set] instead of augmented_wyckoff_set. Wren should be able to learn
+    # anyway.
     augmented_wyckoff_set = []
     for trans in relab_dict[spg_num]:
         # Apply translation dictionary of allowed relabelling operations in spacegroup

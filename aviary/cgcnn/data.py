@@ -327,7 +327,9 @@ def get_structure_neighbor_info(
     )
 
     if max_num_nbr is not None:
-        _center_indices, _neighbor_indices, _neighbor_dists = [], [], []
+        _center_indices: list[int] = []
+        _neighbor_indices: list[int] = []
+        _neighbor_dists: list[float] = []
 
         for _, idx_group in itertools.groupby(  # group by site index
             zip(site_indices, neighbor_indices, neighbor_dists), key=lambda x: x[0]

@@ -48,11 +48,13 @@ def initialize_model(
 
     Args:
         model_class (BaseModelClass): Which model class to initialize.
-        model_params (dict[str, Any]): Dictionary containing model specific hyperparameters.
+        model_params (dict[str, Any]): Dictionary containing model specific hyperparams.
         device (type[torch.device] | "cuda" | "cpu"): Device the model will run on.
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
-        fine_tune (str, optional): Path to model checkpoint to fine tune. Defaults to None.
-        transfer (str, optional): Path to model checkpoint to transfer. Defaults to None.
+        fine_tune (str, optional): Path to model checkpoint to fine tune. Defaults to
+            None.
+        transfer (str, optional): Path to model checkpoint to transfer. Defaults to
+            None.
         **kwargs: Additional keyword arguments (will be ignored).
 
     Returns:
@@ -80,8 +82,8 @@ def initialize_model(
         loaded_n_targets = model.model_params["n_targets"]
         if loaded_n_targets != n_targets:
             raise ValueError(
-                f"n_targets mismatch between model_params dict ({n_targets}) and loaded "
-                f"state dict ({loaded_n_targets})"
+                f"n_targets mismatch between model_params dict ({n_targets}) and "
+                f"loaded state dict ({loaded_n_targets})"
             )
 
     elif transfer is not None:
@@ -202,9 +204,12 @@ def initialize_losses(
     """Create a dictionary of loss functions for a multi-task model.
 
     Args:
-        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
-        loss_name_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss type.
-        robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults to False.
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or
+            "classification".
+        loss_name_dict (dict[str, "L1" | "L2" | "CSE"]): Map of target names to loss
+            type.
+        robust (bool, optional): Whether to use an uncertainty adjusted loss. Defaults
+            to False.
 
     Returns:
         dict[str, tuple[str, type[torch.nn.Module]]]: Dictionary of losses for each task
@@ -252,7 +257,8 @@ def init_normalizers(
     """Initialise a Normalizer to scale the output targets.
 
     Args:
-        task_dict (dict[str, TaskType]): Map of target names to "regression" or "classification".
+        task_dict (dict[str, TaskType]): Map of target names to "regression" or
+            "classification".
         device (torch.device | "cuda" | "cpu"): Device the model will run on
         resume (str, optional): Path to model checkpoint to resume. Defaults to None.
 
@@ -294,7 +300,8 @@ def train_ensemble(
     patience: int | None = None,
     verbose: bool = False,
 ) -> None:
-    """Train multiple models that form an ensemble in serial with this convenience function.
+    """Train multiple models that form an ensemble in serial with this convenience
+    function.
 
     Args:
         model_class (BaseModelClass): Which model class to initialize.
@@ -383,15 +390,11 @@ def train_ensemble(
 
                 for name, task in model.task_dict.items():
                     if task == "regression":
-                        val_score[name] = v_metrics[name]["MAE"]
-                        print(
-                            f"Validation Baseline - {name}: MAE {val_score[name]:.2f}"
-                        )
+                        MAE = val_score[name] = v_metrics[name]["MAE"]
+                        print(f"Validation Baseline - {name}: {MAE=:.2f}")
                     elif task == "classification":
-                        val_score[name] = v_metrics[name]["Accuracy"]
-                        print(
-                            f"Validation Baseline - {name}: Accuracy {val_score[name]:.2f}"
-                        )
+                        Accuracy = val_score[name] = v_metrics[name]["Accuracy"]
+                        print(f"Validation Baseline - {name}: {Accuracy=:.2f}")
                 model.best_val_scores = val_score
 
         model.fit(
@@ -491,8 +494,8 @@ def results_multitask(
         chkpt_task_dict = checkpoint["model_params"]["task_dict"]
         if chkpt_task_dict != task_dict:
             raise ValueError(
-                f"task_dict {chkpt_task_dict} of checkpoint {resume=} does not match provided "
-                f"task_dict {task_dict}"
+                f"task_dict {chkpt_task_dict} of checkpoint {resume=} does not match "
+                f"provided {task_dict=}"
             )
 
         model = model_class(**checkpoint["model_params"])
@@ -630,7 +633,8 @@ def print_metrics_classification(
 
     Args:
         targets (np.array): Categorical encoding of the tasks. Shape (n_test,).
-        logits (list[n_ens * np.array(n_targets, n_test)]): logits predicted by the model.
+        logits (list[n_ens * np.array(n_targets, n_test)]): logits predicted by the
+            model.
         average ("micro" | "macro" | "samples" | "weighted"): Determines the type of
             data averaging. Defaults to 'micro' which calculates metrics globally by
             considering each element of the label indicator matrix as a label.
@@ -718,9 +722,10 @@ def save_results_dict(
     """Save the results to a file after model evaluation.
 
     Args:
-        ids (dict[str, list[str  |  int]]): ): Each key is the name of an identifier (e.g.
-            material ID, composition, ...) and its value a list of IDs.
-        results_dict (dict[str, Any]): ): nested dictionary of results {name: {col: data}}
+        ids (dict[str, list[str  |  int]]): ): Each key is the name of an identifier
+            (e.g. material ID, composition, ...) and its value a list of IDs.
+        results_dict (dict[str, Any]): ): nested dictionary of results
+            {name: {col: data}}
         model_name (str): ): The name given the model via the --model-name flag.
         run_id (str): ): The run ID given to the model via the --run-id flag.
     """
@@ -730,7 +735,7 @@ def save_results_dict(
         for col, data in results_dict[target_name].items():
             # NOTE we save pre_logits rather than logits due to fact
             # that with the heteroskedastic setup we want to be able to
-            # sample from the Gaussian distributed pre_logits we parameterise.
+            # sample from the Gaussian distributed pre_logits we parameterize.
             if "pre-logits" in col:
                 for n_ens, y_pre_logit in enumerate(data):
                     results.update(
@@ -777,15 +782,16 @@ def get_metrics(
 
     Args:
         targets (np.array): Ground truth values.
-        predictions (np.array): Model predictions. Should be class probabilities for classification
-            (i.e. output model after applying softmax/sigmoid). Same shape as targets for
-            regression, and [len(targets), n_classes] for classification.
+        predictions (np.array): Model predictions. Should be class probabilities for
+            classification (i.e. output model after applying softmax/sigmoid). Same
+            shape as targets for regression, and [len(targets), n_classes] for
+            classification.
         type ('regression' | 'classification'): Task type.
-        prec (int, optional): Number of decimal places to round metrics to. Defaults to 4.
+        prec (int, optional): Decimal places to round metrics to. Defaults to 4.
 
     Returns:
-        dict[str, float]: Keys are rmse, mae, r2 for regression and accuracy, balanced_accuracy,
-            f1, rocauc for classification.
+        dict[str, float]: Keys are rmse, mae, r2 for regression and accuracy,
+            balanced_accuracy, f1, rocauc for classification.
     """
     metrics = {}
     nans = np.isnan(np.column_stack([targets, predictions])).any(axis=1)
