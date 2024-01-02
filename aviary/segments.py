@@ -134,7 +134,8 @@ class MessageLayer(nn.Module):
             node_weights (Tensor): The fractional weights of elements in their materials
             node_prev_features (Tensor): Node hidden features before message passing
             self_idx (LongTensor): Indices of the 1st element in each of the node pairs
-            neighbor_idx (LongTensor): Indices of the 2nd element in each of the node pairs
+            neighbor_idx (LongTensor): Indices of the 2nd element in each of the node
+                pairs
 
         Returns:
             Tensor: node hidden features after message passing

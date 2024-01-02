@@ -86,12 +86,13 @@ el_refs = {
 
 
 def get_formation_energy(comp: str, energy: float, el_refs: dict[str, float]) -> float:
-    """Compute formation energy per atom for formula/energy pair and elemental references.
+    """Compute formation energy per atom for formula/energy pair and elemental
+    references.
 
     Args:
         comp (str): Formula string
-        energy (float): energy per atom in eV
-        el_refs (dict[str, float]): elemental reference energies
+        energy (float): energy in eV/atom
+        el_refs (dict[str, float]): elemental reference energies in eV/atom
 
     Returns:
         float: formation energy per atom in eV

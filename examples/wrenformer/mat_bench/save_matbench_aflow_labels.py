@@ -10,8 +10,8 @@ __date__ = "2022-04-11"
 
 
 """
-This file uses Spglib to generate Aflow Wyckoff labels for all Matbench datasets and stores them
-to disk in the datasets/ folder as Bzip2-compressed JSON files.
+This file uses Spglib to generate Aflow Wyckoff labels for all Matbench datasets and
+stores them to disk in the datasets/ folder as Bzip2-compressed JSON files.
 """
 
 

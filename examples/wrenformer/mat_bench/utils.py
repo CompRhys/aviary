@@ -34,10 +34,11 @@ def merge_json_on_disk(
     Args:
         file_path (str): Path to JSON file. File will be created if not exist.
         dct (dict): Dictionary to merge into JSON file.
-        on_non_serializable ('annotate' | 'error'): What to do with non-serializable values
-            encountered in dct. 'annotate' will replace the offending object with a string
-            indicating the type, e.g. '<not serializable: function>'. 'error' will raise
-            'TypeError: Object of type function is not JSON serializable'. Defaults to 'annotate'.
+        on_non_serializable ('annotate' | 'error'): What to do with non-serializable
+            values encountered in dct. 'annotate' will replace the offending object with
+            a string indicating the type, e.g. '<not serializable: function>'. 'error'
+            will raise 'TypeError: Object of type function is not JSON serializable'.
+            Defaults to 'annotate'.
     """
     try:
         with open(file_path) as json_file:
@@ -48,7 +49,8 @@ def merge_json_on_disk(
         pass
 
     def non_serializable_handler(obj: object) -> str:
-        # replace functions and classes in dct with string indicating it's a non-serializable type
+        # replace functions and classes in dct with string indicating it's a
+        # non-serializable type
         return f"<not serializable: {type(obj).__qualname__}>"
 
     with open(file_path, "w") as file:

@@ -31,15 +31,16 @@ class CompositionData(Dataset):
 
         Args:
             df (pd.DataFrame): Pandas dataframe holding input and target values.
-            task_dict (dict[str, "regression" | "classification"]): Map from target names to task
-                type.
-            elem_embedding (str, optional): One of "matscholar200", "cgcnn92", "megnet16",
-                "onehot112" or path to a file with custom element embeddings.
-                Defaults to "matscholar200".
+            task_dict (dict[str, "regression" | "classification"]): Map from target
+                names to task type.
+            elem_embedding (str, optional): One of "matscholar200", "cgcnn92",
+                "megnet16", "onehot112" or path to a file with custom element
+                embeddings. Defaults to "matscholar200".
             inputs (str, optional): df column name holding material compositions.
                 Defaults to "composition".
-            identifiers (list, optional): df columns for distinguishing data points. Will be
-                copied over into the model's output CSV. Defaults to ["material_id", "composition"].
+            identifiers (list, optional): df columns for distinguishing data points.
+                Will be copied over into the model's output CSV. Defaults to
+                ["material_id", "composition"].
         """
         if len(identifiers) != 2:
             raise AssertionError("Two identifiers are required")
@@ -100,11 +101,11 @@ class CompositionData(Dataset):
             elem_fea = np.vstack([self.elem_features[element] for element in elements])
         except AssertionError as exc:
             raise AssertionError(
-                f"{material_ids} ({composition}) contains element types not in embedding"
+                f"{material_ids} contains element types not in embedding"
             ) from exc
         except ValueError as exc:
             raise ValueError(
-                f"{material_ids} ({composition}) composition cannot be parsed into elements"
+                f"{material_ids} composition cannot be parsed into elements"
             ) from exc
 
         n_elems = len(elements)
@@ -150,13 +151,14 @@ def collate_batch(
             - nbr_fea (Tensor):
             - self_idx (LongTensor):
             - nbr_idx (LongTensor):
-            - target (Tensor | LongTensor): target values containing floats for regression or
-                integers as class labels for classification
+            - target (Tensor | LongTensor): target values containing floats for
+                regression or integers as class labels for classification
             - cif_id: str or int
 
     Returns:
         tuple[
-            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched Roost model inputs,
+            tuple[Tensor, Tensor, LongTensor, LongTensor, LongTensor]: batched Roost
+                model inputs,
             tuple[Tensor | LongTensor]: Target values for different tasks,
             # TODO this last tuple is unpacked how to do type hint?
             *tuple[str | int]: Identifiers like material_id, composition
