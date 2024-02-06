@@ -34,3 +34,8 @@ def robust_l2_loss(pred_mean: Tensor, pred_log_std: Tensor, target: Tensor) -> T
     """
     loss = 0.5 * (pred_mean - target) ** 2 * torch.exp(-2 * pred_log_std) + pred_log_std
     return torch.mean(loss)
+
+
+# aliases for backwards compatibility
+RobustL1Loss = robust_l1_loss
+RobustL2Loss = robust_l2_loss

@@ -178,7 +178,7 @@ def df_to_in_mem_dataloader(
     for idx, tensor in enumerate(initial_embeddings):
         inputs[idx] = tensor.to(device)
 
-    ids = (df[id_col] if id_col in df else df.index).to_numpy()
+    ids = df.get(id_col, df.index).to_numpy()
     return InMemoryDataLoader(
         [inputs, targets, ids], collate_fn=collate_batch, **kwargs
     )
