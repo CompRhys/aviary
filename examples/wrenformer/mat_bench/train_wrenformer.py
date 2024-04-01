@@ -23,7 +23,6 @@ MODULE_DIR = os.path.dirname(__file__)
 Train a Wrenformer ensemble of size n_folds on collection of Matbench datasets.
 """
 
-
 # %%
 epochs = 300
 folds = list(range(5))
