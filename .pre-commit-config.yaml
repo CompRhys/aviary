@@ -5,7 +5,7 @@ ci:
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.2.1
+    rev: v0.3.5
     hooks:
       - id: ruff
         args: [--fix]
@@ -30,14 +30,14 @@ repos:
         args: [--check-filenames]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.9.0
     hooks:
       - id: mypy
         exclude: (tests|examples)/
         additional_dependencies: [wandb]
 
   - repo: https://github.com/janosh/format-ipy-cells
-    rev: v0.1.10
+    rev: v0.1.11
     hooks:
       - id: format-ipy-cells
 
