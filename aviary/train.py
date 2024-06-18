@@ -277,10 +277,14 @@ def train_model(
                 inference_model(
                     *[
                         tensor.to(inference_model.device)
-                        if hasattr(tensor, "to") else tensor
+                        if hasattr(tensor, "to")
+                        else tensor
                         for tensor in inputs
                     ]
-                )[0].cpu().numpy() for inputs, *_ in test_loader
+                )[0]
+                .cpu()
+                .numpy()
+                for inputs, *_ in test_loader
             ]
         ).squeeze()
 

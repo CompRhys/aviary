@@ -48,7 +48,7 @@ class BaseModelClass(nn.Module, ABC):
                 loss function to attenuate the weighting of uncertain samples.
             epoch (int, optional): Epoch model training will begin/resume from.
                 Defaults to 0.
-            device 
+            device
             best_val_scores (dict[str, float], optional): Validation score to use for
                 early stopping. Defaults to None.
         """
@@ -279,7 +279,7 @@ class BaseModelClass(nn.Module, ABC):
                 if task == "regression":
                     assert normalizer is not None
                     targets = normalizer.norm(targets).squeeze()  # noqa: PLW2901
-                    targets = targets.to(self.device) # noqa: PLW2901
+                    targets = targets.to(self.device)  # noqa: PLW2901
 
                     if self.robust:
                         preds, log_std = output.unbind(dim=1)
@@ -294,7 +294,7 @@ class BaseModelClass(nn.Module, ABC):
                     target_metrics["MSE"].append(float(error.pow(2).mean()))
 
                 elif task == "classification":
-                    targets = targets.to(self.device) # noqa: PLW2901
+                    targets = targets.to(self.device)  # noqa: PLW2901
 
                     if self.robust:
                         pre_logits, log_std = output.chunk(2, dim=1)
@@ -382,7 +382,10 @@ class BaseModelClass(nn.Module, ABC):
         for inputs, targets, *batch_ids in tqdm(
             data_loader, disable=True if not verbose else None
         ):
-            inputs = [tensor.to(self.device) if hasattr(tensor, "to") else tensor for tensor in inputs]  # noqa: PLW2901
+            inputs = [
+                tensor.to(self.device) if hasattr(tensor, "to") else tensor
+                for tensor in inputs
+            ]  # noqa: PLW2901
             preds = self(*inputs)  # forward pass to get model preds
 
             test_ids.append(batch_ids)
@@ -421,7 +424,10 @@ class BaseModelClass(nn.Module, ABC):
         features = []
 
         for inputs, *_ in data_loader:
-            inputs = [tensor.to(self.device) if hasattr(tensor, "to") else tensor for tensor in inputs]  # noqa: PLW2901
+            inputs = [
+                tensor.to(self.device) if hasattr(tensor, "to") else tensor
+                for tensor in inputs
+            ]  # noqa: PLW2901
             output = self.trunk_nn(self.material_nn(*inputs)).cpu().numpy()
             features.append(output)
 
