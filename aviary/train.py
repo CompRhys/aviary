@@ -136,6 +136,7 @@ def train_model(
         else (torch.nn.NLLLoss() if robust else torch.nn.CrossEntropyLoss())
     )
     loss_dict = {target_col: (task_type, loss_func)}
+
     normalizer_dict = {target_col: Normalizer() if task_type == reg_key else None}
     # TODO consider actually fitting the normalizer, currently just passed into
     # model.evaluate() to match function signature
@@ -272,7 +273,19 @@ def train_model(
 
     with torch.no_grad():
         preds = np.concatenate(
-            [inference_model(*inputs)[0].cpu().numpy() for inputs, *_ in test_loader]
+            [
+                inference_model(
+                    *[
+                        tensor.to(inference_model.device)
+                        if hasattr(tensor, "to")
+                        else tensor
+                        for tensor in inputs
+                    ]
+                )[0]
+                .cpu()
+                .numpy()
+                for inputs, *_ in test_loader
+            ]
         ).squeeze()
 
     if test_df is None:
@@ -371,6 +384,7 @@ def train_wrenformer(
     id_col: str = "material_id",
     input_col: str | None = None,
     model_params: dict[str, Any] | None = None,
+    data_loader_device: str = "cpu",
     **kwargs,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Train a Wrenformer model on a dataframe. This function handles the DataLoader
@@ -396,6 +410,7 @@ def train_wrenformer(
             run_name which default to 'wyckoff' and 'composition' respectively.
         model_params (dict): Passed to Wrenformer class. E.g. dict(n_attn_layers=6,
             embedding_aggregation=("mean", "std")).
+        data_loader_device(str): device to store the InMemoryDataLoader's tensors on.
         **kwargs: Additional keyword arguments are passed to train_model().
 
     Returns:
@@ -419,6 +434,7 @@ def train_wrenformer(
         input_col=input_col,
         id_col=id_col,
         embedding_type=embedding_type,
+        device=data_loader_device,
     )
     train_loader = df_to_in_mem_dataloader(
         train_df,
