@@ -34,6 +34,7 @@ class BaseModelClass(nn.Module, ABC):
         task_dict: dict[str, TaskType],
         robust: bool,
         epoch: int = 0,
+        device: str | None = None,
         best_val_scores: dict[str, float] | None = None,
     ) -> None:
         """Store core model parameters.
@@ -47,6 +48,7 @@ class BaseModelClass(nn.Module, ABC):
                 loss function to attenuate the weighting of uncertain samples.
             epoch (int, optional): Epoch model training will begin/resume from.
                 Defaults to 0.
+            device 
             best_val_scores (dict[str, float], optional): Validation score to use for
                 early stopping. Defaults to None.
         """
@@ -54,10 +56,14 @@ class BaseModelClass(nn.Module, ABC):
         self.task_dict = task_dict
         self.target_names = list(task_dict)
         self.robust = robust
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device
         self.epoch = epoch
         self.best_val_scores = best_val_scores or {}
         self.es_patience = 0
 
+        self.to(self.device)
         self.model_params: dict[str, Any] = {"task_dict": task_dict}
 
     def fit(
@@ -256,7 +262,10 @@ class BaseModelClass(nn.Module, ABC):
         for inputs, targets_list, *_ in tqdm(
             data_loader, disable=None if pbar else True
         ):
-            # compute output
+            inputs = [  # noqa: PLW2901
+                tensor.to(self.device) if hasattr(tensor, "to") else tensor
+                for tensor in inputs
+            ]
             outputs = self(*inputs)
 
             mixed_loss: Tensor = 0  # type: ignore[assignment]
@@ -270,6 +279,7 @@ class BaseModelClass(nn.Module, ABC):
                 if task == "regression":
                     assert normalizer is not None
                     targets = normalizer.norm(targets).squeeze()  # noqa: PLW2901
+                    targets = targets.to(self.device) # noqa: PLW2901
 
                     if self.robust:
                         preds, log_std = output.unbind(dim=1)
@@ -284,6 +294,8 @@ class BaseModelClass(nn.Module, ABC):
                     target_metrics["MSE"].append(float(error.pow(2).mean()))
 
                 elif task == "classification":
+                    targets = targets.to(self.device) # noqa: PLW2901
+
                     if self.robust:
                         pre_logits, log_std = output.chunk(2, dim=1)
                         logits = sampled_softmax(pre_logits, log_std)
@@ -370,6 +382,7 @@ class BaseModelClass(nn.Module, ABC):
         for inputs, targets, *batch_ids in tqdm(
             data_loader, disable=True if not verbose else None
         ):
+            inputs = [tensor.to(self.device) if hasattr(tensor, "to") else tensor for tensor in inputs]  # noqa: PLW2901
             preds = self(*inputs)  # forward pass to get model preds
 
             test_ids.append(batch_ids)
@@ -407,8 +420,9 @@ class BaseModelClass(nn.Module, ABC):
         self.eval()  # ensure model is in evaluation mode
         features = []
 
-        for input_, *_ in data_loader:
-            output = self.trunk_nn(self.material_nn(*input_)).cpu().numpy()
+        for inputs, *_ in data_loader:
+            inputs = [tensor.to(self.device) if hasattr(tensor, "to") else tensor for tensor in inputs]  # noqa: PLW2901
+            output = self.trunk_nn(self.material_nn(*inputs)).cpu().numpy()
             features.append(output)
 
         return np.vstack(features)
