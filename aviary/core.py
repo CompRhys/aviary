@@ -48,7 +48,7 @@ class BaseModelClass(nn.Module, ABC):
                 loss function to attenuate the weighting of uncertain samples.
             epoch (int, optional): Epoch model training will begin/resume from.
                 Defaults to 0.
-            device
+            device (str, optional): Device to store the model parameters on.
             best_val_scores (dict[str, float], optional): Validation score to use for
                 early stopping. Defaults to None.
         """
@@ -382,10 +382,10 @@ class BaseModelClass(nn.Module, ABC):
         for inputs, targets, *batch_ids in tqdm(
             data_loader, disable=True if not verbose else None
         ):
-            inputs = [
+            inputs = [  # noqa: PLW2901
                 tensor.to(self.device) if hasattr(tensor, "to") else tensor
                 for tensor in inputs
-            ]  # noqa: PLW2901
+            ]
             preds = self(*inputs)  # forward pass to get model preds
 
             test_ids.append(batch_ids)
@@ -424,10 +424,10 @@ class BaseModelClass(nn.Module, ABC):
         features = []
 
         for inputs, *_ in data_loader:
-            inputs = [
+            inputs = [  # noqa: PLW2901
                 tensor.to(self.device) if hasattr(tensor, "to") else tensor
                 for tensor in inputs
-            ]  # noqa: PLW2901
+            ]
             output = self.trunk_nn(self.material_nn(*inputs)).cpu().numpy()
             features.append(output)
 
