@@ -1,7 +1,7 @@
 from shutil import which
 
 import pytest
-from pymatgen.core.structure import Structure
+from pymatgen.core.structure import Composition, Structure
 
 from aviary.wren.utils import (
     count_crystal_dof,
@@ -9,6 +9,7 @@ from aviary.wren.utils import (
     count_wyckoff_positions,
     get_aflow_label_from_aflow,
     get_aflow_label_from_spglib,
+    get_aflow_strs_from_iso_and_composition,
     get_isopointal_proto_from_aflow,
 )
 
@@ -53,6 +54,31 @@ def test_count_crystal_dof():
 def test_get_isopointal_proto(aflow_label, expected):
     """Get a recanonicalized prototype string without chemical system"""
     assert get_isopointal_proto_from_aflow(aflow_label) == expected
+
+
+@pytest.mark.parametrize(
+    "isopointal_proto, composition, expected",
+    [
+        (
+            "AB2C3D4_tP10_115_a_g_bg_cdg",
+            "Ce2Al3GaPd4",
+            "A3B2CD4_tP10_115_ag_g_b_cdg:Al-Ce-Ga-Pd",
+        ),
+        # checks that we can handle cases where one element could be on multiple sites
+        (
+            "ABC3_oP20_62_a_c_cd",
+            "YbNiO3",
+            "AB3C_oP20_62_c_cd_a:Ni-O-Yb AB3C_oP20_62_a_cd_c:Ni-O-Yb",
+        ),
+    ],
+)
+def test_get_aflow_strs_from_iso_and_composition(
+    isopointal_proto, composition, expected
+):
+    aflows = get_aflow_strs_from_iso_and_composition(
+        isopointal_proto, Composition(composition)
+    )
+    assert aflows == expected.split(" ")
 
 
 @pytest.mark.parametrize(

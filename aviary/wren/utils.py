@@ -269,13 +269,13 @@ def get_aflow_label_from_spg_analyzer(
     return aflow_label_with_chemsys
 
 
-def canonicalize_elem_wyks(elem_wyks: str, spg_num: int) -> str:
+def canonicalize_elem_wyks(elem_wyks: str, spg_num: int | str) -> str:
     """Given an element ordering, canonicalize the associated Wyckoff positions
     based on the alphabetical weight of equivalent choices of origin.
 
     Args:
         elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff positions
-        spg_num (int): International space group number.
+        spg_num (int | str): International space group number.
 
     Returns:
         str: Canonicalized Wren Wyckoff encoding.
@@ -474,6 +474,84 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     # TODO: how to tie break when the scores are the same?
     # currently done by alphabetical
     return "_".join((c_anom, pearson, spg, canonical[0][1]))
+
+
+def _get_anom_formula_dict(anonymous_formula: str) -> dict:
+    """Get a dictionary of element to count from an anonymous formula."""
+    subst = r"\g<1>1"
+    anonymous_formula = re.sub(r"([A-z](?![0-9]))", subst, anonymous_formula)
+    anom_list = ["".join(g) for _, g in groupby(anonymous_formula, str.isalpha)]
+    counts = anom_list[1::2]
+    dummy = anom_list[0::2]
+
+    return dict(zip(dummy, map(int, counts), strict=True))
+
+
+def _find_translations(dict1: dict, dict2: dict) -> list[dict]:
+    """Find all possible translations between two dictionaries."""
+    # Check if the dictionaries have the same values
+    if sorted(dict1.values()) != sorted(dict2.values()):
+        return []
+
+    keys1 = list(dict1.keys())
+    keys2 = list(dict2.keys())
+
+    valid_translations = []
+
+    # Generate all permutations of keys2
+    for perm in permutations(keys2):
+        # Create a translation dictionary
+        translation = dict(zip(keys1, perm))
+
+        # Apply the translation to dict1
+        transformed = {translation[k]: v for k, v in dict1.items()}
+
+        # Check if the transformed dictionary matches dict2
+        if transformed == dict2:
+            valid_translations.append(translation)
+
+    return valid_translations
+
+
+def get_aflow_strs_from_iso_and_composition(
+    isopointal_proto: str, composition: Composition
+) -> list[str]:
+    """Get a canonicalized string for the prototype.
+
+    Args:
+        isopointal_proto (str): AFLOW-style Canonicalized prototype label
+        composition (Composition): pymatgen Composition object
+
+    Returns:
+        list[str]: List of possible AFLOW-style prototype labels with appended
+            chemical systems that can be generated from combinations of the
+            input isopointal_proto and composition.
+    """
+    anonymous_formula, pearson, spg, *wyckoffs = isopointal_proto.split("_")
+
+    ele_amt_dict = composition.get_el_amt_dict()
+    proto_formula = prototype_formula(composition)
+    anom_amt_dict = _get_anom_formula_dict(anonymous_formula)
+
+    translations = _find_translations(ele_amt_dict, anom_amt_dict)
+    anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs, strict=True))
+
+    subst = r"1\g<1>"
+    anonymous_formula = re.sub(r"([A-z](?![0-9]))", subst, anonymous_formula)
+
+    aflow_strs = []
+    for t in translations:
+        elem_order = sorted(t.keys())
+        elem_wyks = [
+            re.sub(r"(?<!\d)([a-zA-Z])", r"1\1", anom_ele_to_wyk[t[elem]])
+            for elem in elem_order
+        ]
+        canonical = canonicalize_elem_wyks("_".join(elem_wyks), spg)
+        chemsys = "-".join(elem_order)
+        aflow_str = f"{proto_formula}_{pearson}_{spg}_{canonical}:{chemsys}"
+        aflow_strs.append(aflow_str)
+
+    return aflow_strs
 
 
 def count_distinct_wyckoff_letters(aflow_str: str) -> int:
