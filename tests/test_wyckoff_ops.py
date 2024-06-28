@@ -10,7 +10,9 @@ from aviary.wren.utils import (
     get_aflow_label_from_aflow,
     get_aflow_label_from_spglib,
     get_aflow_strs_from_iso_and_composition,
+    get_anom_formula_from_prototype_formula,
     get_isopointal_proto_from_aflow,
+    prototype_formula,
 )
 
 from .conftest import TEST_DIR
@@ -79,6 +81,14 @@ def test_get_aflow_strs_from_iso_and_composition(
         isopointal_proto, Composition(composition)
     )
     assert aflows == expected.split(" ")
+
+
+def test_prototype_formula():
+    assert prototype_formula(Composition("Ce2Al3GaPd4")) == "A3B2CD4"
+
+
+def test_get_anom_formula_from_prototype_formula():
+    assert get_anom_formula_from_prototype_formula("A3B2CD4") == "AB2C3D4"
 
 
 @pytest.mark.parametrize(

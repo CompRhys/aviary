@@ -359,6 +359,22 @@ def prototype_formula(composition: Composition) -> str:
     return anon
 
 
+def get_anom_formula_from_prototype_formula(prototype_formula: str) -> str:
+    """Get an anonymous formula from a prototype formula."""
+    subst = r"\g<1>1"
+    prototype_formula = re.sub(r"([A-z](?![0-9]))", subst, prototype_formula)
+    anom_list = ["".join(g) for _, g in groupby(prototype_formula, str.isalpha)]
+    counts = anom_list[1::2]
+    dummy = anom_list[0::2]
+
+    return "".join(
+        [
+            f"{d}{c}" if c != "1" else d
+            for d, c in zip(dummy, sorted(counts), strict=False)
+        ]
+    )
+
+
 def count_wyckoff_positions(aflow_label: str) -> int:
     """Count number of Wyckoff positions in Wyckoff representation.
 
