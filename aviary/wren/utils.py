@@ -543,6 +543,11 @@ def get_aflow_strs_from_iso_and_composition(
             chemical systems that can be generated from combinations of the
             input isopointal_proto and composition.
     """
+    if not isinstance(isopointal_proto, str):
+        raise TypeError(
+            f"Invalid isopointal_proto: {isopointal_proto} ({type(isopointal_proto)})"
+        )
+
     anonymous_formula, pearson, spg, *wyckoffs = isopointal_proto.split("_")
 
     ele_amt_dict = composition.get_el_amt_dict()
