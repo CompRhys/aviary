@@ -250,6 +250,10 @@ def collate_batch(
     )
 
 
+# Pre-compile the regular expression
+WYK_LETTER_PATTERN = re.compile(r"((?<![0-9])[A-z])")
+
+
 def parse_aflow_wyckoff_str(
     aflow_label: str,
 ) -> tuple[str, list[float], list[str], list[tuple[str, ...]]]:
@@ -271,36 +275,29 @@ def parse_aflow_wyckoff_str(
     wyckoff_set = []
 
     for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
-        # normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_normalized = re.sub(
-            r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
-        )
+        # Normalize Wyckoff letters to start with 1 if missing digit
+        wyk_letters_normalized = WYK_LETTER_PATTERN.sub(r"1\g<1>", wyk_letters_per_elem)
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
         sep_n_wyks = [
             "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
         ]
 
-        # Add the Wyckoff letter and its multiplicity to the list
-        for mult, letter in zip(map(int, sep_n_wyks[0::2]), sep_n_wyks[1::2]):
+        # Process Wyckoff letters and multiplicities
+        mults = map(int, sep_n_wyks[0::2])
+        letters = sep_n_wyks[1::2]
+
+        for mult, letter in zip(mults, letters):
             elements.extend([el] * mult)
             wyckoff_set.extend([letter] * mult)
             wyckoff_site_multiplicities.extend(
                 [float(wyckoff_multiplicity_dict[spg_num][letter])] * mult
             )
 
-    # NOTE This on-the-fly augmentation of equivalent Wyckoff sets could be a source of
-    # high memory use. Can be turned off by commenting out the for loop and returning
-    # [wyckoff_set] instead of augmented_wyckoff_set. Wren should be able to learn
-    # anyway.
-    augmented_wyckoff_set = []
-    for trans in relab_dict[spg_num]:
-        # Apply translation dictionary of allowed relabelling operations in spacegroup
-        t = str.maketrans(trans)
-        augmented_wyckoff_set.append(
-            tuple(",".join(wyckoff_set).translate(t).split(","))
-        )
+    # Create augmented Wyckoff set
+    augmented_wyckoff_set = {
+        tuple(",".join(wyckoff_set).translate(str.maketrans(trans)).split(","))
+        for trans in relab_dict[spg_num]
+    }
 
-    augmented_wyckoff_set = list(set(augmented_wyckoff_set))
-
-    return spg_num, wyckoff_site_multiplicities, elements, augmented_wyckoff_set
+    return spg_num, wyckoff_site_multiplicities, elements, list(augmented_wyckoff_set)

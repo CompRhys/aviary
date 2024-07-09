@@ -78,12 +78,13 @@ def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
     parsed_output = parse_aflow_wyckoff_str(wyckoff_str)
     spg_num, wyckoff_site_multiplicities, elements, augmented_wyckoffs = parsed_output
 
-    symmetry_features = torch.tensor(
+    symmetry_features = np.array(
         [
             [sym_features[spg_num][wyk_pos] for wyk_pos in equivalent_wyckoff_set]
             for equivalent_wyckoff_set in augmented_wyckoffs
         ]
     )
+    symmetry_features = torch.from_numpy(symmetry_features)
 
     n_augments = len(augmented_wyckoffs)  # number of equivalent Wyckoff sets
     element_features = torch.tensor([elem_features[el] for el in elements])
@@ -174,6 +175,7 @@ def df_to_in_mem_dataloader(
     )
     if targets.dtype == torch.bool:
         targets = targets.long()  # convert binary classification targets to 0 and 1
+
     inputs = np.empty(len(initial_embeddings), dtype=object)
     for idx, tensor in enumerate(initial_embeddings):
         inputs[idx] = tensor.to(device)
