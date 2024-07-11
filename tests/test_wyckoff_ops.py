@@ -14,10 +14,16 @@ from aviary.wren.utils import (
     get_aflow_strs_from_iso_and_composition,
     get_anom_formula_from_prototype_formula,
     get_isopointal_proto_from_aflow,
+    get_random_structure_for_protostructure,
     prototype_formula,
 )
 
 from .conftest import TEST_DIR
+
+try:
+    import pyxtal
+except ImportError:
+    pyxtal = None
 
 
 def test_get_aflow_label_from_spglib():
@@ -176,3 +182,26 @@ def test_get_aflow_label_from_aflow():
     out = get_aflow_label_from_aflow(struct, aflow_cli)
     expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
     assert out == expected
+
+
+@pytest.mark.skipif(pyxtal is None, reason="pyxtal not installed")
+@pytest.mark.xfail(
+    reason="pyxtal is non-deterministic and symmetry can increase in random crystal"
+)
+@pytest.mark.parametrize(
+    "protostructure",
+    [
+        ("A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S"),
+        ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"),
+        ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si"),
+        ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O"),
+        ("ABC2D2_mC24_15_e_e_f_f:Ca-Fe-O-Si"),
+        ("A3B2CD4_tP10_115_ag_g_b_cdg:Al-Ce-Ga-Pd"),
+        ("AB2_cF576_228_h_fgh:Ba-Ti"),
+    ],
+)
+def test_get_random_structure_for_protostructure(protostructure):
+    """Check roundtrip for generating a random structure from a prototype string"""
+    assert protostructure == get_aflow_label_from_spglib(
+        get_random_structure_for_protostructure(protostructure)
+    )

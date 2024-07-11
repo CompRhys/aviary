@@ -15,6 +15,11 @@ from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
+try:
+    from pyxtal import pyxtal
+except ImportError:
+    pyxtal = None
+
 module_dir = dirname(abspath(__file__))
 
 with open(join(module_dir, "wyckoff-position-multiplicities.json")) as file:
@@ -82,6 +87,16 @@ def split_alpha_numeric(s: str) -> dict[str, list[str]]:
     }
 
 
+def count_values_for_wyckoff(
+    wyckoff: list[str],
+    multiplicity: list[str],
+    spg: str,
+    lookup_dict: dict[str, dict[str, int]],
+):
+    """Count values from a lookup table and scale by wyckoff multiplicities."""
+    return sum(float(n) * lookup_dict[spg][k] for n, k in zip(multiplicity, wyckoff))
+
+
 def get_aflow_label_from_aflow(
     struct: Structure,
     aflow_executable: str | None = None,
@@ -143,9 +158,11 @@ def get_aflow_label_from_aflow(
             RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
         )
         sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
-        elem_dict[elem] = sum(
-            float(wyckoff_multiplicity_dict[spg_num][w]) * float(n)
-            for n, w in zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"])
+        elem_dict[elem] = count_values_for_wyckoff(
+            sep_el_wyks["alpha"],
+            sep_el_wyks["numeric"],
+            spg_num,
+            wyckoff_multiplicity_dict,
         )
 
     full_label = f"{aflow_label}:{'-'.join(elements)}"
@@ -340,12 +357,11 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
     sorted_el_wyks = []
     for el_wyks in wyks.split("_"):
         sep_el_wyks = split_alpha_numeric(el_wyks)
-        sep_el_wyks["numeric"] = ["" if i == "1" else i for i in sep_el_wyks["numeric"]]
         sorted_el_wyks.append(
             "".join(
                 [
-                    f"{n}{w}"
-                    for n, w in sorted(
+                    f"{mult}{wyk}" if mult != "1" else wyk
+                    for mult, wyk in sorted(
                         zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"]),
                         key=lambda x: x[1],
                     )
@@ -395,9 +411,10 @@ def get_anom_formula_from_prototype_formula(prototype_formula: str) -> str:
 
     return "".join(
         [
-            f"{d}{c}" if c != "1" else d
-            for d, c in zip(
-                anom_list["alpha"], sorted(anom_list["numeric"]), strict=False
+            f"{el}{num}" if num != "1" else el
+            for el, num in zip(
+                anom_list["alpha"],
+                sorted(anom_list["numeric"]),
             )
         ]
     )
@@ -447,9 +464,11 @@ def count_crystal_dof(aflow_label: str) -> int:
             RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
         )
         sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
-        n_params += sum(
-            float(n) * param_dict[spg][k]
-            for n, k in zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"])
+        n_params += count_values_for_wyckoff(
+            sep_el_wyks["alpha"],
+            sep_el_wyks["numeric"],
+            spg,
+            param_dict,
         )
 
     return n_params
@@ -467,21 +486,23 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     aflow_label, _ = aflow_label.split(":")
     anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
 
-    # TODO: this really needs some comments to explain what's going on - @janosh
     anonymous_formula = re.sub(
         RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, anonymous_formula
     )
     anom_list = split_alpha_numeric(anonymous_formula)
     counts = [int(x) for x in anom_list["numeric"]]
-    dummy = anom_list["alpha"]
+    dummy_els = anom_list["alpha"]
 
     s_counts, s_wyks_tup = list(zip(*sorted(zip(counts, wyckoffs))))
     s_wyks = re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, "_".join(s_wyks_tup))
-    c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])
+    c_anom = "".join(
+        [f"{el}{num}" if num != 1 else el for el, num in zip(dummy_els, s_counts)]
+    )
 
     if len(s_counts) == len(set(s_counts)):
         cs_wyks = canonicalize_elem_wyks(s_wyks, int(spg))
         return f"{c_anom}_{pearson}_{spg}_{cs_wyks}"
+
     # credit Stef: https://stackoverflow.com/a/70126643/5517459
     valid_permutations = [
         list(map(itemgetter(1), chain.from_iterable(p)))
@@ -622,3 +643,47 @@ def count_distinct_wyckoff_letters(aflow_str: str) -> int:
     _, _, _, wyckoff_letters = aflow_str.split("_", 3)  # drop prototype, Pearson, spg
     wyckoff_letters = wyckoff_letters.translate(remove_digits).replace("_", "")
     return len(set(wyckoff_letters))  # number of distinct Wyckoff letters
+
+
+def get_random_structure_for_protostructure(protostructure: str, **kwargs) -> Structure:
+    """Generate a random structure for a given prototype structure.
+
+    NOTE that due to the random nature of the generation, the output structure
+    may be higher symmetry than the requested prototype structure.
+    """
+    if pyxtal is None:
+        raise ImportError("pyxtal is required for this function")
+
+    aflow_label, chemsys = protostructure.split(":")
+    _, _, spg, *wyckoffs = aflow_label.split("_")
+
+    wyckoffs = [re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, w) for w in wyckoffs]
+    sep_el_wyks = [split_alpha_numeric(w) for w in wyckoffs]
+
+    species_sites = [
+        [
+            site
+            for m, w in zip(d["numeric"], d["alpha"])
+            for site in [f"{wyckoff_multiplicity_dict[spg][w]}{w}"] * int(m)
+        ]
+        for d in sep_el_wyks
+    ]
+
+    species_counts = [
+        sum(
+            int(wyckoff_multiplicity_dict[spg][w]) * int(m)
+            for m, w in zip(d["numeric"], d["alpha"])
+        )
+        for d in sep_el_wyks
+    ]
+
+    p = pyxtal()
+    p.from_random(
+        dim=3,
+        group=int(spg),
+        species=chemsys.split("-"),
+        numIons=species_counts,
+        sites=species_sites,
+        **kwargs,
+    )
+    return p.to_pymatgen()
