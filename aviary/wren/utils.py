@@ -65,9 +65,21 @@ RE_SUBST_ONE_SUFFIX = r"\g<1>1"
 SUBST_ONE_PREFIX = r"1\g<1>"
 
 
-def split_alpha_numeric(s: str) -> list[str]:
-    """Split a string into alternating alpha and numeric groups."""
-    return ["".join(g) for _, g in groupby(s, str.isalpha)]
+def split_alpha_numeric(s: str) -> dict[str, list[str]]:
+    """Split a string into separate lists of alpha and numeric groups.
+
+    Args:
+        s (str): The input string to split.
+
+    Returns:
+        dict[str, list[str]]: A dictionary with keys 'alpha' and 'numeric',
+                              each containing a list of the respective groups.
+    """
+    groups = ["".join(g) for _, g in groupby(s, str.isalpha)]
+    return {
+        "alpha": [g for g in groups if g.isalpha()],
+        "numeric": [g for g in groups if g.isnumeric()],
+    }
 
 
 def get_aflow_label_from_aflow(
@@ -133,7 +145,7 @@ def get_aflow_label_from_aflow(
         sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
         elem_dict[elem] = sum(
             float(wyckoff_multiplicity_dict[spg_num][w]) * float(n)
-            for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
+            for n, w in zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"])
         )
 
     full_label = f"{aflow_label}:{'-'.join(elements)}"
@@ -328,19 +340,19 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
     sorted_el_wyks = []
     for el_wyks in wyks.split("_"):
         sep_el_wyks = split_alpha_numeric(el_wyks)
-        sep_el_wyks = ["" if i == "1" else i for i in sep_el_wyks]
+        sep_el_wyks["numeric"] = ["" if i == "1" else i for i in sep_el_wyks["numeric"]]
         sorted_el_wyks.append(
             "".join(
                 [
                     f"{n}{w}"
                     for n, w in sorted(
-                        zip(sep_el_wyks[0::2], sep_el_wyks[1::2]),
+                        zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"]),
                         key=lambda x: x[1],
                     )
                 ]
             )
         )
-        score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks[1::2])
+        score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks["alpha"])
 
     return "_".join(sorted_el_wyks), score
 
@@ -380,13 +392,13 @@ def get_anom_formula_from_prototype_formula(prototype_formula: str) -> str:
         RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, prototype_formula
     )
     anom_list = split_alpha_numeric(prototype_formula)
-    counts = anom_list[1::2]
-    dummy = anom_list[0::2]
 
     return "".join(
         [
             f"{d}{c}" if c != "1" else d
-            for d, c in zip(dummy, sorted(counts), strict=False)
+            for d, c in zip(
+                anom_list["alpha"], sorted(anom_list["numeric"]), strict=False
+            )
         ]
     )
 
@@ -437,7 +449,7 @@ def count_crystal_dof(aflow_label: str) -> int:
         sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
         n_params += sum(
             float(n) * param_dict[spg][k]
-            for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
+            for n, k in zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"])
         )
 
     return n_params
@@ -460,8 +472,8 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
         RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, anonymous_formula
     )
     anom_list = split_alpha_numeric(anonymous_formula)
-    counts = [int(x) for x in anom_list[1::2]]
-    dummy = anom_list[0::2]
+    counts = [int(x) for x in anom_list["numeric"]]
+    dummy = anom_list["alpha"]
 
     s_counts, s_wyks_tup = list(zip(*sorted(zip(counts, wyckoffs))))
     s_wyks = re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, "_".join(s_wyks_tup))
