@@ -26,6 +26,18 @@ except ImportError:
     pyxtal = None
 
 
+PROTOSTRUCTURE_SET = [
+    ("A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S"),
+    ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"),
+    ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si"),
+    ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O"),
+    ("ABC2D2_mC24_15_e_e_f_f:Ca-Fe-O-Si"),
+    ("A3B2CD4_tP10_115_ag_g_b_cdg:Al-Ce-Ga-Pd"),
+    ("AB2_cF576_228_h_fgh:Ba-Ti"),
+    ("AB3C_cP5_221_a_c_b:Ba-O-Ti"),
+]
+
+
 def test_get_aflow_label_from_spglib():
     """Check that spglib gives correct Aflow label for esseneite"""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
@@ -190,18 +202,24 @@ def test_get_aflow_label_from_aflow():
 )
 @pytest.mark.parametrize(
     "protostructure",
-    [
-        ("A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S"),
-        ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"),
-        ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si"),
-        ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O"),
-        ("ABC2D2_mC24_15_e_e_f_f:Ca-Fe-O-Si"),
-        ("A3B2CD4_tP10_115_ag_g_b_cdg:Al-Ce-Ga-Pd"),
-        ("AB2_cF576_228_h_fgh:Ba-Ti"),
-    ],
+    PROTOSTRUCTURE_SET,
 )
-def test_get_random_structure_for_protostructure(protostructure):
+def test_get_random_structure_for_protostructure_roundtrip(protostructure):
     """Check roundtrip for generating a random structure from a prototype string"""
     assert protostructure == get_aflow_label_from_spglib(
         get_random_structure_for_protostructure(protostructure)
     )
+
+
+@pytest.mark.skipif(pyxtal is None, reason="pyxtal not installed")
+@pytest.mark.parametrize(
+    "protostructure",
+    PROTOSTRUCTURE_SET,
+)
+def test_get_random_structure_for_protostructure_random(protostructure):
+    """Check roundtrip for generating a random structure from a prototype string"""
+    s1 = get_random_structure_for_protostructure(protostructure)
+    s2 = get_random_structure_for_protostructure(protostructure)
+
+    assert s1.composition == s2.composition
+    assert s1.lattice != s2.lattice
