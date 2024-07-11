@@ -53,6 +53,22 @@ cry_param_dict = {
 
 remove_digits = str.maketrans("", "", digits)
 
+# Define regex patterns as constants
+RE_WYCKOFF_NO_PREFIX = re.compile(r"((?<![0-9])[A-z])")
+RE_ELEMENT_NO_SUFFIX = re.compile(r"([A-z](?![0-9]))")
+RE_WYCKOFF = re.compile(r"(?<!\d)([a-zA-Z])")
+RE_ANONYMOUS = re.compile(r"([A-Z])(?![0-9])")
+RE_SUBST_ONE_PREFIX = r"1\g<1>"
+RE_SUBST_ONE_SUFFIX = r"\g<1>1"
+
+# Define substitution patterns
+SUBST_ONE_PREFIX = r"1\g<1>"
+
+
+def split_alpha_numeric(s: str) -> list[str]:
+    """Split a string into alternating alpha and numeric groups."""
+    return ["".join(g) for _, g in groupby(s, str.isalpha)]
+
 
 def get_aflow_label_from_aflow(
     struct: Structure,
@@ -112,11 +128,9 @@ def get_aflow_label_from_aflow(
     for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_normalized = re.sub(
-            r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
+            RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
         )
-        sep_el_wyks = [
-            "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
-        ]
+        sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
         elem_dict[elem] = sum(
             float(wyckoff_multiplicity_dict[spg_num][w]) * float(n)
             for n, w in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
@@ -313,7 +327,7 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
     score = 0
     sorted_el_wyks = []
     for el_wyks in wyks.split("_"):
-        sep_el_wyks = ["".join(g) for _, g in groupby(el_wyks, str.isalpha)]
+        sep_el_wyks = split_alpha_numeric(el_wyks)
         sep_el_wyks = ["" if i == "1" else i for i in sep_el_wyks]
         sorted_el_wyks.append(
             "".join(
@@ -362,9 +376,10 @@ def prototype_formula(composition: Composition) -> str:
 
 def get_anom_formula_from_prototype_formula(prototype_formula: str) -> str:
     """Get an anonymous formula from a prototype formula."""
-    subst = r"\g<1>1"
-    prototype_formula = re.sub(r"([A-z](?![0-9]))", subst, prototype_formula)
-    anom_list = ["".join(g) for _, g in groupby(prototype_formula, str.isalpha)]
+    prototype_formula = re.sub(
+        RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, prototype_formula
+    )
+    anom_list = split_alpha_numeric(prototype_formula)
     counts = anom_list[1::2]
     dummy = anom_list[0::2]
 
@@ -417,11 +432,9 @@ def count_crystal_dof(aflow_label: str) -> int:
     for wyk_letters_per_elem in wyks:
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_normalized = re.sub(
-            r"((?<![0-9])[A-z])", r"1\g<1>", wyk_letters_per_elem
+            RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
         )
-        sep_el_wyks = [
-            "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
-        ]
+        sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
         n_params += sum(
             float(n) * param_dict[spg][k]
             for n, k in zip(sep_el_wyks[0::2], sep_el_wyks[1::2])
@@ -443,15 +456,15 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
     anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
 
     # TODO: this really needs some comments to explain what's going on - @janosh
-    subst = r"\g<1>1"
-    anonymous_formula = re.sub(r"([A-z](?![0-9]))", subst, anonymous_formula)
-    anom_list = ["".join(g) for _, g in groupby(anonymous_formula, str.isalpha)]
+    anonymous_formula = re.sub(
+        RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, anonymous_formula
+    )
+    anom_list = split_alpha_numeric(anonymous_formula)
     counts = [int(x) for x in anom_list[1::2]]
     dummy = anom_list[0::2]
 
     s_counts, s_wyks_tup = list(zip(*sorted(zip(counts, wyckoffs))))
-    subst = r"1\g<1>"
-    s_wyks = re.sub(r"((?<![0-9])[a-zA])", subst, "_".join(s_wyks_tup))
+    s_wyks = re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, "_".join(s_wyks_tup))
     c_anom = "".join([d + str(c) if c != 1 else d for d, c in zip(dummy, s_counts)])
 
     if len(s_counts) == len(set(s_counts)):
@@ -545,12 +558,6 @@ def _find_translations(
     return backtrack({}, 0)
 
 
-# Precompile regular expressions
-re_wyckoff = re.compile(r"(?<!\d)([a-zA-Z])")
-re_anonymous = re.compile(r"([A-Z])(?![0-9])")
-re_insert_one = r"1\1"
-
-
 def get_aflow_strs_from_iso_and_composition(
     isopointal_proto: str, composition: Composition
 ) -> list[str]:
@@ -578,16 +585,23 @@ def get_aflow_strs_from_iso_and_composition(
 
     translations = _find_translations(ele_amt_dict, anom_amt_dict)
     anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs))
-    anonymous_formula = re_anonymous.sub(re_insert_one, anonymous_formula)
+    anonymous_formula = RE_ANONYMOUS.sub(RE_SUBST_ONE_PREFIX, anonymous_formula)
 
-    return [
-        f"{proto_formula}_{pearson}_{spg}_"
-        f"{canonicalize_elem_wyks('_'.join(
-            re_wyckoff.sub(re_insert_one, anom_ele_to_wyk[t[elem]])
+    result = []
+    for t in translations:
+        wyckoff_part = "_".join(
+            RE_WYCKOFF.sub(RE_SUBST_ONE_PREFIX, anom_ele_to_wyk[t[elem]])
             for elem in sorted(t.keys())
-        ), spg)}:{'-'.join(sorted(t.keys()))}"
-        for t in translations
-    ]
+        )
+        canonicalized_wyckoff = canonicalize_elem_wyks(wyckoff_part, spg)
+        chemical_system = "-".join(sorted(t.keys()))
+
+        aflow_str = (
+            f"{proto_formula}_{pearson}_{spg}_{canonicalized_wyckoff}:{chemical_system}"
+        )
+        result.append(aflow_str)
+
+    return result
 
 
 def count_distinct_wyckoff_letters(aflow_str: str) -> int:
