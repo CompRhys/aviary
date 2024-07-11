@@ -5,7 +5,6 @@ import os
 import shutil
 from abc import ABC
 from collections import defaultdict
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 import numpy as np
@@ -20,6 +19,8 @@ from tqdm import tqdm
 from aviary import ROOT
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from torch.utils.data import DataLoader
 
     from aviary.data import InMemoryDataLoader

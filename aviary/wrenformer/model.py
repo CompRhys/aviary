@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import torch
 import torch.nn.functional as F
@@ -9,6 +8,9 @@ from torch import BoolTensor, Tensor, nn
 
 from aviary.core import BaseModelClass, masked_max, masked_mean, masked_min, masked_std
 from aviary.networks import ResidualNetwork
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class Wrenformer(BaseModelClass):

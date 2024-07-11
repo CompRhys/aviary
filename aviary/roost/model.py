@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F
@@ -9,6 +9,9 @@ from torch import LongTensor, Tensor, nn
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.segments import MessageLayer, WeightedAttentionPooling
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class Roost(BaseModelClass):

@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import json
 import re
-from collections.abc import Sequence
 from itertools import groupby
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +15,8 @@ from aviary import PKG_DIR
 from aviary.wren.utils import relab_dict, wyckoff_multiplicity_dict
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import pandas as pd
 
 

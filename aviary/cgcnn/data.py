@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import itertools
 import json
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -15,6 +14,8 @@ from tqdm import tqdm
 from aviary import PKG_DIR
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import pandas as pd
     from pymatgen.core import Structure
 

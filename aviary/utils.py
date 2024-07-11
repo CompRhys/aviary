@@ -4,7 +4,6 @@ import os
 import sys
 import time
 from collections import defaultdict
-from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
@@ -33,6 +32,7 @@ from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import robust_l1_loss, robust_l2_loss
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable
     from types import ModuleType
 
 
