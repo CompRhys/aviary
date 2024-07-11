@@ -548,6 +548,7 @@ def _find_translations(
 # Precompile regular expressions
 re_wyckoff = re.compile(r"(?<!\d)([a-zA-Z])")
 re_anonymous = re.compile(r"([A-Z])(?![0-9])")
+re_insert_one = r"1\1"
 
 
 def get_aflow_strs_from_iso_and_composition(
@@ -577,12 +578,12 @@ def get_aflow_strs_from_iso_and_composition(
 
     translations = _find_translations(ele_amt_dict, anom_amt_dict)
     anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs))
-    anonymous_formula = re_anonymous.sub(r"1\1", anonymous_formula)
+    anonymous_formula = re_anonymous.sub(re_insert_one, anonymous_formula)
 
     return [
         f"{proto_formula}_{pearson}_{spg}_"
         f"{canonicalize_elem_wyks('_'.join(
-            re_wyckoff.sub(r'1\1', anom_ele_to_wyk[t[elem]])
+            re_wyckoff.sub(re_insert_one, anom_ele_to_wyk[t[elem]])
             for elem in sorted(t.keys())
         ), spg)}:{'-'.join(sorted(t.keys()))}"
         for t in translations
