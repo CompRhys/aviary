@@ -97,21 +97,42 @@ def make_ensemble_predictions(
                 [model(*inputs)[0].cpu().numpy() for inputs, *_ in data_loader]
             ).squeeze()
 
+        pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
+
         if model.robust:
             preds, aleat_log_std = preds.T
-            df[f"aleatoric_std_{idx}"] = aleatoric_std = np.exp(aleat_log_std)
+            ale_col = (
+                f"{target_col}_aleatoric_std_{idx}"
+                if target_col
+                else f"aleatoric_std_{idx}"
+            )
+            df[pred_col] = preds
+            df[ale_col] = aleatoric_std = np.exp(aleat_log_std)
+        else:
+            df[pred_col] = preds
 
-        pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
-        df[pred_col] = preds
+    if len(checkpoint_paths) > 1:
+        df_preds = df.filter(regex=r"_pred_\d")
 
-    df_preds = df.filter(regex=r"_pred_\d")
-    df[f"{target_col}_pred_ens"] = ensemble_preds = df_preds.mean(axis=1)
-    df[f"{target_col}_epistemic_std_ens"] = epistemic_std = df_preds.std(axis=1)
+        pred_ens_col = f"{target_col}_pred_ens" if target_col else "pred_ens"
+        df[pred_ens_col] = ensemble_preds = df_preds.mean(axis=1)
 
-    if df.columns.str.startswith("aleatoric_std_").any():
-        aleatoric_std = df.filter(regex=r"aleatoric_std_\d").mean(axis=1)
-        df[f"{target_col}_aleatoric_std_ens"] = aleatoric_std
-        df[f"{target_col}_total_std_ens"] = (epistemic_std**2 + aleatoric_std**2) ** 0.5
+        pred_epi_std_ens = (
+            f"{target_col}_epistemic_std_ens" if target_col else "epistemic_std_ens"
+        )
+        df[pred_epi_std_ens] = epistemic_std = df_preds.std(axis=1)
+
+        if df.columns.str.startswith("aleatoric_std_").any():
+            pred_ale_std_ens = (
+                f"{target_col}_aleatoric_std_ens" if target_col else "aleatoric_std_ens"
+            )
+            pred_tot_std_ens = (
+                f"{target_col}_total_std_ens" if target_col else "total_std_ens"
+            )
+            df[pred_ale_std_ens] = aleatoric_std = df.filter(
+                regex=r"aleatoric_std_\d"
+            ).mean(axis=1)
+            df[pred_tot_std_ens] = (epistemic_std**2 + aleatoric_std**2) ** 0.5
 
     if target_col:
         targets = df[target_col]
@@ -137,20 +158,23 @@ def make_ensemble_predictions(
 @print_walltime(end_desc="predict_from_wandb_checkpoints")
 def predict_from_wandb_checkpoints(
     runs: list[wandb.apis.public.Run], cache_dir: str, **kwargs: Any
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Download and cache checkpoints for an ensemble of models, then make predictions on some
-    dataset. Finally print ensemble metrics and store predictions to CSV.
+) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
+    """Download and cache checkpoints for an ensemble of models, then make
+    predictions on some dataset. Finally print ensemble metrics and store
+    predictions to CSV.
 
     Args:
-        runs (list[wandb.apis.public.Run]): List of WandB runs to download model checkpoints from
-            which are then loaded into memory to generate predictions for the input_col in df.
+        runs (list[wandb.apis.public.Run]): List of WandB runs to download model
+            checkpoints from which are then loaded into memory to generate
+            predictions for the input_col in df.
         cache_dir (str): Directory to cache downloaded checkpoints in.
         **kwargs: Additional keyword arguments to pass to make_ensemble_predictions().
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: Original input dataframe with added columns for model
-            predictions and uncertainties. The 2nd dataframe holds ensemble performance metrics
-            like mean and standard deviation of MAE/RMSE.
+        pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]: Original input dataframe
+            with added columns for model predictions and uncertainties. The optional
+            2nd dataframe holds ensemble performance metrics like mean and standard
+            deviation of MAE/RMSE.
     """
     print(f"Using checkpoints from {len(runs)} run(s):")
 
@@ -180,7 +204,10 @@ def predict_from_wandb_checkpoints(
         if not os.path.isfile(checkpoint_path):
             run.file("checkpoint.pth").download(root=out_dir)
 
-    df, ensemble_metrics = make_ensemble_predictions(checkpoint_paths, **kwargs)
+    if target_col in kwargs:
+        df, ensemble_metrics = make_ensemble_predictions(checkpoint_paths, **kwargs)
+        # round to save disk space and speed up cloud storage uploads
+        return df.round(6), ensemble_metrics
 
-    # round to save disk space and speed up cloud storage uploads
-    return df.round(6), ensemble_metrics
+    df = make_ensemble_predictions(checkpoint_paths, **kwargs)
+    return df.round(6)
