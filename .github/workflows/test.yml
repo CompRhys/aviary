@@ -22,11 +22,14 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - name: Install uv
+        run: pip install uv
+
       - name: Install dependencies
         run: |
           pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
           pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
-          pip install .[test]
+          uv pip install .[test]
 
       - name: Run Tests
         run: pytest --capture=no --cov .
