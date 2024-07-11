@@ -4,10 +4,11 @@ import os
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 import numpy as np
 import pandas as pd
