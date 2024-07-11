@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections import Counter, defaultdict
 from itertools import chain, groupby, permutations, product
 from operator import itemgetter
 from os.path import abspath, dirname, join
@@ -494,39 +495,59 @@ def get_isopointal_proto_from_aflow(aflow_label: str) -> str:
 
 def _get_anom_formula_dict(anonymous_formula: str) -> dict:
     """Get a dictionary of element to count from an anonymous formula."""
-    subst = r"\g<1>1"
-    anonymous_formula = re.sub(r"([A-z](?![0-9]))", subst, anonymous_formula)
-    anom_list = ["".join(g) for _, g in groupby(anonymous_formula, str.isalpha)]
-    counts = anom_list[1::2]
-    dummy = anom_list[0::2]
+    result: defaultdict = defaultdict(int)
+    element = ""
+    count = ""
 
-    return dict(zip(dummy, map(int, counts), strict=True))
+    for char in anonymous_formula:
+        if char.isalpha():
+            if element:
+                result[element] += int(count) if count else 1
+                count = ""
+            element = char
+        else:
+            count += char
+
+    if element:
+        result[element] += int(count) if count else 1
+
+    return dict(result)
 
 
-def _find_translations(dict1: dict, dict2: dict) -> list[dict]:
+def _find_translations(
+    dict1: dict[str, int], dict2: dict[str, int]
+) -> list[dict[str, str]]:
     """Find all possible translations between two dictionaries."""
-    # Check if the dictionaries have the same values
-    if sorted(dict1.values()) != sorted(dict2.values()):
+    if Counter(dict1.values()) != Counter(dict2.values()):
         return []
 
-    keys1 = list(dict1.keys())
     keys2 = list(dict2.keys())
+    used = set()
 
-    valid_translations = []
+    def backtrack(translation, index):
+        if index == len(dict1):
+            return [translation.copy()]
 
-    # Generate all permutations of keys2
-    for perm in permutations(keys2):
-        # Create a translation dictionary
-        translation = dict(zip(keys1, perm))
+        key1 = list(dict1.keys())[index]
+        value1 = dict1[key1]
+        valid_translations = []
 
-        # Apply the translation to dict1
-        transformed = {translation[k]: v for k, v in dict1.items()}
+        for key2 in keys2:
+            if key2 not in used and dict2[key2] == value1:
+                used.add(key2)
+                translation[key1] = key2
+                valid_translations.extend(backtrack(translation, index + 1))
+                used.remove(key2)
+                del translation[key1]
 
-        # Check if the transformed dictionary matches dict2
-        if transformed == dict2:
-            valid_translations.append(translation)
+        return valid_translations
 
-    return valid_translations
+    return backtrack({}, 0)
+
+
+# Precompile regular expressions
+re_wyckoff = re.compile(r"(?<!\d)([a-zA-Z])")
+re_anonymous = re.compile(r"([A-Z])(?![0-9])")
 
 
 def get_aflow_strs_from_iso_and_composition(
@@ -550,24 +571,17 @@ def get_aflow_strs_from_iso_and_composition(
     anom_amt_dict = _get_anom_formula_dict(anonymous_formula)
 
     translations = _find_translations(ele_amt_dict, anom_amt_dict)
-    anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs, strict=True))
+    anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs))
+    anonymous_formula = re_anonymous.sub(r"1\1", anonymous_formula)
 
-    subst = r"1\g<1>"
-    anonymous_formula = re.sub(r"([A-z](?![0-9]))", subst, anonymous_formula)
-
-    aflow_strs = []
-    for t in translations:
-        elem_order = sorted(t.keys())
-        elem_wyks = [
-            re.sub(r"(?<!\d)([a-zA-Z])", r"1\1", anom_ele_to_wyk[t[elem]])
-            for elem in elem_order
-        ]
-        canonical = canonicalize_elem_wyks("_".join(elem_wyks), spg)
-        chemsys = "-".join(elem_order)
-        aflow_str = f"{proto_formula}_{pearson}_{spg}_{canonical}:{chemsys}"
-        aflow_strs.append(aflow_str)
-
-    return aflow_strs
+    return [
+        f"{proto_formula}_{pearson}_{spg}_"
+        f"{canonicalize_elem_wyks('_'.join(
+            re_wyckoff.sub(r'1\1', anom_ele_to_wyk[t[elem]])
+            for elem in sorted(t.keys())
+        ), spg)}:{'-'.join(sorted(t.keys()))}"
+        for t in translations
+    ]
 
 
 def count_distinct_wyckoff_letters(aflow_str: str) -> int:

@@ -1,9 +1,11 @@
+from itertools import permutations
 from shutil import which
 
 import pytest
 from pymatgen.core.structure import Composition, Structure
 
 from aviary.wren.utils import (
+    _find_translations,
     count_crystal_dof,
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
@@ -82,12 +84,71 @@ def test_get_aflow_strs_from_iso_and_composition(
     )
     assert aflows == expected.split(" ")
 
+    # check the round trip
+    assert all(
+        get_isopointal_proto_from_aflow(aflow) == isopointal_proto for aflow in aflows
+    )
 
-def test_prototype_formula():
-    assert prototype_formula(Composition("Ce2Al3GaPd4")) == "A3B2CD4"
+
+@pytest.mark.parametrize(
+    "dict1, dict2, expected",
+    [
+        # Test case 1: Simple valid translation
+        ({"a": 1, "b": 2}, {"x": 1, "y": 2}, [{"a": "x", "b": "y"}]),
+        # Test case 2: Multiple valid translations
+        (
+            {"a": 1, "b": 1, "c": 1},
+            {"x": 1, "y": 1, "z": 1},
+            [
+                dict(zip(["a", "b", "c"], perm))
+                for perm in permutations(["x", "y", "z"])
+            ],
+        ),
+        # Test case 3: No valid translations (different values)
+        ({"a": 1, "b": 2}, {"x": 1, "y": 3}, []),
+        # Test case 4: No valid translations (different number of items)
+        ({"a": 1, "b": 2}, {"x": 1, "y": 2, "z": 3}, []),
+        # Test case 5: Empty dictionaries
+        ({}, {}, [{}]),
+        # Test case 6: Larger dictionaries
+        (
+            {"a": 1, "b": 4, "c": 3, "d": 4},
+            {"w": 4, "x": 3, "y": 4, "z": 1},
+            [
+                {"a": "z", "b": "y", "c": "x", "d": "w"},
+                {"a": "z", "b": "w", "c": "x", "d": "y"},
+            ],
+        ),
+    ],
+)
+def test_find_translations(dict1, dict2, expected):
+    result = _find_translations(dict1, dict2)
+    assert len(result) == len(expected)
+    for translation in result:
+        assert translation in expected
 
 
-def test_get_anom_formula_from_prototype_formula():
+# Additional test for performance with larger input
+def test_find_translations_performance():
+    dict1 = {f"key{i}": i for i in range(8)}
+    dict2 = {f"val{i}": i for i in range(8)}
+    result = _find_translations(dict1, dict2)
+    assert len(result) == 1  # There should be only one valid translation
+
+
+@pytest.mark.parametrize(
+    "composition, expected",
+    [("Ce2Al3GaPd4", "A3B2CD4"), ("YbNiO3", "AB3C"), ("K2NaAlF6", "AB6C2D")],
+)
+def test_prototype_formula(composition: str, expected: str):
+    assert prototype_formula(Composition(composition)) == expected
+
+
+@pytest.mark.parametrize(
+    "composition, expected",
+    [("Ce2Al3GaPd4", "AB2C3D4"), ("YbNiO3", "ABC3"), ("K2NaAlF6", "ABC2D6")],
+)
+def test_get_anom_formula_from_prototype_formula(composition: str, expected: str):
     assert get_anom_formula_from_prototype_formula("A3B2CD4") == "AB2C3D4"
 
 
