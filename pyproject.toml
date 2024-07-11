@@ -51,7 +51,7 @@ dependencies = [
 Repo = "https://github.com/CompRhys/aviary"
 
 [project.optional-dependencies]
-test = ["matminer", "pytest", "pytest-cov"]
+test = ["matminer", "pytest", "pytest-cov", "pyxtal"]
 pyxtal = ["pyxtal"]
 
 [tool.setuptools.packages]
