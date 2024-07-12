@@ -27,8 +27,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
+          pip install torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.2.1+cpu.html
           uv pip install .[test] --system
 
       - name: Run Tests
