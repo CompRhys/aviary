@@ -7,7 +7,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/comprhys/aviary?label=Last+Commit)](https://github.com/comprhys/aviary/commits)
 [![Tests](https://github.com/CompRhys/aviary/actions/workflows/test.yml/badge.svg)](https://github.com/CompRhys/aviary/actions/workflows/test.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CompRhys/aviary/main.svg)](https://results.pre-commit.ci/latest/github/CompRhys/aviary/main)
-[![This project supports Python 3.8+](https://img.shields.io/badge/Python-3.8+-blue.svg?logo=python&logoColor=white)](https://python.org/downloads)
+[![This project supports Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg?logo=python&logoColor=white)](https://python.org/downloads)
 
 </h4>
 
@@ -18,10 +18,10 @@ The aim of `aviary` is to contain multiple models for materials discovery under 
 Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). `pip install` it with
 
 ```sh
-pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
+pip install torch-scatter -f https://data.pyg.org/whl/torch-2.2.1+cpu.html
 ```
 
-Make sure you replace `2.1.0` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
+Make sure you replace `2.2.1` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
 
 Then install `aviary` from source with
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aviary"
-version = "0.1.1"
+version = "0.1.2"
 description = "A collection of machine learning models for materials discovery"
 authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
 readme = "README.md"
@@ -34,9 +34,9 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Physics",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
-  "numpy",
+  "numpy<2",
   "pandas",
   "pymatgen",
   "scikit_learn",
@@ -51,7 +51,8 @@ dependencies = [
 Repo = "https://github.com/CompRhys/aviary"
 
 [project.optional-dependencies]
-test = ["matminer", "pytest", "pytest-cov"]
+test = ["matminer", "pytest", "pytest-cov", "pyxtal"]
+pyxtal = ["pyxtal"]
 
 [tool.setuptools.packages]
 find = { include = ["aviary*"], exclude = ["tests*"] }
@@ -70,7 +71,7 @@ addopts = "-p no:warnings"
 no_implicit_optional = false
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 include = ["**/pyproject.toml", "*.ipynb", "*.py", "*.pyi"]
 lint.select = [
   "B",    # flake8-bugbear

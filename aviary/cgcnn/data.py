@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import json
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
@@ -14,6 +14,8 @@ from tqdm import tqdm
 from aviary import PKG_DIR
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import pandas as pd
     from pymatgen.core import Structure
 
@@ -123,7 +125,7 @@ class CrystalGraphData(Dataset):
         return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
     # Cache loaded structures
-    @functools.lru_cache(maxsize=None)  # noqa: B019
+    @functools.cache  # noqa: B019
     def __getitem__(self, idx: int):
         """Get an entry out of the Dataset.
 

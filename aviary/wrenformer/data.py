@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from functools import cache
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -65,7 +65,7 @@ with open(f"{PKG_DIR}/embeddings/element/matscholar200.json") as file:
     elem_features = json.load(file)
 
 
-@cache
+@lru_cache(None)
 def get_wyckoff_features(
     equivalent_wyckoff_set: list[tuple], spg_num: int
 ) -> np.ndarray:

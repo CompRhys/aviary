@@ -4,7 +4,7 @@ import functools
 import json
 import re
 from itertools import groupby
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
@@ -15,6 +15,8 @@ from aviary import PKG_DIR
 from aviary.wren.utils import relab_dict, wyckoff_multiplicity_dict
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import pandas as pd
 
 
@@ -88,7 +90,7 @@ class WyckoffData(Dataset):
         df_repr = f"cols=[{', '.join(self.df.columns)}], len={len(self.df)}"
         return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
-    @functools.lru_cache(maxsize=None)  # noqa: B019
+    @functools.cache  # noqa: B019
     def __getitem__(self, idx: int):
         """Get an entry out of the Dataset.
 

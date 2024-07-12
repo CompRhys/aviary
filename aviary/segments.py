@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 import torch
 from torch import LongTensor, Tensor, nn
 from torch_scatter import scatter_add, scatter_max
 
 from aviary.networks import SimpleNetwork
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class AttentionPooling(nn.Module):

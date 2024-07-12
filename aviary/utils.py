@@ -7,7 +7,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 import numpy as np
 import pandas as pd
@@ -32,6 +32,7 @@ from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import robust_l1_loss, robust_l2_loss
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable
     from types import ModuleType
 
 
