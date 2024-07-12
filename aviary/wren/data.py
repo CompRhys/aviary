@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import functools
 import json
 import re
+from functools import cache
 from itertools import groupby
 from typing import TYPE_CHECKING, Any
 
@@ -90,7 +90,7 @@ class WyckoffData(Dataset):
         df_repr = f"cols=[{', '.join(self.df.columns)}], len={len(self.df)}"
         return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
-    @functools.cache  # noqa: B019
+    @cache  # noqa: B019
     def __getitem__(self, idx: int):
         """Get an entry out of the Dataset.
 

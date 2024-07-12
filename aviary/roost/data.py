@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import functools
 import json
+from functools import cache
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -76,7 +76,7 @@ class CompositionData(Dataset):
         return f"{type(self).__name__}({df_repr}, task_dict={self.task_dict})"
 
     # Cache data for faster training
-    @functools.cache  # noqa: B019
+    @cache  # noqa: B019
     def __getitem__(self, idx: int):
         """Get an entry out of the Dataset.
 
