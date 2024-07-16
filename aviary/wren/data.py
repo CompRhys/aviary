@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from functools import cache
 from itertools import groupby
 from typing import TYPE_CHECKING, Any
@@ -12,7 +11,12 @@ from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
-from aviary.wren.utils import relab_dict, wyckoff_multiplicity_dict
+from aviary.wren.utils import (
+    RE_SUBST_ONE_PREFIX,
+    RE_WYCKOFF_NO_PREFIX,
+    relab_dict,
+    wyckoff_multiplicity_dict,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -252,10 +256,6 @@ def collate_batch(
     )
 
 
-# Pre-compile the regular expression
-WYK_LETTER_PATTERN = re.compile(r"((?<![0-9])[A-z])")
-
-
 def parse_aflow_wyckoff_str(
     aflow_label: str,
 ) -> tuple[str, list[float], list[str], list[tuple[str, ...]]]:
@@ -278,7 +278,9 @@ def parse_aflow_wyckoff_str(
 
     for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
         # Normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_normalized = WYK_LETTER_PATTERN.sub(r"1\g<1>", wyk_letters_per_elem)
+        wyk_letters_normalized = RE_WYCKOFF_NO_PREFIX.sub(
+            RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
+        )
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
         sep_n_wyks = [

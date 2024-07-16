@@ -66,9 +66,6 @@ RE_ANONYMOUS = re.compile(r"([A-Z])(?![0-9])")
 RE_SUBST_ONE_PREFIX = r"1\g<1>"
 RE_SUBST_ONE_SUFFIX = r"\g<1>1"
 
-# Define substitution patterns
-SUBST_ONE_PREFIX = r"1\g<1>"
-
 
 def split_alpha_numeric(s: str) -> dict[str, list[str]]:
     """Split a string into separate lists of alpha and numeric groups.
