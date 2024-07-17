@@ -7,6 +7,7 @@ from pymatgen.core.structure import Composition, Structure
 from aviary.wren.utils import (
     _find_translations,
     count_crystal_dof,
+    count_crystal_sites,
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
     get_aflow_label_from_aflow,
@@ -46,20 +47,31 @@ def test_get_aflow_label_from_spglib():
 
 
 @pytest.mark.parametrize(
-    "aflow_label, count",
+    "aflow_label, expected",
     [
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 6),  # esseneite
         ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 26),
         ("foo_bar_47_abc_A_b:X-Y-Z", 5),
     ],
 )
-def test_count_wyckoff_positions(aflow_label, count):
-    assert count_wyckoff_positions(aflow_label) == count
+def test_count_wyckoff_positions(aflow_label, expected):
+    count = count_wyckoff_positions(aflow_label)
+    assert isinstance(count, int)
+    assert count == expected
 
 
 def test_count_crystal_dof():
     """Count the number of coarse-grained parameters in esseneite"""
-    assert count_crystal_dof("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si") == 18
+    count = count_crystal_dof("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si")
+    assert isinstance(count, int)
+    assert count == 18
+
+
+def test_count_crystal_sites():
+    """Count the number of sites in esseneite"""
+    count = count_crystal_sites("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si")
+    assert isinstance(count, int)
+    assert count == 40
 
 
 @pytest.mark.parametrize(
