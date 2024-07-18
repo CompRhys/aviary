@@ -8,7 +8,10 @@ import pandas as pd
 from pymatgen.core import Composition, Structure
 from tqdm import tqdm
 
-from aviary.wren.utils import count_wyckoff_positions, get_aflow_label_from_spglib
+from aviary.wren.utils import (
+    count_wyckoff_positions,
+    get_protostructure_label_from_spglib,
+)
 
 tqdm.pandas()  # prime progress_map functionality
 
@@ -62,7 +65,7 @@ df = df.drop_duplicates(subset="material_id", keep="first")
 print(f"Number of points in dataset: {len(df)}")
 
 # takes ~ 15mins
-df["wyckoff"] = df.final_structure.progress_map(get_aflow_label_from_spglib)
+df["wyckoff"] = df.final_structure.progress_map(get_protostructure_label_from_spglib)
 
 # lattice, sites = zip(*df.final_structure.progress_map(get_cgcnn_input))
 

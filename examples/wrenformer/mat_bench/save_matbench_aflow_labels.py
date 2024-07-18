@@ -3,7 +3,7 @@ from matbench import MatbenchBenchmark
 from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.wren.utils import get_aflow_label_from_spglib
+from aviary.wren.utils import get_protostructure_label_from_spglib
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
@@ -25,7 +25,7 @@ for idx, task in enumerate(benchmark.tasks, 1):
     if "structure" in df:
         df["composition"] = [struct.formula for struct in df.structure]
         df["wyckoff"] = [
-            get_aflow_label_from_spglib(struct)
+            get_protostructure_label_from_spglib(struct)
             for struct in tqdm(df.structure, desc="Getting Aflow Wyckoff labels")
         ]
     elif "composition" in df:

@@ -10,13 +10,14 @@ from aviary.wren.utils import (
     count_crystal_sites,
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
-    get_aflow_label_from_aflow,
-    get_aflow_label_from_spglib,
-    get_aflow_strs_from_iso_and_composition,
     get_anom_formula_from_prototype_formula,
-    get_isopointal_proto_from_aflow,
+    get_protostructure_label_from_aflow,
+    get_protostructure_label_from_spglib,
+    get_protostructures_from_aflow_label_and_composition,
+    get_prototype_from_protostructure,
     get_random_structure_for_protostructure,
     prototype_formula,
+    relab_dict,
 )
 
 from .conftest import TEST_DIR
@@ -39,23 +40,25 @@ PROTOSTRUCTURE_SET = [
 ]
 
 
-def test_get_aflow_label_from_spglib():
-    """Check that spglib gives correct Aflow label for esseneite"""
+def test_get_protostructure_label_from_spglib():
+    """Check that spglib gives correct protostructure label for esseneite"""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
-
-    assert get_aflow_label_from_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    assert (
+        get_protostructure_label_from_spglib(struct)
+        == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    )
 
 
 @pytest.mark.parametrize(
-    "aflow_label, expected",
+    "protostructure_label, expected",
     [
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 6),  # esseneite
         ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 26),
         ("foo_bar_47_abc_A_b:X-Y-Z", 5),
     ],
 )
-def test_count_wyckoff_positions(aflow_label, expected):
-    count = count_wyckoff_positions(aflow_label)
+def test_count_wyckoff_positions(protostructure_label, expected):
+    count = count_wyckoff_positions(protostructure_label)
     assert isinstance(count, int)
     assert count == expected
 
@@ -75,7 +78,7 @@ def test_count_crystal_sites():
 
 
 @pytest.mark.parametrize(
-    "aflow_label, expected",
+    "protostructure_label, expected",
     [
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", "ABC2D6_mC40_15_e_e_f_3f"),
         ("ABC6D2_mC40_15_e_a_3f_f:Ca-Fe-O-Si", "ABC2D6_mC40_15_a_e_f_3f"),
@@ -85,13 +88,30 @@ def test_count_crystal_sites():
         ("A4BC20D2_oC108_41_2b_a_10b_b:B-Ca-H-N", "AB2C4D20_oC108_41_a_b_2b_10b"),
     ],
 )
-def test_get_isopointal_proto(aflow_label, expected):
+def test_get_prototype_from_protostructure(protostructure_label, expected):
     """Get a recanonicalized prototype string without chemical system"""
-    assert get_isopointal_proto_from_aflow(aflow_label) == expected
+    aflow_label, chemsys = protostructure_label.split(":")
+    anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
+
+    wyks = "_".join(wyckoffs)
+    isopointal_wyks = []
+    for trans in relab_dict[str(spg)]:
+        t = str.maketrans(trans)
+        isopointal_wyks.append(wyks.translate(t))
+
+    protostructure_labels = [
+        f"{anonymous_formula}_{pearson}_{spg}_{wyk}:{chemsys}"
+        for wyk in isopointal_wyks
+    ]
+
+    assert all(
+        get_prototype_from_protostructure(protostructure_label) == expected
+        for protostructure_label in protostructure_labels
+    )
 
 
 @pytest.mark.parametrize(
-    "isopointal_proto, composition, expected",
+    "aflow_label, composition, expected",
     [
         (
             "AB2C3D4_tP10_115_a_g_bg_cdg",
@@ -106,17 +126,18 @@ def test_get_isopointal_proto(aflow_label, expected):
         ),
     ],
 )
-def test_get_aflow_strs_from_iso_and_composition(
-    isopointal_proto, composition, expected
+def test_get_protostructures_from_aflow_label_and_composition(
+    aflow_label, composition, expected
 ):
-    aflows = get_aflow_strs_from_iso_and_composition(
-        isopointal_proto, Composition(composition)
+    protostructures = get_protostructures_from_aflow_label_and_composition(
+        aflow_label, Composition(composition)
     )
-    assert aflows == expected.split(" ")
+    assert protostructures == expected.split(" ")
 
     # check the round trip
     assert all(
-        get_isopointal_proto_from_aflow(aflow) == isopointal_proto for aflow in aflows
+        get_prototype_from_protostructure(protostructure) == aflow_label
+        for protostructure in protostructures
     )
 
 
@@ -175,15 +196,17 @@ def test_prototype_formula(composition: str, expected: str):
 
 
 @pytest.mark.parametrize(
-    "composition, expected",
-    [("Ce2Al3GaPd4", "AB2C3D4"), ("YbNiO3", "ABC3"), ("K2NaAlF6", "ABC2D6")],
+    "anom_formula, prototype_formula",
+    [("AB", "AB"), ("A2B", "AB2"), ("A3B2CD4", "AB2C3D4")],
 )
-def test_get_anom_formula_from_prototype_formula(composition: str, expected: str):
-    assert get_anom_formula_from_prototype_formula("A3B2CD4") == "AB2C3D4"
+def test_get_anom_formula_from_prototype_formula(
+    anom_formula: str, prototype_formula: str
+):
+    assert get_anom_formula_from_prototype_formula(anom_formula) == prototype_formula
 
 
 @pytest.mark.parametrize(
-    "aflow_label, expected",
+    "protostructure_label, expected",
     [
         ("A20BC14D8E5F2_oP800_61_40c_2c_28c_16c_10c_4c:C-Cd-H-N-O-S", 1),
         ("ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si", 2),
@@ -191,19 +214,16 @@ def test_get_anom_formula_from_prototype_formula(composition: str, expected: str
         ("A6B11CD7_aP50_2_6i_ac10i_i_7i:C-H-N-O", 3),
     ],
 )
-def test_count_distinct_wyckoff_letters(aflow_label, expected):
-    assert count_distinct_wyckoff_letters(aflow_label) == expected
+def test_count_distinct_wyckoff_letters(protostructure_label, expected):
+    assert count_distinct_wyckoff_letters(protostructure_label) == expected
 
 
-aflow_cli = which("aflow")
-
-
-@pytest.mark.skipif(aflow_cli is None, reason="aflow CLI not installed")
-def test_get_aflow_label_from_aflow():
-    """Check we extract corred correct aflow label for esseneite from  Aflow CLI"""
+@pytest.mark.skipif(which("aflow") is None, reason="AFLOW CLI not installed")
+def test_get_protostructure_label_from_aflow():
+    """Check we extract correct protostructure label for esseneite using AFLOW CLI."""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
-    out = get_aflow_label_from_aflow(struct, aflow_cli)
+    out = get_protostructure_label_from_aflow(struct, which("aflow"))
     expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
     assert out == expected
 
@@ -218,7 +238,7 @@ def test_get_aflow_label_from_aflow():
 )
 def test_get_random_structure_for_protostructure_roundtrip(protostructure):
     """Check roundtrip for generating a random structure from a prototype string"""
-    assert protostructure == get_aflow_label_from_spglib(
+    assert protostructure == get_protostructure_label_from_spglib(
         get_random_structure_for_protostructure(protostructure)
     )
 
