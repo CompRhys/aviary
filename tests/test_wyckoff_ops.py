@@ -112,7 +112,7 @@ def test_get_aflow_strs_from_iso_and_composition(
     aflows = get_aflow_strs_from_iso_and_composition(
         isopointal_proto, Composition(composition)
     )
-    assert aflows == expected.split(" ")
+    assert set(aflows) == set(expected.split(" "))
 
     # check the round trip
     assert all(

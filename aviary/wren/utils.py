@@ -643,7 +643,7 @@ def get_aflow_strs_from_iso_and_composition(
     anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs))
     anonymous_formula = RE_ANONYMOUS.sub(RE_SUBST_ONE_PREFIX, anonymous_formula)
 
-    result = []
+    result = set()
     for t in translations:
         wyckoff_part = "_".join(
             RE_WYCKOFF.sub(RE_SUBST_ONE_PREFIX, anom_ele_to_wyk[t[elem]])
@@ -655,9 +655,9 @@ def get_aflow_strs_from_iso_and_composition(
         aflow_str = (
             f"{proto_formula}_{pearson}_{spg}_{canonicalized_wyckoff}:{chemical_system}"
         )
-        result.append(aflow_str)
+        result.add(aflow_str)
 
-    return result
+    return list(result)
 
 
 def count_distinct_wyckoff_letters(aflow_str: str) -> int:
