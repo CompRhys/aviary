@@ -1,8 +1,11 @@
+import inspect
+import re
 from itertools import permutations
 from shutil import which
 
 import pytest
 from pymatgen.core.structure import Composition, Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from aviary.wren.utils import (
     _find_translations,
@@ -11,6 +14,7 @@ from aviary.wren.utils import (
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
     get_aflow_label_from_aflow,
+    get_aflow_label_from_spg_analyzer,
     get_aflow_label_from_spglib,
     get_aflow_strs_from_iso_and_composition,
     get_anom_formula_from_prototype_formula,
@@ -40,10 +44,52 @@ PROTOSTRUCTURE_SET = [
 
 
 def test_get_aflow_label_from_spglib():
-    """Check that spglib gives correct Aflow label for esseneite"""
+    """Check that spglib gives correct Aflow label for esseneite."""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
     assert get_aflow_label_from_spglib(struct) == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+
+
+def test_get_aflow_label_from_spglib_edge_case():
+    """Check edge case where the symmetry precision is too low."""
+    struct = Structure.from_file(f"{TEST_DIR}/data/U2Pa4Tc6.json")
+
+    defaults = inspect.signature(get_aflow_label_from_spglib).parameters
+
+    assert defaults["init_symprec"].default == 0.1
+
+    spg_analyzer = SpacegroupAnalyzer(
+        struct, symprec=defaults["init_symprec"].default, angle_tolerance=5
+    )
+
+    raises_str = (
+        "Invalid WP multiplicities - A2B3C_hP6_191_c_2g_a:Pa-Tc-U, "
+        "expected U(PaTc3)2 to be UPa2Tc3"
+    )
+    with pytest.raises(ValueError, match=re.escape(raises_str)):
+        get_aflow_label_from_spg_analyzer(spg_analyzer, raise_errors=True)
+
+    assert (
+        get_aflow_label_from_spg_analyzer(spg_analyzer, raise_errors=False)
+        == raises_str
+    )
+
+    # Test that it gives invalid protostructure if fallback is None.
+    with pytest.raises(ValueError, match=re.escape(raises_str)):
+        get_aflow_label_from_spglib(struct, raise_errors=True, fallback_symprec=None)
+
+    assert (
+        get_aflow_label_from_spglib(struct, raise_errors=False, fallback_symprec=None)
+        == raises_str
+    )
+
+    assert get_aflow_label_from_spglib(struct, raise_errors=True) == (
+        "A2B3C_hP6_191_c_g_a:Pa-Tc-U"
+    )
+
+    assert get_aflow_label_from_spglib(struct, raise_errors=False) == (
+        "A2B3C_hP6_191_c_g_a:Pa-Tc-U"
+    )
 
 
 @pytest.mark.parametrize(

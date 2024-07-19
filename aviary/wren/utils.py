@@ -9,7 +9,6 @@ from operator import itemgetter
 from os.path import abspath, dirname, join
 from shutil import which
 from string import ascii_uppercase, digits
-from typing import Literal
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
@@ -97,7 +96,7 @@ def count_values_for_wyckoff(
 def get_aflow_label_from_aflow(
     struct: Structure,
     aflow_executable: str | None = None,
-    errors: Literal["raise", "annotate", "ignore"] = "raise",
+    raise_errors: bool = False,
 ) -> str:
     """Get Aflow prototype label for a pymatgen Structure. Make sure you're running a
     recent version of the aflow CLI as there's been several breaking changes. This code
@@ -111,16 +110,12 @@ def get_aflow_label_from_aflow(
     Args:
         struct (Structure): pymatgen Structure
         aflow_executable (str): path to aflow executable. Defaults to which("aflow").
-        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
-            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
-            with 'invalid <reason>: '.
-
-    Raises:
-        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
-            expected composition.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
 
     Returns:
-        str: Aflow prototype label
+        str: AFLOW prototype label or explanation of failure if symmetry detection
+            failed and raise_errors is False.
     """
     if aflow_executable is None:
         aflow_executable = which("aflow")
@@ -144,12 +139,13 @@ def get_aflow_label_from_aflow(
     aflow_proto = json.loads(output.stdout)
 
     aflow_label = aflow_proto["aflow_prototype_label"]
+    chem_sys = struct.composition.chemical_system
+    full_label = f"{aflow_label}:{chem_sys}"
 
     # check that multiplicities satisfy original composition
     _, _, spg_num, *wyckoff_letters = aflow_label.split("_")
-    elements = sorted(el.symbol for el in struct.composition)
     elem_dict = {}
-    for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
+    for elem, wyk_letters_per_elem in zip(chem_sys.split("-"), wyckoff_letters):
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_normalized = re.sub(
             RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
@@ -162,91 +158,35 @@ def get_aflow_label_from_aflow(
             wyckoff_multiplicity_dict,
         )
 
-    full_label = f"{aflow_label}:{'-'.join(elements)}"
-
     observed_formula = Composition(elem_dict).reduced_formula
     expected_formula = struct.composition.reduced_formula
     if observed_formula != expected_formula:
-        if errors == "raise":
-            raise ValueError(
-                f"invalid WP multiplicities - {aflow_label}, expected "
-                f"{observed_formula} to be {expected_formula}"
-            )
-        if errors == "annotate":
-            return f"invalid multiplicities: {full_label}"
+        err_msg = (
+            f"Invalid WP multiplicities - {full_label}, expected "
+            f"{observed_formula} to be {expected_formula}"
+        )
+        if raise_errors:
+            raise ValueError(err_msg)
+
+        return err_msg
 
     return full_label
 
 
-def get_aflow_label_from_spglib(
-    struct: Structure,
-    errors: Literal["raise", "annotate", "ignore"] = "ignore",
-    init_symprec: float = 0.1,
-    fallback_symprec: float = 1e-5,
-) -> str | None:
-    """Get AFLOW prototype label for pymatgen Structure.
-
-    Args:
-        struct (Structure): pymatgen Structure object.
-        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
-            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
-            with 'invalid <reason>: '.
-        init_symprec (float): Initial symmetry precision for spglib. Defaults to 0.1.
-        fallback_symprec (float): Fallback symmetry precision for spglib if first
-            symmetry detection failed. Defaults to 1e-5.
-
-    Returns:
-        str: AFLOW prototype label or None if errors='ignore' and symmetry detection
-            failed.
-    """
-    try:
-        spg_analyzer = SpacegroupAnalyzer(
-            struct, symprec=init_symprec, angle_tolerance=5
-        )
-        aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
-            spg_analyzer, errors
-        )
-
-        # try again with refined structure if it initially fails
-        # NOTE structures with magmoms fail unless all have same magnetic moment
-        if "invalid" in aflow_label_with_chemsys:
-            spg_analyzer = SpacegroupAnalyzer(
-                spg_analyzer.get_refined_structure(),
-                symprec=fallback_symprec,
-                angle_tolerance=-1,
-            )
-            aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
-                spg_analyzer, errors
-            )
-        return aflow_label_with_chemsys
-
-    except ValueError as exc:
-        if errors == "annotate":
-            return f"invalid spglib: {exc}"
-        raise  # we only get here if errors == "raise"
-
-
 def get_aflow_label_from_spg_analyzer(
     spg_analyzer: SpacegroupAnalyzer,
-    errors: Literal["raise", "annotate", "ignore"] = "raise",
+    raise_errors: bool = False,
 ) -> str:
     """Get AFLOW prototype label for pymatgen SpacegroupAnalyzer.
 
     Args:
         spg_analyzer (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
-        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
-            'ignore' are self-explanatory. 'annotate' prefixes problematic Aflow labels
-            with 'invalid <reason>: '.
-
-    Raises:
-        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
-            expected composition.
-
-    Raises:
-        ValueError: if Wyckoff multiplicities do not add up to expected composition.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
 
     Returns:
-        str: AFLOW prototype labels
+        str: AFLOW prototype label or explanation of failure if symmetry detection
+            failed and raise_errors is False.
     """
     spg_num = spg_analyzer.get_space_group_number()
     sym_struct = spg_analyzer.get_symmetrized_structure()
@@ -288,22 +228,77 @@ def get_aflow_label_from_spg_analyzer(
     prototype_form = prototype_formula(sym_struct.composition)
 
     chem_sys = sym_struct.composition.chemical_system
-    aflow_label_with_chemsys = (
-        f"{prototype_form}_{pearson_symbol}_{spg_num}_{canonical}:{chem_sys}"
-    )
+    full_label = f"{prototype_form}_{pearson_symbol}_{spg_num}_{canonical}:{chem_sys}"
 
     observed_formula = Composition(elem_dict).reduced_formula
     expected_formula = sym_struct.composition.reduced_formula
     if observed_formula != expected_formula:
-        if errors == "raise":
-            raise ValueError(
-                f"Invalid WP multiplicities - {aflow_label_with_chemsys}, expected "
-                f"{observed_formula} to be {expected_formula}"
-            )
-        if errors == "annotate":
-            return f"invalid multiplicities: {aflow_label_with_chemsys}"
+        err_msg = (
+            f"Invalid WP multiplicities - {full_label}, expected "
+            f"{observed_formula} to be {expected_formula}"
+        )
+        if raise_errors:
+            raise ValueError(err_msg)
 
-    return aflow_label_with_chemsys
+        return err_msg
+
+    return full_label
+
+
+def get_aflow_label_from_spglib(
+    struct: Structure,
+    raise_errors: bool = False,
+    init_symprec: float = 0.1,
+    fallback_symprec: float | None = 1e-5,
+) -> str | None:
+    """Get AFLOW prototype label for pymatgen Structure.
+
+    Args:
+        struct (Structure): pymatgen Structure object.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
+        init_symprec (float): Initial symmetry precision for spglib. Defaults to 0.1.
+        fallback_symprec (float): Fallback symmetry precision for spglib if first
+            symmetry detection failed. Defaults to 1e-5.
+
+    Returns:
+        str: AFLOW prototype label or explanation of failure if symmetry detection
+            failed and raise_errors is False.
+    """
+    attempt_to_recover = False
+    try:
+        spg_analyzer = SpacegroupAnalyzer(
+            struct, symprec=init_symprec, angle_tolerance=5
+        )
+        try:
+            aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
+                spg_analyzer, raise_errors
+            )
+
+            if ("Invalid" in aflow_label_with_chemsys) and fallback_symprec is not None:
+                attempt_to_recover = True
+        except ValueError as exc:
+            if fallback_symprec is None:
+                raise exc
+            attempt_to_recover = True
+
+        # try again with refined structure if it initially fails
+        # NOTE structures with magmoms fail unless all have same magnetic moment
+        if attempt_to_recover:
+            spg_analyzer = SpacegroupAnalyzer(
+                spg_analyzer.get_refined_structure(),
+                symprec=fallback_symprec,
+                angle_tolerance=-1,
+            )
+            aflow_label_with_chemsys = get_aflow_label_from_spg_analyzer(
+                spg_analyzer, raise_errors
+            )
+        return aflow_label_with_chemsys
+
+    except ValueError as exc:
+        if not raise_errors:
+            return str(exc)
+        raise
 
 
 def canonicalize_elem_wyks(elem_wyks: str, spg_num: int | str) -> str:
