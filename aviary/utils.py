@@ -720,12 +720,11 @@ def save_results_dict(
     """Save the results to a file after model evaluation.
 
     Args:
-        ids (dict[str, list[str  |  int]]): ): Each key is the name of an identifier
+        ids (dict[str, list[str | int]]): Each key is the name of an identifier
             (e.g. material ID, composition, ...) and its value a list of IDs.
-        results_dict (dict[str, Any]): ): nested dictionary of results
-            {name: {col: data}}
-        model_name (str): ): The name given the model via the --model-name flag.
-        run_id (str): ): The run ID given to the model via the --run-id flag.
+        results_dict (dict[str, Any]): nested dictionary of results {name: {col: data}}
+        model_name (str): The name given the model via the --model-name flag.
+        run_id (str): The run ID given to the model via the --run-id flag.
     """
     results: dict[str, np.ndarray] = {}
 
@@ -742,6 +741,7 @@ def save_results_dict(
                     }
 
             elif "pred" in col or "ale" in col:
+                # elif so that pre-logit-ale doesn't trigger
                 results |= {
                     f"{target_name}_{col}_n{n_ens}": val.ravel()
                     for (n_ens, val) in enumerate(data)
