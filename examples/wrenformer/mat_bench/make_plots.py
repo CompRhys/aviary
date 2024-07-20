@@ -13,7 +13,7 @@ import plotly.express as px
 from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata as matbench_metadata
-from pymatviz.utils import add_identity_line
+from pymatviz.powerups import add_identity_line
 from sklearn.metrics import r2_score, roc_auc_score
 
 from examples.wrenformer.mat_bench import DATA_PATHS
