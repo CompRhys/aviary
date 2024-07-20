@@ -237,15 +237,12 @@ def initialize_losses(
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"
                     )
+            elif loss_name_dict[name] == "L1":
+                loss_func_dict[name] = (task, L1Loss())
+            elif loss_name_dict[name] == "L2":
+                loss_func_dict[name] = (task, MSELoss())
             else:
-                if loss_name_dict[name] == "L1":
-                    loss_func_dict[name] = (task, L1Loss())
-                elif loss_name_dict[name] == "L2":
-                    loss_func_dict[name] = (task, MSELoss())
-                else:
-                    raise NameError(
-                        "Only L1 or L2 losses are allowed for regression tasks"
-                    )
+                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
 
     return loss_func_dict
 

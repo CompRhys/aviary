@@ -344,7 +344,7 @@ def canonicalize_element_wyckoffs(element_wyckoffs: str, spg_num: int | str) -> 
         for element_wyckoffs in isopointal_element_wyckoffs
     ]
 
-    return sorted(scored_element_wyckoffs, key=lambda x: (x[1], x[0]))[0][0]
+    return min(scored_element_wyckoffs, key=lambda x: (x[1], x[0]))[0]
 
 
 def sort_and_score_element_wyckoffs(element_wyckoffs: str) -> tuple[str, int]:
@@ -577,7 +577,7 @@ def get_prototype_from_protostructure(protostructure_label: str) -> str:
         for element_wyckoffs in isopointal_all_wyckoffs
     ]
 
-    all_wyckoffs = sorted(scored_all_wyckoffs, key=lambda x: (x[1], x[0]))[0][0]
+    all_wyckoffs = min(scored_all_wyckoffs, key=lambda x: (x[1], x[0]))[0]
 
     return f"{anonymous_formula}_{pearson_symbol}_{spg_num}_{all_wyckoffs}"
 

@@ -246,14 +246,13 @@ def train_model(
                 print("Starting stochastic weight averaging...")
             swa_model.update_parameters(model)
             swa_scheduler.step()
+        elif scheduler_name == "ReduceLROnPlateau":
+            val_metric = val_metrics[target_col][
+                "MAE" if task_type == reg_key else "Accuracy"
+            ]
+            lr_scheduler.step(val_metric)
         else:
-            if scheduler_name == "ReduceLROnPlateau":
-                val_metric = val_metrics[target_col][
-                    "MAE" if task_type == reg_key else "Accuracy"
-                ]
-                lr_scheduler.step(val_metric)
-            else:
-                lr_scheduler.step()
+            lr_scheduler.step()
 
         model.epoch += 1
 
