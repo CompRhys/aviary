@@ -9,7 +9,6 @@ from operator import itemgetter
 from os.path import abspath, dirname, join
 from shutil import which
 from string import ascii_uppercase, digits
-from typing import Literal
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
@@ -33,8 +32,8 @@ with open(join(module_dir, "wyckoff-position-relabelings.json")) as file:
     relab_dict = json.load(file)
 
 relab_dict = {
-    spg: [{int(key): line for key, line in val.items()} for val in vals]
-    for spg, vals in relab_dict.items()
+    spg_num: [{int(key): line for key, line in val.items()} for val in vals]
+    for spg_num, vals in relab_dict.items()
 }
 
 cry_sys_dict = {
@@ -85,19 +84,22 @@ def split_alpha_numeric(s: str) -> dict[str, list[str]]:
 
 
 def count_values_for_wyckoff(
-    wyckoff: list[str],
-    multiplicity: list[str],
-    spg: str,
+    element_wyckoffs: list[str],
+    counts: list[str],
+    spg_num: str,
     lookup_dict: dict[str, dict[str, int]],
 ):
     """Count values from a lookup table and scale by wyckoff multiplicities."""
-    return sum(int(n) * lookup_dict[spg][k] for n, k in zip(multiplicity, wyckoff))
+    return sum(
+        int(count) * lookup_dict[spg_num][wyckoff_letter]
+        for count, wyckoff_letter in zip(counts, element_wyckoffs)
+    )
 
 
 def get_protostructure_label_from_aflow(
     struct: Structure,
     aflow_executable: str | None = None,
-    errors: Literal["raise", "annotate", "ignore"] = "raise",
+    raise_errors: bool = False,
 ) -> str:
     """Get protostructure label for a pymatgen Structure. Make sure you're running a
     recent version of the aflow CLI as there's been several breaking changes. This code
@@ -112,16 +114,13 @@ def get_protostructure_label_from_aflow(
     Args:
         struct (Structure): pymatgen Structure
         aflow_executable (str): path to aflow executable. Defaults to which("aflow").
-        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
-            'ignore' are self-explanatory. 'annotate' prefixes problematic AFLOW labels
-            with 'invalid <reason>: '.
-
-    Raises:
-        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
-            expected composition.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
 
     Returns:
-        str | None: protostructure_label which is constructed as `aflow_label:chemsys`.
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
     """
     if aflow_executable is None:
         aflow_executable = which("aflow")
@@ -145,139 +144,92 @@ def get_protostructure_label_from_aflow(
     aflow_proto = json.loads(output.stdout)
 
     aflow_label = aflow_proto["aflow_prototype_label"]
-
+    chemsys = struct.composition.chemical_system
     # check that multiplicities satisfy original composition
-    _, _, spg_num, *wyckoff_letters = aflow_label.split("_")
-    elements = sorted(el.symbol for el in struct.composition)
-    elem_dict = {}
-    for elem, wyk_letters_per_elem in zip(elements, wyckoff_letters):
+    prototype_form, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split("_")
+
+    element_dict = {}
+    for elem, wyk_letters_per_elem in zip(chemsys.split("-"), element_wyckoffs):
         # normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_normalized = re.sub(
             RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
         )
         sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
-        elem_dict[elem] = count_values_for_wyckoff(
+        element_dict[elem] = count_values_for_wyckoff(
             sep_el_wyks["alpha"],
             sep_el_wyks["numeric"],
             spg_num,
             wyckoff_multiplicity_dict,
         )
 
-    protostructure_label = f"{aflow_label}:{'-'.join(elements)}"
+    element_wyckoffs = "_".join(element_wyckoffs)
+    element_wyckoffs = canonicalize_element_wyckoffs(element_wyckoffs, spg_num)
 
-    observed_formula = Composition(elem_dict).reduced_formula
+    protostructure_label = (
+        f"{prototype_form}_{pearson_symbol}_{spg_num}_{element_wyckoffs}:{chemsys}"
+    )
+
+    observed_formula = Composition(element_dict).reduced_formula
     expected_formula = struct.composition.reduced_formula
     if observed_formula != expected_formula:
-        if errors == "raise":
-            raise ValueError(
-                f"Invalid WP multiplicities - {aflow_label}, expected "
-                f"{observed_formula} to be {expected_formula}."
-            )
-        if errors == "annotate":
-            return f"Invalid multiplicities: {protostructure_label}"
+        err_msg = (
+            f"Invalid WP multiplicities - {protostructure_label}, expected "
+            f"{observed_formula} to be {expected_formula}"
+        )
+        if raise_errors:
+            raise ValueError(err_msg)
+
+        return err_msg
 
     return protostructure_label
 
 
-def get_protostructure_label_from_spglib(
-    struct: Structure,
-    errors: Literal["raise", "annotate", "ignore"] = "ignore",
-    init_symprec: float = 0.1,
-    fallback_symprec: float = 1e-5,
-) -> str:
-    """Get protostructure label for pymatgen Structure.
-
-    Args:
-        struct (Structure): pymatgen Structure object.
-        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
-            'ignore' are self-explanatory. 'annotate' prefixes problematic AFLOW labels
-            with 'invalid <reason>: '.
-        init_symprec (float): Initial symmetry precision for spglib. Defaults to 0.1.
-        fallback_symprec (float): Fallback symmetry precision for spglib if first
-            symmetry detection failed. Defaults to 1e-5.
-
-    Returns:
-        str: protostructure_label which is constructed as `aflow_label:chemsys` or a
-            a str explaining the reason for failure if errors = "annotate".
-    """
-    try:
-        spg_analyzer = SpacegroupAnalyzer(
-            struct, symprec=init_symprec, angle_tolerance=5
-        )
-        protostructure_label = get_protostructure_label_from_spg_analyzer(
-            spg_analyzer, errors
-        )
-
-        # try again with refined structure if it initially fails
-        # NOTE structures with magmoms fail unless all have same magnetic moment
-        if "invalid" in protostructure_label:
-            spg_analyzer = SpacegroupAnalyzer(
-                spg_analyzer.get_refined_structure(),
-                symprec=fallback_symprec,
-                angle_tolerance=-1,
-            )
-            protostructure_label = get_protostructure_label_from_spg_analyzer(
-                spg_analyzer, errors
-            )
-        return protostructure_label
-
-    except ValueError as exc:
-        if errors == "annotate":
-            return f"Invalid spglib: {exc}"
-        raise  # we only get here if errors == "raise"
-
-
 def get_protostructure_label_from_spg_analyzer(
     spg_analyzer: SpacegroupAnalyzer,
-    errors: Literal["raise", "annotate", "ignore"] = "raise",
+    raise_errors: bool = False,
 ) -> str:
     """Get protostructure label for pymatgen SpacegroupAnalyzer.
 
     Args:
         spg_analyzer (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
-        errors ('raise' | 'annotate' | 'ignore']): How to handle errors. 'raise' and
-            'ignore' are self-explanatory. 'annotate' prefixes problematic AFLOW labels
-            with 'invalid <reason>: '.
-
-    Raises:
-        ValueError: if errors='raise' and Wyckoff multiplicities do not add up to
-            expected composition.
-
-    Raises:
-        ValueError: if Wyckoff multiplicities do not add up to expected composition.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
 
     Returns:
-        str: protostructure_label which is constructed as `aflow_label:chemsys`.
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
     """
     spg_num = spg_analyzer.get_space_group_number()
     sym_struct = spg_analyzer.get_symmetrized_structure()
 
     equivalent_wyckoff_labels = [
+        # tuple of (wp multiplicity, element, wyckoff letter)
         (len(s), s[0].species_string, wyk_letter.translate(remove_digits))
         for s, wyk_letter in zip(
             sym_struct.equivalent_sites, sym_struct.wyckoff_symbols
         )
     ]
+    # Pre-sort by element and wyckoff letter to ensure continuous groups in groupby
     equivalent_wyckoff_labels = sorted(
         equivalent_wyckoff_labels, key=lambda x: (x[1], x[2])
     )
 
     # check that multiplicities satisfy original composition
-    elem_dict = {}
-    elem_wyks = []
-    for el, g in groupby(
-        equivalent_wyckoff_labels, key=lambda x: x[1]
-    ):  # sort alphabetically by element
-        lg = list(g)  # NOTE create a list from the iterator so that we can reuse it
-        elem_dict[el] = sum(wyckoff_multiplicity_dict[str(spg_num)][e[2]] for e in lg)
-        wyks = ""
-        # sort groups alphabetically by wyckoff letter
-        for wyk, w in groupby(lg, key=lambda x: x[2]):
-            wyks += f"{len(list(w))}{wyk}"
-        elem_wyks.append(wyks)
-
-    # canonicalize the possible wyckoff letter sequences
-    canonical = canonicalize_elem_wyks("_".join(elem_wyks), spg_num)
+    element_dict = {}
+    element_wyckoffs = []
+    for el, group in groupby(equivalent_wyckoff_labels, key=lambda x: x[1]):
+        # NOTE create a list from the iterator so that we can use it without exhausting
+        list_group = list(group)
+        element_dict[el] = sum(
+            wyckoff_multiplicity_dict[str(spg_num)][e[2]] for e in list_group
+        )
+        element_wyckoffs.append(
+            "".join(
+                f"{len(list(w))}{wyk}"
+                for wyk, w in groupby(list_group, key=lambda x: x[2])
+            )
+        )
 
     # get Pearson symbol
     cry_sys = spg_analyzer.get_crystal_system()
@@ -286,61 +238,121 @@ def get_protostructure_label_from_spg_analyzer(
     num_sites_conventional = len(spg_analyzer.get_symmetry_dataset()["std_types"])
     pearson_symbol = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
 
-    prototype_form = prototype_formula(sym_struct.composition)
+    prototype_form = get_prototype_formula_from_composition(sym_struct.composition)
+    chemsys = sym_struct.composition.chemical_system
 
-    chem_sys = sym_struct.composition.chemical_system
+    all_wyckoffs = "_".join(element_wyckoffs)
+    all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, spg_num)
+
     protostructure_label = (
-        f"{prototype_form}_{pearson_symbol}_{spg_num}_{canonical}:{chem_sys}"
+        f"{prototype_form}_{pearson_symbol}_{spg_num}_{all_wyckoffs}:{chemsys}"
     )
 
-    observed_formula = Composition(elem_dict).reduced_formula
+    observed_formula = Composition(element_dict).reduced_formula
     expected_formula = sym_struct.composition.reduced_formula
     if observed_formula != expected_formula:
-        if errors == "raise":
-            raise ValueError(
-                f"Invalid WP multiplicities - {protostructure_label}, expected "
-                f"{observed_formula} to be {expected_formula}"
-            )
-        if errors == "annotate":
-            return f"invalid multiplicities: {protostructure_label}"
+        err_msg = (
+            f"Invalid WP multiplicities - {protostructure_label}, expected "
+            f"{observed_formula} to be {expected_formula}"
+        )
+        if raise_errors:
+            raise ValueError(err_msg)
+
+        return err_msg
 
     return protostructure_label
 
 
-def canonicalize_elem_wyks(elem_wyks: str, spg_num: int | str) -> str:
+def get_protostructure_label_from_spglib(
+    struct: Structure,
+    raise_errors: bool = False,
+    init_symprec: float = 0.1,
+    fallback_symprec: float | None = 1e-5,
+) -> str | None:
+    """Get AFLOW prototype label for pymatgen Structure.
+
+    Args:
+        struct (Structure): pymatgen Structure object.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
+        init_symprec (float): Initial symmetry precision for spglib. Defaults to 0.1.
+        fallback_symprec (float): Fallback symmetry precision for spglib if first
+            symmetry detection failed. Defaults to 1e-5.
+
+    Returns:
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
+    """
+    attempt_to_recover = False
+    try:
+        spg_analyzer = SpacegroupAnalyzer(
+            struct, symprec=init_symprec, angle_tolerance=5
+        )
+        try:
+            aflow_label_with_chemsys = get_protostructure_label_from_spg_analyzer(
+                spg_analyzer, raise_errors
+            )
+
+            if ("Invalid" in aflow_label_with_chemsys) and fallback_symprec is not None:
+                attempt_to_recover = True
+        except ValueError as exc:
+            if fallback_symprec is None:
+                raise exc
+            attempt_to_recover = True
+
+        # try again with refined structure if it initially fails
+        # NOTE structures with magmoms fail unless all have same magnetic moment
+        if attempt_to_recover:
+            spg_analyzer = SpacegroupAnalyzer(
+                spg_analyzer.get_refined_structure(),
+                symprec=fallback_symprec,
+                angle_tolerance=-1,
+            )
+            aflow_label_with_chemsys = get_protostructure_label_from_spg_analyzer(
+                spg_analyzer, raise_errors
+            )
+        return aflow_label_with_chemsys
+
+    except ValueError as exc:
+        if not raise_errors:
+            return str(exc)
+        raise
+
+
+def canonicalize_element_wyckoffs(element_wyckoffs: str, spg_num: int | str) -> str:
     """Given an element ordering, canonicalize the associated Wyckoff positions
     based on the alphabetical weight of equivalent choices of origin.
 
     Args:
-        elem_wyks (str): Wren Wyckoff string encoding element types at Wyckoff positions
+        element_wyckoffs (str): wyckoff substring section from aflow_label with the
+            wyckoff letters for different elements separated by underscores.
         spg_num (int | str): International space group number.
 
     Returns:
-        str: Canonicalized Wren Wyckoff encoding.
+        str: element_wyckoff string with canonical ordering of the wyckoff letters.
     """
-    isopointal = []
+    isopointal_element_wyckoffs = list(
+        {
+            element_wyckoffs.translate(str.maketrans(trans))
+            for trans in relab_dict[str(spg_num)]
+        }
+    )
 
-    for trans in relab_dict[str(spg_num)]:
-        t = str.maketrans(trans)
-        isopointal.append(elem_wyks.translate(t))
+    scored_element_wyckoffs = [
+        sort_and_score_element_wyckoffs(element_wyckoffs)
+        for element_wyckoffs in isopointal_element_wyckoffs
+    ]
 
-    isopointal = list(set(isopointal))
-
-    scores = []
-    sorted_iso = []
-    for wyks in isopointal:
-        sorted_el_wyks, score = sort_and_score_wyks(wyks)
-        scores.append(score)
-        sorted_iso.append(sorted_el_wyks)
-
-    return sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))[0][1]
+    return sorted(scored_element_wyckoffs, key=lambda x: (x[1], x[0]))[0][0]
 
 
-def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
+def sort_and_score_element_wyckoffs(element_wyckoffs: str) -> tuple[str, int]:
     """Determines the order or Wyckoff positions when canonicalizing AFLOW labels.
 
     Args:
-        wyks (str): Wyckoff position substring from AFLOW-style prototype label
+        element_wyckoffs (str): wyckoff substring section from aflow_label with the
+            wyckoff letters for different elements separated by underscores.
 
     Returns:
         tuple: containing
@@ -348,26 +360,29 @@ def sort_and_score_wyks(wyks: str) -> tuple[str, int]:
         - int: integer score to rank order when canonicalizing
     """
     score = 0
-    sorted_el_wyks = []
-    for el_wyks in wyks.split("_"):
-        sep_el_wyks = split_alpha_numeric(el_wyks)
-        sorted_el_wyks.append(
+    sorted_element_wyckoffs = []
+    for el_wyks in element_wyckoffs.split("_"):
+        wp_counts = split_alpha_numeric(el_wyks)
+        sorted_element_wyckoffs.append(
             "".join(
                 [
-                    f"{mult}{wyk}" if mult != "1" else wyk
-                    for mult, wyk in sorted(
-                        zip(sep_el_wyks["numeric"], sep_el_wyks["alpha"]),
+                    f"{count}{wyckoff_letter}" if count != "1" else wyckoff_letter
+                    for count, wyckoff_letter in sorted(
+                        zip(wp_counts["numeric"], wp_counts["alpha"]),
                         key=lambda x: x[1],
                     )
                 ]
             )
         )
-        score += sum(0 if el == "A" else ord(el) - 96 for el in sep_el_wyks["alpha"])
+        score += sum(
+            0 if wyckoff_letter == "A" else ord(wyckoff_letter) - 96
+            for wyckoff_letter in wp_counts["alpha"]
+        )
 
-    return "_".join(sorted_el_wyks), score
+    return "_".join(sorted_element_wyckoffs), score
 
 
-def prototype_formula(composition: Composition) -> str:
+def get_prototype_formula_from_composition(composition: Composition) -> str:
     """An anonymized formula. Unique species are arranged in alphabetical order
     and assigned ascending alphabets. This format is used in the aflow structure
     prototype labelling scheme.
@@ -396,7 +411,7 @@ def prototype_formula(composition: Composition) -> str:
     return anon
 
 
-def get_anom_formula_from_prototype_formula(prototype_formula: str) -> str:
+def get_anonymous_formula_from_prototype_formula(prototype_formula: str) -> str:
     """Get an anonymous formula from a prototype formula."""
     prototype_formula = re.sub(
         RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, prototype_formula
@@ -405,13 +420,28 @@ def get_anom_formula_from_prototype_formula(prototype_formula: str) -> str:
 
     return "".join(
         [
-            f"{el}{num}" if num != "1" else el
+            f"{el}{num}" if num != 1 else el
             for el, num in zip(
                 anom_list["alpha"],
-                sorted(anom_list["numeric"]),
+                sorted(map(int, anom_list["numeric"])),
             )
         ]
     )
+
+
+def count_distinct_wyckoff_letters(protostructure_label: str) -> int:
+    """Count number of distinct Wyckoff letters in protostructure_label.
+
+    Args:
+        protostructure_label (str): label constructed as `aflow_label:chemsys`
+
+    Returns:
+        int: number of distinct Wyckoff letters in protostructure_label
+    """
+    aflow_label, _ = protostructure_label.split(":")
+    _, _, _, element_wyckoffs = aflow_label.split("_", 3)
+    element_wyckoffs = element_wyckoffs.translate(remove_digits).replace("_", "")
+    return len(set(element_wyckoffs))  # number of distinct Wyckoff letters
 
 
 def count_wyckoff_positions(protostructure_label: str) -> int:
@@ -421,7 +451,7 @@ def count_wyckoff_positions(protostructure_label: str) -> int:
         protostructure_label (str): label constructed as `aflow_label:chemsys`
 
     Returns:
-        int: number of distinct Wyckoff positions
+        int: number of distinct Wyckoff positions in protostructure_label
     """
     aflow_label, _ = protostructure_label.split(":")  # remove chemical system
     # discard prototype formula and spg symbol and spg number
@@ -445,27 +475,13 @@ def count_crystal_dof(protostructure_label: str) -> int:
     Returns:
         int: Number of free-parameters in given prototype
     """
-    n_params = 0
-
     aflow_label, _ = protostructure_label.split(":")  # chop off chemical system
-    _, pearson, spg, *wyks = aflow_label.split("_")
+    _, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split("_")
 
-    n_params += cry_param_dict[pearson[0]]
-
-    for wyk_letters_per_elem in wyks:
-        # normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_normalized = re.sub(
-            RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
-        )
-        sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
-        n_params += count_values_for_wyckoff(
-            sep_el_wyks["alpha"],
-            sep_el_wyks["numeric"],
-            spg,
-            param_dict,
-        )
-
-    return n_params
+    return (
+        _count_from_dict(element_wyckoffs, param_dict, spg_num)
+        + cry_param_dict[pearson_symbol[0]]
+    )
 
 
 def count_crystal_sites(protostructure_label: str) -> int:
@@ -477,33 +493,31 @@ def count_crystal_sites(protostructure_label: str) -> int:
     Returns:
         int: Number of free-parameters in given prototype
     """
+    aflow_label, _ = protostructure_label.split(":")  # chop off chemical system
+    _, _, spg_num, *element_wyckoffs = aflow_label.split("_")
+
+    return _count_from_dict(element_wyckoffs, wyckoff_multiplicity_dict, spg_num)
+
+
+def _count_from_dict(
+    element_wyckoffs: list[str], lookup_dict: dict, spg_num: str
+) -> int:
+    """Count number of sites from protostructure_label."""
     n_params = 0
 
-    aflow_label, _ = protostructure_label.split(":")  # chop off chemical system
-    _, pearson, spg, *wyks = aflow_label.split("_")
-
-    for wyk_letters_per_elem in wyks:
+    for wyckoffs in element_wyckoffs:
         # normalize Wyckoff letters to start with 1 if missing digit
-        wyk_letters_normalized = re.sub(
-            RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
+        sep_el_wyks = split_alpha_numeric(
+            re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, wyckoffs)
         )
-        sep_el_wyks = split_alpha_numeric(wyk_letters_normalized)
         n_params += count_values_for_wyckoff(
             sep_el_wyks["alpha"],
             sep_el_wyks["numeric"],
-            spg,
-            wyckoff_multiplicity_dict,
+            spg_num,
+            lookup_dict,
         )
 
     return int(n_params)
-
-
-def count_distinct_wyckoff_letters(protostructure_label: str) -> int:
-    """Count number of distinct Wyckoff letters in protostructure_label."""
-    aflow_label, _ = protostructure_label.split(":")  # drop chemical system
-    _, _, _, wyckoff_letters = aflow_label.split("_", 3)  # drop prototype, Pearson, spg
-    wyckoff_letters = wyckoff_letters.translate(remove_digits).replace("_", "")
-    return len(set(wyckoff_letters))  # number of distinct Wyckoff letters
 
 
 def get_prototype_from_protostructure(protostructure_label: str) -> str:
@@ -517,62 +531,58 @@ def get_prototype_from_protostructure(protostructure_label: str) -> str:
         str: Canonicalized AFLOW-style prototype label
     """
     aflow_label, _ = protostructure_label.split(":")
-    anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
-
-    anonymous_formula = re.sub(
-        RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, anonymous_formula
-    )
-    anom_list = split_alpha_numeric(anonymous_formula)
-    counts = [int(x) for x in anom_list["numeric"]]
-    dummy_els = anom_list["alpha"]
-
-    s_counts, s_wyks_tup = list(zip(*sorted(zip(counts, wyckoffs))))
-    s_wyks = re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, "_".join(s_wyks_tup))
-    c_anom = "".join(
-        [f"{el}{num}" if num != 1 else el for el, num in zip(dummy_els, s_counts)]
+    prototype_formula, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split(
+        "_"
     )
 
-    if len(s_counts) == len(set(s_counts)):
-        cs_wyks = canonicalize_elem_wyks(s_wyks, int(spg))
-        return f"{c_anom}_{pearson}_{spg}_{cs_wyks}"
+    anonymous_formula = get_anonymous_formula_from_prototype_formula(prototype_formula)
+    counts = [
+        int(x)
+        for x in split_alpha_numeric(
+            re.sub(RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, prototype_formula)
+        )["numeric"]
+    ]
+
+    # map to list to avoid mypy error, zip returns tuples.
+    counts, element_wyckoffs = map(list, zip(*sorted(zip(counts, element_wyckoffs))))
+    all_wyckoffs = "_".join(element_wyckoffs)
+    all_wyckoffs = re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, all_wyckoffs)
+    if len(counts) == len(set(counts)):
+        all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, int(spg_num))
+        return f"{anonymous_formula}_{pearson_symbol}_{spg_num}_{all_wyckoffs}"
 
     # credit Stef: https://stackoverflow.com/a/70126643/5517459
-    valid_permutations = [
-        list(map(itemgetter(1), chain.from_iterable(p)))
+    all_wyckoffs_permutations = [
+        "_".join(list(map(itemgetter(1), chain.from_iterable(p))))
         for p in product(
             *[
                 permutations(g)
                 for _, g in groupby(
-                    sorted(zip(s_counts, s_wyks.split("_"))), key=lambda x: x[0]
+                    sorted(zip(counts, all_wyckoffs.split("_"))), key=lambda x: x[0]
                 )
             ]
         )
     ]
 
-    isopointal: list[str] = []
+    isopointal_all_wyckoffs = list(
+        {
+            all_wyckoffs.translate(str.maketrans(trans))
+            for all_wyckoffs in all_wyckoffs_permutations
+            for trans in relab_dict[spg_num]
+        }
+    )
 
-    for wyks_list in valid_permutations:
-        for trans in relab_dict[spg]:
-            t = str.maketrans(trans)
-            isopointal.append("_".join(wyks_list).translate(t))
+    scored_all_wyckoffs = [
+        sort_and_score_element_wyckoffs(element_wyckoffs)
+        for element_wyckoffs in isopointal_all_wyckoffs
+    ]
 
-    isopointal = list(set(isopointal))
+    all_wyckoffs = sorted(scored_all_wyckoffs, key=lambda x: (x[1], x[0]))[0][0]
 
-    scores = []
-    sorted_iso = []
-    for wyks in isopointal:
-        sorted_el_wyks, score = sort_and_score_wyks(wyks)
-        scores.append(score)
-        sorted_iso.append(sorted_el_wyks)
-
-    canonical = sorted(zip(scores, sorted_iso), key=lambda x: (x[0], x[1]))
-
-    # TODO: how to tie break when the scores are the same?
-    # currently done by alphabetical
-    return "_".join((c_anom, pearson, spg, canonical[0][1]))
+    return f"{anonymous_formula}_{pearson_symbol}_{spg_num}_{all_wyckoffs}"
 
 
-def _get_anom_formula_dict(anonymous_formula: str) -> dict:
+def _get_anonymous_formula_dict(anonymous_formula: str) -> dict:
     """Get a dictionary of element to count from an anonymous formula."""
     result: defaultdict = defaultdict(int)
     element = ""
@@ -637,31 +647,32 @@ def get_protostructures_from_aflow_label_and_composition(
         list[str]: List of possible protostructure labels that can be generated
             from combinations of the input aflow_label and composition.
     """
-    anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
+    anonymous_formula, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split(
+        "_"
+    )
 
     ele_amt_dict = composition.get_el_amt_dict()
-    proto_formula = prototype_formula(composition)
-    anom_amt_dict = _get_anom_formula_dict(anonymous_formula)
+    proto_formula = get_prototype_formula_from_composition(composition)
+    anom_amt_dict = _get_anonymous_formula_dict(anonymous_formula)
 
     translations = _find_translations(ele_amt_dict, anom_amt_dict)
-    anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), wyckoffs))
+    anom_ele_to_wyk = dict(zip(anom_amt_dict.keys(), element_wyckoffs))
     anonymous_formula = RE_ANONYMOUS.sub(RE_SUBST_ONE_PREFIX, anonymous_formula)
 
-    protostructures = []
+    protostructures = set()
     for t in translations:
         wyckoff_part = "_".join(
             RE_WYCKOFF.sub(RE_SUBST_ONE_PREFIX, anom_ele_to_wyk[t[elem]])
             for elem in sorted(t.keys())
         )
-        canonicalized_wyckoff = canonicalize_elem_wyks(wyckoff_part, spg)
+        canonicalized_wyckoff = canonicalize_element_wyckoffs(wyckoff_part, spg_num)
         chemical_system = "-".join(sorted(t.keys()))
 
-        protostructure_label = (
-            f"{proto_formula}_{pearson}_{spg}_{canonicalized_wyckoff}:{chemical_system}"
+        protostructures.add(
+            f"{proto_formula}_{pearson_symbol}_{spg_num}_{canonicalized_wyckoff}:{chemical_system}"
         )
-        protostructures.append(protostructure_label)
 
-    return protostructures
+    return list(protostructures)
 
 
 def get_random_structure_for_protostructure(
@@ -680,24 +691,29 @@ def get_random_structure_for_protostructure(
         raise ImportError("pyxtal is required for this function")
 
     aflow_label, chemsys = protostructure_label.split(":")
-    _, _, spg, *wyckoffs = aflow_label.split("_")
+    _, _, spg_num, *element_wyckoffs = aflow_label.split("_")
 
-    wyckoffs = [re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, w) for w in wyckoffs]
-    sep_el_wyks = [split_alpha_numeric(w) for w in wyckoffs]
+    sep_el_wyks = [
+        split_alpha_numeric(re.sub(RE_WYCKOFF_NO_PREFIX, RE_SUBST_ONE_PREFIX, w))
+        for w in element_wyckoffs
+    ]
 
     species_sites = [
         [
             site
-            for m, w in zip(d["numeric"], d["alpha"])
-            for site in [f"{wyckoff_multiplicity_dict[spg][w]}{w}"] * int(m)
+            for count, wyckoff_letter in zip(d["numeric"], d["alpha"])
+            for site in [
+                f"{wyckoff_multiplicity_dict[spg_num][wyckoff_letter]}{wyckoff_letter}"
+            ]
+            * int(count)
         ]
         for d in sep_el_wyks
     ]
 
     species_counts = [
         sum(
-            wyckoff_multiplicity_dict[spg][w] * int(m)
-            for m, w in zip(d["numeric"], d["alpha"])
+            wyckoff_multiplicity_dict[spg_num][wyckoff_letter] * int(count)
+            for count, wyckoff_letter in zip(d["numeric"], d["alpha"])
         )
         for d in sep_el_wyks
     ]
@@ -705,7 +721,7 @@ def get_random_structure_for_protostructure(
     p = pyxtal()
     p.from_random(
         dim=3,
-        group=int(spg),
+        group=int(spg_num),
         species=chemsys.split("-"),
         numIons=species_counts,
         sites=species_sites,

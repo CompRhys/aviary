@@ -1,8 +1,11 @@
+import inspect
+import re
 from itertools import permutations
 from shutil import which
 
 import pytest
 from pymatgen.core.structure import Composition, Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from aviary.wren.utils import (
     _find_translations,
@@ -10,13 +13,14 @@ from aviary.wren.utils import (
     count_crystal_sites,
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
-    get_anom_formula_from_prototype_formula,
+    get_anonymous_formula_from_prototype_formula,
     get_protostructure_label_from_aflow,
+    get_protostructure_label_from_spg_analyzer,
     get_protostructure_label_from_spglib,
     get_protostructures_from_aflow_label_and_composition,
+    get_prototype_formula_from_composition,
     get_prototype_from_protostructure,
     get_random_structure_for_protostructure,
-    prototype_formula,
     relab_dict,
 )
 
@@ -46,6 +50,52 @@ def test_get_protostructure_label_from_spglib():
     assert (
         get_protostructure_label_from_spglib(struct)
         == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
+    )
+
+
+def test_get_aflow_label_from_spglib_edge_case():
+    """Check edge case where the symmetry precision is too low."""
+    struct = Structure.from_file(f"{TEST_DIR}/data/U2Pa4Tc6.json")
+
+    defaults = inspect.signature(get_protostructure_label_from_spglib).parameters
+
+    assert defaults["init_symprec"].default == 0.1
+
+    spg_analyzer = SpacegroupAnalyzer(
+        struct, symprec=defaults["init_symprec"].default, angle_tolerance=5
+    )
+
+    raises_str = (
+        "Invalid WP multiplicities - A2B3C_hP6_191_c_2g_a:Pa-Tc-U, "
+        "expected U(PaTc3)2 to be UPa2Tc3"
+    )
+    with pytest.raises(ValueError, match=re.escape(raises_str)):
+        get_protostructure_label_from_spg_analyzer(spg_analyzer, raise_errors=True)
+
+    assert (
+        get_protostructure_label_from_spg_analyzer(spg_analyzer, raise_errors=False)
+        == raises_str
+    )
+
+    # Test that it gives invalid protostructure if fallback is None.
+    with pytest.raises(ValueError, match=re.escape(raises_str)):
+        get_protostructure_label_from_spglib(
+            struct, raise_errors=True, fallback_symprec=None
+        )
+
+    assert (
+        get_protostructure_label_from_spglib(
+            struct, raise_errors=False, fallback_symprec=None
+        )
+        == raises_str
+    )
+
+    assert get_protostructure_label_from_spglib(struct, raise_errors=True) == (
+        "A2B3C_hP6_191_c_g_a:Pa-Tc-U"
+    )
+
+    assert get_protostructure_label_from_spglib(struct, raise_errors=False) == (
+        "A2B3C_hP6_191_c_g_a:Pa-Tc-U"
     )
 
 
@@ -91,18 +141,26 @@ def test_count_crystal_sites():
 def test_get_prototype_from_protostructure(protostructure_label, expected):
     """Get a recanonicalized prototype string without chemical system"""
     aflow_label, chemsys = protostructure_label.split(":")
-    anonymous_formula, pearson, spg, *wyckoffs = aflow_label.split("_")
+    prototype_formula, pearson_symbol, spg_num, *wyckoffs = aflow_label.split("_")
 
-    wyks = "_".join(wyckoffs)
-    isopointal_wyks = []
-    for trans in relab_dict[str(spg)]:
-        t = str.maketrans(trans)
-        isopointal_wyks.append(wyks.translate(t))
+    element_wyckoff = "_".join(wyckoffs)
+
+    isopointal_element_wyckoffs = list(
+        {
+            element_wyckoff.translate(str.maketrans(trans))
+            for trans in relab_dict[spg_num]
+        }
+    )
 
     protostructure_labels = [
-        f"{anonymous_formula}_{pearson}_{spg}_{wyk}:{chemsys}"
-        for wyk in isopointal_wyks
+        f"{prototype_formula}_{pearson_symbol}_{spg_num}_{element_wyckoff}:{chemsys}"
+        for element_wyckoff in isopointal_element_wyckoffs
     ]
+
+    print(protostructure_label)
+    print(protostructure_labels)
+    print(get_prototype_from_protostructure(protostructure_label))
+    print(expected)
 
     assert all(
         get_prototype_from_protostructure(protostructure_label) == expected
@@ -132,7 +190,7 @@ def test_get_protostructures_from_aflow_label_and_composition(
     protostructures = get_protostructures_from_aflow_label_and_composition(
         aflow_label, Composition(composition)
     )
-    assert protostructures == expected.split(" ")
+    assert set(protostructures) == set(expected.split(" "))
 
     # check the round trip
     assert all(
@@ -191,18 +249,21 @@ def test_find_translations_performance():
     "composition, expected",
     [("Ce2Al3GaPd4", "A3B2CD4"), ("YbNiO3", "AB3C"), ("K2NaAlF6", "AB6C2D")],
 )
-def test_prototype_formula(composition: str, expected: str):
-    assert prototype_formula(Composition(composition)) == expected
+def test_get_prototype_formula_from_composition(composition: str, expected: str):
+    assert get_prototype_formula_from_composition(Composition(composition)) == expected
 
 
 @pytest.mark.parametrize(
-    "anom_formula, prototype_formula",
+    "anonymous_formula, prototype_formula",
     [("AB", "AB"), ("A2B", "AB2"), ("A3B2CD4", "AB2C3D4")],
 )
-def test_get_anom_formula_from_prototype_formula(
-    anom_formula: str, prototype_formula: str
+def test_get_anonymous_formula_from_prototype_formula(
+    anonymous_formula: str, prototype_formula: str
 ):
-    assert get_anom_formula_from_prototype_formula(anom_formula) == prototype_formula
+    assert (
+        get_anonymous_formula_from_prototype_formula(anonymous_formula)
+        == prototype_formula
+    )
 
 
 @pytest.mark.parametrize(
