@@ -727,39 +727,28 @@ def save_results_dict(
         model_name (str): ): The name given the model via the --model-name flag.
         run_id (str): ): The run ID given to the model via the --run-id flag.
     """
-    results = {}
+    results: dict[str, np.ndarray] = {}
 
-    for target_name in results_dict:
-        for col, data in results_dict[target_name].items():
+    for target_name, target_data in results_dict.items():
+        for col, data in target_data.items():
             # NOTE we save pre_logits rather than logits due to fact
             # that with the heteroskedastic setup we want to be able to
             # sample from the Gaussian distributed pre_logits we parameterize.
             if "pre-logits" in col:
                 for n_ens, y_pre_logit in enumerate(data):
-                    results.update(
-                        {
-                            f"{target_name}_{col}_c{lab}_n{n_ens}": val.ravel()
-                            for lab, val in enumerate(y_pre_logit.T)
-                        }
-                    )
+                    results |= {
+                        f"{target_name}_{col}_c{lab}_n{n_ens}": val.ravel()
+                        for lab, val in enumerate(y_pre_logit.T)
+                    }
 
-            elif "pred" in col:
-                preds = {
+            elif "pred" in col or "ale" in col:
+                results |= {
                     f"{target_name}_{col}_n{n_ens}": val.ravel()
                     for (n_ens, val) in enumerate(data)
                 }
-                results.update(preds)
-
-            elif "ale" in col:  # elif so that pre-logit-ale doesn't trigger
-                results.update(
-                    {
-                        f"{target_name}_{col}_n{n_ens}": val.ravel()
-                        for (n_ens, val) in enumerate(data)
-                    }
-                )
 
             elif col == "target":
-                results.update({f"{target_name}_target": data})
+                results |= {f"{target_name}_target": data}
 
     df = pd.DataFrame({**ids, **results})
 

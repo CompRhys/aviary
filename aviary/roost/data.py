@@ -113,8 +113,8 @@ class CompositionData(Dataset):
         n_elems = len(elements)
         self_idx = []
         nbr_idx = []
-        for idx in range(n_elems):
-            self_idx += [idx] * n_elems
+        for elem_idx in range(n_elems):
+            self_idx += [elem_idx] * n_elems
             nbr_idx += list(range(n_elems))
 
         # convert all data to tensors
