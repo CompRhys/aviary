@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.wren.utils import (
-    get_aflow_label_from_aflow,
+    get_protostructure_label_from_aflow,
     get_protostructure_label_from_spglib,
 )
 from examples.wrenformer.mat_bench import DATA_PATHS
@@ -42,7 +42,7 @@ df_perovskites["structure"] = [
 # takes ~6h (when running uninterrupted)
 for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskites)):
     if pd.isna(df_perovskites.aflow_wyckoff[idx]):
-        df_perovskites.loc[idx, "aflow_wyckoff"] = get_aflow_label_from_aflow(
+        df_perovskites.loc[idx, "aflow_wyckoff"] = get_protostructure_label_from_aflow(
             struct, "/Users/janosh/bin/aflow"
         )
 

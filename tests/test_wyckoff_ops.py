@@ -53,7 +53,7 @@ def test_get_protostructure_label_from_spglib():
     )
 
 
-def test_get_aflow_label_from_spglib_edge_case():
+def test_get_protostructure_label_from_spglib_edge_case():
     """Check edge case where the symmetry precision is too low."""
     struct = Structure.from_file(f"{TEST_DIR}/data/U2Pa4Tc6.json")
 
