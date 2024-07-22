@@ -108,10 +108,10 @@ class WyckoffData(Dataset):
             - list[str | int]: identifiers like material_id, composition
         """
         row = self.df.iloc[idx]
-        wyckoff_str = row[self.inputs]
+        protostructure_label = row[self.inputs]
         material_ids = row[self.identifiers].to_list()
 
-        parsed_output = parse_aflow_wyckoff_str(wyckoff_str)
+        parsed_output = parse_protostructure_label(protostructure_label)
         spg_num, wyk_site_multiplcities, elements, augmented_wyks = parsed_output
 
         wyk_site_multiplcities = np.atleast_2d(wyk_site_multiplcities).T / np.sum(
@@ -256,21 +256,29 @@ def collate_batch(
     )
 
 
-def parse_aflow_wyckoff_str(
-    aflow_label: str,
+def parse_protostructure_label(
+    protostructure_label: str,
 ) -> tuple[str, list[float], list[str], list[tuple[str, ...]]]:
     """Parse the Wren AFLOW-like Wyckoff encoding.
 
     Args:
-        aflow_label (str): AFLOW-style prototype string with appended chemical system
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         tuple[str, list[float], list[str], list[str]]: spacegroup number, Wyckoff site
             multiplicities, elements symbols and equivalent wyckoff sets
     """
-    proto, chemsys = aflow_label.split(":")
+    aflow_label, chemsys = protostructure_label.split(":")
     elems = chemsys.split("-")
-    _, _, spg_num, *wyckoff_letters = proto.split("_")
+    _, _, spg_num, *wyckoff_letters = aflow_label.split("_")
+
+    if len(elems) != len(wyckoff_letters):
+        raise ValueError(
+            f"Chemical system {chemsys} does not match Wyckoff letters "
+            f"{wyckoff_letters}"
+        )
 
     wyckoff_site_multiplicities = []
     elements = []

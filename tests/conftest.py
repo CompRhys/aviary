@@ -4,7 +4,7 @@ import pytest
 import torch
 from matminer.datasets import load_dataset
 
-from aviary.wren.utils import get_aflow_label_from_spglib
+from aviary.wren.utils import get_protostructure_label_from_spglib
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-09"
@@ -37,7 +37,7 @@ def df_matbench_jdft2d():
     df = df.set_index("material_id", drop=False)
     df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
 
-    df["wyckoff"] = df.structure.map(get_aflow_label_from_spglib)
+    df["wyckoff"] = df.structure.map(get_protostructure_label_from_spglib)
 
     return df
 
@@ -48,7 +48,7 @@ def df_matbench_phonons_wyckoff(df_matbench_phonons):
     paying for it unless requested.
     """
     df_matbench_phonons["wyckoff"] = df_matbench_phonons.structure.map(
-        get_aflow_label_from_spglib
+        get_protostructure_label_from_spglib
     )
 
     return df_matbench_phonons

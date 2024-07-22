@@ -35,7 +35,7 @@ def scale_errors(df: pd.DataFrame) -> pd.DataFrame:
         # scale regression problems by mad/mae
         mask = series > 0
         mask_iix = np.where(mask)
-        series.iloc[mask_iix] = series.iloc[mask_iix] / mad
+        series.iloc[mask_iix] /= mad
         series.loc[~mask] = np.nan
         return series
 

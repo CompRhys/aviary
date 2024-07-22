@@ -142,24 +142,23 @@ def main(
                 df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
+        elif val_size == 0 and evaluate:
+            print("No validation set used, using test set for evaluation purposes")
+            # NOTE that when using this option care must be taken not to
+            # peak at the test-set. The only valid model to use is the one
+            # obtained after the final epoch where the epoch count is
+            # decided in advance of the experiment.
+            val_set = test_set
+        elif val_size == 0:
+            val_set = None
         else:
-            if val_size == 0 and evaluate:
-                print("No validation set used, using test set for evaluation purposes")
-                # NOTE that when using this option care must be taken not to
-                # peak at the test-set. The only valid model to use is the one
-                # obtained after the final epoch where the epoch count is
-                # decided in advance of the experiment.
-                val_set = test_set
-            elif val_size == 0:
-                val_set = None
-            else:
-                print(f"using {val_size} of training set as validation set")
-                train_idx, val_idx = split(
-                    train_idx,
-                    random_state=data_seed,
-                    test_size=val_size / (1 - test_size),
-                )
-                val_set = torch.utils.data.Subset(dataset, val_idx)
+            print(f"using {val_size} of training set as validation set")
+            train_idx, val_idx = split(
+                train_idx,
+                random_state=data_seed,
+                test_size=val_size / (1 - test_size),
+            )
+            val_set = torch.utils.data.Subset(dataset, val_idx)
 
         train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
 

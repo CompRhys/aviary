@@ -237,15 +237,12 @@ def initialize_losses(
                     raise NameError(
                         "Only L1 or L2 losses are allowed for robust regression tasks"
                     )
+            elif loss_name_dict[name] == "L1":
+                loss_func_dict[name] = (task, L1Loss())
+            elif loss_name_dict[name] == "L2":
+                loss_func_dict[name] = (task, MSELoss())
             else:
-                if loss_name_dict[name] == "L1":
-                    loss_func_dict[name] = (task, L1Loss())
-                elif loss_name_dict[name] == "L2":
-                    loss_func_dict[name] = (task, MSELoss())
-                else:
-                    raise NameError(
-                        "Only L1 or L2 losses are allowed for regression tasks"
-                    )
+                raise NameError("Only L1 or L2 losses are allowed for regression tasks")
 
     return loss_func_dict
 
@@ -723,46 +720,35 @@ def save_results_dict(
     """Save the results to a file after model evaluation.
 
     Args:
-        ids (dict[str, list[str  |  int]]): ): Each key is the name of an identifier
+        ids (dict[str, list[str | int]]): Each key is the name of an identifier
             (e.g. material ID, composition, ...) and its value a list of IDs.
-        results_dict (dict[str, Any]): ): nested dictionary of results
-            {name: {col: data}}
-        model_name (str): ): The name given the model via the --model-name flag.
-        run_id (str): ): The run ID given to the model via the --run-id flag.
+        results_dict (dict[str, Any]): nested dictionary of results {name: {col: data}}
+        model_name (str): The name given the model via the --model-name flag.
+        run_id (str): The run ID given to the model via the --run-id flag.
     """
-    results = {}
+    results: dict[str, np.ndarray] = {}
 
-    for target_name in results_dict:
-        for col, data in results_dict[target_name].items():
+    for target_name, target_data in results_dict.items():
+        for col, data in target_data.items():
             # NOTE we save pre_logits rather than logits due to fact
             # that with the heteroskedastic setup we want to be able to
             # sample from the Gaussian distributed pre_logits we parameterize.
             if "pre-logits" in col:
                 for n_ens, y_pre_logit in enumerate(data):
-                    results.update(
-                        {
-                            f"{target_name}_{col}_c{lab}_n{n_ens}": val.ravel()
-                            for lab, val in enumerate(y_pre_logit.T)
-                        }
-                    )
+                    results |= {
+                        f"{target_name}_{col}_c{lab}_n{n_ens}": val.ravel()
+                        for lab, val in enumerate(y_pre_logit.T)
+                    }
 
-            elif "pred" in col:
-                preds = {
+            elif "pred" in col or "ale" in col:
+                # elif so that pre-logit-ale doesn't trigger
+                results |= {
                     f"{target_name}_{col}_n{n_ens}": val.ravel()
                     for (n_ens, val) in enumerate(data)
                 }
-                results.update(preds)
-
-            elif "ale" in col:  # elif so that pre-logit-ale doesn't trigger
-                results.update(
-                    {
-                        f"{target_name}_{col}_n{n_ens}": val.ravel()
-                        for (n_ens, val) in enumerate(data)
-                    }
-                )
 
             elif col == "target":
-                results.update({f"{target_name}_target": data})
+                results |= {f"{target_name}_target": data}
 
     df = pd.DataFrame({**ids, **results})
 

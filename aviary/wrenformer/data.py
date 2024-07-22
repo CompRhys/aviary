@@ -11,7 +11,7 @@ from torch import LongTensor, Tensor, nn
 
 from aviary import PKG_DIR
 from aviary.data import InMemoryDataLoader
-from aviary.wren.data import parse_aflow_wyckoff_str
+from aviary.wren.data import parse_protostructure_label
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -84,18 +84,20 @@ def get_wyckoff_features(
     )
 
 
-def wyckoff_embedding_from_aflow_str(wyckoff_str: str) -> Tensor:
+def wyckoff_embedding_from_protostructure_label(protostructure_label: str) -> Tensor:
     """Concatenate Matscholar element embeddings with Wyckoff set embeddings and handle
     augmentation of equivalent Wyckoff sets.
 
     Args:
-        wyckoff_str (str): Aflow-style Wyckoff string.
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         Tensor: Shape (n_equiv_wyksets, n_wyckoff_sites, n_features) where n_features =
             200 + 444 for Matscholar and Wyckoff embeddings respectively.
     """
-    parsed_output = parse_aflow_wyckoff_str(wyckoff_str)
+    parsed_output = parse_protostructure_label(protostructure_label)
     spg_num, wyckoff_site_multiplicities, elements, augmented_wyckoffs = parsed_output
 
     symmetry_features = np.stack(
@@ -185,7 +187,7 @@ def df_to_in_mem_dataloader(
         raise ValueError(f"{embedding_type = } must be 'wyckoff' or 'composition'")
 
     initial_embeddings = df[input_col].map(
-        wyckoff_embedding_from_aflow_str
+        wyckoff_embedding_from_protostructure_label
         if embedding_type == "wyckoff"
         else get_composition_embedding
     )

@@ -10,7 +10,10 @@ from pymatviz.utils import crystal_sys_from_spg_num
 from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.wren.utils import get_aflow_label_from_aflow, get_aflow_label_from_spglib
+from aviary.wren.utils import (
+    get_protostructure_label_from_aflow,
+    get_protostructure_label_from_spglib,
+)
 from examples.wrenformer.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
@@ -39,7 +42,7 @@ df_perovskites["structure"] = [
 # takes ~6h (when running uninterrupted)
 for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskites)):
     if pd.isna(df_perovskites.aflow_wyckoff[idx]):
-        df_perovskites.loc[idx, "aflow_wyckoff"] = get_aflow_label_from_aflow(
+        df_perovskites.loc[idx, "aflow_wyckoff"] = get_protostructure_label_from_aflow(
             struct, "/Users/janosh/bin/aflow"
         )
 
@@ -47,7 +50,7 @@ for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskit
 # %%
 # takes ~30 sec
 for struct in tqdm(df_perovskites.structure, total=len(df_perovskites)):
-    get_aflow_label_from_spglib(struct)
+    get_protostructure_label_from_spglib(struct)
 
 
 # %%
@@ -62,16 +65,15 @@ print(
 
 
 # %%
-# df_perovskites.drop("structure", axis=1).to_csv(
-#     f"{ROOT}/datasets/matbench_perovskites_aflow_labels.csv"
-# )
-df_perovskites = pd.read_csv(
-    f"{ROOT}/datasets/matbench_perovskites_aflow_labels.csv"
-).set_index("mbid")
+df_perovskites.drop("structure", axis=1).to_csv(
+    f"{ROOT}/datasets/matbench_perovskites_protostructure_labels.csv"
+)
 
 
 # %%
-f"{ROOT}/datasets/matbench_perovskites_aflow_labels.csv"
+df_perovskites = pd.read_csv(
+    f"{ROOT}/datasets/matbench_perovskites_protostructure_labels.csv"
+).set_index("mbid")
 
 
 # %%
