@@ -433,7 +433,9 @@ def count_distinct_wyckoff_letters(protostructure_label: str) -> int:
     """Count number of distinct Wyckoff letters in protostructure_label.
 
     Args:
-        protostructure_label (str): label constructed as `aflow_label:chemsys`
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         int: number of distinct Wyckoff letters in protostructure_label
@@ -448,7 +450,9 @@ def count_wyckoff_positions(protostructure_label: str) -> int:
     """Count number of Wyckoff positions in protostructure_label.
 
     Args:
-        protostructure_label (str): label constructed as `aflow_label:chemsys`
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         int: number of distinct Wyckoff positions in protostructure_label
@@ -470,7 +474,9 @@ def count_crystal_dof(protostructure_label: str) -> int:
     a crystal structure relaxation.
 
     Args:
-        protostructure_label (str): label constructed as `aflow_label:chemsys`
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         int: Number of free-parameters in given prototype
@@ -488,7 +494,9 @@ def count_crystal_sites(protostructure_label: str) -> int:
     """Count number of sites from protostructure_label.
 
     Args:
-        protostructure_label (str): label constructed as `aflow_label:chemsys`
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         int: Number of free-parameters in given prototype
@@ -525,7 +533,9 @@ def get_prototype_from_protostructure(protostructure_label: str) -> str:
     the same for all isopointal protostructures.
 
     Args:
-        protostructure_label (str): label constructed as `aflow_label:chemsys`
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
 
     Returns:
         str: Canonicalized AFLOW-style prototype label
@@ -684,7 +694,9 @@ def get_random_structure_for_protostructure(
     may be higher symmetry than the requested prototype structure.
 
     Args:
-        protostructure_label (str): label constructed as `aflow_label:chemsys`
+        protostructure_label (str): label constructed as `aflow_label:chemsys` where
+            aflow_label is an AFLOW-style prototype label chemsys is the alphabetically
+            sorted chemical system.
         **kwargs: Keyword arguments to pass to pyxtal().from_random()
     """
     if pyxtal is None:

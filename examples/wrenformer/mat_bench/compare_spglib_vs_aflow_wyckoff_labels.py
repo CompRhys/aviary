@@ -65,16 +65,15 @@ print(
 
 
 # %%
-# df_perovskites.drop("structure", axis=1).to_csv(
-#     f"{ROOT}/datasets/matbench_perovskites_aflow_labels.csv"
-# )
-df_perovskites = pd.read_csv(
-    f"{ROOT}/datasets/matbench_perovskites_aflow_labels.csv"
-).set_index("mbid")
+df_perovskites.drop("structure", axis=1).to_csv(
+    f"{ROOT}/datasets/matbench_perovskites_protostructure_labels.csv"
+)
 
 
 # %%
-f"{ROOT}/datasets/matbench_perovskites_aflow_labels.csv"
+df_perovskites = pd.read_csv(
+    f"{ROOT}/datasets/matbench_perovskites_protostructure_labels.csv"
+).set_index("mbid")
 
 
 # %%
