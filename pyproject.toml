@@ -71,6 +71,7 @@ addopts = "-p no:warnings"
 no_implicit_optional = false
 
 [tool.ruff]
+line-length = 90
 target-version = "py39"
 extend-include = ["*.ipynb"]
 lint.select = [

@@ -14,6 +14,7 @@ from aviary.wren.utils import (
     count_distinct_wyckoff_letters,
     count_wyckoff_positions,
     get_anonymous_formula_from_prototype_formula,
+    get_formula_from_protostructure_label,
     get_protostructure_label_from_aflow,
     get_protostructure_label_from_spg_analyzer,
     get_protostructure_label_from_spglib,
@@ -146,21 +147,13 @@ def test_get_prototype_from_protostructure(protostructure_label, expected):
     element_wyckoff = "_".join(wyckoffs)
 
     isopointal_element_wyckoffs = list(
-        {
-            element_wyckoff.translate(str.maketrans(trans))
-            for trans in relab_dict[spg_num]
-        }
+        {element_wyckoff.translate(str.maketrans(trans)) for trans in relab_dict[spg_num]}
     )
 
     protostructure_labels = [
         f"{prototype_formula}_{pearson_symbol}_{spg_num}_{element_wyckoff}:{chemsys}"
         for element_wyckoff in isopointal_element_wyckoffs
     ]
-
-    print(protostructure_label)
-    print(protostructure_labels)
-    print(get_prototype_from_protostructure(protostructure_label))
-    print(expected)
 
     assert all(
         get_prototype_from_protostructure(protostructure_label) == expected
@@ -208,10 +201,7 @@ def test_get_protostructures_from_aflow_label_and_composition(
         (
             {"a": 1, "b": 1, "c": 1},
             {"x": 1, "y": 1, "z": 1},
-            [
-                dict(zip(["a", "b", "c"], perm))
-                for perm in permutations(["x", "y", "z"])
-            ],
+            [dict(zip(["a", "b", "c"], perm)) for perm in permutations(["x", "y", "z"])],
         ),
         # Test case 3: No valid translations (different values)
         ({"a": 1, "b": 2}, {"x": 1, "y": 3}, []),
@@ -251,6 +241,14 @@ def test_find_translations_performance():
 )
 def test_get_prototype_formula_from_composition(composition: str, expected: str):
     assert get_prototype_formula_from_composition(Composition(composition)) == expected
+
+
+@pytest.mark.parametrize(
+    "protostructure_label, expected",
+    [("AB3C_oP20_62_c_cd_a:Ni-O-Yb", "NiO3Yb")],
+)
+def test_get_formula_from_protostructure_label(protostructure_label: str, expected: str):
+    assert get_formula_from_protostructure_label(protostructure_label) == expected
 
 
 @pytest.mark.parametrize(

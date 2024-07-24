@@ -206,9 +206,7 @@ def get_protostructure_label_from_spg_analyzer(
     equivalent_wyckoff_labels = [
         # tuple of (wp multiplicity, element, wyckoff letter)
         (len(s), s[0].species_string, wyk_letter.translate(remove_digits))
-        for s, wyk_letter in zip(
-            sym_struct.equivalent_sites, sym_struct.wyckoff_symbols
-        )
+        for s, wyk_letter in zip(sym_struct.equivalent_sites, sym_struct.wyckoff_symbols)
     ]
     # Pre-sort by element and wyckoff letter to ensure continuous groups in groupby
     equivalent_wyckoff_labels = sorted(
@@ -286,9 +284,7 @@ def get_protostructure_label_from_spglib(
     """
     attempt_to_recover = False
     try:
-        spg_analyzer = SpacegroupAnalyzer(
-            struct, symprec=init_symprec, angle_tolerance=5
-        )
+        spg_analyzer = SpacegroupAnalyzer(struct, symprec=init_symprec, angle_tolerance=5)
         try:
             aflow_label_with_chemsys = get_protostructure_label_from_spg_analyzer(
                 spg_analyzer, raise_errors
@@ -429,6 +425,25 @@ def get_anonymous_formula_from_prototype_formula(prototype_formula: str) -> str:
     )
 
 
+def get_formula_from_protostructure_label(protostructure_label: str) -> str:
+    """Get a formula from a protostructure label."""
+    aflow_label, chemsys = protostructure_label.split(":")
+    prototype_formula = aflow_label.split("_")[0]
+    prototype_formula = re.sub(
+        RE_ELEMENT_NO_SUFFIX, RE_SUBST_ONE_SUFFIX, prototype_formula
+    )
+    anom_list = split_alpha_numeric(prototype_formula)
+
+    return "".join(
+        [
+            f"{el}{num}" if num != 1 else el
+            for el, num in zip(
+                chemsys.split("-"), map(int, anom_list["numeric"]), strict=True
+            )
+        ]
+    )
+
+
 def count_distinct_wyckoff_letters(protostructure_label: str) -> int:
     """Count number of distinct Wyckoff letters in protostructure_label.
 
@@ -507,9 +522,7 @@ def count_crystal_sites(protostructure_label: str) -> int:
     return _count_from_dict(element_wyckoffs, wyckoff_multiplicity_dict, spg_num)
 
 
-def _count_from_dict(
-    element_wyckoffs: list[str], lookup_dict: dict, spg_num: str
-) -> int:
+def _count_from_dict(element_wyckoffs: list[str], lookup_dict: dict, spg_num: str) -> int:
     """Count number of sites from protostructure_label."""
     n_params = 0
 
@@ -541,9 +554,7 @@ def get_prototype_from_protostructure(protostructure_label: str) -> str:
         str: Canonicalized AFLOW-style prototype label
     """
     aflow_label, _ = protostructure_label.split(":")
-    prototype_formula, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split(
-        "_"
-    )
+    prototype_formula, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split("_")
 
     anonymous_formula = get_anonymous_formula_from_prototype_formula(prototype_formula)
     counts = [
@@ -657,9 +668,7 @@ def get_protostructures_from_aflow_label_and_composition(
         list[str]: List of possible protostructure labels that can be generated
             from combinations of the input aflow_label and composition.
     """
-    anonymous_formula, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split(
-        "_"
-    )
+    anonymous_formula, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split("_")
 
     ele_amt_dict = composition.get_el_amt_dict()
     proto_formula = get_prototype_formula_from_composition(composition)
