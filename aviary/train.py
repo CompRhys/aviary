@@ -304,9 +304,7 @@ def train_model(
     targets = test_df[target_col]
     # preds can have shape (n_samples, n_classes) if doing multi-class classification so
     # use df to merge all columns into test_df
-    df_preds = pd.DataFrame(preds, index=test_df.index).add_prefix(
-        f"{target_col}_pred_"
-    )
+    df_preds = pd.DataFrame(preds, index=test_df.index).add_prefix(f"{target_col}_pred_")
     test_df[df_preds.columns] = df_preds  # requires shuffle=False for test_loader
 
     test_metrics = get_metrics(targets, preds, task_type)
@@ -379,6 +377,7 @@ def train_wrenformer(
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
     batch_size: int = 128,
+    inference_multiplier: int = 4,
     embedding_type: str | None = None,
     id_col: str = "material_id",
     input_col: str | None = None,
@@ -400,6 +399,8 @@ def train_wrenformer(
         train_df (pd.DataFrame): Training set dataframe.
         test_df (pd.DataFrame): Test set dataframe.
         batch_size (int, optional): Batch size for training. Defaults to 128.
+        inference_multiplier (int, optional): Multiplier for the test set data loader
+            batch size. Defaults to 1.
         embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use.
             Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name.
         id_col (str, optional): Column name in train_df and test_df containing unique
@@ -444,7 +445,7 @@ def train_wrenformer(
 
     test_loader = df_to_in_mem_dataloader(
         test_df,
-        batch_size=512,
+        batch_size=batch_size * inference_multiplier,
         shuffle=False,
         **data_loader_kwargs,  # type: ignore[arg-type]
     )
