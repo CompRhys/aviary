@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -345,7 +346,7 @@ def train_model(
             loss_dict=loss_dict,
             epochs=epochs,
             test_metrics=test_metrics,
-            timestamp=timestamp,
+            timestamp=timestamp or datetime.now().astimezone().strftime("%Y%m%d-%H%M%S"),
             run_name=run_name,
             normalizer_dict=normalizer_dict,
             run_params=run_params,
