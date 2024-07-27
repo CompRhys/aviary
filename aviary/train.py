@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -265,6 +264,25 @@ def train_model(
         if wandb_path:
             wandb.log({"training": train_metrics, "validation": val_metrics})
 
+        if (epoch + 1) % 10 == 0:
+            inference_model = swa_model if swa_start else model
+            inference_model.eval()
+            checkpoint_model(
+                checkpoint_endpoint=checkpoint,
+                model_params=model_params,
+                inference_model=inference_model,
+                optimizer_instance=optimizer_instance,
+                lr_scheduler=lr_scheduler,
+                loss_dict=loss_dict,
+                epochs=epochs,
+                test_metrics=val_metrics,
+                timestamp=timestamp,
+                run_name=run_name,
+                normalizer_dict=normalizer_dict,
+                run_params=run_params,
+                scheduler_name=scheduler_name,
+            )
+
     # get test set predictions
     if swa_start is not None:
         n_swa_epochs = int((1 - swa_start) * epochs)
@@ -327,7 +345,7 @@ def train_model(
             loss_dict=loss_dict,
             epochs=epochs,
             test_metrics=test_metrics,
-            timestamp=timestamp or datetime.now().astimezone().strftime("%Y%m%d-%H%M%S"),
+            timestamp=timestamp,
             run_name=run_name,
             normalizer_dict=normalizer_dict,
             run_params=run_params,
@@ -365,7 +383,7 @@ def train_model(
 
 
 def checkpoint_model(
-    checkpoint_endpoint: str,
+    checkpoint_endpoint: Literal["local", "wandb"] | None,
     model_params: dict | None,
     inference_model: nn.Module,
     optimizer_instance: torch.optim.Optimizer,
@@ -373,13 +391,16 @@ def checkpoint_model(
     loss_dict: dict,
     epochs: int,
     test_metrics: dict,
-    timestamp: str,
+    timestamp: str | None,
     run_name: str,
     normalizer_dict: dict,
     run_params: dict,
     scheduler_name: str,
 ):
     """Save model checkpoint to different endpoints."""
+    if checkpoint_endpoint is None:
+        return
+
     if model_params is None:
         raise ValueError("Must provide model_params to save checkpoint, got None")
 
@@ -400,15 +421,22 @@ def checkpoint_model(
         # torch.load()-ing a checkpoint and the file defining lr_lambda() was
         # renamed
         checkpoint_dict["run_params"]["lr_scheduler"].pop("params")
+
     if checkpoint_endpoint == "local":
         os.makedirs(f"{ROOT}/models", exist_ok=True)
-        checkpoint_path = f"{ROOT}/models/{timestamp}-{run_name}.pth"
+        checkpoint_path = (
+            f"{ROOT}/models/{timestamp+'-' if timestamp else ''}{run_name}-{epochs}.pth"
+        )
         torch.save(checkpoint_dict, checkpoint_path)
+
     if checkpoint_endpoint == "wandb":
         assert (
             wandb.run is not None
         ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
-        torch.save(checkpoint_dict, f"{wandb.run.dir}/checkpoint.pth")
+        torch.save(
+            checkpoint_dict,
+            f"{wandb.run.dir}/{timestamp+'-' if timestamp else ''}-{run_name}-{epochs}.pth",
+        )
 
 
 def train_wrenformer(
