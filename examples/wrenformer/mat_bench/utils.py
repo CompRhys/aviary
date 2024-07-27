@@ -54,7 +54,5 @@ def merge_json_on_disk(
         return f"<not serializable: {type(obj).__qualname__}>"
 
     with open(file_path, "w") as file:
-        default = (
-            non_serializable_handler if on_non_serializable == "annotate" else None
-        )
+        default = non_serializable_handler if on_non_serializable == "annotate" else None
         json.dump(dct, file, default=default, indent=2)

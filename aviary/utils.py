@@ -174,13 +174,9 @@ def initialize_optim(
             momentum=momentum,
         )
     elif optim == "Adam":
-        optimizer = Adam(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
-        )
+        optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optim == "AdamW":
-        optimizer = AdamW(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
-        )
+        optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     else:
         raise NameError("Only SGD, Adam or AdamW are allowed as --optim")
 
@@ -361,9 +357,7 @@ def train_ensemble(
                 sample_target = Tensor(train_set.df[target].values)
                 if not restart_params["resume"]:
                     normalizer.fit(sample_target)
-                print(
-                    f"Dummy MAE: {(sample_target - normalizer.mean).abs().mean():.4f}"
-                )
+                print(f"Dummy MAE: {(sample_target - normalizer.mean).abs().mean():.4f}")
 
         if log:
             writer = SummaryWriter(
@@ -528,9 +522,7 @@ def results_multitask(
             elif task_type == "classification":
                 if model.robust:
                     mean, log_std = output.chunk(2, dim=1)
-                    logits = (
-                        sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
-                    )
+                    logits = sampled_softmax(mean, log_std, samples=10).data.cpu().numpy()
                     pre_logits = mean.data.cpu().numpy()
                     pre_logits_std = torch.exp(log_std).data.cpu().numpy()
                     res_dict["pre-logits_ale"].append(pre_logits_std)  # type: ignore[union-attr]
