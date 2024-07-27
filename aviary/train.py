@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -20,7 +21,7 @@ from aviary.wrenformer.model import Wrenformer
 try:
     import wandb
 except ImportError:
-    wandb = None
+    wandb = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
     from torch import nn
@@ -319,13 +320,14 @@ def train_model(
     if checkpoint is not None:
         checkpoint_model(
             checkpoint_endpoint=checkpoint,
-            model=inference_model,
+            model_params=model_params,
+            inference_model=inference_model,
             optimizer_instance=optimizer_instance,
             lr_scheduler=lr_scheduler,
             loss_dict=loss_dict,
-            epoch=epochs,
+            epochs=epochs,
             test_metrics=test_metrics,
-            timestamp=timestamp,
+            timestamp=timestamp or datetime.now().astimezone().strftime("%Y%m%d-%H%M%S"),
             run_name=run_name,
             normalizer_dict=normalizer_dict,
             run_params=run_params,
@@ -364,7 +366,7 @@ def train_model(
 
 def checkpoint_model(
     checkpoint_endpoint: str,
-    model_params: dict,
+    model_params: dict | None,
     inference_model: nn.Module,
     optimizer_instance: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler._LRScheduler,

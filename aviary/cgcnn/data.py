@@ -148,9 +148,7 @@ class CrystalGraphData(Dataset):
         site_atoms = [atom.species.as_dict() for atom in struct]
         atom_features = np.vstack(
             [
-                np.sum(
-                    [self.elem_features[el] * amt for el, amt in site.items()], axis=0
-                )
+                np.sum([self.elem_features[el] * amt for el, amt in site.items()], axis=0)
                 for site in site_atoms
             ]
         )

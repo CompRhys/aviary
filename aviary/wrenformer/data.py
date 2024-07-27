@@ -66,9 +66,7 @@ with open(f"{PKG_DIR}/embeddings/element/matscholar200.json") as file:
 
 
 @cache
-def get_wyckoff_features(
-    equivalent_wyckoff_set: list[tuple], spg_num: int
-) -> np.ndarray:
+def get_wyckoff_features(equivalent_wyckoff_set: list[tuple], spg_num: int) -> np.ndarray:
     """Get Wyckoff set features from the precomputed dictionary. The output of this
     function is cached for speed.
 
@@ -204,6 +202,4 @@ def df_to_in_mem_dataloader(
         inputs[idx] = tensor.to(device)
 
     ids = df.get(id_col, df.index).to_numpy()
-    return InMemoryDataLoader(
-        [inputs, targets, ids], collate_fn=collate_batch, **kwargs
-    )
+    return InMemoryDataLoader([inputs, targets, ids], collate_fn=collate_batch, **kwargs)

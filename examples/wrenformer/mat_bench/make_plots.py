@@ -40,7 +40,7 @@ others_scores: dict[str, dict[str, float]] = defaultdict(dict)
 
 # %% --- Load other's scores ---
 # load benchmark data for models with existing Matbench submission
-for idx, dirname in enumerate(glob(f"{bench_dir}/*"), 1):
+for idx, dirname in enumerate(glob(f"{bench_dir}/*"), start=1):
     model_name = dirname.split("/matbench_v0.1_")[-1]
     print(f"{idx}. {model_name}")
     mbbm = MatbenchBenchmark.from_file(f"{dirname}/results.json.gz")
@@ -62,7 +62,7 @@ for idx, dirname in enumerate(glob(f"{bench_dir}/*"), 1):
 # %% --- Load our scores ---
 our_score_files = sorted(glob("model_scores/*.json"), key=lambda s: s.split("@")[0])
 
-for idx, filename in enumerate(our_score_files, 1):
+for idx, filename in enumerate(our_score_files, start=1):
     date, model_name = re.split(r"@\d\d-\d\d-", filename.split("/")[-1])
 
     print(f"{idx}.  {date}  {model_name}")

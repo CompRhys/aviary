@@ -205,7 +205,7 @@ class DescriptorNetwork(nn.Module):
                 msg_gate_layers=elem_gate,
                 msg_net_layers=elem_msg,
             )
-            for i in range(n_graph)
+            for _ in range(n_graph)
         )
 
         # define a global pooling function for materials
@@ -259,9 +259,7 @@ class DescriptorNetwork(nn.Module):
             for attnhead in self.cry_pool
         ]
 
-        return scatter_mean(
-            torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0
-        )
+        return scatter_mean(torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0)
 
     def __repr__(self) -> str:
         return (
