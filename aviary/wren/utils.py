@@ -437,9 +437,7 @@ def get_formula_from_protostructure_label(protostructure_label: str) -> str:
     return "".join(
         [
             f"{el}{num}" if num != 1 else el
-            for el, num in zip(
-                chemsys.split("-"), map(int, anom_list["numeric"]), strict=True
-            )
+            for el, num in zip(chemsys.split("-"), map(int, anom_list["numeric"]))
         ]
     )
 
