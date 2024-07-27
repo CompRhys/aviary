@@ -361,13 +361,11 @@ def sort_and_score_element_wyckoffs(element_wyckoffs: str) -> tuple[str, int]:
         wp_counts = split_alpha_numeric(el_wyks)
         sorted_element_wyckoffs.append(
             "".join(
-                [
-                    f"{count}{wyckoff_letter}" if count != "1" else wyckoff_letter
-                    for count, wyckoff_letter in sorted(
-                        zip(wp_counts["numeric"], wp_counts["alpha"]),
-                        key=lambda x: x[1],
-                    )
-                ]
+                f"{count}{wyckoff_letter}" if count != "1" else wyckoff_letter
+                for count, wyckoff_letter in sorted(
+                    zip(wp_counts["numeric"], wp_counts["alpha"]),
+                    key=lambda x: x[1],
+                )
             )
         )
         score += sum(
@@ -396,14 +394,14 @@ def get_prototype_formula_from_composition(composition: Composition) -> str:
     amounts = [reduced[key] for key in sorted(reduced, key=str)]
 
     anon = ""
-    for e, amt in zip(ascii_uppercase, amounts):
+    for elem, amt in zip(ascii_uppercase, amounts):
         if amt == 1:
             amt_str = ""
         elif abs(amt % 1) < 1e-8:
             amt_str = str(int(amt))
         else:
             amt_str = str(amt)
-        anon += f"{e}{amt_str}"
+        anon += f"{elem}{amt_str}"
     return anon
 
 
@@ -415,13 +413,8 @@ def get_anonymous_formula_from_prototype_formula(prototype_formula: str) -> str:
     anom_list = split_alpha_numeric(prototype_formula)
 
     return "".join(
-        [
-            f"{el}{num}" if num != 1 else el
-            for el, num in zip(
-                anom_list["alpha"],
-                sorted(map(int, anom_list["numeric"])),
-            )
-        ]
+        f"{el}{num}" if num != 1 else el
+        for el, num in zip(anom_list["alpha"], sorted(map(int, anom_list["numeric"])))
     )
 
 
