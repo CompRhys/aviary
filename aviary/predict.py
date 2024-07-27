@@ -69,7 +69,7 @@ def make_ensemble_predictions(
     # (i.e. tty mode) https://git.io/JnBOi
     print(f"Pytorch running on {device=}")
     for idx, checkpoint_path in tqdm(
-        enumerate(tqdm(checkpoint_paths), 1), disable=None if pbar else True
+        enumerate(tqdm(checkpoint_paths), start=1), disable=None if pbar else True
     ):
         try:
             checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -189,7 +189,7 @@ def predict_from_wandb_checkpoints(
 
     checkpoint_paths: list[str] = []
 
-    for idx, run in enumerate(runs, 1):
+    for idx, run in enumerate(runs, start=1):
         run_path = "/".join(run.path)
         out_dir = f"{cache_dir}/{run_path}"
         os.makedirs(out_dir, exist_ok=True)

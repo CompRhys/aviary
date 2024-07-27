@@ -391,7 +391,7 @@ def get_prototype_formula_from_composition(composition: Composition) -> str:
     """
     reduced = composition.element_composition
     if all(x == int(x) for x in composition.values()):
-        reduced /= gcd(*(int(i) for i in composition.values()))
+        reduced /= gcd(*(int(amt) for amt in composition.values()))
 
     amounts = [reduced[key] for key in sorted(reduced, key=str)]
 

@@ -229,8 +229,8 @@ def test_find_translations(dict1, dict2, expected):
 
 # Additional test for performance with larger input
 def test_find_translations_performance():
-    dict1 = {f"key{i}": i for i in range(8)}
-    dict2 = {f"val{i}": i for i in range(8)}
+    dict1 = {f"key{idx}": idx for idx in range(8)}
+    dict2 = {f"val{idx}": idx for idx in range(8)}
     result = _find_translations(dict1, dict2)
     assert len(result) == 1  # There should be only one valid translation
 

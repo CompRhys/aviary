@@ -139,16 +139,16 @@ class WyckoffData(Dataset):
         n_wyks = len(elements)
         self_idx = []
         nbr_idx = []
-        for i in range(n_wyks):
-            self_idx += [i] * n_wyks
+        for wyk_idx in range(n_wyks):
+            self_idx += [wyk_idx] * n_wyks
             nbr_idx += list(range(n_wyks))
 
         self_aug_fea_idx = []
         nbr_aug_fea_idx = []
         n_aug = len(augmented_wyks)
-        for i in range(n_aug):
-            self_aug_fea_idx += [x + i * n_wyks for x in self_idx]
-            nbr_aug_fea_idx += [x + i * n_wyks for x in nbr_idx]
+        for aug_idx in range(n_aug):
+            self_aug_fea_idx += [x + aug_idx * n_wyks for x in self_idx]
+            nbr_aug_fea_idx += [x + aug_idx * n_wyks for x in nbr_idx]
 
         # convert all data to tensors
         wyckoff_weights = Tensor(wyk_site_multiplcities)
@@ -291,9 +291,7 @@ def parse_protostructure_label(
         )
 
         # Separate out pairs of Wyckoff letters and their number of occurrences
-        sep_n_wyks = [
-            "".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)
-        ]
+        sep_n_wyks = ["".join(g) for _, g in groupby(wyk_letters_normalized, str.isalpha)]
 
         # Process Wyckoff letters and multiplicities
         mults = map(int, sep_n_wyks[0::2])

@@ -176,7 +176,7 @@ def collate_batch(
     batch_cry_ids = []
 
     cry_base_idx = 0
-    for i, (inputs, target, *cry_ids) in enumerate(samples):
+    for idx, (inputs, target, *cry_ids) in enumerate(samples):
         elem_weights, elem_fea, self_idx, nbr_idx = inputs
 
         n_sites = elem_fea.shape[0]  # number of atoms for this crystal
@@ -190,7 +190,7 @@ def collate_batch(
         batch_nbr_idx.append(nbr_idx + cry_base_idx)
 
         # mapping from atoms to crystals
-        crystal_elem_idx.append(torch.tensor([i] * n_sites))
+        crystal_elem_idx.append(torch.tensor([idx] * n_sites))
 
         # batch the targets and ids
         batch_targets.append(target)

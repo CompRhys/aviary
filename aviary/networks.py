@@ -34,15 +34,15 @@ class SimpleNetwork(nn.Module):
         dims = [input_dim, *list(hidden_layer_dims)]
 
         self.fcs = nn.ModuleList(
-            nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
+            nn.Linear(dims[idx], dims[idx + 1]) for idx in range(len(dims) - 1)
         )
 
         if batch_norm:
             self.bns = nn.ModuleList(
-                nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)
+                nn.BatchNorm1d(dims[idx + 1]) for idx in range(len(dims) - 1)
             )
         else:
-            self.bns = nn.ModuleList(nn.Identity() for i in range(len(dims) - 1))
+            self.bns = nn.ModuleList(nn.Identity() for _ in range(len(dims) - 1))
 
         self.acts = nn.ModuleList(activation() for _ in range(len(dims) - 1))
 
@@ -95,21 +95,21 @@ class ResidualNetwork(nn.Module):
         dims = [input_dim, *list(hidden_layer_dims)]
 
         self.fcs = nn.ModuleList(
-            nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)
+            nn.Linear(dims[idx], dims[idx + 1]) for idx in range(len(dims) - 1)
         )
 
         if batch_norm:
             self.bns = nn.ModuleList(
-                nn.BatchNorm1d(dims[i + 1]) for i in range(len(dims) - 1)
+                nn.BatchNorm1d(dims[idx + 1]) for idx in range(len(dims) - 1)
             )
         else:
-            self.bns = nn.ModuleList(nn.Identity() for i in range(len(dims) - 1))
+            self.bns = nn.ModuleList(nn.Identity() for _ in range(len(dims) - 1))
 
         self.res_fcs = nn.ModuleList(
-            nn.Linear(dims[i], dims[i + 1], bias=False)
-            if (dims[i] != dims[i + 1])
+            nn.Linear(dims[idx], dims[idx + 1], bias=False)
+            if (dims[idx] != dims[idx + 1])
             else nn.Identity()
-            for i in range(len(dims) - 1)
+            for idx in range(len(dims) - 1)
         )
         self.acts = nn.ModuleList(activation() for _ in range(len(dims) - 1))
 

@@ -17,7 +17,7 @@ stores them to disk in the datasets/ folder as Bzip2-compressed JSON files.
 
 benchmark = MatbenchBenchmark()
 
-for idx, task in enumerate(benchmark.tasks, 1):
+for idx, task in enumerate(benchmark.tasks, start=1):
     print(f"\n\n{idx}/{len(benchmark.tasks)}")
     task.load()
     df: pd.DataFrame = task.df
