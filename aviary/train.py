@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -56,6 +56,7 @@ def train_model(
     train_loader: DataLoader | InMemoryDataLoader,
     test_loader: DataLoader | InMemoryDataLoader,
     checkpoint: Literal["local", "wandb"] | None = None,
+    checkpoint_frequency: int = 10,
     learning_rate: float = 1e-4,
     model_params: dict[str, Any] | None = None,
     run_params: dict[str, Any] | None = None,
@@ -90,6 +91,7 @@ def train_model(
             checkpoint = wandb.restore("checkpoint.pth", run_path)
             torch.load(checkpoint.name)
             ```
+        checkpoint_frequency (int): How often to save a checkpoint. Defaults to 10.
         learning_rate (float): The optimizer's learning rate. Defaults to 1e-4.
         model_params (dict): Arguments passed to model class. E.g. dict(n_attn_layers=6,
             embedding_aggregation=("mean", "std")) for Wrenformer.
@@ -227,7 +229,7 @@ def train_model(
             **wandb_kwargs or {},
         )
 
-    for epoch in tqdm(range(epochs), disable=None, desc="Training epoch"):
+    for epoch in tqdm(range(1, epochs + 1), disable=None, desc="Training epoch"):
         train_metrics = model.evaluate(
             train_loader,
             loss_dict,
@@ -265,7 +267,7 @@ def train_model(
         if wandb_path:
             wandb.log({"training": train_metrics, "validation": val_metrics})
 
-        if (epoch + 1) % 10 == 0:
+        if epoch % checkpoint_frequency == 0 and epoch < epochs:
             inference_model = swa_model if swa_start else model
             inference_model.eval()
             checkpoint_model(
@@ -275,7 +277,7 @@ def train_model(
                 optimizer_instance=optimizer_instance,
                 lr_scheduler=lr_scheduler,
                 loss_dict=loss_dict,
-                epochs=epochs,
+                epochs=epoch,
                 test_metrics=val_metrics,
                 timestamp=timestamp,
                 run_name=run_name,
@@ -346,7 +348,7 @@ def train_model(
             loss_dict=loss_dict,
             epochs=epochs,
             test_metrics=test_metrics,
-            timestamp=timestamp or datetime.now().astimezone().strftime("%Y%m%d-%H%M%S"),
+            timestamp=timestamp,
             run_name=run_name,
             normalizer_dict=normalizer_dict,
             run_params=run_params,
@@ -415,7 +417,7 @@ def checkpoint_model(
         metrics=test_metrics,
         run_name=run_name,
         normalizer_dict=normalizer_dict,
-        run_params=run_params.copy(),
+        run_params=deepcopy(run_params),
     )
     if scheduler_name == "LambdaLR":
         # exclude lr_lambda from pickled checkpoint since it causes errors when
@@ -436,7 +438,7 @@ def checkpoint_model(
         ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
         torch.save(
             checkpoint_dict,
-            f"{wandb.run.dir}/{timestamp+'-' if timestamp else ''}-{run_name}-{epochs}.pth",
+            f"{wandb.run.dir}/{timestamp+'-' if timestamp else ''}{run_name}-{epochs}.pth",
         )
 
 
