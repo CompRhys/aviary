@@ -42,7 +42,6 @@ dependencies = [
   "scikit_learn",
   "tensorboard",
   "torch",
-  "torch_scatter",
   "tqdm",
   "wandb",
 ]

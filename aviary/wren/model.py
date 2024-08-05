@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 import torch
 import torch.nn.functional as F
 from torch import LongTensor, Tensor, nn
-from torch_scatter import scatter_mean
 
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
+from aviary.scatter import scatter_reduce
 from aviary.segments import MessageLayer, WeightedAttentionPooling
 
 if TYPE_CHECKING:
@@ -259,7 +259,9 @@ class DescriptorNetwork(nn.Module):
             for attnhead in self.cry_pool
         ]
 
-        return scatter_mean(torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0)
+        return scatter_reduce(
+            torch.mean(torch.stack(head_fea), dim=0), aug_cry_idx, dim=0, reduce="mean"
+        )
 
     def __repr__(self) -> str:
         return (
