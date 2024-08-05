@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 
 import torch
 from torch import LongTensor, Tensor, nn
-from torch_scatter import scatter_add, scatter_max
 
 from aviary.networks import SimpleNetwork
+from aviary.scatter import scatter_reduce
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -38,12 +38,12 @@ class AttentionPooling(nn.Module):
         """
         gate = self.gate_nn(x)
 
-        gate -= scatter_max(gate, index, dim=0)[0][index]
+        gate -= scatter_reduce(gate, index, dim=0, reduce="amax")[index]
         gate = gate.exp()
-        gate /= scatter_add(gate, index, dim=0)[index] + 1e-10
+        gate /= scatter_reduce(gate, index, dim=0, reduce="sum")[index] + 1e-10
 
         x = self.message_nn(x)
-        return scatter_add(gate * x, index, dim=0)
+        return scatter_reduce(gate * x, index, dim=0, reduce="sum")
 
     def __repr__(self) -> str:
         gate_nn, message_nn = self.gate_nn, self.message_nn
@@ -78,12 +78,12 @@ class WeightedAttentionPooling(nn.Module):
         """
         gate = self.gate_nn(x)
 
-        gate -= scatter_max(gate, index, dim=0)[0][index]
+        gate -= scatter_reduce(gate, index, dim=0, reduce="amax")[index]
         gate = (weights**self.pow) * gate.exp()
-        gate /= scatter_add(gate, index, dim=0)[index] + 1e-10
+        gate /= scatter_reduce(gate, index, dim=0, reduce="sum")[index] + 1e-10
 
         x = self.message_nn(x)
-        return scatter_add(gate * x, index, dim=0)
+        return scatter_reduce(gate * x, index, dim=0, reduce="sum")
 
     def __repr__(self) -> str:
         pow, gate_nn, message_nn = float(self.pow), self.gate_nn, self.message_nn
