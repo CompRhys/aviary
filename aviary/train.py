@@ -428,7 +428,7 @@ def checkpoint_model(
     if checkpoint_endpoint == "local":
         os.makedirs(f"{ROOT}/models", exist_ok=True)
         checkpoint_path = (
-            f"{ROOT}/models/{timestamp+'-' if timestamp else ''}{run_name}-{epochs}.pth"
+            f"{ROOT}/models/{timestamp + '-' if timestamp else ''}{run_name}-{epochs}.pth"
         )
         torch.save(checkpoint_dict, checkpoint_path)
 
@@ -438,7 +438,7 @@ def checkpoint_model(
         ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
         torch.save(
             checkpoint_dict,
-            f"{wandb.run.dir}/{timestamp+'-' if timestamp else ''}{run_name}-{epochs}.pth",
+            f"{wandb.run.dir}/{timestamp + '-' if timestamp else ''}{run_name}-{epochs}.pth",
         )
 
 

@@ -14,14 +14,14 @@ def _int_keys(dct: dict) -> dict:
     return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in dct.items()}
 
 
-def recursive_dict_merge(d1: dict, d2: dict) -> dict:
+def recursive_dict_merge(dict1: dict, dict2: dict) -> dict:
     """Merge two dicts recursively."""
-    for key in d2:
-        if key in d1 and isinstance(d1[key], dict) and isinstance(d2[key], dict):
-            recursive_dict_merge(d1[key], d2[key])
+    for key, val2 in dict2.items():
+        if key in dict1 and isinstance(dict1[key], dict) and isinstance(val2, dict):
+            recursive_dict_merge(dict1[key], val2)
         else:
-            d1[key] = d2[key]
-    return d1
+            dict1[key] = val2
+    return dict1
 
 
 def merge_json_on_disk(
