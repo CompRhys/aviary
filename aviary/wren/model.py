@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F
+from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
 from torch_scatter import scatter_mean
 
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+@due.dcite(Doi("10.1126/sciadv.abn4117"), description="Wren model")
 class Wren(BaseModelClass):
     """The Roost model is comprised of a fully connected network
     and message passing graph layers.

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F
+from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
 from torch_scatter import scatter_add, scatter_mean
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+@due.dcite(Doi("10.1103/PhysRevLett.120.145301"), description="CGCNN model")
 class CrystalGraphConvNet(BaseModelClass):
     """Create a crystal graph convolutional neural network for predicting total
     material properties.
