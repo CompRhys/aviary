@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F
+from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
 
 from aviary.core import BaseModelClass
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+@due.dcite(Doi("10.1038/s41467-020-19964-7"), description="Roost model")
 class Roost(BaseModelClass):
     """The Roost model is comprised of a fully connected network
     and message passing graph layers.

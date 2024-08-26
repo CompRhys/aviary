@@ -2,18 +2,14 @@
 import os
 
 import pandas as pd
+import pymatviz as pmv
 from matminer.datasets import load_dataset
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from pymatviz import sankey_from_2_df_cols, spacegroup_sunburst
-from pymatviz.utils import crystal_sys_from_spg_num
 from tqdm import tqdm
 
+import aviary.wren.utils as wren_utils
 from aviary import ROOT
-from aviary.wren.utils import (
-    get_protostructure_label_from_aflow,
-    get_protostructure_label_from_spglib,
-)
 from examples.wrenformer.mat_bench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
@@ -31,92 +27,92 @@ MODULE_DIR = os.path.dirname(__file__)
 
 
 # %%
-df_perovskites = pd.read_json(DATA_PATHS["matbench_perovskites"]).set_index("mbid")
-df_perovskites = df_perovskites.rename(columns={"wyckoff": "spglib_wyckoff"})
-df_perovskites["structure"] = [
-    Structure.from_dict(struct) for struct in df_perovskites.structure
-]
+df_perov = pd.read_json(DATA_PATHS["matbench_perovskites"]).set_index("mbid")
+df_perov = df_perov.rename(columns={"wyckoff": "spglib_wyckoff"})
+df_perov["structure"] = df_perov.structure.map(Structure.from_dict)
 
 
 # %%
 # takes ~6h (when running uninterrupted)
-for idx, struct in tqdm(df_perovskites.structure.items(), total=len(df_perovskites)):
-    if pd.isna(df_perovskites.aflow_wyckoff[idx]):
-        df_perovskites.loc[idx, "aflow_wyckoff"] = get_protostructure_label_from_aflow(
-            struct, "/Users/janosh/bin/aflow"
+for idx, struct in tqdm(df_perov.structure.items(), total=len(df_perov)):
+    if pd.isna(df_perov.aflow_wyckoff[idx]):
+        df_perov.loc[idx, "aflow_wyckoff"] = (
+            wren_utils.get_protostructure_label_from_aflow(
+                struct, "/Users/janosh/bin/aflow"
+            )
         )
 
 
 # %%
 # takes ~30 sec
-for struct in tqdm(df_perovskites.structure, total=len(df_perovskites)):
-    get_protostructure_label_from_spglib(struct)
+for struct in tqdm(df_perov.structure, total=len(df_perov)):
+    wren_utils.get_protostructure_label_from_spglib(struct)
 
 
 # %%
-df_perovskites.dropna().query("wyckoff != aflow_wyckoff")
+df_perov.dropna().query("wyckoff != aflow_wyckoff")
 
 
 # %%
 print(
     "Percentage of materials with spglib label != aflow label: "
-    f"{len(df_perovskites.query('wyckoff != aflow_wyckoff')) / len(df_perovskites):.0%}"
+    f"{len(df_perov.query('wyckoff != aflow_wyckoff')) / len(df_perov):.0%}"
 )
 
 
 # %%
-df_perovskites.drop("structure", axis=1).to_csv(
+df_perov.drop("structure", axis=1).to_csv(
     f"{ROOT}/datasets/matbench_perovskites_protostructure_labels.csv"
 )
 
 
 # %%
-df_perovskites = pd.read_csv(
+df_perov = pd.read_csv(
     f"{ROOT}/datasets/matbench_perovskites_protostructure_labels.csv"
 ).set_index("mbid")
 
 
 # %%
 for src in ("aflow", "spglib"):
-    df_perovskites[f"{src}_spg_num"] = (
-        df_perovskites[f"{src}_wyckoff"].str.split("_").str[2].astype(int)
+    df_perov[f"{src}_spg_num"] = (
+        df_perov[f"{src}_wyckoff"].str.split("_").str[2].astype(int)
     )
 
 
 # %%
-fig = spacegroup_sunburst(df_perovskites.spglib_spg)
+fig = pmv.spacegroup_sunburst(df_perov.spglib_spg)
 fig.update_layout(title=dict(text="Spglib Spacegroups", x=0.5, y=0.93))
 # fig.write_image(f"{MODULE_DIR}/plots/matbench_perovskites_aflow_sunburst.pdf")
 
 
 # %%
-fig = spacegroup_sunburst(df_perovskites.aflow_spg, title="Aflow")
+fig = pmv.spacegroup_sunburst(df_perov.aflow_spg, title="Aflow")
 fig.update_layout(title=dict(text="Aflow Spacegroups", x=0.5, y=0.85))
 # fig.write_image(f"{MODULE_DIR}/plots/matbench_perovskites_spglib_sunburst.pdf")
 
 
 # %%
-df_perovskites = load_dataset("matbench_perovskites")
+df_perov = load_dataset("matbench_perovskites")
 
-df_perovskites["spglib_spg_num"] = df_perovskites.structure.map(
+df_perov["spglib_spg_num"] = df_perov.structure.map(
     lambda struct: SpacegroupAnalyzer(struct).get_space_group_number()
 )
 
 
 # %%
 for src in ("aflow", "spglib"):
-    df_perovskites[f"{src}_crys_sys"] = df_perovskites[f"{src}_spg_num"].map(
-        crystal_sys_from_spg_num
+    df_perov[f"{src}_crys_sys"] = df_perov[f"{src}_spg_num"].map(
+        pmv.utils.crystal_sys_from_spg_num
     )
 
 
 # %%
-fig = sankey_from_2_df_cols(df_perovskites, ["aflow_spg_num", "spglib_spg_num"])
+fig = pmv.sankey_from_2_df_cols(df_perov, ["aflow_spg_num", "spglib_spg_num"])
 
 fig.update_layout(title="Matbench Perovskites Aflow vs Spglib Spacegroups")
 
 
 # %%
-fig = sankey_from_2_df_cols(df_perovskites, ["aflow_crys_sys", "spglib_crys_sys"])
+fig = pmv.sankey_from_2_df_cols(df_perov, ["aflow_crys_sys", "spglib_crys_sys"])
 
 fig.update_layout(title="Aflow vs Spglib Crystal Systems")

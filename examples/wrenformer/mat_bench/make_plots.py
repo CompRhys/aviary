@@ -10,10 +10,10 @@ from glob import glob
 
 import pandas as pd
 import plotly.express as px
+import pymatviz as pmv
 from matbench import MatbenchBenchmark
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata as matbench_metadata
-from pymatviz.powerups import add_identity_line
 from sklearn.metrics import r2_score, roc_auc_score
 
 from examples.wrenformer.mat_bench import DATA_PATHS
@@ -209,7 +209,7 @@ fig = px.scatter(
         "value ": "Predicted formation energy (eV/atom)",
     },
 )
-add_identity_line(fig)
+pmv.powerups.add_identity_line(fig)
 
 fig.update_layout(legend=dict(x=0.02, y=0.95, xanchor="left", title="Models"))
 
