@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Callable
 
 import torch
 import torch.nn.functional as F
+from pymatgen.util.due import Doi, due
 from torch import BoolTensor, Tensor, nn
 
 from aviary.core import BaseModelClass, masked_max, masked_mean, masked_min, masked_std
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+@due.dcite(Doi("10.48550/arXiv.2308.14920"), description="Wrenformer model")
+@due.dcite(Doi("10.1038/s41524-021-00545-1"), description="Crabnet model")
 class Wrenformer(BaseModelClass):
     """Crabnet-inspired re-implementation of Wren as a transformer.
     https://github.com/anthony-wang/CrabNet.
