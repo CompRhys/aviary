@@ -6,10 +6,10 @@ import torch
 import torch.nn.functional as F
 from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
-from torch_scatter import scatter_add, scatter_mean
 
 from aviary.core import BaseModelClass
 from aviary.networks import SimpleNetwork
+from aviary.scatter import scatter_reduce
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -114,7 +114,7 @@ class CrystalGraphConvNet(BaseModelClass):
         """
         atom_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
-        crys_fea = scatter_mean(atom_fea, crystal_atom_idx, dim=0)
+        crys_fea = scatter_reduce(atom_fea, crystal_atom_idx, dim=0, reduce="mean")
 
         # NOTE required to match the reference implementation
         crys_fea = nn.functional.softplus(crys_fea)
@@ -236,7 +236,7 @@ class CGCNNConv(nn.Module):
 
         # take the elementwise product of the filter and core
         nbr_msg = filter_fea * core_fea
-        nbr_summed = scatter_add(nbr_msg, self_idx, dim=0)
+        nbr_summed = scatter_reduce(nbr_msg, self_idx, dim=0, reduce="sum")
 
         nbr_summed = self.bn2(nbr_summed)
         return self.softplus2(atom_in_fea + nbr_summed)

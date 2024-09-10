@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aviary"
-version = "1.0.0"
+version = "1.1.0"
 description = "A collection of machine learning models for materials discovery"
 authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
 readme = "README.md"
@@ -27,7 +27,6 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Scientific/Engineering :: Chemistry",
@@ -42,7 +41,6 @@ dependencies = [
   "scikit_learn",
   "tensorboard",
   "torch",
-  "torch_scatter",
   "tqdm",
   "wandb",
 ]
@@ -114,6 +112,7 @@ ignore = [
   "D105",  # Missing docstring in magic method
   "D205",  # 1 blank line required between summary line and description
   "E731",  # Do not assign a lambda expression, use a def
+  "ISC001",
   "PD901", # pandas-df-variable-name
   "PLR",   # pylint refactor
   "PT006", # pytest-parametrize-names-wrong-type

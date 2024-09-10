@@ -15,15 +15,7 @@ The aim of `aviary` is to contain multiple models for materials discovery under 
 
 ## Installation
 
-Aviary requires [`torch-scatter`](https://github.com/rusty1s/pytorch_scatter). `pip install` it with
-
-```sh
-pip install torch-scatter -f https://data.pyg.org/whl/torch-2.2.1+cpu.html
-```
-
-Make sure you replace `2.2.1` with your actual `torch.__version__` (`python -c 'import torch; print(torch.__version__)'`) and `cpu` with your CUDA version if applicable.
-
-Then install `aviary` from source with
+Users can install `aviary` from source with
 
 ```sh
 pip install -U git+https://github.com/CompRhys/aviary
