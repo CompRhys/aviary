@@ -77,7 +77,7 @@ If you use this code please cite the relevant work:
 
 `roost` - Predicting materials properties without crystal structure: Deep representation learning from stoichiometry. [[Paper]](https://doi.org/10.1038/s41467-020-19964-7) [[arXiv]](https://arxiv.org/abs/1910.00617)
 
-```tex
+```bibtex
 @article{goodall_2020_predicting,
   title={Predicting materials properties without crystal structure: Deep representation learning from stoichiometry},
   author={Goodall, Rhys EA and Lee, Alpha A},
@@ -92,7 +92,7 @@ If you use this code please cite the relevant work:
 
 `wren` - Rapid Discovery of Stable Materials by Coordinate-free Coarse Graining. [[Paper]](https://www.science.org/doi/10.1126/sciadv.abn4117) [[arXiv]](https://arxiv.org/abs/2106.11132)
 
-```tex
+```bibtex
 @article{goodall_2022_rapid,
   title={Rapid discovery of stable materials by coordinate-free coarse graining},
   author={Goodall, Rhys EA and Parackal, Abhijith S and Faber, Felix A and Armiento, Rickard and Lee, Alpha A},
@@ -107,7 +107,7 @@ If you use this code please cite the relevant work:
 
 `cgcnn` - Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties. [[Paper]](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.120.145301) [[arXiv]](https://arxiv.org/abs/1710.10324)
 
-```tex
+```bibtex
 @article{xie_2018_crystal,
   title={Crystal graph convolutional neural networks for an accurate and interpretable prediction of material properties},
   author={Xie, Tian and Grossman, Jeffrey C},
