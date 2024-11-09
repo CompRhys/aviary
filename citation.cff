@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+authors:
+  - given-names: Rhys
+    family-names: Goodall
+    affiliation: University of Cambridge
+    orcid: https://orcid.org/0000-0002-6589-1700
+    affil_key: 1
+  - given-names: Janosh
+    family-names: Riebesell
+    affiliation: University of Cambridge, Lawrence Berkeley National Lab
+    email: janosh.riebesell@gmail.com
+    orcid: https://orcid.org/0000-0001-5233-3462
+    corresponding: true
+    affil_key: 1, 2
+    github: https://github.com/janosh
+title: "aviary"
+version: 1.0.0
+doi: 10.5281/zenodo.1234
+date-released: 2024-11-09
+url: "https://github.com/CompRhys/aviary"
