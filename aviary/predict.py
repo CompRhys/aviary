@@ -9,13 +9,14 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 
+from aviary.core import Normalizer
 from aviary.utils import get_metrics, print_walltime
 
 if TYPE_CHECKING:
     import wandb.apis.public
     from torch.utils.data import DataLoader
 
-    from aviary.core import BaseModelClass, Normalizer
+    from aviary.core import BaseModelClass
     from aviary.data import InMemoryDataLoader
 
 __author__ = "Janosh Riebesell"
