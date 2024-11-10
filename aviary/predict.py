@@ -101,7 +101,9 @@ def make_ensemble_predictions(
 
         # denormalize predictions if a normalizer was used during training
         if "normalizer_dict" in checkpoint:
-            normalizer = Normalizer.from_state_dict(checkpoint["normalizer_dict"][target_name])
+            normalizer = Normalizer.from_state_dict(
+                checkpoint["normalizer_dict"][target_name]
+            )
             preds = normalizer.denorm(preds)
 
         pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
