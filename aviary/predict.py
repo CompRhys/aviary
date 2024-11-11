@@ -102,10 +102,18 @@ def make_ensemble_predictions(
 
         # denormalize predictions if a normalizer was used during training
         if "normalizer_dict" in checkpoint:
+            assert task_type == "regression", "Normalization only takes place for regression."
             normalizer = Normalizer.from_state_dict(
                 checkpoint["normalizer_dict"][target_name]
             )
-            preds = normalizer.denorm(preds)
+            if model.robust:
+                # denorm the mean and aleatoroc uncertainties separately
+                mean, log_std = np.split(preds, 2, axis=1)
+                preds = normalizer.denorm(mean)
+                ale_std = np.exp(log_std) * normalizer.std
+                preds = np.column_stack([preds, ale_std])
+            else:
+                preds = normalizer.denorm(preds)
 
         pred_col = f"{target_col}_pred_{idx}" if target_col else f"pred_{idx}"
 
