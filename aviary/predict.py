@@ -116,9 +116,7 @@ def make_ensemble_predictions(
 
     # denormalize predictions if a normalizer was used during training
     if "normalizer_dict" in checkpoint:
-        assert (
-            task_type == "regression"
-        ), "Normalization only takes place for regression."
+        assert task_type == "regression", "Normalization only takes place for regression."
         normalizer = Normalizer.from_state_dict(
             checkpoint["normalizer_dict"][target_name]
         )
