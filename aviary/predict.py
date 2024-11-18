@@ -120,10 +120,12 @@ def make_ensemble_predictions(
         normalizer = Normalizer.from_state_dict(
             checkpoint["normalizer_dict"][target_name]
         )
+        mean = normalizer.mean.cpu().numpy()
+        std = normalizer.std.cpu().numpy()
         # denorm the mean and aleatoric uncertainties separately
-        df[pred_col] = df[pred_col].apply(normalizer.denorm)
+        df[pred_col] = df[pred_col] * std + mean
         if model.robust:
-            df[ale_col] = df[ale_col] * normalizer.std
+            df[ale_col] = df[ale_col] * std
 
     df_preds = df.filter(regex=r"_pred_\d")
 
