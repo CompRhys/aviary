@@ -144,7 +144,7 @@ def get_protostructure_label_from_aflow(
     aflow_proto = json.loads(output.stdout)
 
     aflow_label = aflow_proto["aflow_prototype_label"]
-    chemsys = struct.composition.chemical_system
+    chemsys = struct.chemical_system
     # check that multiplicities satisfy original composition
     prototype_form, pearson_symbol, spg_num, *element_wyckoffs = aflow_label.split("_")
 
@@ -237,7 +237,7 @@ def get_protostructure_label_from_spg_analyzer(
     pearson_symbol = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
 
     prototype_form = get_prototype_formula_from_composition(sym_struct.composition)
-    chemsys = sym_struct.composition.chemical_system
+    chemsys = sym_struct.chemical_system
 
     all_wyckoffs = "_".join(element_wyckoffs)
     all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, spg_num)
@@ -314,6 +314,139 @@ def get_protostructure_label_from_spglib(
         if not raise_errors:
             return str(exc)
         raise
+
+
+def get_protostructure_label_from_moyopy(
+    struct: Structure,
+    raise_errors: bool = False,
+    init_symprec: float = 0.1,
+    fallback_symprec: float | None = 1e-5,
+) -> str | None:
+    """Get AFLOW prototype label using Moyopy for symmetry detection.
+
+    Args:
+        struct (Structure): pymatgen Structure object.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
+        init_symprec (float): Initial symmetry precision for Moyopy. Defaults to 0.1.
+        fallback_symprec (float): Fallback symmetry precision if first symmetry detection
+            failed. Defaults to 1e-5.
+
+    Returns:
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
+    """
+    import moyopy
+    from moyopy.interface import MoyoAdapter
+
+    attempt_to_recover = False
+    try:
+        # Convert pymatgen Structure to Moyo Cell
+        moyo_cell = MoyoAdapter.from_structure(struct)
+
+        try:
+            # First attempt with initial symprec
+            moyo_data = moyopy.MoyoDataset(moyo_cell, symprec=init_symprec)
+
+            # Get space group number and Wyckoff positions
+            spg_num = moyo_data.number
+            wyckoff_symbols = moyo_data.wyckoffs
+
+            # Get crystal system and centering from Hall symbol entry
+            hall_entry = moyopy.HallSymbolEntry(hall_number=moyo_data.hall_number)
+            spg_sym = hall_entry.hm_short
+
+            # Get crystal system from space group number instead of symbol
+            if spg_num <= 2:
+                cry_sys = "triclinic"
+            elif spg_num <= 15:
+                cry_sys = "monoclinic"
+            elif spg_num <= 74:
+                cry_sys = "orthorhombic"
+            elif spg_num <= 142:
+                cry_sys = "tetragonal"
+            elif spg_num <= 167:
+                cry_sys = "trigonal"
+            elif spg_num <= 194:
+                cry_sys = "hexagonal"
+            else:
+                cry_sys = "cubic"
+
+            # Get centering from first letter of space group symbol
+            # Handle special case for C-centered
+            centering = spg_sym[0]
+            if centering in ("A", "B", "C", "S"):
+                centering = "C"
+
+            # Get number of sites in conventional cell
+            num_sites_conventional = len(moyo_data.std_cell.numbers)
+            pearson_symbol = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
+
+            # Group Wyckoff positions by element
+            element_dict = {}
+            element_wyckoffs = []
+            for element, sites in groupby(
+                zip(struct.species, wyckoff_symbols), key=lambda x: x[0].symbol
+            ):
+                sites_list = list(sites)
+                element_dict[element] = sum(
+                    wyckoff_multiplicity_dict[str(spg_num)][s[1].translate(remove_digits)]
+                    for s in sites_list
+                )
+                element_wyckoffs.append(
+                    "".join(
+                        f"{len(list(w))}{wyk[0].translate(remove_digits)}"
+                        for wyk, w in groupby(
+                            sorted(sites_list, key=lambda x: x[1]), key=lambda x: x[1]
+                        )
+                    )
+                )
+
+            prototype_form = get_prototype_formula_from_composition(struct.composition)
+            chemsys = struct.chemical_system
+
+            all_wyckoffs = "_".join(element_wyckoffs)
+            all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, spg_num)
+
+            protostructure_label = (
+                f"{prototype_form}_{pearson_symbol}_{spg_num}_{all_wyckoffs}:{chemsys}"
+            )
+
+            # Verify multiplicities match composition
+            observed_formula = Composition(element_dict).reduced_formula
+            expected_formula = struct.composition.reduced_formula
+            if observed_formula != expected_formula:
+                if fallback_symprec is not None:
+                    attempt_to_recover = True
+                else:
+                    err_msg = (
+                        f"Invalid WP multiplicities - {protostructure_label}, expected "
+                        f"{observed_formula} to be {expected_formula}"
+                    )
+                    if raise_errors:
+                        raise ValueError(err_msg)
+                    return err_msg
+
+            return protostructure_label
+
+        except Exception as exc:
+            if fallback_symprec is None:
+                raise exc
+            attempt_to_recover = True
+
+        # Try again with fallback symprec if initial attempt failed
+        if attempt_to_recover:
+            return get_protostructure_label_from_moyopy(
+                struct, raise_errors=raise_errors, fallback_symprec=fallback_symprec
+            )
+
+    except Exception as exc:
+        if not raise_errors:
+            return str(exc)
+        raise
+
+    return None
 
 
 def canonicalize_element_wyckoffs(element_wyckoffs: str, spg_num: int | str) -> str:
