@@ -9,6 +9,7 @@ from operator import itemgetter
 from os.path import abspath, dirname, join
 from shutil import which
 from string import ascii_uppercase, digits
+from typing import Literal
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
@@ -16,8 +17,21 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 try:
     from pyxtal import pyxtal
+
+    has_pyxtal = True
 except ImportError:
     pyxtal = None
+    has_pyxtal = False
+
+try:
+    import moyopy
+    from moyopy.interface import MoyoAdapter
+
+    has_moyopy = True
+except ImportError:
+    moyopy = None
+    has_moyopy = False
+
 
 module_dir = dirname(abspath(__file__))
 
@@ -96,10 +110,111 @@ def count_values_for_wyckoff(
     )
 
 
+def get_crystal_system(n: int) -> str:
+    """Get the crystal system for the structure, e.g. (triclinic, orthorhombic,
+    cubic, etc.).
+
+    Mirrors method of SpacegroupAnalyzer.get_crystal_system().
+
+    Args:
+        n (int): Space group number
+
+    Raises:
+        ValueError: on invalid space group numbers < 1 or > 230.
+
+    Returns:
+        str: Crystal system for structure
+    """
+    # Not using isinstance(n, int) to allow 0-decimal floats
+    if n != int(n) or not 0 < n < 231:
+        raise ValueError(f"Received invalid space group {n}")
+
+    if 0 < n < 3:
+        return "triclinic"
+    if n < 16:
+        return "monoclinic"
+    if n < 75:
+        return "orthorhombic"
+    if n < 143:
+        return "tetragonal"
+    if n < 168:
+        return "trigonal"
+    if n < 195:
+        return "hexagonal"
+    return "cubic"
+
+
+def get_centering(spg_sym: str) -> str:
+    """Get the centering for the structure, e.g. (A, B, C, S)."""
+    return "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
+
+
+def get_pearson_symbol_from_spg_analyzer(spg_analyzer: SpacegroupAnalyzer) -> str:
+    """Get the Pearson symbol for the structure."""
+    cry_sys = spg_analyzer.get_crystal_system()
+    spg_sym = spg_analyzer.get_space_group_symbol()
+    centering = get_centering(spg_sym)
+
+    num_sites_conventional = len(spg_analyzer.get_symmetry_dataset()["std_types"])
+    return f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
+
+
+def get_pearson_symbol_from_moyo_dataset(moyo_data: moyopy.MoyoDataset) -> str:
+    """Get the Pearson symbol for the structure from a MoyoDataset."""
+    # Get space group number and Wyckoff positions
+    spg_num = moyo_data.number
+
+    # Get crystal system and centering from Hall symbol entry
+    hall_entry = moyopy.HallSymbolEntry(hall_number=moyo_data.hall_number)
+    spg_sym = hall_entry.hm_short
+    centering = hall_entry.centering
+
+    # Get crystal system from space group number instead of symbol
+    cry_sys = get_crystal_system(spg_num)
+
+    # Get centering from first letter of space group symbol
+    # Handle special case for C-centered
+    centering = get_centering(spg_sym)
+
+    # Get number of sites in conventional cell
+    num_sites_conventional = len(moyo_data.std_cell.numbers)
+    return f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
+
+
+def get_protostructure_label(
+    struct: Structure,
+    method: Literal["aflow", "spglib", "moyopy"],
+    raise_errors: bool = False,
+    **kwargs,
+) -> str:
+    """Get protostructure label for a pymatgen Structure.
+
+    Args:
+        struct (Structure): pymatgen Structure
+        method (Literal["aflow", "spglib", "moyopy"]): Method to use for symmetry
+        detection
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
+        **kwargs: Additional arguments for the specific method
+
+    Returns:
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
+    """
+    if method == "aflow":
+        return get_protostructure_label_from_aflow(struct, raise_errors, **kwargs)
+    if method == "spglib":
+        return get_protostructure_label_from_spglib(struct, raise_errors, **kwargs)
+    if method == "moyopy":
+        return get_protostructure_label_from_moyopy(struct, raise_errors, **kwargs)
+    raise ValueError(f"Invalid method: {method}")
+
+
 def get_protostructure_label_from_aflow(
     struct: Structure,
-    aflow_executable: str | None = None,
     raise_errors: bool = False,
+    aflow_executable: str | None = None,
 ) -> str:
     """Get protostructure label for a pymatgen Structure. Make sure you're running a
     recent version of the aflow CLI as there's been several breaking changes. This code
@@ -184,30 +299,10 @@ def get_protostructure_label_from_aflow(
     return protostructure_label
 
 
-def get_protostructure_label_from_spg_analyzer(
-    spg_analyzer: SpacegroupAnalyzer,
-    raise_errors: bool = False,
-) -> str:
-    """Get protostructure label for pymatgen SpacegroupAnalyzer.
-
-    Args:
-        spg_analyzer (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
-        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
-            False.
-
-    Returns:
-        str: protostructure_label which is constructed as `aflow_label:chemsys` or
-            explanation of failure if symmetry detection failed and `raise_errors`
-            is False.
-    """
-    spg_num = spg_analyzer.get_space_group_number()
-    sym_struct = spg_analyzer.get_symmetrized_structure()
-
-    equivalent_wyckoff_labels = [
-        # tuple of (wp multiplicity, element, wyckoff letter)
-        (len(s), s[0].species_string, wyk_letter.translate(remove_digits))
-        for s, wyk_letter in zip(sym_struct.equivalent_sites, sym_struct.wyckoff_symbols)
-    ]
+def _get_all_wyckoffs_substring_and_element_dict(
+    equivalent_wyckoff_labels: list[tuple[int, str, str]],
+    spg_num: int | str,
+):
     # Pre-sort by element and wyckoff letter to ensure continuous groups in groupby
     equivalent_wyckoff_labels = sorted(
         equivalent_wyckoff_labels, key=lambda x: (x[1], x[2])
@@ -228,19 +323,45 @@ def get_protostructure_label_from_spg_analyzer(
                 for wyk, w in groupby(list_group, key=lambda x: x[2])
             )
         )
+    all_wyckoffs = "_".join(element_wyckoffs)
+    all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, spg_num)
 
-    # get Pearson symbol
-    cry_sys = spg_analyzer.get_crystal_system()
-    spg_sym = spg_analyzer.get_space_group_symbol()
-    centering = "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
-    num_sites_conventional = len(spg_analyzer.get_symmetry_dataset()["std_types"])
-    pearson_symbol = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
+    return all_wyckoffs, element_dict
 
+
+def get_protostructure_label_from_spg_analyzer(
+    spg_analyzer: SpacegroupAnalyzer,
+    raise_errors: bool = False,
+) -> str:
+    """Get protostructure label for pymatgen SpacegroupAnalyzer.
+
+    Args:
+        spg_analyzer (SpacegroupAnalyzer): pymatgen SpacegroupAnalyzer object.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
+
+    Returns:
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
+    """
+    sym_struct = spg_analyzer.get_symmetrized_structure()
+
+    spg_num = spg_analyzer.get_space_group_number()
+    pearson_symbol = get_pearson_symbol_from_spg_analyzer(spg_analyzer)
     prototype_form = get_prototype_formula_from_composition(sym_struct.composition)
     chemsys = sym_struct.chemical_system
 
-    all_wyckoffs = "_".join(element_wyckoffs)
-    all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, spg_num)
+    # get Wyckoff position substring
+    equivalent_wyckoff_labels = [
+        # tuple of (wp multiplicity, element, wyckoff letter)
+        (len(s), s[0].species_string, wyk_letter.translate(remove_digits))
+        for s, wyk_letter in zip(sym_struct.equivalent_sites, sym_struct.wyckoff_symbols)
+    ]
+
+    all_wyckoffs, element_dict = _get_all_wyckoffs_substring_and_element_dict(
+        equivalent_wyckoff_labels, spg_num
+    )
 
     protostructure_label = (
         f"{prototype_form}_{pearson_symbol}_{spg_num}_{all_wyckoffs}:{chemsys}"
@@ -266,7 +387,7 @@ def get_protostructure_label_from_spglib(
     raise_errors: bool = False,
     init_symprec: float = 0.1,
     fallback_symprec: float | None = 1e-5,
-) -> str | None:
+) -> str:
     """Get AFLOW prototype label for pymatgen Structure.
 
     Args:
@@ -316,12 +437,59 @@ def get_protostructure_label_from_spglib(
         raise
 
 
+def _get_protostructure_label_from_moyopy(
+    struct: Structure,
+    symprec: float,
+    raise_errors: bool = False,
+) -> str:
+    moyo_cell = MoyoAdapter.from_structure(struct)
+    moyo_data = moyopy.MoyoDataset(moyo_cell, symprec=symprec)
+
+    # Get space group number and Wyckoff positions
+    spg_num = moyo_data.number
+    pearson_symbol = get_pearson_symbol_from_moyo_dataset(moyo_data)
+    prototype_form = get_prototype_formula_from_composition(struct.composition)
+    chemsys = struct.chemical_system
+
+    # Group Wyckoff positions by orbit and element
+    equivalent_wyckoff_labels = []
+    for orbit_idx, group in groupby(sorted(moyo_data.orbits)):
+        equivalent_wyckoff_labels.append(
+            (
+                len(list(group)),  # multiplicity
+                struct.species[orbit_idx],  # element
+                moyo_data.wyckoffs[orbit_idx],  # wyckoff letter
+            )
+        )
+
+    all_wyckoffs, element_dict = _get_all_wyckoffs_substring_and_element_dict(
+        equivalent_wyckoff_labels, spg_num
+    )
+
+    protostructure_label = (
+        f"{prototype_form}_{pearson_symbol}_{spg_num}_{all_wyckoffs}:{chemsys}"
+    )
+
+    # Verify multiplicities match composition
+    observed_formula = Composition(element_dict).reduced_formula
+    expected_formula = struct.composition.reduced_formula
+    if observed_formula != expected_formula:
+        err_msg = (
+            f"Invalid WP multiplicities - {protostructure_label}, expected "
+            f"{observed_formula} to be {expected_formula}"
+        )
+        if raise_errors:
+            raise ValueError(err_msg)
+        return err_msg
+
+    return protostructure_label
+
+
 def get_protostructure_label_from_moyopy(
     struct: Structure,
     raise_errors: bool = False,
     init_symprec: float = 0.1,
-    fallback_symprec: float | None = 1e-5,
-) -> str | None:
+) -> str:
     """Get AFLOW prototype label using Moyopy for symmetry detection.
 
     Args:
@@ -329,124 +497,27 @@ def get_protostructure_label_from_moyopy(
         raise_errors (bool): Whether to raise errors or annotate them. Defaults to
             False.
         init_symprec (float): Initial symmetry precision for Moyopy. Defaults to 0.1.
-        fallback_symprec (float): Fallback symmetry precision if first symmetry detection
-            failed. Defaults to 1e-5.
 
     Returns:
         str: protostructure_label which is constructed as `aflow_label:chemsys` or
             explanation of failure if symmetry detection failed and `raise_errors`
             is False.
     """
-    import moyopy
-    from moyopy.interface import MoyoAdapter
+    if not has_moyopy:
+        raise ImportError(
+            "moyopy is not installed, please install it with `pip install moyopy`"
+        )
 
-    attempt_to_recover = False
     try:
-        # Convert pymatgen Structure to Moyo Cell
-        moyo_cell = MoyoAdapter.from_structure(struct)
-
-        try:
-            # First attempt with initial symprec
-            moyo_data = moyopy.MoyoDataset(moyo_cell, symprec=init_symprec)
-
-            # Get space group number and Wyckoff positions
-            spg_num = moyo_data.number
-            wyckoff_symbols = moyo_data.wyckoffs
-
-            # Get crystal system and centering from Hall symbol entry
-            hall_entry = moyopy.HallSymbolEntry(hall_number=moyo_data.hall_number)
-            spg_sym = hall_entry.hm_short
-
-            # Get crystal system from space group number instead of symbol
-            if spg_num <= 2:
-                cry_sys = "triclinic"
-            elif spg_num <= 15:
-                cry_sys = "monoclinic"
-            elif spg_num <= 74:
-                cry_sys = "orthorhombic"
-            elif spg_num <= 142:
-                cry_sys = "tetragonal"
-            elif spg_num <= 167:
-                cry_sys = "trigonal"
-            elif spg_num <= 194:
-                cry_sys = "hexagonal"
-            else:
-                cry_sys = "cubic"
-
-            # Get centering from first letter of space group symbol
-            # Handle special case for C-centered
-            centering = spg_sym[0]
-            if centering in ("A", "B", "C", "S"):
-                centering = "C"
-
-            # Get number of sites in conventional cell
-            num_sites_conventional = len(moyo_data.std_cell.numbers)
-            pearson_symbol = f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
-
-            # Group Wyckoff positions by element
-            element_dict = {}
-            element_wyckoffs = []
-            for element, sites in groupby(
-                zip(struct.species, wyckoff_symbols), key=lambda x: x[0].symbol
-            ):
-                sites_list = list(sites)
-                element_dict[element] = sum(
-                    wyckoff_multiplicity_dict[str(spg_num)][s[1].translate(remove_digits)]
-                    for s in sites_list
-                )
-                element_wyckoffs.append(
-                    "".join(
-                        f"{len(list(w))}{wyk[0].translate(remove_digits)}"
-                        for wyk, w in groupby(
-                            sorted(sites_list, key=lambda x: x[1]), key=lambda x: x[1]
-                        )
-                    )
-                )
-
-            prototype_form = get_prototype_formula_from_composition(struct.composition)
-            chemsys = struct.chemical_system
-
-            all_wyckoffs = "_".join(element_wyckoffs)
-            all_wyckoffs = canonicalize_element_wyckoffs(all_wyckoffs, spg_num)
-
-            protostructure_label = (
-                f"{prototype_form}_{pearson_symbol}_{spg_num}_{all_wyckoffs}:{chemsys}"
-            )
-
-            # Verify multiplicities match composition
-            observed_formula = Composition(element_dict).reduced_formula
-            expected_formula = struct.composition.reduced_formula
-            if observed_formula != expected_formula:
-                if fallback_symprec is not None:
-                    attempt_to_recover = True
-                else:
-                    err_msg = (
-                        f"Invalid WP multiplicities - {protostructure_label}, expected "
-                        f"{observed_formula} to be {expected_formula}"
-                    )
-                    if raise_errors:
-                        raise ValueError(err_msg)
-                    return err_msg
-
-            return protostructure_label
-
-        except Exception as exc:
-            if fallback_symprec is None:
-                raise exc
-            attempt_to_recover = True
-
-        # Try again with fallback symprec if initial attempt failed
-        if attempt_to_recover:
-            return get_protostructure_label_from_moyopy(
-                struct, raise_errors=raise_errors, fallback_symprec=fallback_symprec
-            )
-
+        aflow_label_with_chemsys = _get_protostructure_label_from_moyopy(
+            struct, init_symprec, raise_errors
+        )
     except Exception as exc:
         if not raise_errors:
             return str(exc)
         raise
 
-    return None
+    return aflow_label_with_chemsys
 
 
 def canonicalize_element_wyckoffs(element_wyckoffs: str, spg_num: int | str) -> str:
@@ -830,7 +901,7 @@ def get_random_structure_for_protostructure(
             sorted chemical system.
         **kwargs: Keyword arguments to pass to pyxtal().from_random()
     """
-    if pyxtal is None:
+    if not has_pyxtal:
         raise ImportError("pyxtal is required for this function")
 
     aflow_label, chemsys = protostructure_label.split(":")

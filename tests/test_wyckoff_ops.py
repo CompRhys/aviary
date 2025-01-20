@@ -283,7 +283,7 @@ def test_get_protostructure_label_from_aflow():
     """Check we extract correct protostructure label for esseneite using AFLOW CLI."""
     struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
 
-    out = get_protostructure_label_from_aflow(struct, which("aflow"))
+    out = get_protostructure_label_from_aflow(struct, aflow_executable=which("aflow"))
     expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
     assert out == expected
 
@@ -428,62 +428,6 @@ def test_moyopy_spglib_interchangeable():
     assert moyopy_recovered.split(":")[-1] == spglib_recovered.split(":")[-1]
 
 
-def test_moyopy_spglib_identical_results():
-    """Test that moyopy and spglib give identical results for simple structures."""
-    # Create simple test structures
-    test_structs = {
-        "cubic": Structure(
-            lattice=[[4, 0, 0], [0, 4, 0], [0, 0, 4]],
-            species=["Na", "Cl"],
-            coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
-        ),
-        "tetragonal": Structure(
-            lattice=[[3, 0, 0], [0, 3, 0], [0, 0, 4]],
-            species=["Ti", "O", "O"],
-            coords=[[0, 0, 0], [0.3, 0.3, 0], [0.7, 0.7, 0]],
-        ),
-        "hexagonal": Structure(
-            lattice=[[3, 0, 0], [-1.5, 2.6, 0], [0, 0, 5]],
-            species=["Zn", "O"],
-            coords=[[1 / 3, 2 / 3, 0], [2 / 3, 1 / 3, 0.5]],
-        ),
-    }
-
-    # Expected outputs for each structure
-    expected_outputs = {
-        "cubic": (
-            "AB_cP2_221_a_b:Cl-Na",  # moyopy
-            "AB_cF8_225_a_b:Na-Cl",  # spglib
-        ),
-        "tetragonal": (
-            "AB2_tP6_136_2a_4c:Ti-O",
-            "AB2_tP6_136_a_2c:Ti-O",
-        ),
-        "hexagonal": (
-            "AB_hP4_194_2a_2b:Zn-O",
-            "AB_hP4_194_a_b:Zn-O",
-        ),
-    }
-
-    for name, struct in test_structs.items():
-        moyopy_label = get_protostructure_label_from_moyopy(struct)
-        spglib_label = get_protostructure_label_from_spglib(struct)
-
-        moyopy_expected, spglib_expected = expected_outputs[name]
-
-        assert moyopy_label == moyopy_expected, (
-            f"Moyopy output mismatch for {name}:\n"
-            f"got:      {moyopy_label}\n"
-            f"expected: {moyopy_expected}"
-        )
-
-        assert spglib_label == spglib_expected, (
-            f"Spglib output mismatch for {name}:\n"
-            f"got:      {spglib_label}\n"
-            f"expected: {spglib_expected}"
-        )
-
-
 def test_moyopy_spglib_equivalence():
     """Test that moyopy and spglib give equivalent results for various structures."""
     # Simple test structures with known symmetry
@@ -510,8 +454,8 @@ def test_moyopy_spglib_equivalence():
     # Expected outputs (moyopy, spglib) for each structure
     expected_outputs = {
         "cubic": (
-            "AB_cF8_225_a_b:Na-Cl",
-            "AB_cF8_225_a_b:Na-Cl",
+            "AB_cF8_225_a_b:Cl-Na",
+            "AB_cF8_225_a_b:Cl-Na",
         ),
         "tetragonal": (
             "AB2_tP6_136_2a_4c:Ti-O",
