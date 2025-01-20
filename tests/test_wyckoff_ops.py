@@ -1,6 +1,6 @@
 import inspect
 import re
-from itertools import permutations
+from itertools import permutations, product
 from shutil import which
 
 import pytest
@@ -15,6 +15,7 @@ from aviary.wren.utils import (
     count_wyckoff_positions,
     get_anonymous_formula_from_prototype_formula,
     get_formula_from_protostructure_label,
+    get_protostructure_label,
     get_protostructure_label_from_aflow,
     get_protostructure_label_from_moyopy,
     get_protostructure_label_from_spg_analyzer,
@@ -45,14 +46,37 @@ PROTOSTRUCTURE_SET = [
     ("AB3C_cP5_221_a_c_b:Ba-O-Ti"),
 ]
 
+TEST_STRUCTS = [
+    Structure(  # NaCl structure
+        lattice=[[4, 0, 0], [0, 4, 0], [0, 0, 4]],
+        species=["Na", "Cl"],
+        coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
+    ),
+    Structure(  # TiO2 structure
+        lattice=[[3, 0, 0], [0, 3, 0], [0, 0, 4]],
+        species=["Ti", "O", "O"],
+        coords=[[0, 0, 0], [0.3, 0.3, 0], [0.7, 0.7, 0]],
+    ),
+    Structure(  # ZnO structure
+        lattice=[[3, 0, 0], [-1.5, 2.6, 0], [0, 0, 5]],
+        species=["Zn", "O"],
+        coords=[[1 / 3, 2 / 3, 0], [2 / 3, 1 / 3, 0.5]],
+    ),
+    Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif"),
+]
 
-def test_get_protostructure_label_from_spglib():
-    """Check that spglib gives correct protostructure label for esseneite"""
-    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
-    assert (
-        get_protostructure_label_from_spglib(struct)
-        == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
-    )
+TEST_PROTOSTRUCTURES = [
+    "AB_cF8_225_a_b:Cl-Na",
+    "AB2_tP6_136_a_2c:Ti-O",
+    "AB_hP4_194_a_b:Zn-O",
+    "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si",
+]
+
+
+@pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
+def test_get_protostructure_label_from_spglib(structure, expected):
+    """Check that spglib gives correct protostructure label simple cases."""
+    assert get_protostructure_label_from_spglib(structure) == expected
 
 
 def test_get_protostructure_label_from_spglib_edge_case():
@@ -279,13 +303,33 @@ def test_count_distinct_wyckoff_letters(protostructure_label, expected):
 
 
 @pytest.mark.skipif(which("aflow") is None, reason="AFLOW CLI not installed")
-def test_get_protostructure_label_from_aflow():
-    """Check we extract correct protostructure label for esseneite using AFLOW CLI."""
-    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
+@pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
+def test_get_protostructure_label_from_aflow(structure, expected):
+    """Check that AFLOW CLI gives correct protostructure label simple cases."""
+    assert (
+        get_protostructure_label_from_aflow(structure, aflow_executable=which("aflow"))
+        == expected
+    )
 
-    out = get_protostructure_label_from_aflow(struct, aflow_executable=which("aflow"))
-    expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
-    assert out == expected
+
+@pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
+def test_get_protostructure_label_from_moyopy(structure, expected):
+    """Check that moyopy gives correct protostructure label simple cases."""
+    assert get_protostructure_label_from_moyopy(structure) == expected
+
+
+@pytest.mark.parametrize(
+    "protostructure",
+    PROTOSTRUCTURE_SET,
+)
+def test_moyopy_spglib_consistency(protostructure):
+    """Check that moyopy and spglib give consistent results."""
+    struct = get_random_structure_for_protostructure(protostructure)
+
+    moyopy_label = get_protostructure_label_from_moyopy(struct)
+    spglib_label = get_protostructure_label_from_spglib(struct)
+
+    assert moyopy_label == spglib_label
 
 
 @pytest.mark.skipif(pyxtal is None, reason="pyxtal not installed")
@@ -293,13 +337,16 @@ def test_get_protostructure_label_from_aflow():
     reason="pyxtal is non-deterministic and symmetry can increase in random crystal"
 )
 @pytest.mark.parametrize(
-    "protostructure",
-    PROTOSTRUCTURE_SET,
+    "protostructure, method",
+    list(product(PROTOSTRUCTURE_SET, ["spglib", "moyopy"])),
 )
-def test_get_random_structure_for_protostructure_roundtrip(protostructure):
+def test_get_random_structure_for_protostructure_roundtrip(
+    protostructure: str, method: str
+):
     """Check roundtrip for generating a random structure from a prototype string"""
-    assert protostructure == get_protostructure_label_from_spglib(
-        get_random_structure_for_protostructure(protostructure)
+    assert protostructure == get_protostructure_label(
+        get_random_structure_for_protostructure(protostructure),
+        method=method,
     )
 
 
@@ -317,199 +364,7 @@ def test_get_random_structure_for_protostructure_random(protostructure):
     assert s1.lattice != s2.lattice
 
 
-def test_get_protostructure_label_from_moyopy():
-    """Check that moyopy gives correct protostructure label for esseneite"""
-    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
-    assert (
-        get_protostructure_label_from_moyopy(struct)
-        == "ABC6D2_mC40_15_4e_4e_8f_24f:Ca-Fe-O-Si"
-    )
+if __name__ == "__main__":
+    import pytest
 
-
-def test_get_protostructure_label_from_moyopy_edge_case():
-    """Check edge case where the symmetry precision is too low."""
-    struct = Structure.from_file(f"{TEST_DIR}/data/U2Pa4Tc6.json")
-
-    defaults = inspect.signature(get_protostructure_label_from_moyopy).parameters
-
-    assert defaults["init_symprec"].default == 0.1
-
-    raises_str = (
-        "Invalid WP multiplicities - A2B3C_hP6_191_2a_4c_6g:Pa-Tc-U, "
-        "expected UPa4Tc9 to be UPa2Tc3"
-    )
-
-    # Test that it gives invalid protostructure if fallback is None
-    with pytest.raises(ValueError, match=re.escape(raises_str)):
-        get_protostructure_label_from_moyopy(
-            struct, raise_errors=True, fallback_symprec=None
-        )
-
-    assert (
-        get_protostructure_label_from_moyopy(
-            struct, raise_errors=False, fallback_symprec=None
-        )
-        == raises_str
-    )
-
-    # Test that it recovers with fallback symprec
-    assert get_protostructure_label_from_moyopy(struct, raise_errors=True) == (
-        "A2B3C_hP6_191_2a_4c_6g:Pa-Tc-U"
-    )
-
-    assert get_protostructure_label_from_moyopy(struct, raise_errors=False) == (
-        "A2B3C_hP6_191_2a_4c_6g:Pa-Tc-U"
-    )
-
-
-@pytest.mark.parametrize(
-    "protostructure",
-    PROTOSTRUCTURE_SET,
-)
-def test_moyopy_spglib_consistency(protostructure):
-    """Check that moyopy and spglib give consistent results."""
-    struct = get_random_structure_for_protostructure(protostructure)
-
-    moyopy_label = get_protostructure_label_from_moyopy(struct)
-    spglib_label = get_protostructure_label_from_spglib(struct)
-
-    assert moyopy_label == spglib_label
-
-
-def test_moyopy_spglib_interchangeable():
-    """Test that moyopy and spglib functions are drop-in replacements for each other."""
-    # Test normal case
-    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
-
-    # Both should handle raise_errors=True/False similarly
-    for raise_errors in (True, False):
-        moyopy_label = get_protostructure_label_from_moyopy(
-            struct, raise_errors=raise_errors
-        )
-        spglib_label = get_protostructure_label_from_spglib(
-            struct, raise_errors=raise_errors
-        )
-
-        # Compare parts that should be identical
-        moyopy_parts = moyopy_label.split("_", 3)
-        spglib_parts = spglib_label.split("_", 3)
-
-        assert moyopy_parts[:3] == spglib_parts[:3]  # prototype, Pearson, space group
-        assert (
-            moyopy_label.split(":")[-1] == spglib_label.split(":")[-1]
-        )  # chemical system
-
-    # Test edge case with invalid structure
-    struct_invalid = Structure.from_file(f"{TEST_DIR}/data/U2Pa4Tc6.json")
-
-    # Both should handle fallback_symprec=None similarly
-    for func in (
-        get_protostructure_label_from_moyopy,
-        get_protostructure_label_from_spglib,
-    ):
-        # Should raise error when raise_errors=True
-        with pytest.raises(ValueError, match="Invalid WP multiplicities"):
-            func(struct_invalid, raise_errors=True, fallback_symprec=None)
-
-        # Should return error message when raise_errors=False
-        result = func(struct_invalid, raise_errors=False, fallback_symprec=None)
-        assert "Invalid WP multiplicities" in result
-        assert "expected" in result
-
-    # Both should recover with default fallback_symprec
-    moyopy_recovered = get_protostructure_label_from_moyopy(struct_invalid)
-    spglib_recovered = get_protostructure_label_from_spglib(struct_invalid)
-
-    # Compare recovered results (ignoring Wyckoff position format differences)
-    moyopy_parts = moyopy_recovered.split("_", 3)
-    spglib_parts = spglib_recovered.split("_", 3)
-
-    assert moyopy_parts[:3] == spglib_parts[:3]
-    assert moyopy_recovered.split(":")[-1] == spglib_recovered.split(":")[-1]
-
-
-def test_moyopy_spglib_equivalence():
-    """Test that moyopy and spglib give equivalent results for various structures."""
-    # Simple test structures with known symmetry
-    test_structs = {
-        "cubic": Structure(  # NaCl structure
-            lattice=[[4, 0, 0], [0, 4, 0], [0, 0, 4]],
-            species=["Na", "Cl"],
-            coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
-        ),
-        "tetragonal": Structure(  # TiO2 structure
-            lattice=[[3, 0, 0], [0, 3, 0], [0, 0, 4]],
-            species=["Ti", "O", "O"],
-            coords=[[0, 0, 0], [0.3, 0.3, 0], [0.7, 0.7, 0]],
-        ),
-        "hexagonal": Structure(  # ZnO structure
-            lattice=[[3, 0, 0], [-1.5, 2.6, 0], [0, 0, 5]],
-            species=["Zn", "O"],
-            coords=[[1 / 3, 2 / 3, 0], [2 / 3, 1 / 3, 0.5]],
-        ),
-        # Real structure from file
-        "esseneite": Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif"),
-    }
-
-    # Expected outputs (moyopy, spglib) for each structure
-    expected_outputs = {
-        "cubic": (
-            "AB_cF8_225_a_b:Cl-Na",
-            "AB_cF8_225_a_b:Cl-Na",
-        ),
-        "tetragonal": (
-            "AB2_tP6_136_2a_4c:Ti-O",
-            "AB2_tP6_136_a_2c:Ti-O",
-        ),
-        "hexagonal": (
-            "AB_hP4_194_2a_2b:Zn-O",
-            "AB_hP4_194_a_b:Zn-O",
-        ),
-        "esseneite": (
-            "ABC6D2_mC40_15_4e_4e_8f_24f:Ca-Fe-O-Si",
-            "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si",
-        ),
-    }
-
-    # Test each structure
-    for name, struct in test_structs.items():
-        moyopy_label = get_protostructure_label_from_moyopy(struct)
-        spglib_label = get_protostructure_label_from_spglib(struct)
-
-        moyopy_expected, spglib_expected = expected_outputs[name]
-
-        # Check full labels match expected output
-        assert moyopy_label == moyopy_expected, (
-            f"Moyopy output mismatch for {name}:\n"
-            f"got:      {moyopy_label}\n"
-            f"expected: {moyopy_expected}"
-        )
-        assert spglib_label == spglib_expected, (
-            f"Spglib output mismatch for {name}:\n"
-            f"got:      {spglib_label}\n"
-            f"expected: {spglib_expected}"
-        )
-
-        # Check that both functions agree on key properties
-        moyopy_parts = moyopy_label.split("_", 3)
-        spglib_parts = spglib_label.split("_", 3)
-
-        assert moyopy_parts[:3] == spglib_parts[:3], (
-            f"Core properties mismatch for {name}:\n"
-            f"moyopy: {moyopy_parts[:3]}\n"
-            f"spglib: {spglib_parts[:3]}"
-        )
-
-    # Test random structures from PROTOSTRUCTURE_SET
-    for proto in PROTOSTRUCTURE_SET:
-        struct = get_random_structure_for_protostructure(proto)
-        moyopy_label = get_protostructure_label_from_moyopy(struct)
-        spglib_label = get_protostructure_label_from_spglib(struct)
-
-        # Compare core properties (prototype, Pearson, space group)
-        moyopy_parts = moyopy_label.split("_", 3)
-        spglib_parts = spglib_label.split("_", 3)
-        assert moyopy_parts[:3] == spglib_parts[:3]
-
-        # Compare chemical system
-        assert moyopy_label.split(":")[-1] == spglib_label.split(":")[-1]
+    pytest.main(["-v", __file__])

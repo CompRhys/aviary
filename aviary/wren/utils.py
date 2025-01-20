@@ -437,11 +437,29 @@ def get_protostructure_label_from_spglib(
         raise
 
 
-def _get_protostructure_label_from_moyopy(
+def get_protostructure_label_from_moyopy(
     struct: Structure,
-    symprec: float,
     raise_errors: bool = False,
+    symprec: float = 0.1,
 ) -> str:
+    """Get AFLOW prototype label using Moyopy for symmetry detection.
+
+    Args:
+        struct (Structure): pymatgen Structure object.
+        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
+            False.
+        symprec (float): Initial symmetry precision for Moyopy. Defaults to 0.1.
+
+    Returns:
+        str: protostructure_label which is constructed as `aflow_label:chemsys` or
+            explanation of failure if symmetry detection failed and `raise_errors`
+            is False.
+    """
+    if not has_moyopy:
+        raise ImportError(
+            "moyopy is not installed, please install it with `pip install moyopy`"
+        )
+
     moyo_cell = MoyoAdapter.from_structure(struct)
     moyo_data = moyopy.MoyoDataset(moyo_cell, symprec=symprec)
 
@@ -453,7 +471,7 @@ def _get_protostructure_label_from_moyopy(
 
     # Group Wyckoff positions by orbit and element
     equivalent_wyckoff_labels = []
-    for orbit_idx, group in groupby(sorted(moyo_data.orbits)):
+    for orbit_idx, group in groupby(moyo_data.orbits):
         equivalent_wyckoff_labels.append(
             (
                 len(list(group)),  # multiplicity
@@ -483,41 +501,6 @@ def _get_protostructure_label_from_moyopy(
         return err_msg
 
     return protostructure_label
-
-
-def get_protostructure_label_from_moyopy(
-    struct: Structure,
-    raise_errors: bool = False,
-    init_symprec: float = 0.1,
-) -> str:
-    """Get AFLOW prototype label using Moyopy for symmetry detection.
-
-    Args:
-        struct (Structure): pymatgen Structure object.
-        raise_errors (bool): Whether to raise errors or annotate them. Defaults to
-            False.
-        init_symprec (float): Initial symmetry precision for Moyopy. Defaults to 0.1.
-
-    Returns:
-        str: protostructure_label which is constructed as `aflow_label:chemsys` or
-            explanation of failure if symmetry detection failed and `raise_errors`
-            is False.
-    """
-    if not has_moyopy:
-        raise ImportError(
-            "moyopy is not installed, please install it with `pip install moyopy`"
-        )
-
-    try:
-        aflow_label_with_chemsys = _get_protostructure_label_from_moyopy(
-            struct, init_symprec, raise_errors
-        )
-    except Exception as exc:
-        if not raise_errors:
-            return str(exc)
-        raise
-
-    return aflow_label_with_chemsys
 
 
 def canonicalize_element_wyckoffs(element_wyckoffs: str, spg_num: int | str) -> str:
