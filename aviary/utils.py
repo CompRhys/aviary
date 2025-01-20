@@ -322,6 +322,7 @@ def train_ensemble(
     if val_set is not None:
         data_params.update({"batch_size": 16 * data_params["batch_size"]})
         val_loader = DataLoader(val_set, **data_params)
+        print(f"Validating on {len(val_set):,} samples")
     else:
         val_loader = None
 
