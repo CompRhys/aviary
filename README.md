@@ -61,12 +61,11 @@ Consequently understanding these examples will ensure you can deploy the models 
 
 We also provide some notebooks that show more a more pythonic way to interact with the codebase, these examples make use of the TAATA dataset examined in the `wren` manuscript:
 
-|                                                                                          |                                      |                                                                                                                              |                                                                                                            |
-| ---------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **[Roost](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb)** | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb) | [![Launch Binder]](https://mybinder.org/v2/gh/CompRhys/aviary/main?labpath=examples/notebooks/Roost.ipynb) |
-| **[Wren](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)**   | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)  | [![Launch Binder]](https://mybinder.org/v2/gh/CompRhys/aviary/main?labpath=examples/notebooks/Wren.ipynb)  |
+|                                                                                          |                                      |                                                                                                                              |
+| ---------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **[Roost](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb)** | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb) |
+| **[Wren](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)**   | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)  |
 
-[Launch Binder]: https://mybinder.org/badge_logo.svg
 [Open in Google Colab]: https://colab.research.google.com/assets/colab-badge.svg
 [Launch Codespace]: https://img.shields.io/badge/Launch-Codespace-darkblue?logo=github
 [codespace url]: https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=411272553
