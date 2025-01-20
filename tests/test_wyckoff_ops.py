@@ -4,7 +4,7 @@ from itertools import permutations, product
 from shutil import which
 
 import pytest
-from pymatgen.core.structure import Composition, Structure
+from pymatgen.core.structure import Composition, Lattice, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from aviary.wren.utils import (
@@ -48,27 +48,40 @@ PROTOSTRUCTURE_SET = [
 
 TEST_STRUCTS = [
     Structure(  # NaCl structure
-        lattice=[[4, 0, 0], [0, 4, 0], [0, 0, 4]],
+        lattice=[[2, 2, 0], [0, 2, 2], [2, 0, 2]],
         species=["Na", "Cl"],
         coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
     ),
-    Structure(  # TiO2 structure
-        lattice=[[3, 0, 0], [0, 3, 0], [0, 0, 4]],
-        species=["Ti", "O", "O"],
-        coords=[[0, 0, 0], [0.3, 0.3, 0], [0.7, 0.7, 0]],
+    Structure(  # CsCl structure
+        lattice=[[4, 0, 0], [0, 4, 0], [0, 0, 4]],
+        species=["Cs", "Cl"],
+        coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
     ),
-    Structure(  # ZnO structure
-        lattice=[[3, 0, 0], [-1.5, 2.6, 0], [0, 0, 5]],
+    Structure(  # ZnO zincblende structure
+        lattice=[[2, 2, 0], [0, 2, 2], [2, 0, 2]],
         species=["Zn", "O"],
-        coords=[[1 / 3, 2 / 3, 0], [2 / 3, 1 / 3, 0.5]],
+        coords=[[0, 0, 0], [0.25, 0.25, 0.25]],
+    ),
+    Structure(  # ZnO wurtzite structure
+        lattice=Lattice.from_parameters(
+            a=3.8227, b=3.8227, c=6.2607, alpha=90, beta=90, gamma=120
+        ),
+        species=["Zn", "O", "Zn", "O"],
+        coords=[
+            [1 / 3, 2 / 3, 0],
+            [2 / 3, 1 / 3, 0.3748],
+            [2 / 3, 1 / 3, 1 / 2],
+            [1 / 3, 2 / 3, 1 / 2 + 0.3748],
+        ],
     ),
     Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif"),
 ]
 
 TEST_PROTOSTRUCTURES = [
     "AB_cF8_225_a_b:Cl-Na",
-    "AB2_tP6_136_a_2c:Ti-O",
-    "AB_hP4_194_a_b:Zn-O",
+    "AB_cP2_221_a_b:Cl-Cs",
+    "AB_cF8_216_a_c:O-Zn",
+    "AB_hP4_186_b_b:O-Zn",
     "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si",
 ]
 
