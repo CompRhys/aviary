@@ -135,6 +135,7 @@ def test_cgcnn_regression(df_matbench_phonons):
 
     mae, rmse, r2 = get_metrics(targets, y_ens, task).values()
 
+    assert len(targets) == len(test_set) == len(test_idx)
     assert r2 > 0.7
     assert mae < 150
     assert rmse < 300

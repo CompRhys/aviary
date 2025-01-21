@@ -146,5 +146,6 @@ def test_wren_clf(df_matbench_phonons_wyckoff):
 
     ens_acc, *_, ens_roc_auc = get_metrics(targets, ens_logits, task).values()
 
+    assert len(targets) == len(test_set) == len(test_idx)
     assert ens_acc > 0.85
     assert ens_roc_auc > 0.9

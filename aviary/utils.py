@@ -316,17 +316,13 @@ def train_ensemble(
             when early stopping. Defaults to None.
         verbose (bool, optional): Whether to show progress bars for each epoch.
     """
-    if isinstance(train_set, Subset):
-        train_set = train_set.dataset
-    if isinstance(val_set, Subset):
-        val_set = val_set.dataset
-
     train_loader = DataLoader(train_set, **data_params)
     print(f"Training on {len(train_set):,} samples")
 
     if val_set is not None:
         data_params.update({"batch_size": 16 * data_params["batch_size"]})
         val_loader = DataLoader(val_set, **data_params)
+        print(f"Validating on {len(val_set):,} samples")
     else:
         val_loader = None
 
@@ -354,7 +350,13 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                sample_target = Tensor(train_set.df[target].values)
+                if isinstance(train_set, Subset):
+                    sample_target = Tensor(
+                        train_set.dataset.df[target].iloc[train_set.indices].values
+                    )
+                else:
+                    sample_target = Tensor(train_set.df[target].values)
+
                 if not restart_params["resume"]:
                     normalizer.fit(sample_target)
                 print(f"Dummy MAE: {(sample_target - normalizer.mean).abs().mean():.4f}")
@@ -455,10 +457,6 @@ def results_multitask(
         "------------Evaluate model on Test Set------------\n"
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
     )
-
-    if isinstance(test_set, Subset):
-        test_set = test_set.dataset
-
     test_loader = DataLoader(test_set, **data_params)
     print(f"Testing on {len(test_set):,} samples")
 

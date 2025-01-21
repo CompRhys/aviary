@@ -346,7 +346,7 @@ class BaseModelClass(nn.Module, ABC):
                 metrics_str = " ".join(
                     f"{key} {val:<9.2f}" for key, val in avrg_metrics[target].items()
                 )
-                print(f"{action:>9}: {target} {metrics_str}")
+                print(f"{action:>9}: {target} N {len(data_loader):,} {metrics_str}")
 
         return avrg_metrics
 

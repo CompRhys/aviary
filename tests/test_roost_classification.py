@@ -138,5 +138,7 @@ def test_roost_clf(df_matbench_phonons):
 
     ens_acc, *_, ens_roc_auc = get_metrics(targets, ens_logits, task).values()
 
+    assert len(logits) == ensemble
+    assert len(targets) == len(test_set) == len(test_idx)
     assert ens_acc > 0.9
     assert ens_roc_auc > 0.9
