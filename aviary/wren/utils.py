@@ -9,7 +9,7 @@ from operator import itemgetter
 from os.path import abspath, dirname, join
 from shutil import which
 from string import ascii_uppercase, digits
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
@@ -23,15 +23,8 @@ except ImportError:
     pyxtal = None
     has_pyxtal = False
 
-try:
+if TYPE_CHECKING:
     import moyopy
-    from moyopy.interface import MoyoAdapter
-
-    has_moyopy = True
-except ImportError:
-    moyopy = None
-    has_moyopy = False
-
 
 module_dir = dirname(abspath(__file__))
 
@@ -161,6 +154,8 @@ def get_pearson_symbol_from_spg_analyzer(spg_analyzer: SpacegroupAnalyzer) -> st
 
 def get_pearson_symbol_from_moyo_dataset(moyo_data: moyopy.MoyoDataset) -> str:
     """Get the Pearson symbol for the structure from a MoyoDataset."""
+    import moyopy
+
     # Get space group number and Wyckoff positions
     spg_num = moyo_data.number
 
@@ -186,7 +181,7 @@ def get_protostructure_label(
     method: Literal["aflow", "spglib", "moyopy"],
     raise_errors: bool = False,
     **kwargs,
-) -> str:
+) -> str | None:
     """Get protostructure label for a pymatgen Structure.
 
     Args:
@@ -303,6 +298,18 @@ def _get_all_wyckoffs_substring_and_element_dict(
     equivalent_wyckoff_labels: list[tuple[int, str, str]],
     spg_num: int | str,
 ):
+    """Get Wyckoff position substring and element dict from equivalent Wyckoff labels.
+
+    Args:
+        equivalent_wyckoff_labels (list[tuple[int, str, str]]): List of tuples containing
+            (multiplicity, element symbol, Wyckoff letter).
+        spg_num (int | str): Space group number.
+
+    Returns:
+        tuple[str, dict]: Tuple containing:
+            - str: Wyckoff position substring
+            - dict: Dictionary mapping element symbols to their multiplicities
+    """
     # Pre-sort by element and wyckoff letter to ensure continuous groups in groupby
     equivalent_wyckoff_labels = sorted(
         equivalent_wyckoff_labels, key=lambda x: (x[1], x[2])
@@ -317,10 +324,11 @@ def _get_all_wyckoffs_substring_and_element_dict(
         element_dict[el] = sum(
             wyckoff_multiplicity_dict[str(spg_num)][e[2]] for e in list_group
         )
+        # group by Wyckoff letter to get Wyckoff site multiplicity from len
         element_wyckoffs.append(
             "".join(
-                f"{len(list(w))}{wyk}"
-                for wyk, w in groupby(list_group, key=lambda x: x[2])
+                f"{len(list(occurrences))}{wyk_letter}"
+                for wyk_letter, occurrences in groupby(list_group, key=lambda x: x[2])
             )
         )
     all_wyckoffs = "_".join(element_wyckoffs)
@@ -441,7 +449,7 @@ def get_protostructure_label_from_moyopy(
     struct: Structure,
     raise_errors: bool = False,
     symprec: float = 0.1,
-) -> str:
+) -> str | None:
     """Get AFLOW prototype label using Moyopy for symmetry detection.
 
     Args:
@@ -455,15 +463,17 @@ def get_protostructure_label_from_moyopy(
             explanation of failure if symmetry detection failed and `raise_errors`
             is False.
     """
-    if not has_moyopy:
-        raise ImportError(
-            "moyopy is not installed, please install it with `pip install moyopy`"
-        )
+    # Convert pymatgen Structure to Moyo Cell and get symmetry data
+    try:
+        import moyopy
+        from moyopy.interface import MoyoAdapter
+    except ImportError:
+        raise ImportError("moyopy not found, run pip install moyopy") from None
 
     moyo_cell = MoyoAdapter.from_structure(struct)
     moyo_data = moyopy.MoyoDataset(moyo_cell, symprec=symprec)
 
-    # Get space group number and Wyckoff positions
+    # Get space group number and Pearson symbol
     spg_num = moyo_data.number
     pearson_symbol = get_pearson_symbol_from_moyo_dataset(moyo_data)
     prototype_form = get_prototype_formula_from_composition(struct.composition)
@@ -471,14 +481,27 @@ def get_protostructure_label_from_moyopy(
 
     # Group Wyckoff positions by orbit and element
     equivalent_wyckoff_labels = []
-    for orbit_idx, group in groupby(moyo_data.orbits):
-        equivalent_wyckoff_labels.append(
-            (
-                len(list(group)),  # multiplicity
-                struct.species[orbit_idx],  # element
-                moyo_data.wyckoffs[orbit_idx],  # wyckoff letter
-            )
-        )
+    orbit_groups: list[list[int]] = []
+    current_orbit: list[int] = []
+
+    # Group sites by orbit
+    for idx, orbit_id in enumerate(moyo_data.orbits):
+        if not current_orbit or orbit_id == moyo_data.orbits[current_orbit[0]]:
+            current_orbit += [idx]
+        else:
+            orbit_groups += [current_orbit]
+            current_orbit = [idx]
+    if current_orbit:
+        orbit_groups += [current_orbit]
+
+    # Create equivalent_wyckoff_labels from orbit groups
+    for orbit in orbit_groups:
+        # All sites in an orbit have the same Wyckoff letter and element
+        wyckoff = moyo_data.wyckoffs[orbit[0]]
+        element = struct.species[orbit[0]]
+        equivalent_wyckoff_labels += [
+            (len(orbit), element.symbol, wyckoff.translate(remove_digits))
+        ]
 
     all_wyckoffs, element_dict = _get_all_wyckoffs_substring_and_element_dict(
         equivalent_wyckoff_labels, spg_num
