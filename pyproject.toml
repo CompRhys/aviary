@@ -49,9 +49,9 @@ dependencies = [
 Repo = "https://github.com/CompRhys/aviary"
 
 [project.optional-dependencies]
-test = ["matminer", "moyopy", "pytest", "pytest-cov", "pyxtal"]
+test = ["matminer", "moyopy>=0.3.1", "pytest", "pytest-cov", "pyxtal"]
 pyxtal = ["pyxtal"]
-moyopy = ["moyopy"]
+moyopy = ["moyopy>=0.3.1"]
 
 [tool.setuptools.packages]
 find = { include = ["aviary*"], exclude = ["tests*"] }
@@ -107,16 +107,16 @@ select = [
   "YTT",  # flake8-2020
 ]
 ignore = [
-  "C408",  # Unnecessary dict call - rewrite as a literal
-  "D100",  # Missing docstring in public module
-  "D104",  # Missing docstring in public package
-  "D105",  # Missing docstring in magic method
-  "D205",  # 1 blank line required between summary line and description
-  "E731",  # Do not assign a lambda expression, use a def
+  "C408",   # Unnecessary dict call - rewrite as a literal
+  "D100",   # Missing docstring in public module
+  "D104",   # Missing docstring in public package
+  "D105",   # Missing docstring in magic method
+  "D205",   # 1 blank line required between summary line and description
+  "E731",   # Do not assign a lambda expression, use a def
   "ISC001",
-  "PD901", # pandas-df-variable-name
-  "PLR",   # pylint refactor
-  "PT006", # pytest-parametrize-names-wrong-type
+  "PD901",  # pandas-df-variable-name
+  "PLR",    # pylint refactor
+  "PT006",  # pytest-parametrize-names-wrong-type
 ]
 pydocstyle.convention = "google"
 isort.known-third-party = ["wandb"]
