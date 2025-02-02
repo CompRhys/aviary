@@ -74,6 +74,25 @@ TEST_STRUCTS = [
             [1 / 3, 2 / 3, 1 / 2 + 0.3748],
         ],
     ),
+    Structure(
+        lattice=[[3.9, 0, 0], [0, 3.9, 0], [0, 0, 3.9]],
+        species=["Sr", "Ti", "O", "O", "O"],
+        coords=[[0, 0, 0], [0.5, 0.5, 0.5], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]],
+    ),
+    Structure(
+        lattice=[[5.76, 0, 0], [0, 5.76, 0], [0, 0, 5.76]],
+        species=["Al", "Fe", "Fe", "Fe", "Al", "Fe", "Fe", "Fe"],
+        coords=[
+            [0, 0, 0],
+            [0.25, 0.25, 0.25],
+            [0.5, 0.5, 0],
+            [0.75, 0.75, 0.25],
+            [0, 0.5, 0.5],
+            [0.25, 0.75, 0.75],
+            [0.5, 0, 0.5],
+            [0.75, 0.25, 0.75],
+        ],
+    ),
     Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif"),
 ]
 
@@ -82,6 +101,8 @@ TEST_PROTOSTRUCTURES = [
     "AB_cP2_221_a_b:Cl-Cs",
     "AB_cF8_216_a_c:O-Zn",
     "AB_hP4_186_b_b:O-Zn",
+    "A3BC_cP5_221_c_a_b:O-Sr-Ti",
+    "AB3_tP4_115_a_cg:Al-Fe",
     "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si",
 ]
 

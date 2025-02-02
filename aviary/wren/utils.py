@@ -9,7 +9,7 @@ from operator import itemgetter
 from os.path import abspath, dirname, join
 from shutil import which
 from string import ascii_uppercase, digits
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from monty.fractions import gcd
 from pymatgen.core import Composition, Structure
@@ -23,8 +23,15 @@ except ImportError:
     pyxtal = None
     has_pyxtal = False
 
-if TYPE_CHECKING:
+try:
     import moyopy
+    from moyopy.interface import MoyoAdapter
+
+    has_moyopy = True
+except ImportError:
+    moyopy = None
+    MoyoAdapter = None
+    has_moyopy = False
 
 module_dir = dirname(abspath(__file__))
 
@@ -154,7 +161,8 @@ def get_pearson_symbol_from_spg_analyzer(spg_analyzer: SpacegroupAnalyzer) -> st
 
 def get_pearson_symbol_from_moyo_dataset(moyo_data: moyopy.MoyoDataset) -> str:
     """Get the Pearson symbol for the structure from a MoyoDataset."""
-    import moyopy
+    if not has_moyopy:
+        raise ImportError("moyopy not found, run pip install moyopy")
 
     # Get space group number and Wyckoff positions
     spg_num = moyo_data.number
@@ -463,13 +471,10 @@ def get_protostructure_label_from_moyopy(
             explanation of failure if symmetry detection failed and `raise_errors`
             is False.
     """
-    # Convert pymatgen Structure to Moyo Cell and get symmetry data
-    try:
-        import moyopy
-        from moyopy.interface import MoyoAdapter
-    except ImportError:
-        raise ImportError("moyopy not found, run pip install moyopy") from None
+    if not has_moyopy:
+        raise ImportError("moyopy not found, run pip install moyopy")
 
+    # Convert pymatgen Structure to Moyo Cell and get symmetry data
     moyo_cell = MoyoAdapter.from_structure(struct)
     moyo_data = moyopy.MoyoDataset(moyo_cell, symprec=symprec)
 
@@ -481,21 +486,16 @@ def get_protostructure_label_from_moyopy(
 
     # Group Wyckoff positions by orbit and element
     equivalent_wyckoff_labels = []
-    orbit_groups: list[list[int]] = []
-    current_orbit: list[int] = []
+    orbit_groups: dict[int, list[int]] = {}
 
     # Group sites by orbit
     for idx, orbit_id in enumerate(moyo_data.orbits):
-        if not current_orbit or orbit_id == moyo_data.orbits[current_orbit[0]]:
-            current_orbit += [idx]
-        else:
-            orbit_groups += [current_orbit]
-            current_orbit = [idx]
-    if current_orbit:
-        orbit_groups += [current_orbit]
+        if orbit_id not in orbit_groups:
+            orbit_groups[orbit_id] = []
+        orbit_groups[orbit_id].append(idx)
 
     # Create equivalent_wyckoff_labels from orbit groups
-    for orbit in orbit_groups:
+    for orbit in orbit_groups.values():
         # All sites in an orbit have the same Wyckoff letter and element
         wyckoff = moyo_data.wyckoffs[orbit[0]]
         element = struct.species[orbit[0]]
