@@ -110,40 +110,6 @@ def count_values_for_wyckoff(
     )
 
 
-def get_crystal_system(n: int) -> str:
-    """Get the crystal system for the structure, e.g. (triclinic, orthorhombic,
-    cubic, etc.).
-
-    Mirrors method of SpacegroupAnalyzer.get_crystal_system().
-
-    Args:
-        n (int): Space group number
-
-    Raises:
-        ValueError: on invalid space group numbers < 1 or > 230.
-
-    Returns:
-        str: Crystal system for structure
-    """
-    # Not using isinstance(n, int) to allow 0-decimal floats
-    if n != int(n) or not 0 < n < 231:
-        raise ValueError(f"Received invalid space group {n}")
-
-    if 0 < n < 3:
-        return "triclinic"
-    if n < 16:
-        return "monoclinic"
-    if n < 75:
-        return "orthorhombic"
-    if n < 143:
-        return "tetragonal"
-    if n < 168:
-        return "trigonal"
-    if n < 195:
-        return "hexagonal"
-    return "cubic"
-
-
 def get_centering(spg_sym: str) -> str:
     """Get the centering for the structure, e.g. (A, B, C, S)."""
     return "C" if spg_sym[0] in ("A", "B", "C", "S") else spg_sym[0]
@@ -173,7 +139,7 @@ def get_pearson_symbol_from_moyo_dataset(moyo_data: moyopy.MoyoDataset) -> str:
     centering = hall_entry.centering
 
     # Get crystal system from space group number instead of symbol
-    cry_sys = get_crystal_system(spg_num)
+    cry_sys = moyopy.SpaceGroupType(spg_num).crystal_system.lower()
 
     # Get centering from first letter of space group symbol
     # Handle special case for C-centered
