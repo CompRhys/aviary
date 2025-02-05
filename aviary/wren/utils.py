@@ -50,7 +50,7 @@ relab_dict = {
     for spg_num, vals in relab_dict.items()
 }
 
-cry_sys_dict = {
+CRYSTAL_FAMILY_SYMBOLS = {
     "triclinic": "a",
     "monoclinic": "m",
     "orthorhombic": "o",
@@ -60,7 +60,7 @@ cry_sys_dict = {
     "cubic": "c",
 }
 
-cry_param_dict = {
+CRYSTAL_LATTICE_PARAMETERS_COUNTS = {
     "a": 6,
     "m": 4,
     "o": 3,
@@ -122,32 +122,7 @@ def get_pearson_symbol_from_spg_analyzer(spg_analyzer: SpacegroupAnalyzer) -> st
     centering = get_centering(spg_sym)
 
     num_sites_conventional = len(spg_analyzer.get_symmetry_dataset()["std_types"])
-    return f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
-
-
-def get_pearson_symbol_from_moyo_dataset(moyo_data: moyopy.MoyoDataset) -> str:
-    """Get the Pearson symbol for the structure from a MoyoDataset."""
-    if not has_moyopy:
-        raise ImportError("moyopy not found, run pip install moyopy")
-
-    # Get space group number and Wyckoff positions
-    spg_num = moyo_data.number
-
-    # Get crystal system and centering from Hall symbol entry
-    hall_entry = moyopy.HallSymbolEntry(hall_number=moyo_data.hall_number)
-    spg_sym = hall_entry.hm_short
-    centering = hall_entry.centering
-
-    # Get crystal system from space group number instead of symbol
-    cry_sys = moyopy.SpaceGroupType(spg_num).crystal_system.lower()
-
-    # Get centering from first letter of space group symbol
-    # Handle special case for C-centered
-    centering = get_centering(spg_sym)
-
-    # Get number of sites in conventional cell
-    num_sites_conventional = len(moyo_data.std_cell.numbers)
-    return f"{cry_sys_dict[cry_sys]}{centering}{num_sites_conventional}"
+    return f"{CRYSTAL_FAMILY_SYMBOLS[cry_sys]}{centering}{num_sites_conventional}"
 
 
 def get_protostructure_label(
@@ -330,7 +305,7 @@ def get_protostructure_label_from_spg_analyzer(
     sym_struct = spg_analyzer.get_symmetrized_structure()
 
     spg_num = spg_analyzer.get_space_group_number()
-    pearson_symbol = get_pearson_symbol_from_spg_analyzer(spg_analyzer)
+    pearson_symbol = spg_analyzer.get_pearson_symbol()
     prototype_form = get_prototype_formula_from_composition(sym_struct.composition)
     chemsys = sym_struct.chemical_system
 
@@ -446,7 +421,7 @@ def get_protostructure_label_from_moyopy(
 
     # Get space group number and Pearson symbol
     spg_num = moyo_data.number
-    pearson_symbol = get_pearson_symbol_from_moyo_dataset(moyo_data)
+    pearson_symbol = moyo_data.pearson_symbol
     prototype_form = get_prototype_formula_from_composition(struct.composition)
     chemsys = struct.chemical_system
 
@@ -666,7 +641,7 @@ def count_crystal_dof(protostructure_label: str) -> int:
 
     return (
         _count_from_dict(element_wyckoffs, param_dict, spg_num)
-        + cry_param_dict[pearson_symbol[0]]
+        + CRYSTAL_LATTICE_PARAMETERS_COUNTS[pearson_symbol[0]]
     )
 
 
