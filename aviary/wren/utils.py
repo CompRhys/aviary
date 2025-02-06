@@ -121,7 +121,7 @@ def get_pearson_symbol_from_spg_analyzer(spg_analyzer: SpacegroupAnalyzer) -> st
     spg_sym = spg_analyzer.get_space_group_symbol()
     centering = get_centering(spg_sym)
 
-    num_sites_conventional = len(spg_analyzer.get_symmetry_dataset()["std_types"])
+    num_sites_conventional = len(spg_analyzer.get_symmetry_dataset().std_types)
     return f"{CRYSTAL_FAMILY_SYMBOLS[cry_sys]}{centering}{num_sites_conventional}"
 
 
