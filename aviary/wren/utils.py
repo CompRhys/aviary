@@ -305,7 +305,7 @@ def get_protostructure_label_from_spg_analyzer(
     sym_struct = spg_analyzer.get_symmetrized_structure()
 
     spg_num = spg_analyzer.get_space_group_number()
-    pearson_symbol = spg_analyzer.get_pearson_symbol()
+    pearson_symbol = get_pearson_symbol_from_spg_analyzer(spg_analyzer)
     prototype_form = get_prototype_formula_from_composition(sym_struct.composition)
     chemsys = sym_struct.chemical_system
 
