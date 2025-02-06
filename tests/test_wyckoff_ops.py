@@ -1,10 +1,10 @@
 import inspect
 import re
-from itertools import permutations
+from itertools import permutations, product
 from shutil import which
 
 import pytest
-from pymatgen.core.structure import Composition, Structure
+from pymatgen.core.structure import Composition, Lattice, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from aviary.wren.utils import (
@@ -15,7 +15,9 @@ from aviary.wren.utils import (
     count_wyckoff_positions,
     get_anonymous_formula_from_prototype_formula,
     get_formula_from_protostructure_label,
+    get_protostructure_label,
     get_protostructure_label_from_aflow,
+    get_protostructure_label_from_moyopy,
     get_protostructure_label_from_spg_analyzer,
     get_protostructure_label_from_spglib,
     get_protostructures_from_aflow_label_and_composition,
@@ -44,14 +46,71 @@ PROTOSTRUCTURE_SET = [
     ("AB3C_cP5_221_a_c_b:Ba-O-Ti"),
 ]
 
+TEST_STRUCTS = [
+    Structure(  # NaCl structure
+        lattice=[[2, 2, 0], [0, 2, 2], [2, 0, 2]],
+        species=["Na", "Cl"],
+        coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
+    ),
+    Structure(  # CsCl structure
+        lattice=[[4, 0, 0], [0, 4, 0], [0, 0, 4]],
+        species=["Cs", "Cl"],
+        coords=[[0, 0, 0], [0.5, 0.5, 0.5]],
+    ),
+    Structure(  # ZnO zincblende structure
+        lattice=[[2, 2, 0], [0, 2, 2], [2, 0, 2]],
+        species=["Zn", "O"],
+        coords=[[0, 0, 0], [0.25, 0.25, 0.25]],
+    ),
+    Structure(  # ZnO wurtzite structure
+        lattice=Lattice.from_parameters(
+            a=3.8227, b=3.8227, c=6.2607, alpha=90, beta=90, gamma=120
+        ),
+        species=["Zn", "O", "Zn", "O"],
+        coords=[
+            [1 / 3, 2 / 3, 0],
+            [2 / 3, 1 / 3, 0.3748],
+            [2 / 3, 1 / 3, 1 / 2],
+            [1 / 3, 2 / 3, 1 / 2 + 0.3748],
+        ],
+    ),
+    Structure(
+        lattice=[[3.9, 0, 0], [0, 3.9, 0], [0, 0, 3.9]],
+        species=["Sr", "Ti", "O", "O", "O"],
+        coords=[[0, 0, 0], [0.5, 0.5, 0.5], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]],
+    ),
+    Structure(
+        lattice=[[5.76, 0, 0], [0, 5.76, 0], [0, 0, 5.76]],
+        species=["Al", "Fe", "Fe", "Fe", "Al", "Fe", "Fe", "Fe"],
+        coords=[
+            [0, 0, 0],
+            [0.25, 0.25, 0.25],
+            [0.5, 0.5, 0],
+            [0.75, 0.75, 0.25],
+            [0, 0.5, 0.5],
+            [0.25, 0.75, 0.75],
+            [0.5, 0, 0.5],
+            [0.75, 0.25, 0.75],
+        ],
+    ),
+    Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif"),
+]
 
-def test_get_protostructure_label_from_spglib():
-    """Check that spglib gives correct protostructure label for esseneite"""
-    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
-    assert (
-        get_protostructure_label_from_spglib(struct)
-        == "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
-    )
+TEST_PROTOSTRUCTURES = [
+    "AB_cF8_225_a_b:Cl-Na",
+    "AB_cP2_221_a_b:Cl-Cs",
+    "AB_cF8_216_a_c:O-Zn",
+    "AB_hP4_186_b_b:O-Zn",
+    "A3BC_cP5_221_c_a_b:O-Sr-Ti",
+    "AB3_tP4_115_a_cg:Al-Fe",
+    "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si",
+]
+
+
+@pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
+def test_get_protostructure_label_from_spglib(structure, expected):
+    """Check that spglib gives correct protostructure label simple cases."""
+    assert get_protostructure_label_from_spglib(structure) == expected
 
 
 def test_get_protostructure_label_from_spglib_edge_case():
@@ -278,13 +337,37 @@ def test_count_distinct_wyckoff_letters(protostructure_label, expected):
 
 
 @pytest.mark.skipif(which("aflow") is None, reason="AFLOW CLI not installed")
-def test_get_protostructure_label_from_aflow():
-    """Check we extract correct protostructure label for esseneite using AFLOW CLI."""
-    struct = Structure.from_file(f"{TEST_DIR}/data/ABC6D2_mC40_15_e_e_3f_f.cif")
+@pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
+def test_get_protostructure_label_from_aflow(structure, expected):
+    """Check that AFLOW CLI gives correct protostructure label simple cases."""
+    assert (
+        get_protostructure_label_from_aflow(structure, aflow_executable=which("aflow"))
+        == expected
+    )
 
-    out = get_protostructure_label_from_aflow(struct, which("aflow"))
-    expected = "ABC6D2_mC40_15_e_e_3f_f:Ca-Fe-O-Si"
-    assert out == expected
+
+@pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
+def test_get_protostructure_label_from_moyopy(structure, expected):
+    """Check that moyopy gives correct protostructure label simple cases."""
+    assert (
+        get_protostructure_label_from_moyopy(structure) == expected
+    ), f"unexpected moyopy protostructure for {structure=}"
+
+
+@pytest.mark.parametrize(
+    "protostructure",
+    PROTOSTRUCTURE_SET,
+)
+def test_moyopy_spglib_consistency(protostructure):
+    """Check that moyopy and spglib give consistent results."""
+    struct = get_random_structure_for_protostructure(protostructure)
+
+    moyopy_label = get_protostructure_label_from_moyopy(struct)
+    spglib_label = get_protostructure_label_from_spglib(struct)
+
+    assert (
+        moyopy_label == spglib_label
+    ), f"spglib moyopy protostructure mismatch for {protostructure}"
 
 
 @pytest.mark.skipif(pyxtal is None, reason="pyxtal not installed")
@@ -292,13 +375,16 @@ def test_get_protostructure_label_from_aflow():
     reason="pyxtal is non-deterministic and symmetry can increase in random crystal"
 )
 @pytest.mark.parametrize(
-    "protostructure",
-    PROTOSTRUCTURE_SET,
+    "protostructure, method",
+    list(product(PROTOSTRUCTURE_SET, ["spglib", "moyopy"])),
 )
-def test_get_random_structure_for_protostructure_roundtrip(protostructure):
+def test_get_random_structure_for_protostructure_roundtrip(
+    protostructure: str, method: str
+):
     """Check roundtrip for generating a random structure from a prototype string"""
-    assert protostructure == get_protostructure_label_from_spglib(
-        get_random_structure_for_protostructure(protostructure)
+    assert protostructure == get_protostructure_label(
+        get_random_structure_for_protostructure(protostructure),
+        method=method,
     )
 
 
@@ -314,3 +400,9 @@ def test_get_random_structure_for_protostructure_random(protostructure):
 
     assert s1.composition == s2.composition
     assert s1.lattice != s2.lattice
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main(["-v", __file__])
