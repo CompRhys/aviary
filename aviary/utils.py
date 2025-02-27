@@ -536,7 +536,7 @@ def results_multitask(
     # TODO cleaner way to get identifier names
     if save_results:
         save_results_dict(
-            dict(zip(test_loader.dataset.identifiers, *ids)),
+            dict(zip(test_loader.dataset.dataset.identifiers, *ids)),
             results_dict,
             model_name,
             f"-r{run_id}",
