@@ -66,7 +66,7 @@ def initialize_model(
 
     if fine_tune is not None:
         print(f"Use material_nn and output_nn from {fine_tune=} as a starting point")
-        checkpoint = torch.load(fine_tune, map_location=device)
+        checkpoint = torch.load(fine_tune, map_location=device, weights_only=False)
 
         # update the task disk to fine tuning task
         checkpoint["model_params"]["task_dict"] = model_params["task_dict"]
@@ -93,7 +93,7 @@ def initialize_model(
             f"Use material_nn from {transfer=} as a starting point and "
             "train the output_nn from scratch"
         )
-        checkpoint = torch.load(transfer, map_location=device)
+        checkpoint = torch.load(transfer, map_location=device, weights_only=False)
 
         model = model_class(**model_params)
         model.to(device)
@@ -107,7 +107,7 @@ def initialize_model(
 
     elif resume:
         print(f"Resuming training from {resume=}")
-        checkpoint = torch.load(resume, map_location=device)
+        checkpoint = torch.load(resume, map_location=device, weights_only=False)
 
         model = model_class(**checkpoint["model_params"])
         model.to(device)
@@ -186,7 +186,7 @@ def initialize_optim(
         # TODO work out how to ensure that we are using the same optimizer
         # when resuming such that the state dictionaries do not clash.
         # TODO breaking the function apart means we load the checkpoint twice.
-        checkpoint = torch.load(resume, map_location=device)
+        checkpoint = torch.load(resume, map_location=device, weights_only=False)
         optimizer.load_state_dict(checkpoint["optimizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
 
@@ -261,7 +261,7 @@ def init_normalizers(
     """
     normalizer_dict: dict[str, Normalizer | None] = {}
     if resume:
-        checkpoint = torch.load(resume, map_location=device)
+        checkpoint = torch.load(resume, map_location=device, weights_only=False)
         for task, state_dict in checkpoint["normalizer_dict"].items():
             normalizer_dict[task] = Normalizer.from_state_dict(state_dict)
 
@@ -476,7 +476,7 @@ def results_multitask(
             resume = f"{ROOT}/models/{model_name}/{eval_type}-r{ens_idx}.pth.tar"
             print(f"Evaluating Model {ens_idx + 1}/{ensemble_folds}")
 
-        checkpoint = torch.load(resume, map_location=device)
+        checkpoint = torch.load(resume, map_location=device, weights_only=False)
 
         if checkpoint["model_params"]["robust"] != robust:
             raise ValueError(f"robustness of checkpoint {resume=} is not {robust}")
@@ -819,7 +819,7 @@ def update_module_path_in_pickled_object(
     sys.modules[old_module_path] = new_module
 
     try:
-        dic = torch.load(pickle_path, map_location="cpu")
+        dic = torch.load(pickle_path, map_location="cpu", weights_only=False)
     except Exception as exc:
         raise PickleError(pickle_path) from exc
 
