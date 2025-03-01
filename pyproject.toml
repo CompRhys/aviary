@@ -49,7 +49,7 @@ dependencies = [
 Repo = "https://github.com/CompRhys/aviary"
 
 [project.optional-dependencies]
-test = ["matminer", "moyopy>=0.3.1", "pytest", "pytest-cov", "pyxtal"]
+test = ["matminer", "moyopy>=0.3.3", "pytest", "pytest-cov", "pyxtal"]
 pyxtal = ["pyxtal"]
 moyopy = ["moyopy>=0.3.3"]
 
