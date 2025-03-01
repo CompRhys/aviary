@@ -74,7 +74,9 @@ def make_ensemble_predictions(
         enumerate(tqdm(checkpoint_paths), start=1), disable=None if pbar else True
     ):
         try:
-            checkpoint = torch.load(checkpoint_path, map_location=device)
+            checkpoint = torch.load(
+                checkpoint_path, map_location=device, weights_only=False
+            )
         except Exception as exc:
             raise RuntimeError(f"Failed to load {checkpoint_path=}") from exc
 
