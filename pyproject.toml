@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aviary"
-version = "1.1.1"
+version = "1.2.0"
 description = "A collection of machine learning models for materials discovery"
 authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
 readme = "README.md"
@@ -37,7 +37,7 @@ requires-python = ">=3.9"
 dependencies = [
   "numpy>=2,<3",
   "pandas",
-  "pymatgen",
+  "pymatgen>2025.3.10",
   "scikit_learn",
   "tensorboard",
   "torch>=2.3.0",
@@ -49,8 +49,7 @@ dependencies = [
 Repo = "https://github.com/CompRhys/aviary"
 
 [project.optional-dependencies]
-test = ["matminer", "moyopy>=0.3.3", "pytest", "pytest-cov", "pyxtal"]
-pyxtal = ["pyxtal"]
+test = ["matminer", "moyopy>=0.3.3", "pytest", "pytest-cov"]
 moyopy = ["moyopy>=0.3.3"]
 
 [tool.setuptools.packages]
