@@ -13,7 +13,7 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from tqdm import tqdm
 
 from aviary import ROOT
-from examples.wrenformer.mat_bench import DATA_PATHS
+from examples.wrenformer.matbench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-05-17"
