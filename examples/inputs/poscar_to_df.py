@@ -5,13 +5,12 @@ import glob
 import os
 
 import pandas as pd
-from pymatgen.core import Composition, Structure
-from tqdm import tqdm
-
-from aviary.wren.utils import (
+from pymatgen.analysis.prototypes import (
     count_wyckoff_positions,
     get_protostructure_label_from_spglib,
 )
+from pymatgen.core import Composition, Structure
+from tqdm import tqdm
 
 tqdm.pandas()  # prime progress_map functionality
 

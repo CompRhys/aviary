@@ -11,19 +11,19 @@ from glob import glob
 import pandas as pd
 import plotly.express as px
 import pymatviz as pmv
-from matbench import MatbenchBenchmark
-from matbench.constants import CLF_KEY, REG_KEY
-from matbench.metadata import mbv01_metadata as matbench_metadata
 from sklearn.metrics import r2_score, roc_auc_score
 
-from examples.wrenformer.mat_bench import DATA_PATHS
-from examples.wrenformer.mat_bench.plotting_functions import (
+from examples.wrenformer.matbench import DATA_PATHS
+from examples.wrenformer.matbench.plotting_functions import (
     dataset_labels_html,
     error_heatmap,
     plot_leaderboard,
     scale_errors,
 )
-from examples.wrenformer.mat_bench.utils import recursive_dict_merge
+from examples.wrenformer.matbench.utils import recursive_dict_merge
+from matbench import MatbenchBenchmark
+from matbench.constants import CLF_KEY, REG_KEY
+from matbench.metadata import mbv01_metadata as matbench_metadata
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-25"

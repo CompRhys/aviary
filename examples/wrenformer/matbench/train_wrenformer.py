@@ -5,14 +5,14 @@ from itertools import product
 
 import pandas as pd
 import wandb
-from matbench.metadata import mbv01_metadata
-from matbench.task import MatbenchTask
 from matbench_discovery.slurm import slurm_submit
 
 from aviary.core import TaskType
 from aviary.train import train_wrenformer
-from examples.wrenformer.mat_bench import DATA_PATHS
-from examples.wrenformer.mat_bench.utils import merge_json_on_disk
+from examples.wrenformer.matbench import DATA_PATHS
+from examples.wrenformer.matbench.utils import merge_json_on_disk
+from matbench.metadata import mbv01_metadata
+from matbench.task import MatbenchTask
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"

@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import plotly.express as px
 import plotly.io as pio
+from sklearn.metrics import accuracy_score, auc, roc_curve
+
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
 from matbench.metadata import mbv01_metadata as matbench_metadata
-from sklearn.metrics import accuracy_score, auc, roc_curve
 
 if TYPE_CHECKING:
     import pandas as pd

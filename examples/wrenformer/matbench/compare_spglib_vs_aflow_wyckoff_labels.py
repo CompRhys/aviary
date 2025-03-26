@@ -4,13 +4,16 @@ import os
 import pandas as pd
 import pymatviz as pmv
 from matminer.datasets import load_dataset
+from pymatgen.analysis.prototypes import (
+    get_protostructure_label_from_aflow,
+    get_protostructure_label_from_spglib,
+)
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from tqdm import tqdm
 
-import aviary.wren.utils as wren_utils
 from aviary import ROOT
-from examples.wrenformer.mat_bench import DATA_PATHS
+from examples.wrenformer.matbench import DATA_PATHS
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-05-17"
@@ -36,17 +39,15 @@ df_perov["structure"] = df_perov.structure.map(Structure.from_dict)
 # takes ~6h (when running uninterrupted)
 for idx, struct in tqdm(df_perov.structure.items(), total=len(df_perov)):
     if pd.isna(df_perov.aflow_wyckoff[idx]):
-        df_perov.loc[idx, "aflow_wyckoff"] = (
-            wren_utils.get_protostructure_label_from_aflow(
-                struct, "/Users/janosh/bin/aflow"
-            )
+        df_perov.loc[idx, "aflow_wyckoff"] = get_protostructure_label_from_aflow(
+            struct, "/Users/janosh/bin/aflow"
         )
 
 
 # %%
 # takes ~30 sec
 for struct in tqdm(df_perov.structure, total=len(df_perov)):
-    wren_utils.get_protostructure_label_from_spglib(struct)
+    get_protostructure_label_from_spglib(struct)
 
 
 # %%
