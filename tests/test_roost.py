@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from sklearn.model_selection import train_test_split as split
+from torch.utils.data import DataLoader
 
 from aviary.roost.data import CompositionData, collate_batch
 from aviary.roost.model import Roost
@@ -114,34 +115,38 @@ def test_roost_regression(
         **model_architecture,  # unpack all model architecture parameters
     }
 
+    train_loader = DataLoader(train_set, **data_params)
+    val_loader = DataLoader(
+        val_set,
+        **{**data_params, "batch_size": 16 * data_params["batch_size"], "shuffle": False},
+    )
+
     train_ensemble(
         model_class=Roost,
         model_name=model_name,
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
         epochs=epochs,
-        train_set=train_set,
-        val_set=val_set,
+        train_loader=train_loader,
+        val_loader=val_loader,
         log=base_config["log"],
-        data_params=data_params,
         setup_params=setup_params,
         restart_params=restart_params,
         model_params=model_params,
         loss_dict=loss_dict,
     )
 
-    data_params["batch_size"] = (
-        64 * training_config["batch_size"]
-    )  # faster model inference
-    data_params["shuffle"] = False  # need fixed data order due to ensembling
+    test_loader = DataLoader(
+        test_set,
+        **{**data_params, "batch_size": 64 * data_params["batch_size"], "shuffle": False},
+    )
 
     results_dict = results_multitask(
         model_class=Roost,
         model_name=model_name,
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
-        test_set=test_set,
-        data_params=data_params,
+        test_loader=test_loader,
         robust=base_config["robust"],
         task_dict=task_dict,
         device=training_config["device"],
@@ -220,34 +225,39 @@ def test_roost_clf(df_matbench_phonons, base_config, model_architecture, trainin
         **model_architecture,  # unpack all model architecture parameters
     }
 
+    train_loader = DataLoader(train_set, **data_params)
+
+    val_loader = DataLoader(
+        val_set,
+        **{**data_params, "batch_size": 16 * data_params["batch_size"], "shuffle": False},
+    )
+
     train_ensemble(
         model_class=Roost,
         model_name=model_name,
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
         epochs=epochs,
-        train_set=train_set,
-        val_set=val_set,
+        train_loader=train_loader,
+        val_loader=val_loader,
         log=base_config["log"],
-        data_params=data_params,
         setup_params=setup_params,
         restart_params=restart_params,
         model_params=model_params,
         loss_dict=loss_dict,
     )
 
-    data_params["batch_size"] = (
-        64 * training_config["batch_size"]
-    )  # faster model inference
-    data_params["shuffle"] = False  # need fixed data order due to ensembling
+    test_loader = DataLoader(
+        test_set,
+        **{**data_params, "batch_size": 64 * data_params["batch_size"], "shuffle": False},
+    )
 
     results_dict = results_multitask(
         model_class=Roost,
         model_name=model_name,
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
-        test_set=test_set,
-        data_params=data_params,
+        test_loader=test_loader,
         robust=base_config["robust"],
         task_dict=task_dict,
         device=training_config["device"],

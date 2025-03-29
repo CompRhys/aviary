@@ -3,6 +3,7 @@ import argparse
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split as split
+from torch.utils.data import DataLoader
 
 from aviary import ROOT
 from aviary.utils import results_multitask, train_ensemble
@@ -199,6 +200,20 @@ def main(
     }
 
     if train:
+        train_loader = DataLoader(train_set, **data_params)
+
+        if val_set is not None:
+            val_loader = DataLoader(
+                val_set,
+                **{
+                    **data_params,
+                    "batch_size": 16 * data_params["batch_size"],
+                    "shuffle": False,
+                },
+            )
+        else:
+            val_loader = None
+
         train_ensemble(
             model_class=Wren,
             model_name=model_name,
@@ -206,10 +221,9 @@ def main(
             ensemble_folds=ensemble,
             epochs=epochs,
             patience=patience,
-            train_set=train_set,
-            val_set=val_set,
+            train_loader=train_loader,
+            val_loader=val_loader,
             log=log,
-            data_params=data_params,
             setup_params=setup_params,
             restart_params=restart_params,
             model_params=model_params,
@@ -217,19 +231,21 @@ def main(
         )
 
     if evaluate:
-        data_reset = {
-            "batch_size": 16 * batch_size,  # faster model inference
-            "shuffle": False,  # need fixed data order due to ensembling
-        }
-        data_params.update(data_reset)
+        test_loader = DataLoader(
+            test_set,
+            **{
+                **data_params,
+                "batch_size": 64 * data_params["batch_size"],
+                "shuffle": False,
+            },
+        )
 
         results_multitask(
             model_class=Wren,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
-            test_set=test_set,
-            data_params=data_params,
+            test_loader=test_loader,
             robust=robust,
             task_dict=task_dict,
             device=device,

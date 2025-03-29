@@ -25,7 +25,7 @@ from torch import LongTensor, Tensor
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.optim import SGD, Adam, AdamW, Optimizer
 from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
 from aviary import ROOT
@@ -280,10 +280,9 @@ def train_ensemble(
     run_id: int,
     ensemble_folds: int,
     epochs: int,
-    train_set: Dataset | Subset,
-    val_set: Dataset | Subset,
+    train_loader: DataLoader,
+    val_loader: DataLoader | None,
     log: Literal["tensorboard", "wandb"],
-    data_params: dict[str, Any],
     setup_params: dict[str, Any],
     restart_params: dict[str, Any],
     model_params: dict[str, Any],
@@ -300,10 +299,9 @@ def train_ensemble(
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
         epochs (int): Number of epochs to train for.
-        train_set (Subset): Dataloader containing training data.
-        val_set (Subset): Dataloader containing validation data.
+        train_loader (DataLoader): Dataloader containing training data.
+        val_loader (DataLoader | None): Dataloader containing validation data.
         log (bool): Whether to log intermediate metrics to TensorBoard.
-        data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
         model_params (dict[str, Any]): Dictionary of model parameters
@@ -313,16 +311,6 @@ def train_ensemble(
             when early stopping. Defaults to None.
         verbose (bool, optional): Whether to show progress bars for each epoch.
     """
-    train_loader = DataLoader(train_set, **data_params)
-    print(f"Training on {len(train_set):,} samples")
-
-    if val_set is not None:
-        data_params.update({"batch_size": 16 * data_params["batch_size"]})
-        val_loader = DataLoader(val_set, **data_params)
-        print(f"Validating on {len(val_set):,} samples")
-    else:
-        val_loader = None
-
     #  this allows us to run ensembles in parallel rather than in series
     #  by specifying the run-id arg.
     for r_id in [run_id] if ensemble_folds == 1 else range(ensemble_folds):
@@ -347,12 +335,13 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                if isinstance(train_set, Subset):
+                data = train_loader.dataset
+                if isinstance(train_loader.dataset, Subset):
                     sample_target = Tensor(
-                        train_set.dataset.df[target].iloc[train_set.indices].values
+                        data.dataset.df[target].iloc[data.indices].values
                     )
                 else:
-                    sample_target = Tensor(train_set.df[target].values)
+                    sample_target = Tensor(data.df[target].values)
 
                 if not restart_params["resume"]:
                     normalizer.fit(sample_target)
@@ -370,7 +359,6 @@ def train_ensemble(
                 name=f"{model_name}-r{r_id}",
                 config={
                     "model_params": model_params,
-                    "data_params": data_params,
                     "setup_params": setup_params,
                     "restart_params": restart_params,
                     "loss_dict": loss_dict,
@@ -380,7 +368,7 @@ def train_ensemble(
         else:
             writer = None
 
-        if (val_set is not None) and (model.best_val_scores is None):
+        if (val_loader is not None) and (model.best_val_scores is None):
             print("Getting Validation Baseline")
             with torch.no_grad():
                 v_metrics = model.evaluate(
@@ -425,8 +413,7 @@ def results_multitask(
     model_name: str,
     run_id: int,
     ensemble_folds: int,
-    test_set: Dataset | Subset,
-    data_params: dict[str, Any],
+    test_loader: DataLoader,
     robust: bool,
     task_dict: dict[str, TaskType],
     device: type[torch.device] | Literal["cuda", "cpu"],
@@ -441,8 +428,7 @@ def results_multitask(
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
-        test_set (Subset): Dataloader containing testing data.
-        data_params (dict[str, Any]): Dictionary of data loader parameters
+        test_loader (DataLoader): Dataloader containing testing data.
         robust (bool): Whether to estimate standard deviation for use in a robust
             loss function.
         task_dict (dict[str, TaskType]): Map of target names to "regression" or
@@ -469,15 +455,12 @@ def results_multitask(
         "------------Evaluate model on Test Set------------\n"
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
     )
-    test_loader = DataLoader(test_set, **data_params)
-    print(f"Testing on {len(test_set):,} samples")
-
     results_dict: dict[str, dict[str, list | np.ndarray]] = {}
     for target_name, task_type in task_dict.items():
         results_dict[target_name] = defaultdict(
             list
             if task_type == "classification"
-            else lambda: np.zeros((ensemble_folds, len(test_set)))  # type: ignore[call-overload]
+            else lambda: np.zeros((ensemble_folds, len(test_loader.dataset)))  # type: ignore[call-overload]
         )
 
     for ens_idx in range(ensemble_folds):

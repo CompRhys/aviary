@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from sklearn.model_selection import train_test_split as split
+from torch.utils.data import DataLoader
 
 from aviary.cgcnn.data import CrystalGraphData, collate_batch
 from aviary.cgcnn.model import CrystalGraphConvNet
@@ -87,6 +88,12 @@ def test_cgcnn_regression(
         "collate_fn": collate_batch,
     }
 
+    train_loader = DataLoader(train_set, **data_params)
+    val_loader = DataLoader(
+        val_set,
+        **{**data_params, "batch_size": 16 * data_params["batch_size"], "shuffle": False},
+    )
+
     setup_params = {
         "optim": training_config["optim"],
         "learning_rate": training_config["learning_rate"],
@@ -116,26 +123,26 @@ def test_cgcnn_regression(
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
         epochs=epochs,
-        train_set=train_set,
-        val_set=val_set,
+        train_loader=train_loader,
+        val_loader=val_loader,
         log=base_config["log"],
-        data_params=data_params,
         setup_params=setup_params,
         restart_params=restart_params,
         model_params=model_params,
         loss_dict=loss_dict,
     )
 
-    data_params["batch_size"] = 64 * training_config["batch_size"]
-    data_params["shuffle"] = False
+    test_loader = DataLoader(
+        test_set,
+        **{**data_params, "batch_size": 64 * data_params["batch_size"], "shuffle": False},
+    )
 
     results_dict = results_multitask(
         model_class=CrystalGraphConvNet,
         model_name=model_name,
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
-        test_set=test_set,
-        data_params=data_params,
+        test_loader=test_loader,
         robust=base_config["robust"],
         task_dict=task_dict,
         device=training_config["device"],
@@ -201,6 +208,12 @@ def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, trainin
         "collate_fn": collate_batch,
     }
 
+    train_loader = DataLoader(train_set, **data_params)
+    val_loader = DataLoader(
+        val_set,
+        **{**data_params, "batch_size": 16 * data_params["batch_size"], "shuffle": False},
+    )
+
     setup_params = {
         "optim": training_config["optim"],
         "learning_rate": training_config["learning_rate"],
@@ -230,26 +243,26 @@ def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, trainin
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
         epochs=epochs,
-        train_set=train_set,
-        val_set=val_set,
+        train_loader=train_loader,
+        val_loader=val_loader,
         log=base_config["log"],
-        data_params=data_params,
         setup_params=setup_params,
         restart_params=restart_params,
         model_params=model_params,
         loss_dict=loss_dict,
     )
 
-    data_params["batch_size"] = 64 * training_config["batch_size"]
-    data_params["shuffle"] = False
+    test_loader = DataLoader(
+        test_set,
+        **{**data_params, "batch_size": 64 * data_params["batch_size"], "shuffle": False},
+    )
 
     results_dict = results_multitask(
         model_class=CrystalGraphConvNet,
         model_name=model_name,
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
-        test_set=test_set,
-        data_params=data_params,
+        test_loader=test_loader,
         robust=base_config["robust"],
         task_dict=task_dict,
         device=training_config["device"],
