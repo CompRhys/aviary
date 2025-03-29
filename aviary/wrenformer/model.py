@@ -1,11 +1,11 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
 from pymatgen.util.due import Doi, due
 from torch import BoolTensor, Tensor, nn
 
-from aviary.core import BaseModelClass, masked_max, masked_mean, masked_min, masked_std
+from aviary.core import AGGREGATORS, BaseModelClass
 from aviary.networks import ResidualNetwork
 
 
@@ -141,7 +141,7 @@ class Wrenformer(BaseModelClass):
         # careful to ignore padded values when taking the mean
         inv_mask: torch.BoolTensor = ~mask[..., None]
 
-        aggregation_funcs = [aggregators[key] for key in self.embedding_aggregations]
+        aggregation_funcs = [AGGREGATORS[key] for key in self.embedding_aggregations]
         aggregated_embeddings = torch.cat(
             [func(embeddings, inv_mask, 1) for func in aggregation_funcs], dim=1
         )
@@ -150,13 +150,3 @@ class Wrenformer(BaseModelClass):
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))
 
         return tuple(output_nn(predictions) for output_nn in self.output_nns)
-
-
-# map aggregation types to functions
-aggregators: dict[str, Callable[[Tensor, BoolTensor, int], Tensor]] = {
-    "mean": masked_mean,
-    "std": masked_std,
-    "max": masked_max,
-    "min": masked_min,
-    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
-}

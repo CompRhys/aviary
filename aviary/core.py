@@ -598,3 +598,12 @@ def masked_min(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:
     x_inf = x.float().masked_fill(~mask, float("inf"))
     x_min, _ = x_inf.min(dim=dim)
     return x_min
+
+
+AGGREGATORS: dict[str, Callable[[Tensor, BoolTensor, int], Tensor]] = {
+    "mean": masked_mean,
+    "std": masked_std,
+    "max": masked_max,
+    "min": masked_min,
+    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
+}

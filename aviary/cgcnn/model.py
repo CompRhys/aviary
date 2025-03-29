@@ -210,7 +210,7 @@ class CGCNNConv(nn.Module):
         Args:
             atom_in_fea (Tensor): Atom hidden features before convolution
             nbr_fea (Tensor): Bond features of each atom's neighbors
-            self_idx (LongTensor): _description_
+            self_idx (LongTensor): Indices of the atom's self
             nbr_idx (LongTensor): Indices of M neighbors of each atom
 
         Returns:

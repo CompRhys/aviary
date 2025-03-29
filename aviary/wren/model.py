@@ -41,34 +41,7 @@ class Wren(BaseModelClass):
         out_hidden: Sequence[int] = (256, 128, 64),
         **kwargs,
     ) -> None:
-        """Composition plus symmetry model.
-
-        Args:
-            robust (bool): If True, the number of model outputs is doubled. 2nd output
-                for each target will be an estimate for the aleatoric uncertainty (
-                uncertainty inherent to the sample) which can be used with a robust loss
-                function to attenuate the weighting of uncertain samples.
-            n_targets (list[int]): Number of targets to train on. 1 for regression and
-                number of different class labels for classification.
-            elem_emb_len (int): Number of features in initial element embedding
-            sym_emb_len (int): Number of features in initial Wyckoff letter embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode
-                elements. Defaults to 32.
-            sym_fea_len (int, optional): Number of hidden features to use to encode
-                Wyckoff letters. Defaults to 32.
-            n_graph (int, optional): Number of message passing operations to carry out.
-                Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message
-                passing operation. Defaults to 1.
-            elem_gate (list[int], optional): _description_. Defaults to [256].
-            elem_msg (list[int], optional): _description_. Defaults to [256].
-            cry_heads (int, optional): _description_. Defaults to 1.
-            cry_gate (list[int], optional): _description_. Defaults to [256].
-            cry_msg (list[int], optional): _description_. Defaults to [256].
-            trunk_hidden (list[int], optional): _description_. Defaults to [1024, 512].
-            out_hidden (list[int], optional): _description_. Defaults to [256, 128, 64].
-            **kwargs: Additional keyword arguments to pass to BaseModelClass.
-        """
+        """Protostructure based model."""
         super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
@@ -118,20 +91,7 @@ class Wren(BaseModelClass):
         cry_elem_idx: LongTensor,
         aug_cry_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
-        """Forward pass through the material_nn and output_nn.
-
-        Args:
-            elem_weights (Tensor): _description_
-            elem_fea (Tensor): _description_
-            sym_fea (Tensor): _description_
-            self_idx (LongTensor): _description_
-            nbr_idx (LongTensor): _description_
-            cry_elem_idx (LongTensor): _description_
-            aug_cry_idx (LongTensor): _description_
-
-        Returns:
-            tuple[Tensor, ...]: Predicted values for each target
-        """
+        """Forward pass through the material_nn and output_nn."""
         crys_fea = self.material_nn(
             elem_weights,
             elem_fea,
@@ -165,25 +125,7 @@ class DescriptorNetwork(nn.Module):
         cry_gate: Sequence[int] = (256,),
         cry_msg: Sequence[int] = (256,),
     ):
-        """Message passing section of the Roost model.
-
-        Args:
-            elem_emb_len (int): Number of features in initial element embedding
-            sym_emb_len (int): Number of features in initial Wyckoff letter embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode
-                elements. Defaults to 32.
-            sym_fea_len (int, optional): Number of hidden features to use to encode
-                Wyckoff letters. Defaults to 32.
-            n_graph (int, optional): Number of message passing operations to carry out.
-                Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message
-                passing operation. Defaults to 1.
-            elem_gate (list[int], optional): _description_. Defaults to [256].
-            elem_msg (list[int], optional): _description_. Defaults to [256].
-            cry_heads (int, optional): Number of attention heads. Defaults to 1.
-            cry_gate (list[int], optional): _description_. Defaults to [256].
-            cry_msg (list[int], optional): _description_. Defaults to [256].
-        """
+        """Message passing section of the Roost model."""
         super().__init__()
 
         # apply linear transform to the input to get a trainable embedding

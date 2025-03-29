@@ -175,23 +175,6 @@ def collate_batch(
 ) -> tuple[Any, ...]:
     """Collate a list of data and return a batch for predicting
     crystal properties.
-
-    Args:
-        samples ([tuple]): list of tuples for each data point.
-            (elem_fea, nbr_fea, nbr_idx, target)
-
-            elem_fea (Tensor): Node features from atom type and Wyckoff letter
-            nbr_fea (Tensor): _description_
-            nbr_idx (LongTensor):
-            target (Tensor):
-            cif_id: str or int
-
-    Returns:
-        tuple[
-            tuple[Tensor * 3, LongTensor * 4]: batched Wren model inputs,
-            tuple[Tensor | LongTensor]: Target values for different tasks,
-            *tuple[str | int]]: Identifiers like material_id, composition
-        ]
     """
     # define the lists
     batch_mult_weights = []

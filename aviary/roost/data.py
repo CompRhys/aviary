@@ -144,10 +144,9 @@ def collate_batch(
     Args:
         samples (list): list of tuples for each data point where each tuple contains:
             (elem_fea, nbr_fea, nbr_idx, target)
-            - elem_fea (Tensor):  _description_
-            - nbr_fea (Tensor):
-            - self_idx (LongTensor):
-            - nbr_idx (LongTensor):
+            - elem_fea (Tensor): Atom hidden features before convolution
+            - self_idx (LongTensor): Indices of the atom's self
+            - nbr_idx (LongTensor): Indices of M neighbors of each atom
             - target (Tensor | LongTensor): target values containing floats for
                 regression or integers as class labels for classification
             - cif_id: str or int

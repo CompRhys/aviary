@@ -574,7 +574,7 @@ def df_train_test_split(
             Or if not 0 < test_size < 1 or not 1 < n_folds <= 10.
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: _description_
+        tuple[pd.DataFrame, pd.DataFrame]: Train and test sets.
     """
     # shuffle samples for random train/test split
     df_all = df.sample(frac=1, random_state=0)
