@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable, Sequence
 
 import torch
 import torch.nn.functional as F
@@ -9,9 +7,6 @@ from torch import BoolTensor, Tensor, nn
 
 from aviary.core import BaseModelClass, masked_max, masked_mean, masked_min, masked_std
 from aviary.networks import ResidualNetwork
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @due.dcite(Doi("10.48550/arXiv.2308.14920"), description="Wrenformer model")
@@ -81,7 +76,7 @@ class Wrenformer(BaseModelClass):
         self.resize_embedding = nn.Linear(n_features, d_model)
 
         transformer_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=n_attn_heads, batch_first=True
+            d_model=d_model, nhead=n_attn_heads, batch_first=True, norm_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(
             transformer_layer, num_layers=n_attn_layers

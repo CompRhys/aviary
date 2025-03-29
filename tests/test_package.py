@@ -8,10 +8,6 @@ from aviary import ROOT
 package_sources_path = f"{ROOT}/aviary.egg-info/SOURCES.txt"
 
 
-__author__ = "Janosh Riebesell"
-__date__ = "2022-05-25"
-
-
 @pytest.mark.skipif(
     not os.path.isfile(package_sources_path),
     reason="No aviary.egg-info/SOURCES.txt file, run pip install . to create it",

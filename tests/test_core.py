@@ -57,7 +57,7 @@ def test_masked_std():
     # test against explicit calculation
     rand_floats = torch.rand(3, 4, 5)
     rand_masks = torch.randint(0, 2, (3, 4, 5)).bool()
-    for xi, mask in zip(rand_floats, rand_masks):
+    for xi, mask in zip(rand_floats, rand_masks, strict=False):
         for dim in (0, 1):
             out = masked_std(xi, mask, dim=dim)
             xi_nan = torch.where(mask, xi, torch.tensor(float("nan")))

@@ -1,6 +1,4 @@
 # %%
-from __future__ import annotations
-
 import glob
 import os
 
@@ -83,7 +81,7 @@ df_el = df[df["nelements"] == 1]
 df_el = df_el.sort_values(by=["composition", "E_vasp_per_atom"], ascending=True)
 el_refs = {
     c.composition.elements[0]: e
-    for c, e in zip(df_el.final_structure, df_el.E_vasp_per_atom)
+    for c, e in zip(df_el.final_structure, df_el.E_vasp_per_atom, strict=False)
 }
 
 

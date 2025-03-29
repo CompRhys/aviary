@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 import json
+from collections.abc import Sequence
 from functools import cache
 from itertools import groupby
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
 from pymatgen.analysis.prototypes import (
     RE_SUBST_ONE_PREFIX,
@@ -17,11 +17,6 @@ from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import pandas as pd
 
 
 class WyckoffData(Dataset):
@@ -251,8 +246,10 @@ def collate_batch(
             torch.cat(crystal_wyk_idx),
             torch.cat(aug_cry_idx),
         ),
-        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        *zip(*batch_cry_ids),
+        tuple(
+            torch.stack(b_target, dim=0) for b_target in zip(*batch_targets, strict=False)
+        ),
+        *zip(*batch_cry_ids, strict=False),
     )
 
 
@@ -284,7 +281,7 @@ def parse_protostructure_label(
     elements = []
     wyckoff_set = []
 
-    for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
+    for el, wyk_letters_per_elem in zip(elems, wyckoff_letters, strict=False):
         # Normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_normalized = RE_WYCKOFF_NO_PREFIX.sub(
             RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
@@ -297,7 +294,7 @@ def parse_protostructure_label(
         mults = map(int, sep_n_wyks[0::2])
         letters = sep_n_wyks[1::2]
 
-        for mult, letter in zip(mults, letters):
+        for mult, letter in zip(mults, letters, strict=False):
             elements.extend([el] * mult)
             wyckoff_set.extend([letter] * mult)
             wyckoff_site_multiplicities.extend(

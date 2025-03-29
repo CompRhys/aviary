@@ -5,9 +5,6 @@ import torch
 from matminer.datasets import load_dataset
 from pymatgen.analysis.prototypes import get_protostructure_label_from_spglib
 
-__author__ = "Janosh Riebesell"
-__date__ = "2022-04-09"
-
 torch.manual_seed(0)  # ensure reproducible results (applies to all tests)
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))

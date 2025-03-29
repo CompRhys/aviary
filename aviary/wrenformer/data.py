@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 import json
 from functools import cache
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import numpy as np
+import pandas as pd
 import torch
 from pymatgen.core import Composition
 from torch import LongTensor, Tensor, nn
@@ -12,9 +11,6 @@ from torch import LongTensor, Tensor, nn
 from aviary import PKG_DIR
 from aviary.data import InMemoryDataLoader
 from aviary.wren.data import parse_protostructure_label
-
-if TYPE_CHECKING:
-    import pandas as pd
 
 
 def collate_batch(
@@ -131,7 +127,7 @@ def get_composition_embedding(formula: str) -> Tensor:
         Tensor: Shape (n_elements, n_features). Usually (2-6, 200).
     """
     composition_dict = Composition(formula).get_el_amt_dict()
-    elements, elem_weights = zip(*composition_dict.items())
+    elements, elem_weights = zip(*composition_dict.items(), strict=False)
 
     elem_weights = np.atleast_2d(elem_weights).T / sum(elem_weights)
 

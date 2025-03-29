@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
@@ -11,9 +9,6 @@ from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.scatter import scatter_reduce
 from aviary.segments import MessageLayer, WeightedAttentionPooling
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @due.dcite(Doi("10.1126/sciadv.abn4117"), description="Wren model")

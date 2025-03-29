@@ -1,17 +1,18 @@
-from __future__ import annotations
-
 import os
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from types import ModuleType
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -30,10 +31,6 @@ from torch.utils.tensorboard import SummaryWriter
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.losses import robust_l1_loss, robust_l2_loss
-
-if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
-    from types import ModuleType
 
 
 def initialize_model(
@@ -285,7 +282,7 @@ def train_ensemble(
     epochs: int,
     train_set: Dataset | Subset,
     val_set: Dataset | Subset,
-    log: bool,
+    log: Literal["tensorboard", "wandb"],
     data_params: dict[str, Any],
     setup_params: dict[str, Any],
     restart_params: dict[str, Any],
@@ -361,10 +358,25 @@ def train_ensemble(
                     normalizer.fit(sample_target)
                 print(f"Dummy MAE: {(sample_target - normalizer.mean).abs().mean():.4f}")
 
-        if log:
+        if log == "tensorboard":
             writer = SummaryWriter(
                 f"{ROOT}/runs/{model_name}/{model_name}-r{r_id}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
+        elif log == "wandb":
+            wandb.init(
+                project="lightning_logs",
+                # https://docs.wandb.ai/guides/track/launch#init-start-error
+                settings=wandb.Settings(start_method="fork"),
+                name=f"{model_name}-r{r_id}",
+                config={
+                    "model_params": model_params,
+                    "data_params": data_params,
+                    "setup_params": setup_params,
+                    "restart_params": restart_params,
+                    "loss_dict": loss_dict,
+                },
+            )
+            writer = "wandb"
         else:
             writer = None
 
@@ -502,7 +514,7 @@ def results_multitask(
         y_test, outputs, *ids = model.predict(test_loader)
 
         for output, targets, (target_name, task_type), res_dict in zip(
-            outputs, y_test, model.task_dict.items(), results_dict.values()
+            outputs, y_test, model.task_dict.items(), results_dict.values(), strict=False
         ):
             if task_type == "regression":
                 normalizer = normalizer_dict[target_name]
@@ -536,7 +548,7 @@ def results_multitask(
     # TODO cleaner way to get identifier names
     if save_results:
         save_results_dict(
-            dict(zip(test_loader.dataset.dataset.identifiers, *ids)),
+            dict(zip(test_loader.dataset.dataset.identifiers, *ids, strict=False)),
             results_dict,
             model_name,
             f"-r{run_id}",

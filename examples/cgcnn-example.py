@@ -85,8 +85,8 @@ def main(
             "Cannot fine-tune and transfer checkpoint(s) at the same time."
         )
 
-    task_dict = dict(zip(targets, tasks))
-    loss_dict = dict(zip(targets, losses))
+    task_dict = dict(zip(targets, tasks, strict=False))
+    loss_dict = dict(zip(targets, losses, strict=False))
 
     dist_dict = {
         "radius": radius,

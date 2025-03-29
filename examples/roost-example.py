@@ -78,8 +78,8 @@ def main(
             "Cannot fine-tune and transfer checkpoint(s) at the same time."
         )
 
-    task_dict = dict(zip(targets, tasks))
-    loss_dict = dict(zip(targets, losses))
+    task_dict = dict(zip(targets, tasks, strict=False))
+    loss_dict = dict(zip(targets, losses, strict=False))
 
     # NOTE make sure to use dense datasets,
     # NOTE do not use default_na as "NaN" is a valid material

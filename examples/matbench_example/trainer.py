@@ -1,36 +1,23 @@
-# ruff: noqa: E501
-from __future__ import annotations
-
 import os
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import torch
+import wandb
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, np_softmax
+from aviary.data import InMemoryDataLoader
 from aviary.losses import robust_l1_loss
+from aviary.predict import make_ensemble_predictions
 from aviary.utils import get_metrics, print_walltime
 from aviary.wrenformer.data import df_to_in_mem_dataloader
 from aviary.wrenformer.model import Wrenformer
-
-try:
-    import wandb
-except ImportError:
-    wandb = None  # type: ignore[assignment]
-
-if TYPE_CHECKING:
-    from torch import nn
-
-    from aviary.data import InMemoryDataLoader
-
-__author__ = "Janosh Riebesell"
-__date__ = "2022-10-29"
-
 
 torch.manual_seed(0)  # ensure reproducible results
 
@@ -55,6 +42,7 @@ def train_model(
     task_type: TaskType,
     train_loader: DataLoader | InMemoryDataLoader,
     test_loader: DataLoader | InMemoryDataLoader,
+    *,  # force keyword-only arguments
     checkpoint: Literal["local", "wandb"] | None = None,
     checkpoint_frequency: int = 10,
     learning_rate: float = 1e-4,
@@ -74,18 +62,20 @@ def train_model(
     Wrapped by other functions like train_wrenformer() for specific datasets.
 
     Args:
-        run_name (str): A string to describe the training run. Should usually contain model type
-            (Roost/Wren) and important params. Include 'robust' to use a robust loss function and
-            have the model learn to predict an aleatoric uncertainty.
+        run_name (str): A string to describe the training run. Should usually contain
+            model type (Roost/Wren) and important params. Include 'robust' to use a
+            robust loss function and have the model learn to predict an aleatoric
+            uncertainty.
         model (BaseModelClass): A model instance subclassing aviary.core.BaseModelClass.
         epochs (int): How many epochs to train for. Defaults to 100.
         target_col (str): Name of df column containing the target values.
-        task_type ('regression' | 'classification'): What type of task to train the model for.
-        test_loader (DataLoader | InMemoryDataLoader): Test data.
-        train_loader (DataLoader | InMemoryDataLoader): Train data.
-        checkpoint (None | 'local' | 'wandb'): Whether to save the model+optimizer+scheduler state
-            dicts to disk (local) or upload to WandB. Defaults to None.
-            To later copy a wandb checkpoint file to cwd and use it:
+        task_type ('regression' | 'classification'): What type of task to train the
+            model for.
+        train_loader (DataLoader | InMemoryDataLoader): Training data loader.
+        test_loader (DataLoader | InMemoryDataLoader): Test data loader.
+        checkpoint (None | 'local' | 'wandb'): Whether to save the model, optimizer,
+            and scheduler state dicts to disk (local) or upload to WandB.
+            Defaults to None. To later copy a wandb checkpoint file to cwd and use it:
             ```py
             run_path = "<user|team>/<project>/<run_id>"  # e.g. aviary/matbench/31qh7b5q
             checkpoint = wandb.restore("checkpoint.pth", run_path)
@@ -97,39 +87,42 @@ def train_model(
             embedding_aggregation=("mean", "std")) for Wrenformer.
         run_params (dict[str, Any]): Additional parameters to merge into the run's dict of
             model_params. Will be logged to wandb. Can be anything really. Defaults to {}.
-        optimizer (str | tuple[str, dict]): Name of a torch.optim.Optimizer class like 'Adam',
-            'AdamW', 'SGD', etc. Can be a string or a string and dict with params to pass to the
-            class. Defaults to 'AdamW'.
+        optimizer (str | tuple[str, dict]): Name of a torch.optim.Optimizer class like
+            'Adam', 'AdamW', 'SGD', etc. Can be a string or a string and dict with params
+            to pass to the class. Defaults to 'AdamW'.
         scheduler (str | tuple[str, dict]): Name of a torch.optim.lr_scheduler class like
-            'LambdaLR', 'StepLR', 'CosineAnnealingLR', etc. Defaults to 'LambdaLR'. Can be a string
-            to create a scheduler with all its default values or tuple[str, dict] with custom params
-            to pass to the class. E.g. ('CosineAnnealingLR', {'T_max': n_epochs}).
-            See https://stackoverflow.com/a/2121918 about pickle errors when trying to load a
-            LambdaLR scheduler from a torch.save() checkpoint created prior to this file having
-            been renamed.
-        swa_start (float | None): When to start using stochastic weight averaging during training.
-            Should be a float between 0 and 1. 0.7 means start SWA after 70% of epochs. Set to
-            None to disable SWA. Defaults to None. Proposed in https://arxiv.org/abs/1803.05407.
-        swa_lr (float): Learning rate for SWA scheduler. Defaults to learning_rate.
-            by the transformer encoder before passing into the ResidualNetwork. One or more of
-            ['mean', 'std', 'sum', 'min', 'max']. Defaults to ['mean'].
-        test_df (pd.DataFrame): Test data as a DataFrame. Model preds will be inserted as new
-            column and df returned.
-        timestamp (str): Will prefix the names of model checkpoint files and other output files.
-            Will also be included in run_params. Defaults to None.
-        verbose (bool): Whether to print progress and metrics to stdout. Defaults to False.
-        wandb_path (str | None): Path to Weights and Biases project where to log this run formatted
-            as '<entity>/<project>'. Defaults to None which means logging is disabled.
-        wandb_kwargs (dict[str, Any]): Kwargs to pass to wandb.init() like
-            dict(tags=['ensemble-id-1']). Should not include keys config, project, entity as
-            they're already set by this function.
+            'LambdaLR', 'StepLR', 'CosineAnnealingLR', etc. Can be a string to create a
+            scheduler with default values or tuple[str, dict] with custom params.
+            E.g. ('CosineAnnealingLR', {'T_max': n_epochs}). Defaults to 'LambdaLR'.
+            See https://stackoverflow.com/a/2121918 about pickle errors when trying to
+            load a LambdaLR scheduler from a torch.save() checkpoint created prior to this
+            file having been renamed.
+        swa_start (float | None): When to start using stochastic weight averaging during
+            training. Should be a float between 0 and 1. 0.7 means start SWA after 70%
+            of epochs. Set to None to disable SWA. Defaults to None. Proposed in
+            https://arxiv.org/abs/1803.05407.
+        swa_lr (float | None): Learning rate for SWA scheduler. Defaults to learning_rate.
+        test_df (pd.DataFrame): Test data as a DataFrame. Model preds will be inserted
+            as new columns and df returned.
+        timestamp (str | None): Will prefix the names of model checkpoint files and other
+            output files. Will also be included in run_params. Defaults to None.
+        verbose (bool): Whether to print progress and metrics to stdout. Defaults to
+            False.
+        wandb_path (str | None): Path to Weights and Biases project where to log this run
+            formatted as '<entity>/<project>'. Defaults to None which means logging is
+            disabled.
+        wandb_kwargs (dict[str, Any] | None): Kwargs to pass to wandb.init() like
+            dict(tags=['ensemble-id-1']). Should not include keys config, project, entity
+            as they're already set by this function. Defaults to None.
 
     Raises:
         ValueError: On unknown dataset_name or invalid checkpoint.
 
     Returns:
-        tuple[dict[str, float], dict[str, Any]]: 1st dict are the model's test set metrics.
-            2nd dict are the run's hyperparameters. 3rd is a dataframe with test set predictions.
+        tuple[dict[str, float], dict[str, Any], pd.DataFrame]: A tuple containing:
+            - Test set metrics dictionary
+            - Run hyperparameters dictionary
+            - Test dataframe with predictions
     """
     if checkpoint not in (None, "local", "wandb"):
         raise ValueError(f"Unknown {checkpoint=}")
@@ -161,10 +154,11 @@ def train_model(
     model.to(device)
     if isinstance(optimizer, str):
         optimizer_name, optimizer_params = optimizer, None
-    elif isinstance(optimizer, (tuple, list)):
+    elif isinstance(optimizer, tuple | list):
         optimizer_name, optimizer_params = optimizer
     else:
-        raise ValueError(f"Unknown {optimizer=}")
+        raise TypeError(f"Unknown {optimizer=}")
+
     optimizer_cls = getattr(torch.optim, optimizer_name)
     optimizer_instance = optimizer_cls(
         params=model.parameters(), lr=learning_rate, **(optimizer_params or {})
@@ -174,10 +168,11 @@ def train_model(
         scheduler_name, scheduler_params = "LambdaLR", {"lr_lambda": lr_lambda}
     elif isinstance(scheduler, str):
         scheduler_name, scheduler_params = scheduler, None
-    elif isinstance(scheduler, (tuple, list)):
+    elif isinstance(scheduler, tuple | list):
         scheduler_name, scheduler_params = scheduler
     else:
         raise ValueError(f"Unknown {scheduler=}")
+
     scheduler_cls = getattr(torch.optim.lr_scheduler, scheduler_name)
     lr_scheduler = scheduler_cls(optimizer_instance, **(scheduler_params or {}))
 
@@ -252,8 +247,8 @@ def train_model(
         if swa_start and epoch >= int(swa_start * epochs):
             if epoch == int(swa_start * epochs):
                 print("Starting stochastic weight averaging...")
-            swa_model.update_parameters(model)
-            swa_scheduler.step()
+            swa_model.update_parameters(model)  # type: ignore[reportPossiblyUnboundVariable]
+            swa_scheduler.step()  # type: ignore[reportPossiblyUnboundVariable]
         elif scheduler_name == "ReduceLROnPlateau":
             val_metric = val_metrics[target_col][
                 "MAE" if task_type == reg_key else "Accuracy"
@@ -268,7 +263,7 @@ def train_model(
             wandb.log({"training": train_metrics, "validation": val_metrics})
 
         if epoch % checkpoint_frequency == 0 and epoch < epochs:
-            inference_model = swa_model if swa_start else model
+            inference_model = swa_model if swa_start else model  # type: ignore[reportPossiblyUnboundVariable]
             inference_model.eval()
             checkpoint_model(
                 checkpoint_endpoint=checkpoint,
@@ -294,7 +289,7 @@ def train_model(
             f"({swa_start=})"
         )
 
-    inference_model = swa_model if swa_start else model
+    inference_model = swa_model if swa_start else model  # type: ignore[reportPossiblyUnboundVariable]
     inference_model.eval()
 
     with torch.no_grad():
@@ -315,7 +310,8 @@ def train_model(
         ).squeeze()
 
     if test_df is None:
-        assert isinstance(test_loader, DataLoader)
+        if not isinstance(test_loader, DataLoader):
+            raise TypeError(f"Unknown {test_loader=}")
         test_df = test_loader.dataset.df
 
     if robust:
@@ -399,7 +395,7 @@ def checkpoint_model(
     normalizer_dict: dict,
     run_params: dict,
     scheduler_name: str,
-):
+) -> None:
     """Save model checkpoint to different endpoints."""
     if checkpoint_endpoint is None:
         return
@@ -433,12 +429,13 @@ def checkpoint_model(
         torch.save(checkpoint_dict, checkpoint_path)
 
     if checkpoint_endpoint == "wandb":
-        assert (
-            wandb.run is not None
-        ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
+        if wandb.run is None:
+            raise ValueError(
+                "can't save model checkpoint to Weights and Biases, wandb.run is None"
+            )
         torch.save(
             checkpoint_dict,
-            f"{wandb.run.dir}/{timestamp + '-' if timestamp else ''}{run_name}-{epochs}.pth",
+            f"{wandb.run.dir}/{timestamp + '-' if timestamp else ''}{run_name}-{epochs}.pth",  # noqa: E501
         )
 
 
@@ -455,7 +452,7 @@ def train_wrenformer(
     input_col: str | None = None,
     model_params: dict[str, Any] | None = None,
     data_loader_device: str = "cpu",
-    **kwargs,
+    **kwargs: Any,
 ) -> tuple[dict[str, float], dict[str, Any], pd.DataFrame]:
     """Train a Wrenformer model on a dataframe. This function handles the DataLoader
     creation, then delegates to train_model().
@@ -528,7 +525,8 @@ def train_wrenformer(
     # element) in the material
     embedding_len = train_loader.tensors[0][0].shape[-1]
     # Roost and Wren embedding size resp.
-    assert embedding_len in (200 + 1, 200 + 1 + 444), f"{embedding_len=}"
+    if embedding_len not in (200 + 1, 200 + 1 + 444):
+        raise ValueError(f"{embedding_len=}, expected 201 or 645")
 
     model_params = dict(
         # 1 for regression, n_classes for classification
@@ -579,26 +577,87 @@ def df_train_test_split(
         tuple[pd.DataFrame, pd.DataFrame]: _description_
     """
     # shuffle samples for random train/test split
-    df = df.sample(frac=1, random_state=0)
+    df_all = df.sample(frac=1, random_state=0)
 
     if folds:
         n_folds, test_fold_idx = folds
-        assert 1 < n_folds <= 10, f"{n_folds = } must be between 2 and 10"
-        assert (
-            0 <= test_fold_idx < n_folds
-        ), f"{test_fold_idx = } must be between 0 and {n_folds - 1}"
+        if not 1 < n_folds <= 10:
+            raise ValueError(f"{n_folds = } must be between 2 and 10")
+        if not 0 <= test_fold_idx < n_folds:
+            raise ValueError(f"{test_fold_idx = } must be between 0 and {n_folds - 1}")
 
-        df_splits: list[pd.DataFrame] = np.array_split(df, n_folds)
+        df_splits: list[pd.DataFrame] = np.array_split(df_all, n_folds)
         test_df = df_splits.pop(test_fold_idx)
         train_df = pd.concat(df_splits)
     elif test_size:
-        assert 0 < test_size < 1, f"{test_size = } must be between 0 and 1"
+        if not 0 < test_size < 1:
+            raise ValueError(f"{test_size = } must be between 0 and 1")
 
-        train_df = df.sample(frac=1 - test_size, random_state=0)
-        test_df = df.drop(train_df.index)
+        train_df = df_all.sample(frac=1 - test_size, random_state=0)
+        test_df = df_all.drop(train_df.index)
     else:
         raise ValueError(f"Specify either {folds=} or {test_size=}")
     if folds and test_size:
         raise ValueError(f"Specify either {folds=} or {test_size=}, not both")
 
     return train_df, test_df
+
+
+@print_walltime(end_desc="predict_from_wandb_checkpoints")
+def predict_from_wandb_checkpoints(
+    runs: list[wandb.apis.public.Run],
+    checkpoint_filename: str = "checkpoint.pth",
+    cache_dir: str = "./checkpoint_cache",
+    **kwargs: Any,
+) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
+    """Download and cache checkpoints for an ensemble of models, then make
+    predictions on some dataset. Finally print ensemble metrics and store
+    predictions to CSV.
+
+    Args:
+        runs (list[wandb.apis.public.Run]): List of WandB runs to download model
+            checkpoints from which are then loaded into memory to generate
+            predictions for the input_col in df.
+        checkpoint_filename (str): Name of the checkpoint file to download.
+        cache_dir (str): Directory to cache downloaded checkpoints in.
+        **kwargs: Additional keyword arguments to pass to make_ensemble_predictions().
+
+    Returns:
+        pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]: Original input dataframe
+            with added columns for model predictions and uncertainties. The optional
+            2nd dataframe holds ensemble performance metrics like mean and standard
+            deviation of MAE/RMSE.
+    """
+    print(f"Using checkpoints from {len(runs)} run(s):")
+
+    run_target = runs[0].config["target"]
+    if not all(run_target == run.config["target"] for run in runs):
+        raise ValueError(f"Runs have differing targets, first {run_target=}")
+
+    target_col = kwargs.get("target_col")
+    if target_col and target_col != run_target:
+        print(f"\nWarning: {target_col=} does not match {run_target=}")
+
+    checkpoint_paths: list[str] = []
+
+    for idx, run in enumerate(runs, start=1):
+        run_path = "/".join(run.path)
+        out_dir = f"{cache_dir}/{run_path}"
+        os.makedirs(out_dir, exist_ok=True)
+
+        checkpoint_path = f"{out_dir}/{checkpoint_filename}"
+        checkpoint_paths.append(checkpoint_path)
+        print(f"{idx:>3}/{len(runs)}: {run.url}\n\t{checkpoint_path}\n")
+
+        with open(f"{out_dir}/run.md", "w") as md_file:
+            md_file.write(f"[{run.name}]({run.url})\n")
+
+        if not os.path.isfile(checkpoint_path):
+            run.file(f"{checkpoint_filename}").download(root=out_dir)
+
+    if target_col is not None:
+        df_ens, ensemble_metrics = make_ensemble_predictions(checkpoint_paths, **kwargs)
+        # round to save disk space and speed up cloud storage uploads
+        return df_ens.round(6), ensemble_metrics
+
+    return make_ensemble_predictions(checkpoint_paths, **kwargs)
