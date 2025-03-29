@@ -31,6 +31,7 @@ class Wrenformer(BaseModelClass):
 
     def __init__(
         self,
+        robust: bool,
         n_targets: Sequence[int],
         n_features: int,
         d_model: int = 128,
@@ -38,7 +39,6 @@ class Wrenformer(BaseModelClass):
         n_attn_heads: int = 4,
         trunk_hidden: Sequence[int] = (1024, 512),
         out_hidden: Sequence[int] = (256, 128, 64),
-        robust: bool = False,
         embedding_aggregations: Sequence[str] = ("mean",),
         **kwargs,
     ) -> None:

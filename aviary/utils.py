@@ -30,6 +30,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
+from aviary.data import InMemoryDataLoader
 from aviary.losses import robust_l1_loss, robust_l2_loss
 
 
@@ -335,13 +336,17 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                data = train_loader.dataset
-                if isinstance(train_loader.dataset, Subset):
-                    sample_target = Tensor(
-                        data.dataset.df[target].iloc[data.indices].values
-                    )
+                if isinstance(train_loader, InMemoryDataLoader):
+                    # FIXME: this is really brittle but it works for now.
+                    sample_target = train_loader.tensors[1]
                 else:
-                    sample_target = Tensor(data.df[target].values)
+                    data = train_loader.dataset
+                    if isinstance(train_loader.dataset, Subset):
+                        sample_target = Tensor(
+                            data.dataset.df[target].iloc[data.indices].to_numpy()
+                        )
+                    else:
+                        sample_target = Tensor(data.df[target].to_numpy())
 
                 if not restart_params["resume"]:
                     normalizer.fit(sample_target)

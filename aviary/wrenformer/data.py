@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from functools import cache
 from typing import Any, Literal
 
@@ -148,6 +149,7 @@ def df_to_in_mem_dataloader(
     id_col: str | None = None,
     embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
     device: str | None = None,
+    collate_fn: Callable = collate_batch,
     **kwargs: Any,
 ) -> InMemoryDataLoader:
     """Construct an InMemoryDataLoader with Wrenformer batch collation from a dataframe.
@@ -167,6 +169,8 @@ def df_to_in_mem_dataloader(
         embedding_type ('wyckoff' | 'composition'): Defaults to "wyckoff".
         device (str): torch.device to load tensors onto. Defaults to
             "cuda" if torch.cuda.is_available() else "cpu".
+        collate_fn (Callable): Function to collate data into a batch. Defaults to
+            collate_batch.
         kwargs (dict): Keyword arguments like batch_size: int and shuffle: bool
             to pass to InMemoryDataLoader. Defaults to None.
 
@@ -198,4 +202,4 @@ def df_to_in_mem_dataloader(
         inputs[idx] = tensor.to(device)
 
     ids = df.get(id_col, df.index).to_numpy()
-    return InMemoryDataLoader([inputs, targets, ids], collate_fn=collate_batch, **kwargs)
+    return InMemoryDataLoader([inputs, targets, ids], collate_fn=collate_fn, **kwargs)

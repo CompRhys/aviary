@@ -10,6 +10,7 @@ tqdm.pandas()
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
+SMOKE_TEST = True
 
 matbench_datasets = [
     "matbench_steels",
@@ -26,6 +27,9 @@ matbench_datasets = [
     "matbench_mp_is_metal",
     "matbench_mp_e_form",
 ]
+
+if SMOKE_TEST:
+    matbench_datasets = matbench_datasets[2:3]
 
 MatbenchDatasets = Literal[*matbench_datasets]
 
@@ -44,8 +48,6 @@ for dataset in matbench_datasets:
         df["wyckoff"] = df["structure"].progress_apply(
             get_protostructure_label_from_spglib
         )
-    elif "composition" in df:
-        df["composition"] = [comp.formula for comp in df.composition]
     else:
         raise ValueError("No structure or composition column found")
 
