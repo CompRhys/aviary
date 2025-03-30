@@ -411,14 +411,13 @@ def train_ensemble(
         )
 
 
-# TODO find a better name for this function @janosh
 @torch.no_grad()
 def results_multitask(
     model_class: BaseModelClass,
     model_name: str,
     run_id: int,
     ensemble_folds: int,
-    test_loader: DataLoader,
+    test_loader: DataLoader | InMemoryDataLoader,
     robust: bool,
     task_dict: dict[str, TaskType],
     device: type[torch.device] | Literal["cuda", "cpu"],
@@ -461,11 +460,16 @@ def results_multitask(
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
     )
     results_dict: dict[str, dict[str, list | np.ndarray]] = {}
+    n_test = (
+        len(test_loader.dataset)
+        if isinstance(test_loader, InMemoryDataLoader)
+        else len(test_loader)
+    )
     for target_name, task_type in task_dict.items():
         results_dict[target_name] = defaultdict(
             list
             if task_type == "classification"
-            else lambda: np.zeros((ensemble_folds, len(test_loader.dataset)))  # type: ignore[call-overload]
+            else lambda: np.zeros((ensemble_folds, n_test))  # type: ignore[call-overload]
         )
 
     for ens_idx in range(ensemble_folds):

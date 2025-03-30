@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aviary"
-version = "1.2.0"
+version = "1.3.0"
 description = "A collection of machine learning models for materials discovery"
 authors = [{ name = "Rhys Goodall", email = "rhys.goodall@outlook.com" }]
 readme = "README.md"

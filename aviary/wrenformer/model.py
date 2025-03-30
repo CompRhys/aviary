@@ -72,6 +72,19 @@ class Wrenformer(BaseModelClass):
         """
         super().__init__(robust=robust, **kwargs)
 
+        model_params = {
+            "robust": robust,
+            "n_targets": n_targets,
+            "n_features": n_features,
+            "d_model": d_model,
+            "n_attn_layers": n_attn_layers,
+            "n_attn_heads": n_attn_heads,
+            "trunk_hidden": trunk_hidden,
+            "out_hidden": out_hidden,
+            "embedding_aggregations": embedding_aggregations,
+        }
+        self.model_params.update(model_params)
+
         # up- or down-size embedding dimension (n_features) to model dimension (d_model)
         self.resize_embedding = nn.Linear(n_features, d_model)
 
@@ -79,7 +92,7 @@ class Wrenformer(BaseModelClass):
             d_model=d_model, nhead=n_attn_heads, batch_first=True, norm_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(
-            transformer_layer, num_layers=n_attn_layers
+            transformer_layer, num_layers=n_attn_layers, enable_nested_tensor=False
         )
 
         if self.robust:
