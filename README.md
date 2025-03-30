@@ -51,6 +51,10 @@ python examples/wren-example.py --train --evaluate --data-path examples/inputs/e
 ```
 
 ```sh
+python examples/wrenformer-example.py --train --evaluate --data-path examples/inputs/examples.csv --targets E_f --tasks regression --losses L1 --robust --epoch 10
+```
+
+```sh
 python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/examples.json --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 

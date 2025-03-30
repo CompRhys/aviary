@@ -461,9 +461,9 @@ def results_multitask(
     )
     results_dict: dict[str, dict[str, list | np.ndarray]] = {}
     n_test = (
-        len(test_loader.dataset)
+        len(test_loader.tensors[0])
         if isinstance(test_loader, InMemoryDataLoader)
-        else len(test_loader)
+        else len(test_loader.dataset)
     )
     for target_name, task_type in task_dict.items():
         results_dict[target_name] = defaultdict(
@@ -492,7 +492,7 @@ def results_multitask(
                 f"provided {task_dict=}"
             )
 
-        model = model_class(**checkpoint["model_params"])
+        model: BaseModelClass = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -537,10 +537,14 @@ def results_multitask(
 
             res_dict["targets"] = targets
 
-    # TODO cleaner way to get identifier names
     if save_results:
+        identifier_names = (
+            [f"idx_{i}" for i in range(len(ids))]
+            if isinstance(test_loader, InMemoryDataLoader)
+            else test_loader.dataset.dataset.identifiers
+        )
         save_results_dict(
-            dict(zip(test_loader.dataset.dataset.identifiers, *ids, strict=False)),
+            dict(zip(identifier_names, *ids, strict=False)),
             results_dict,
             model_name,
             f"-r{run_id}",

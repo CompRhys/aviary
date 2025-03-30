@@ -28,8 +28,8 @@ class WyckoffData(Dataset):
         task_dict: dict[str, str],
         elem_embedding: str = "matscholar200",
         sym_emb: str = "bra-alg-off",
-        inputs: str = "wyckoff",
-        identifiers: Sequence[str] = ("material_id", "composition", "wyckoff"),
+        inputs: str = "protostructure",
+        identifiers: Sequence[str] = ("material_id", "composition", "protostructure"),
     ):
         """Data class for Wren models.
 
@@ -43,10 +43,10 @@ class WyckoffData(Dataset):
             sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or
                 "spg-alg-off" or path to a file with custom symmetry embeddings.
             inputs (str, optional): df columns to be used for featurization.
-                Defaults to "wyckoff".
+                Defaults to "protostructure".
             identifiers (list, optional): df columns for distinguishing data points.
                 Will be copied over into the model's output CSV. Defaults to
-                ["material_id", "composition", "wyckoff"].
+                ["material_id", "composition", "protostructure"].
         """
         if len(identifiers) < 2:
             raise AssertionError("Two identifiers are required")

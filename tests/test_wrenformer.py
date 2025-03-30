@@ -25,7 +25,7 @@ def base_config():
 def model_architecture():
     return {
         "d_model": 128,
-        "n_attn_layers": 6,
+        "n_attn_layers": 2,
         "n_attn_heads": 4,
         "trunk_hidden": (1024, 512),
         "out_hidden": (256, 128, 64),
@@ -57,8 +57,8 @@ def test_wrenformer_regression(
     losses = ["L1"]
     epochs = 25
     model_name = "wrenformer-reg-test"
-    input_col = "wyckoff"
-    embedding_type = "wyckoff"
+    input_col = "protostructure"
+    embedding_type = "protostructure"
 
     task_dict = dict(zip([target_name], [task], strict=False))
     loss_dict = dict(zip([target_name], losses, strict=False))

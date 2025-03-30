@@ -45,7 +45,7 @@ for dataset in matbench_datasets:
 
     if "structure" in df:
         df["composition"] = [struct.formula for struct in df.structure]
-        df["wyckoff"] = df["structure"].progress_apply(
+        df["protostructure"] = df["structure"].progress_apply(
             get_protostructure_label_from_spglib
         )
     else:

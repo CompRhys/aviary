@@ -470,13 +470,14 @@ def train_wrenformer(
         batch_size (int, optional): Batch size for training. Defaults to 128.
         inference_multiplier (int, optional): Multiplier for the test set data loader
             batch size. Defaults to 1.
-        embedding_type ('wyckoff' | 'composition', optional): Type of embedding to use.
-            Defaults to None meaning auto-detect based on 'wren'/'roost' in run_name.
+        embedding_type ('protostructure' | 'composition', optional): Type of
+            embedding to use. Defaults to None meaning auto-detect based on 'wren'/'roost'
+            in run_name.
         id_col (str, optional): Column name in train_df and test_df containing unique
             IDs for each sample. Defaults to "material_id".
         input_col (str, optional): Column name in train_df and test_df containing input
             values. Defaults to None meaning auto-detect based on 'wren'/'roost' in
-            run_name which default to 'wyckoff' and 'composition' respectively.
+            run_name which default to 'protostructure' and 'composition' respectively.
         model_params (dict): Passed to Wrenformer class. E.g. dict(n_attn_layers=6,
             embedding_aggregation=("mean", "std")).
         data_loader_device(str): device to store the InMemoryDataLoader's tensors on.
@@ -490,8 +491,8 @@ def train_wrenformer(
     robust = "robust" in run_name.lower()
 
     if "wren" in run_name.lower():
-        input_col = input_col or "wyckoff"
-        embedding_type = embedding_type or "wyckoff"
+        input_col = input_col or "protostructure"
+        embedding_type = embedding_type or "protostructure"
     elif "roost" in run_name.lower():
         input_col = input_col or "composition"
         embedding_type = embedding_type or "composition"

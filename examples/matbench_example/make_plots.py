@@ -187,7 +187,7 @@ df = df.dropna(axis=1)  # drop models with missing predictions
 target = df.columns[0]
 
 
-y_cols = [c for c in df if c not in [target, "composition", "wyckoff"]]
+y_cols = [c for c in df if c not in [target, "composition", "protostructure"]]
 labels = {}
 
 for y_col in y_cols:

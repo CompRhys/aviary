@@ -144,10 +144,10 @@ def get_composition_embedding(formula: str) -> Tensor:
 
 def df_to_in_mem_dataloader(
     df: pd.DataFrame,
-    input_col: str = "wyckoff",
+    input_col: str = "protostructure",
     target_col: str | None = None,
     id_col: str | None = None,
-    embedding_type: Literal["wyckoff", "composition"] = "wyckoff",
+    embedding_type: Literal["protostructure", "composition"] = "protostructure",
     device: str | None = None,
     collate_fn: Callable = collate_batch,
     **kwargs: Any,
@@ -160,13 +160,13 @@ def df_to_in_mem_dataloader(
         df (pd.DataFrame): Expected to have columns input_col, target_col, id_col.
         input_col (str): Column name holding the input values (Aflow Wyckoff labels or
             composition strings) from which initial embeddings will be constructed.
-            Defaults to "wyckoff".
+            Defaults to "protostructure".
         target_col (str): Column name holding the target values. Defaults to None. Only
             leave this empty if making predictions since target tensor will be set to
             list of Nones.
         id_col (str): Column name holding sample IDs. Defaults to None. If None, IDs
             will be the dataframe index.
-        embedding_type ('wyckoff' | 'composition'): Defaults to "wyckoff".
+        embedding_type ('protostructure' | 'composition'): Defaults to "protostructure".
         device (str): torch.device to load tensors onto. Defaults to
             "cuda" if torch.cuda.is_available() else "cpu".
         collate_fn (Callable): Function to collate data into a batch. Defaults to
@@ -181,12 +181,12 @@ def df_to_in_mem_dataloader(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if embedding_type not in ("wyckoff", "composition"):
-        raise ValueError(f"{embedding_type = } must be 'wyckoff' or 'composition'")
+    if embedding_type not in ("protostructure", "composition"):
+        raise ValueError(f"{embedding_type = } must be 'protostructure' or 'composition'")
 
     initial_embeddings = df[input_col].map(
         wyckoff_embedding_from_protostructure_label
-        if embedding_type == "wyckoff"
+        if embedding_type == "protostructure"
         else get_composition_embedding
     )
     targets = (
