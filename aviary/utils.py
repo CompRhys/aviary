@@ -1,17 +1,18 @@
-from __future__ import annotations
-
 import os
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pickle import PickleError
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from types import ModuleType
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -24,16 +25,13 @@ from torch import LongTensor, Tensor
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
 from torch.optim import SGD, Adam, AdamW, Optimizer
 from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
 from aviary import ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
+from aviary.data import InMemoryDataLoader
 from aviary.losses import robust_l1_loss, robust_l2_loss
-
-if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
-    from types import ModuleType
 
 
 def initialize_model(
@@ -283,10 +281,9 @@ def train_ensemble(
     run_id: int,
     ensemble_folds: int,
     epochs: int,
-    train_set: Dataset | Subset,
-    val_set: Dataset | Subset,
-    log: bool,
-    data_params: dict[str, Any],
+    train_loader: DataLoader,
+    val_loader: DataLoader | None,
+    log: Literal["tensorboard", "wandb"],
     setup_params: dict[str, Any],
     restart_params: dict[str, Any],
     model_params: dict[str, Any],
@@ -303,10 +300,9 @@ def train_ensemble(
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
         epochs (int): Number of epochs to train for.
-        train_set (Subset): Dataloader containing training data.
-        val_set (Subset): Dataloader containing validation data.
+        train_loader (DataLoader): Dataloader containing training data.
+        val_loader (DataLoader | None): Dataloader containing validation data.
         log (bool): Whether to log intermediate metrics to TensorBoard.
-        data_params (dict[str, Any]): Dictionary of data loader parameters
         setup_params (dict[str, Any]): Dictionary of setup parameters
         restart_params (dict[str, Any]): Dictionary of restart parameters
         model_params (dict[str, Any]): Dictionary of model parameters
@@ -316,16 +312,6 @@ def train_ensemble(
             when early stopping. Defaults to None.
         verbose (bool, optional): Whether to show progress bars for each epoch.
     """
-    train_loader = DataLoader(train_set, **data_params)
-    print(f"Training on {len(train_set):,} samples")
-
-    if val_set is not None:
-        data_params.update({"batch_size": 16 * data_params["batch_size"]})
-        val_loader = DataLoader(val_set, **data_params)
-        print(f"Validating on {len(val_set):,} samples")
-    else:
-        val_loader = None
-
     #  this allows us to run ensembles in parallel rather than in series
     #  by specifying the run-id arg.
     for r_id in [run_id] if ensemble_folds == 1 else range(ensemble_folds):
@@ -350,25 +336,44 @@ def train_ensemble(
 
         for target, normalizer in normalizer_dict.items():
             if normalizer is not None:
-                if isinstance(train_set, Subset):
-                    sample_target = Tensor(
-                        train_set.dataset.df[target].iloc[train_set.indices].values
-                    )
+                if isinstance(train_loader, InMemoryDataLoader):
+                    # FIXME: this is really brittle but it works for now.
+                    sample_target = train_loader.tensors[1]
                 else:
-                    sample_target = Tensor(train_set.df[target].values)
+                    data = train_loader.dataset
+                    if isinstance(train_loader.dataset, Subset):
+                        sample_target = Tensor(
+                            data.dataset.df[target].iloc[data.indices].to_numpy()
+                        )
+                    else:
+                        sample_target = Tensor(data.df[target].to_numpy())
 
                 if not restart_params["resume"]:
                     normalizer.fit(sample_target)
                 print(f"Dummy MAE: {(sample_target - normalizer.mean).abs().mean():.4f}")
 
-        if log:
+        if log == "tensorboard":
             writer = SummaryWriter(
                 f"{ROOT}/runs/{model_name}/{model_name}-r{r_id}_{datetime.now():%d-%m-%Y_%H-%M-%S}"
             )
+        elif log == "wandb":
+            wandb.init(
+                project="lightning_logs",
+                # https://docs.wandb.ai/guides/track/launch#init-start-error
+                settings=wandb.Settings(start_method="fork"),
+                name=f"{model_name}-r{r_id}",
+                config={
+                    "model_params": model_params,
+                    "setup_params": setup_params,
+                    "restart_params": restart_params,
+                    "loss_dict": loss_dict,
+                },
+            )
+            writer = "wandb"
         else:
             writer = None
 
-        if (val_set is not None) and (model.best_val_scores is None):
+        if (val_loader is not None) and (model.best_val_scores is None):
             print("Getting Validation Baseline")
             with torch.no_grad():
                 v_metrics = model.evaluate(
@@ -406,15 +411,13 @@ def train_ensemble(
         )
 
 
-# TODO find a better name for this function @janosh
 @torch.no_grad()
 def results_multitask(
     model_class: BaseModelClass,
     model_name: str,
     run_id: int,
     ensemble_folds: int,
-    test_set: Dataset | Subset,
-    data_params: dict[str, Any],
+    test_loader: DataLoader | InMemoryDataLoader,
     robust: bool,
     task_dict: dict[str, TaskType],
     device: type[torch.device] | Literal["cuda", "cpu"],
@@ -429,8 +432,7 @@ def results_multitask(
         model_name (str): String describing the model.
         run_id (int): Unique identifier of the model run.
         ensemble_folds (int): Number of members in ensemble.
-        test_set (Subset): Dataloader containing testing data.
-        data_params (dict[str, Any]): Dictionary of data loader parameters
+        test_loader (DataLoader): Dataloader containing testing data.
         robust (bool): Whether to estimate standard deviation for use in a robust
             loss function.
         task_dict (dict[str, TaskType]): Map of target names to "regression" or
@@ -457,15 +459,17 @@ def results_multitask(
         "------------Evaluate model on Test Set------------\n"
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
     )
-    test_loader = DataLoader(test_set, **data_params)
-    print(f"Testing on {len(test_set):,} samples")
-
     results_dict: dict[str, dict[str, list | np.ndarray]] = {}
+    n_test = (
+        len(test_loader.tensors[0])
+        if isinstance(test_loader, InMemoryDataLoader)
+        else len(test_loader.dataset)
+    )
     for target_name, task_type in task_dict.items():
         results_dict[target_name] = defaultdict(
             list
             if task_type == "classification"
-            else lambda: np.zeros((ensemble_folds, len(test_set)))  # type: ignore[call-overload]
+            else lambda: np.zeros((ensemble_folds, n_test))  # type: ignore[call-overload]
         )
 
     for ens_idx in range(ensemble_folds):
@@ -488,7 +492,7 @@ def results_multitask(
                 f"provided {task_dict=}"
             )
 
-        model = model_class(**checkpoint["model_params"])
+        model: BaseModelClass = model_class(**checkpoint["model_params"])
         model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
 
@@ -502,7 +506,7 @@ def results_multitask(
         y_test, outputs, *ids = model.predict(test_loader)
 
         for output, targets, (target_name, task_type), res_dict in zip(
-            outputs, y_test, model.task_dict.items(), results_dict.values()
+            outputs, y_test, model.task_dict.items(), results_dict.values(), strict=False
         ):
             if task_type == "regression":
                 normalizer = normalizer_dict[target_name]
@@ -533,10 +537,14 @@ def results_multitask(
 
             res_dict["targets"] = targets
 
-    # TODO cleaner way to get identifier names
     if save_results:
+        identifier_names = (
+            [f"idx_{i}" for i in range(len(ids))]
+            if isinstance(test_loader, InMemoryDataLoader)
+            else test_loader.dataset.dataset.identifiers
+        )
         save_results_dict(
-            dict(zip(test_loader.dataset.dataset.identifiers, *ids)),
+            dict(zip(identifier_names, *ids, strict=False)),
             results_dict,
             model_name,
             f"-r{run_id}",

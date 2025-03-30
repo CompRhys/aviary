@@ -36,3 +36,6 @@ examples/**/job-logs/
 examples/**/artifacts/
 examples/**/*.csv
 wandb/
+
+# profiling
+*.prof

@@ -1,22 +1,13 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.io as pio
-from sklearn.metrics import accuracy_score, auc, roc_curve
-
 from matbench.constants import CLF_KEY, REG_KEY
 from matbench.metadata import mbv01_metadata
-from matbench.metadata import mbv01_metadata as matbench_metadata
-
-if TYPE_CHECKING:
-    import pandas as pd
-    from plotly.graph_objs._figure import Figure
-
-__author__ = "Janosh Riebesell"
-__date__ = "2022-04-25"
+from plotly.graph_objs._figure import Figure
+from sklearn.metrics import accuracy_score, auc, roc_curve
 
 pio.templates.default = "plotly_white"
 
@@ -76,7 +67,7 @@ dataset_labels = {
     "matbench_mp_is_metal": "Metallicity DFT",
     "matbench_mp_e_form": "Eᶠ DFT",
 }
-dataset_sizes = {k: v["n_samples"] for k, v in matbench_metadata.items()}
+dataset_sizes = {k: v["n_samples"] for k, v in mbv01_metadata.items()}
 dataset_labels_html = {
     k: f"<b>{v}</b>  {dataset_sizes[k]:,}" for k, v in dataset_labels.items()
 }
