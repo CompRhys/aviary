@@ -276,8 +276,7 @@ def parse_protostructure_label(
 
     if len(elems) != len(wyckoff_letters):
         raise ValueError(
-            f"Chemical system {chemsys} does not match Wyckoff letters "
-            f"{wyckoff_letters}"
+            f"Chemical system {chemsys} does not match Wyckoff letters {wyckoff_letters}"
         )
 
     wyckoff_site_multiplicities = []

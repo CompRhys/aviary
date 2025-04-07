@@ -214,9 +214,9 @@ def predict_from_wandb_checkpoints(
     print(f"Using checkpoints from {len(runs)} run(s):")
 
     run_target = runs[0].config["target"]
-    assert all(
-        run_target == run.config["target"] for run in runs
-    ), f"Runs have differing targets, first {run_target=}"
+    assert all(run_target == run.config["target"] for run in runs), (
+        f"Runs have differing targets, first {run_target=}"
+    )
 
     target_col = kwargs.get("target_col")
     if target_col and target_col != run_target:

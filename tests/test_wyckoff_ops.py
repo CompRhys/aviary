@@ -349,9 +349,9 @@ def test_get_protostructure_label_from_aflow(structure, expected):
 @pytest.mark.parametrize("structure, expected", zip(TEST_STRUCTS, TEST_PROTOSTRUCTURES))
 def test_get_protostructure_label_from_moyopy(structure, expected):
     """Check that moyopy gives correct protostructure label simple cases."""
-    assert (
-        get_protostructure_label_from_moyopy(structure) == expected
-    ), f"unexpected moyopy protostructure for {structure=}"
+    assert get_protostructure_label_from_moyopy(structure) == expected, (
+        f"unexpected moyopy protostructure for {structure=}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -365,9 +365,9 @@ def test_moyopy_spglib_consistency(protostructure):
     moyopy_label = get_protostructure_label_from_moyopy(struct)
     spglib_label = get_protostructure_label_from_spglib(struct)
 
-    assert (
-        moyopy_label == spglib_label
-    ), f"spglib moyopy protostructure mismatch for {protostructure}"
+    assert moyopy_label == spglib_label, (
+        f"spglib moyopy protostructure mismatch for {protostructure}"
+    )
 
 
 @pytest.mark.skipif(pyxtal is None, reason="pyxtal not installed")
