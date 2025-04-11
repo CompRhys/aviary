@@ -37,6 +37,7 @@ class Wrenformer(BaseModelClass):
         d_model: int = 128,
         n_attn_layers: int = 6,
         n_attn_heads: int = 4,
+        dropout: float = 0.0,
         trunk_hidden: Sequence[int] = (1024, 512),
         out_hidden: Sequence[int] = (256, 128, 64),
         embedding_aggregations: Sequence[str] = ("mean",),
@@ -55,6 +56,8 @@ class Wrenformer(BaseModelClass):
                 to 3.
             n_attn_heads (int): Number of attention heads to use in the transformer.
                 d_model needs to be divisible by this number. Defaults to 4.
+            dropout (float, optional): Dropout rate for the transformer encoder. Defaults
+                to 0.
             trunk_hidden (list[int], optional): Number of hidden units in the trunk
                 network which is shared across tasks when multitasking. Defaults to
                 [1024, 512].
@@ -79,6 +82,7 @@ class Wrenformer(BaseModelClass):
             "d_model": d_model,
             "n_attn_layers": n_attn_layers,
             "n_attn_heads": n_attn_heads,
+            "dropout": dropout,
             "trunk_hidden": trunk_hidden,
             "out_hidden": out_hidden,
             "embedding_aggregations": embedding_aggregations,
@@ -89,7 +93,11 @@ class Wrenformer(BaseModelClass):
         self.resize_embedding = nn.Linear(n_features, d_model)
 
         transformer_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=n_attn_heads, batch_first=True, norm_first=True
+            d_model=d_model,
+            nhead=n_attn_heads,
+            batch_first=True,
+            norm_first=True,
+            dropout=dropout,
         )
         self.transformer_encoder = nn.TransformerEncoder(
             transformer_layer, num_layers=n_attn_layers, enable_nested_tensor=False
