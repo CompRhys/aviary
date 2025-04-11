@@ -62,6 +62,6 @@ DATA_PATHS = {
     for path in glob(f"{current_dir}/datasets/matbench_*.json.bz2")
 }
 
-assert len(DATA_PATHS) == len(
-    matbench_datasets
-), f"glob found {len(DATA_PATHS)} data sets, expected {len(matbench_datasets)}"
+assert len(DATA_PATHS) == len(matbench_datasets), (
+    f"glob found {len(DATA_PATHS)} data sets, expected {len(matbench_datasets)}"
+)
