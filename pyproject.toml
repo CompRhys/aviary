@@ -36,7 +36,7 @@ requires-python = ">=3.10"
 dependencies = [
   "numpy>=2,<3",
   "pandas",
-  "pymatgen>2025.3.10",
+  "pymatgen>=2025.4.10",
   "scikit_learn",
   "tensorboard",
   "torch>=2.3.0",
