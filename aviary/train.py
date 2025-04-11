@@ -433,9 +433,9 @@ def checkpoint_model(
         torch.save(checkpoint_dict, checkpoint_path)
 
     if checkpoint_endpoint == "wandb":
-        assert (
-            wandb.run is not None
-        ), "can't save model checkpoint to Weights and Biases, wandb.run is None"
+        assert wandb.run is not None, (
+            "can't save model checkpoint to Weights and Biases, wandb.run is None"
+        )
         torch.save(
             checkpoint_dict,
             f"{wandb.run.dir}/{timestamp + '-' if timestamp else ''}{run_name}-{epochs}.pth",
@@ -584,9 +584,9 @@ def df_train_test_split(
     if folds:
         n_folds, test_fold_idx = folds
         assert 1 < n_folds <= 10, f"{n_folds = } must be between 2 and 10"
-        assert (
-            0 <= test_fold_idx < n_folds
-        ), f"{test_fold_idx = } must be between 0 and {n_folds - 1}"
+        assert 0 <= test_fold_idx < n_folds, (
+            f"{test_fold_idx = } must be between 0 and {n_folds - 1}"
+        )
 
         df_splits: list[pd.DataFrame] = np.array_split(df, n_folds)
         test_df = df_splits.pop(test_fold_idx)
