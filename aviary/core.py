@@ -32,6 +32,7 @@ class BaseModelClass(nn.Module, ABC):
         epoch: int = 0,
         device: str | None = None,
         best_val_scores: dict[str, float] | None = None,
+        **kwargs,
     ) -> None:
         """Store core model parameters.
 
@@ -47,6 +48,7 @@ class BaseModelClass(nn.Module, ABC):
             device (str, optional): Device to store the model parameters on.
             best_val_scores (dict[str, float], optional): Validation score to use for
                 early stopping. Defaults to None.
+            **kwargs: Additional keyword arguments.
         """
         super().__init__()
         self.task_dict = task_dict
@@ -299,8 +301,9 @@ class BaseModelClass(nn.Module, ABC):
                         preds = output.squeeze(1)
                         loss = loss_func(preds, targets)
 
-                    z_scored_error = preds - targets
-                    error = normalizer.std * z_scored_error.data.cpu()
+                    denormed_preds = normalizer.denorm(preds)
+                    denormed_targets = normalizer.denorm(targets)
+                    error = denormed_preds - denormed_targets
                     target_metrics["MAE"].append(float(error.abs().mean()))
                     target_metrics["MSE"].append(float(error.pow(2).mean()))
 

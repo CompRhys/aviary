@@ -1,10 +1,13 @@
+import json
 from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
+from pymatgen.core import Element
 from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
 
+from aviary import PKG_DIR
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.segments import MessageLayer, WeightedAttentionPooling
@@ -25,7 +28,7 @@ class Roost(BaseModelClass):
         self,
         robust: bool,
         n_targets: Sequence[int],
-        elem_emb_len: int,
+        elem_embedding: str = "matscholar200",
         elem_fea_len: int = 64,
         n_graph: int = 3,
         elem_heads: int = 3,
@@ -40,6 +43,21 @@ class Roost(BaseModelClass):
     ) -> None:
         """Composition-only model."""
         super().__init__(robust=robust, **kwargs)
+
+        if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
+
+        with open(elem_embedding) as file:
+            self.elem_features = json.load(file)
+
+        max_z = max(Element(elem).Z for elem in self.elem_features)
+        elem_emb_len = len(next(iter(self.elem_features.values())))
+        elem_feature_matrix = torch.zeros((max_z + 1, elem_emb_len))
+        for elem, feature in self.elem_features.items():
+            elem_feature_matrix[Element(elem).Z] = torch.tensor(feature)
+
+        self.elem_embedding = nn.Embedding(max_z + 1, elem_emb_len)
+        self.elem_embedding.weight.data.copy_(elem_feature_matrix)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -60,6 +78,7 @@ class Roost(BaseModelClass):
             "n_targets": n_targets,
             "out_hidden": out_hidden,
             "trunk_hidden": trunk_hidden,
+            "elem_embedding": elem_embedding,
             **desc_dict,
         }
         self.model_params.update(model_params)
@@ -83,6 +102,8 @@ class Roost(BaseModelClass):
         cry_elem_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
         """Forward pass through the material_nn and output_nn."""
+        elem_fea = self.elem_embedding(elem_fea)
+
         crys_fea = self.material_nn(
             elem_weights, elem_fea, self_idx, nbr_idx, cry_elem_idx
         )

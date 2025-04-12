@@ -1,4 +1,3 @@
-import json
 from collections.abc import Sequence
 from functools import cache
 from typing import Any
@@ -10,8 +9,6 @@ from pymatgen.core import Composition
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
-from aviary import PKG_DIR
-
 
 class CompositionData(Dataset):
     """Dataset class for the Roost composition model."""
@@ -20,7 +17,6 @@ class CompositionData(Dataset):
         self,
         df: pd.DataFrame,
         task_dict: dict[str, str],
-        elem_embedding: str = "matscholar200",
         inputs: str = "composition",
         identifiers: Sequence[str] = ("material_id", "composition"),
     ):
@@ -46,14 +42,6 @@ class CompositionData(Dataset):
         self.task_dict = task_dict
         self.identifiers = list(identifiers)
         self.df = df
-
-        if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
-            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-
-        with open(elem_embedding) as file:
-            self.elem_features = json.load(file)
-
-        self.elem_emb_len = len(next(iter(self.elem_features.values())))
 
         self.n_targets = []
         for target, task in self.task_dict.items():
@@ -88,24 +76,12 @@ class CompositionData(Dataset):
         composition = row[self.inputs]
         material_ids = row[self.identifiers].to_list()
 
-        comp_dict = Composition(composition).get_el_amt_dict()
-        elements = list(comp_dict)
-
+        comp_dict = Composition(composition).fractional_composition
         weights = list(comp_dict.values())
         weights = np.atleast_2d(weights).T / np.sum(weights)
+        elem_fea = [elem.Z for elem in comp_dict]
 
-        try:
-            elem_fea = np.vstack([self.elem_features[element] for element in elements])
-        except AssertionError as exc:
-            raise AssertionError(
-                f"{material_ids} contains element types not in embedding"
-            ) from exc
-        except ValueError as exc:
-            raise ValueError(
-                f"{material_ids} composition cannot be parsed into elements"
-            ) from exc
-
-        n_elems = len(elements)
+        n_elems = len(comp_dict)
         self_idx = []
         nbr_idx = []
         for elem_idx in range(n_elems):
@@ -114,7 +90,7 @@ class CompositionData(Dataset):
 
         # convert all data to tensors
         elem_weights = Tensor(weights)
-        elem_fea = Tensor(elem_fea)
+        elem_fea = LongTensor(elem_fea)
         self_idx = LongTensor(self_idx)
         nbr_idx = LongTensor(nbr_idx)
 

@@ -86,9 +86,8 @@ def main(
     # NOTE do not use default_na as "NaN" is a valid material
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-    dataset = CompositionData(df=df, elem_embedding=elem_embedding, task_dict=task_dict)
+    dataset = CompositionData(df=df, task_dict=task_dict)
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
 
     train_idx = list(range(len(dataset)))
 
@@ -99,9 +98,7 @@ def main(
             df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
 
             print(f"using independent test set: {test_path}")
-            test_set = CompositionData(
-                df=df, elem_embedding=elem_embedding, task_dict=task_dict
-            )
+            test_set = CompositionData(df=df, task_dict=task_dict)
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0:
             raise ValueError("test-size must be non-zero to evaluate model")
@@ -119,9 +116,7 @@ def main(
             df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
 
             print(f"using independent validation set: {val_path}")
-            val_set = CompositionData(
-                df=df, elem_embedding=elem_embedding, task_dict=task_dict
-            )
+            val_set = CompositionData(df=df, task_dict=task_dict)
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         elif val_size == 0 and evaluate:
             print("No validation set used, using test set for evaluation purposes")
@@ -172,7 +167,7 @@ def main(
         "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
+        "elem_embedding": elem_embedding,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
         "elem_heads": 3,

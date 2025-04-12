@@ -69,11 +69,9 @@ def test_roost_regression(
 
     dataset = CompositionData(
         df=df_matbench_phonons,
-        elem_embedding=base_config["elem_embedding"],
         task_dict=task_dict,
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
 
     train_idx = list(range(len(dataset)))
     train_idx, test_idx = split(
@@ -111,7 +109,7 @@ def test_roost_regression(
         "task_dict": task_dict,
         "robust": base_config["robust"],
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
+        "elem_embedding": base_config["elem_embedding"],
         **model_architecture,  # unpack all model architecture parameters
     }
 
@@ -179,11 +177,9 @@ def test_roost_clf(df_matbench_phonons, base_config, model_architecture, trainin
 
     dataset = CompositionData(
         df=df_matbench_phonons,
-        elem_embedding=base_config["elem_embedding"],
         task_dict=task_dict,
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
 
     train_idx = list(range(len(dataset)))
     train_idx, test_idx = split(
@@ -221,7 +217,7 @@ def test_roost_clf(df_matbench_phonons, base_config, model_architecture, trainin
         "task_dict": task_dict,
         "robust": base_config["robust"],
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
+        "elem_embedding": base_config["elem_embedding"],
         **model_architecture,  # unpack all model architecture parameters
     }
 
