@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 import json
+from collections.abc import Sequence
 from functools import cache
 from itertools import groupby
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
 from pymatgen.analysis.prototypes import (
     RE_SUBST_ONE_PREFIX,
@@ -18,11 +18,6 @@ from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import pandas as pd
-
 
 class WyckoffData(Dataset):
     """Wyckoff dataset class for the Wren model."""
@@ -33,8 +28,8 @@ class WyckoffData(Dataset):
         task_dict: dict[str, str],
         elem_embedding: str = "matscholar200",
         sym_emb: str = "bra-alg-off",
-        inputs: str = "wyckoff",
-        identifiers: Sequence[str] = ("material_id", "composition", "wyckoff"),
+        inputs: str = "protostructure",
+        identifiers: Sequence[str] = ("material_id", "composition", "protostructure"),
     ):
         """Data class for Wren models.
 
@@ -48,10 +43,10 @@ class WyckoffData(Dataset):
             sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or
                 "spg-alg-off" or path to a file with custom symmetry embeddings.
             inputs (str, optional): df columns to be used for featurization.
-                Defaults to "wyckoff".
+                Defaults to "protostructure".
             identifiers (list, optional): df columns for distinguishing data points.
                 Will be copied over into the model's output CSV. Defaults to
-                ["material_id", "composition", "wyckoff"].
+                ["material_id", "composition", "protostructure"].
         """
         if len(identifiers) < 2:
             raise AssertionError("Two identifiers are required")
@@ -180,23 +175,6 @@ def collate_batch(
 ) -> tuple[Any, ...]:
     """Collate a list of data and return a batch for predicting
     crystal properties.
-
-    Args:
-        samples ([tuple]): list of tuples for each data point.
-            (elem_fea, nbr_fea, nbr_idx, target)
-
-            elem_fea (Tensor): Node features from atom type and Wyckoff letter
-            nbr_fea (Tensor): _description_
-            nbr_idx (LongTensor):
-            target (Tensor):
-            cif_id: str or int
-
-    Returns:
-        tuple[
-            tuple[Tensor * 3, LongTensor * 4]: batched Wren model inputs,
-            tuple[Tensor | LongTensor]: Target values for different tasks,
-            *tuple[str | int]]: Identifiers like material_id, composition
-        ]
     """
     # define the lists
     batch_mult_weights = []
@@ -251,8 +229,10 @@ def collate_batch(
             torch.cat(crystal_wyk_idx),
             torch.cat(aug_cry_idx),
         ),
-        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        *zip(*batch_cry_ids),
+        tuple(
+            torch.stack(b_target, dim=0) for b_target in zip(*batch_targets, strict=False)
+        ),
+        *zip(*batch_cry_ids, strict=False),
     )
 
 
@@ -283,7 +263,7 @@ def parse_protostructure_label(
     elements = []
     wyckoff_set = []
 
-    for el, wyk_letters_per_elem in zip(elems, wyckoff_letters):
+    for el, wyk_letters_per_elem in zip(elems, wyckoff_letters, strict=False):
         # Normalize Wyckoff letters to start with 1 if missing digit
         wyk_letters_normalized = RE_WYCKOFF_NO_PREFIX.sub(
             RE_SUBST_ONE_PREFIX, wyk_letters_per_elem
@@ -296,7 +276,7 @@ def parse_protostructure_label(
         mults = map(int, sep_n_wyks[0::2])
         letters = sep_n_wyks[1::2]
 
-        for mult, letter in zip(mults, letters):
+        for mult, letter in zip(mults, letters, strict=False):
             elements.extend([el] * mult)
             wyckoff_set.extend([letter] * mult)
             wyckoff_site_multiplicities.extend(

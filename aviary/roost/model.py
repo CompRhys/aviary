@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
@@ -10,9 +8,6 @@ from torch import LongTensor, Tensor, nn
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.segments import MessageLayer, WeightedAttentionPooling
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @due.dcite(Doi("10.1038/s41467-020-19964-7"), description="Roost model")
@@ -43,30 +38,7 @@ class Roost(BaseModelClass):
         out_hidden: Sequence[int] = (256, 128, 64),
         **kwargs,
     ) -> None:
-        """Composition-only model.
-
-        Args:
-            robust (bool): If True, the number of model outputs is doubled. 2nd output
-                for each target will be an estimate for the aleatoric uncertainty
-                (uncertainty inherent to the sample) which can be used with a robust
-                loss function to attenuate the weighting of uncertain samples.
-            n_targets (list[int]): Number of targets to train on
-            elem_emb_len (int): Number of features in initial element embedding
-            elem_fea_len (int, optional): Number of hidden features to use to encode
-                elements. Defaults to 64.
-            n_graph (int, optional): Number of message passing operations to carry out.
-                Defaults to 3.
-            elem_heads (int, optional): Number of parallel attention heads per message
-                passing operation. Defaults to 3.
-            elem_gate (list[int], optional): _description_. Defaults to (256,).
-            elem_msg (list[int], optional): _description_. Defaults to (256,).
-            cry_heads (int, optional): _description_. Defaults to 3.
-            cry_gate (list[int], optional): _description_. Defaults to (256,).
-            cry_msg (list[int], optional): _description_. Defaults to (256,).
-            trunk_hidden (list[int], optional): _description_. Defaults to (1024, 512).
-            out_hidden (list[int], optional): _description_. Defaults to (256, 128, 64).
-            **kwargs: Additional keyword arguments to pass to BaseModelClass.
-        """
+        """Composition-only model."""
         super().__init__(robust=robust, **kwargs)
 
         desc_dict = {
@@ -110,18 +82,7 @@ class Roost(BaseModelClass):
         nbr_idx: LongTensor,
         cry_elem_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
-        """Forward pass through the material_nn and output_nn.
-
-        Args:
-            elem_weights (Tensor): _description_
-            elem_fea (Tensor): _description_
-            self_idx (LongTensor): _description_
-            nbr_idx (LongTensor): _description_
-            cry_elem_idx (LongTensor): _description_
-
-        Returns:
-            tuple[Tensor, ...]: _description_
-        """
+        """Forward pass through the material_nn and output_nn."""
         crys_fea = self.material_nn(
             elem_weights, elem_fea, self_idx, nbr_idx, cry_elem_idx
         )
@@ -149,19 +110,6 @@ class DescriptorNetwork(nn.Module):
     ) -> None:
         """Bundles n_graph message passing layers followed by cry_heads weighted
         attention pooling layers.
-
-        Args:
-            elem_emb_len (int): Element embedding length.
-            elem_fea_len (int, optional): Element feature length. Defaults to 64.
-            n_graph (int, optional): Number of message-passing layers. Defaults to 3.
-            elem_heads (int, optional): Message-passing heads in each MP layer.
-                Defaults to 3.
-            elem_gate (list[int], optional): Message gate layers in each MP layer.
-                Defaults to (256,).
-            elem_msg (list[int], optional): _description_. Defaults to (256,).
-            cry_heads (int, optional): _description_. Defaults to 3.
-            cry_gate (list[int], optional): _description_. Defaults to (256,).
-            cry_msg (list[int], optional): _description_. Defaults to (256,).
         """
         super().__init__()
 

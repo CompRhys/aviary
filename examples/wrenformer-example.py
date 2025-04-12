@@ -3,12 +3,10 @@ import argparse
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split as split
-from torch.utils.data import DataLoader
 
-from aviary import ROOT
 from aviary.utils import results_multitask, train_ensemble
-from aviary.wren.data import WyckoffData, collate_batch
-from aviary.wren.model import Wren
+from aviary.wrenformer.data import df_to_in_mem_dataloader
+from aviary.wrenformer.model import Wrenformer
 
 
 def main(
@@ -17,24 +15,22 @@ def main(
     tasks,
     losses,
     robust,
-    elem_embedding="matscholar200",
-    sym_emb="bra-alg-off",
-    model_name="wren",
-    sym_fea_len=32,
-    elem_fea_len=32,
-    n_graph=3,
+    model_name="wrenformer",
+    embedding_type="protostructure",
+    n_attn_layers=6,
+    n_attn_heads=4,
+    d_model=128,
     ensemble=1,
     run_id=1,
     data_seed=42,
     epochs=100,
-    patience=None,
-    log=True,
+    log=False,
     sample=1,
     test_size=0.2,
     test_path=None,
     val_size=0,
     val_path=None,
-    resume=None,
+    resume=False,
     fine_tune=None,
     transfer=None,
     train=True,
@@ -48,10 +44,10 @@ def main(
     device=None,
     **kwargs,
 ):
-    """Train and evaluate a Wren model."""
+    """Train and evaluate a Wrenformer model."""
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"The model will run on the {args.device} device")
+    print(f"The model will run on the {device} device")
 
     if not len(targets) == len(tasks) == len(losses):
         raise AssertionError
@@ -61,166 +57,108 @@ def main(
             "No action given - At least one of 'train' or 'evaluate' cli flags required"
         )
 
-    if test_path:
-        test_size = 0
-
-    if not (test_path and val_path) and test_size + val_size >= 1:
+    if test_size + val_size >= 1:
         raise AssertionError(
             f"'test_size'({test_size}) plus 'val_size'({val_size}) must be less than 1"
         )
 
-    if ensemble > 1 and (fine_tune or transfer):
-        raise NotImplementedError(
-            "If training an ensemble with fine tuning or transferring"
-            " options the models must be trained one by one using the"
-            " run-id flag."
-        )
-
-    if fine_tune and transfer:
-        raise AssertionError(
-            "Cannot fine-tune and transfer checkpoint(s) at the same time."
-        )
-
-    # TODO CLI controls for loss dict.
-
     task_dict = dict(zip(targets, tasks, strict=False))
     loss_dict = dict(zip(targets, losses, strict=False))
 
-    # NOTE make sure to use dense datasets,
-    # NOTE do not use default_na as "NaN" is a valid material composition
+    # Load and preprocess data
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-    dataset = WyckoffData(
-        df=df, elem_embedding=elem_embedding, sym_emb=sym_emb, task_dict=task_dict
-    )
-    n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    sym_emb_len = dataset.sym_emb_len
-
-    train_idx = list(range(len(dataset)))
-
+    # Split datasets
     if evaluate:
         if test_path:
-            # NOTE make sure to use dense datasets,
-            # NOTE do not use default_na as "NaN" is a valid material
-            df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
-
             print(f"using independent test set: {test_path}")
-            test_set = WyckoffData(
-                df=df,
-                elem_embedding=elem_embedding,
-                sym_emb=sym_emb,
-                task_dict=task_dict,
-            )
-            test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
-        elif test_size == 0:
-            raise ValueError("test-size must be non-zero to evaluate model")
+            test_df = pd.read_csv(test_path, keep_default_na=False, na_values=[])
         else:
             print(f"using {test_size} of training set as test set")
-            train_idx, test_idx = split(
-                train_idx, random_state=data_seed, test_size=test_size
-            )
-            test_set = torch.utils.data.Subset(dataset, test_idx)
+            train_df, test_df = split(df, random_state=data_seed, test_size=test_size)
 
     if train:
         if val_path:
-            # NOTE make sure to use dense datasets,
-            # NOTE do not use default_na as "NaN" is a valid material
-            df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
-
             print(f"using independent validation set: {val_path}")
-            val_set = WyckoffData(
-                df=df,
-                elem_embedding=elem_embedding,
-                sym_emb=sym_emb,
-                task_dict=task_dict,
-            )
-            val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
+            val_df = pd.read_csv(val_path, keep_default_na=False, na_values=[])
         elif val_size == 0 and evaluate:
             print("No validation set used, using test set for evaluation purposes")
-            # NOTE that when using this option care must be taken not to
-            # peak at the test-set. The only valid model to use is the one
-            # obtained after the final epoch where the epoch count is
-            # decided in advance of the experiment.
-            val_set = test_set
+            val_df = test_df
         elif val_size == 0:
-            val_set = None
+            val_df = None
         else:
             print(f"using {val_size} of training set as validation set")
             test_size = val_size / (1 - test_size)
-            train_idx, val_idx = split(
-                train_idx, random_state=data_seed, test_size=test_size
+            train_df, val_df = split(
+                train_df, random_state=data_seed, test_size=test_size
             )
-            val_set = torch.utils.data.Subset(dataset, val_idx)
 
-        train_set = torch.utils.data.Subset(dataset, train_idx[0::sample])
-
-    data_params = {
-        "batch_size": batch_size,
-        "num_workers": workers,
-        "pin_memory": False,
-        "shuffle": True,
-        "collate_fn": collate_batch,
-    }
-
-    setup_params = {
-        "optim": optim,
-        "learning_rate": learning_rate,
-        "weight_decay": weight_decay,
-        "momentum": momentum,
-        "device": device,
-    }
-
-    if resume:
-        resume = f"{ROOT}/models/{model_name}/checkpoint-r{run_id}.pth.tar"
-
-    restart_params = {
-        "resume": resume,
-        "fine_tune": fine_tune,
-        "transfer": transfer,
-    }
-
-    model_params = {
-        "task_dict": task_dict,
-        "robust": robust,
-        "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "sym_emb_len": sym_emb_len,
-        "elem_fea_len": elem_fea_len,
-        "sym_fea_len": sym_fea_len,
-        "n_graph": n_graph,
-        "elem_heads": 1,
-        "elem_gate": [256],
-        "elem_msg": [256],
-        "cry_heads": 1,
-        "cry_gate": [256],
-        "cry_msg": [256],
-        "out_hidden": [256, 256],
-        "trunk_hidden": [128, 64],
-    }
+    # Setup data loaders
+    data_loader_kwargs = dict(
+        id_col="material_id",
+        input_col="protostructure",
+        target_col=targets[0],
+        embedding_type=embedding_type,
+        device=device,
+    )
 
     if train:
-        train_loader = DataLoader(train_set, **data_params)
+        if sample > 1:
+            train_df = train_df.iloc[::sample].copy()
 
-        if val_set is not None:
-            val_loader = DataLoader(
-                val_set,
-                **{
-                    **data_params,
-                    "batch_size": 16 * data_params["batch_size"],
-                    "shuffle": False,
-                },
-            )
-        else:
-            val_loader = None
+        train_loader = df_to_in_mem_dataloader(
+            train_df,
+            batch_size=batch_size,
+            shuffle=True,
+            **data_loader_kwargs,
+        )
+
+        val_loader = df_to_in_mem_dataloader(
+            val_df,
+            batch_size=batch_size * 16,
+            shuffle=False,
+            **data_loader_kwargs,
+        )
+
+        # Model parameters
+        n_targets = [
+            1 if task_type == "regression" else train_df[target_col].max() + 1
+            for target_col, task_type in task_dict.items()
+        ]
+
+        model_params = {
+            "task_dict": task_dict,
+            "robust": robust,
+            "n_targets": n_targets,
+            "n_features": train_loader.tensors[0][0].shape[-1],
+            "d_model": d_model,
+            "n_attn_layers": n_attn_layers,
+            "n_attn_heads": n_attn_heads,
+            "trunk_hidden": (1024, 512),
+            "out_hidden": (256, 128, 64),
+            "embedding_aggregations": ("mean",),
+        }
+
+        setup_params = {
+            "optim": optim,
+            "learning_rate": learning_rate,
+            "weight_decay": weight_decay,
+            "momentum": momentum,
+            "device": device,
+        }
+
+        restart_params = {
+            "resume": resume,
+            "fine_tune": fine_tune,
+            "transfer": transfer,
+        }
 
         train_ensemble(
-            model_class=Wren,
+            model_class=Wrenformer,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
             epochs=epochs,
-            patience=patience,
             train_loader=train_loader,
             val_loader=val_loader,
             log=log,
@@ -231,17 +169,15 @@ def main(
         )
 
     if evaluate:
-        test_loader = DataLoader(
-            test_set,
-            **{
-                **data_params,
-                "batch_size": 64 * data_params["batch_size"],
-                "shuffle": False,
-            },
+        test_loader = df_to_in_mem_dataloader(
+            test_df,
+            batch_size=batch_size * 64,
+            shuffle=False,
+            **data_loader_kwargs,
         )
 
         results_multitask(
-            model_class=Wren,
+            model_class=Wrenformer,
             model_name=model_name,
             run_id=run_id,
             ensemble_folds=ensemble,
@@ -250,12 +186,13 @@ def main(
             task_dict=task_dict,
             device=device,
             eval_type="checkpoint",
+            save_results=False,
         )
 
 
 def input_parser():
-    """Parse input."""
-    parser = argparse.ArgumentParser(description=("Wren"))
+    """Parse input arguments."""
+    parser = argparse.ArgumentParser(description=("Wrenformer"))
 
     # data inputs
     parser.add_argument(
@@ -284,20 +221,6 @@ def input_parser():
         type=float,
         metavar="FLOAT",
         help="Proportion of data set for testing",
-    )
-
-    # data embeddings
-    parser.add_argument(
-        "--elem-emb",
-        default="matscholar200",
-        metavar="STR/PATH",
-        help="Preset embedding name or path to JSON file",
-    )
-    parser.add_argument(
-        "--sym-emb",
-        default="bra-alg-off",
-        metavar="STR/PATH",
-        help="Preset embedding name or path to JSON file",
     )
 
     # data loader inputs
@@ -394,29 +317,6 @@ def input_parser():
         help="Optimizer weight decay (default: 1e-6)",
     )
 
-    # graph inputs
-    parser.add_argument(
-        "--elem-fea-len",
-        default=32,
-        type=int,
-        metavar="INT",
-        help="Number of hidden features for elements (default: 64)",
-    )
-    parser.add_argument(
-        "--sym-fea-len",
-        default=32,
-        type=int,
-        metavar="INT",
-        help="Number of hidden features for elements (default: 64)",
-    )
-    parser.add_argument(
-        "--n-graph",
-        default=3,
-        type=int,
-        metavar="INT",
-        help="Number of message passing layers (default: 3)",
-    )
-
     # ensemble inputs
     parser.add_argument(
         "--ensemble",
@@ -470,6 +370,36 @@ def input_parser():
         "--log", action="store_true", help="Log training metrics to TensorBoard"
     )
 
+    # model architecture inputs
+    parser.add_argument(
+        "--embedding-type",
+        default="protostructure",
+        type=str,
+        metavar="STR",
+        help="Type of embedding to use (default: 'protostructure')",
+    )
+    parser.add_argument(
+        "--n-attn-layers",
+        default=6,
+        type=int,
+        metavar="INT",
+        help="Number of attention layers (default: 6)",
+    )
+    parser.add_argument(
+        "--n-attn-heads",
+        default=4,
+        type=int,
+        metavar="INT",
+        help="Number of attention heads per layer (default: 4)",
+    )
+    parser.add_argument(
+        "--d-model",
+        default=128,
+        type=int,
+        metavar="INT",
+        help="Dimension of model embeddings (default: 128)",
+    )
+
     args = parser.parse_args()
 
     if args.model_name is None:
@@ -486,5 +416,4 @@ def input_parser():
 
 if __name__ == "__main__":
     args = input_parser()
-
     raise SystemExit(main(**vars(args)))

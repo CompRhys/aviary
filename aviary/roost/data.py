@@ -1,21 +1,16 @@
-from __future__ import annotations
-
 import json
+from collections.abc import Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
 from pymatgen.core import Composition
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import pandas as pd
 
 
 class CompositionData(Dataset):
@@ -149,10 +144,9 @@ def collate_batch(
     Args:
         samples (list): list of tuples for each data point where each tuple contains:
             (elem_fea, nbr_fea, nbr_idx, target)
-            - elem_fea (Tensor):  _description_
-            - nbr_fea (Tensor):
-            - self_idx (LongTensor):
-            - nbr_idx (LongTensor):
+            - elem_fea (Tensor): Atom hidden features before convolution
+            - self_idx (LongTensor): Indices of the atom's self
+            - nbr_idx (LongTensor): Indices of M neighbors of each atom
             - target (Tensor | LongTensor): target values containing floats for
                 regression or integers as class labels for classification
             - cif_id: str or int
@@ -207,6 +201,8 @@ def collate_batch(
             torch.cat(batch_nbr_idx, dim=0),
             torch.cat(crystal_elem_idx),
         ),
-        tuple(torch.stack(b_target, dim=0) for b_target in zip(*batch_targets)),
-        *zip(*batch_cry_ids),
+        tuple(
+            torch.stack(b_target, dim=0) for b_target in zip(*batch_targets, strict=False)
+        ),
+        *zip(*batch_cry_ids, strict=False),
     )

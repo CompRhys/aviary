@@ -5,9 +5,6 @@ import torch
 from matminer.datasets import load_dataset
 from pymatgen.analysis.prototypes import get_protostructure_label_from_spglib
 
-__author__ = "Janosh Riebesell"
-__date__ = "2022-04-09"
-
 torch.manual_seed(0)  # ensure reproducible results (applies to all tests)
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +33,7 @@ def df_matbench_jdft2d():
     df = df.set_index("material_id", drop=False)
     df["composition"] = [x.composition.formula.replace(" ", "") for x in df.structure]
 
-    df["wyckoff"] = df.structure.map(get_protostructure_label_from_spglib)
+    df["protostructure"] = df.structure.map(get_protostructure_label_from_spglib)
 
     return df
 
@@ -46,7 +43,7 @@ def df_matbench_phonons_wyckoff(df_matbench_phonons):
     """Getting Aflow labels is expensive so we split into a separate fixture to avoid
     paying for it unless requested.
     """
-    df_matbench_phonons["wyckoff"] = df_matbench_phonons.structure.map(
+    df_matbench_phonons["protostructure"] = df_matbench_phonons.structure.map(
         get_protostructure_label_from_spglib
     )
 

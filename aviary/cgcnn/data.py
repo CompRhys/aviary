@@ -1,23 +1,18 @@
-from __future__ import annotations
-
 import itertools
 import json
+from collections.abc import Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
+from pymatgen.core import Structure
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from aviary import PKG_DIR
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import pandas as pd
-    from pymatgen.core import Structure
 
 
 class CrystalGraphData(Dataset):
@@ -253,9 +248,10 @@ def collate_batch(
     return (
         (atom_fea, nbr_dist, self_idx, nbr_idx, cry_idx),
         tuple(
-            torch.stack(b_target, dim=0).to(device) for b_target in zip(*batch_targets)
+            torch.stack(b_target, dim=0).to(device)
+            for b_target in zip(*batch_targets, strict=False)
         ),
-        *zip(*batch_identifiers),
+        *zip(*batch_identifiers, strict=False),
     )
 
 
@@ -332,10 +328,12 @@ def get_structure_neighbor_info(
         _neighbor_dists: list[float] = []
 
         for _, idx_group in itertools.groupby(  # group by site index
-            zip(site_indices, neighbor_indices, neighbor_dists), key=lambda x: x[0]
+            zip(site_indices, neighbor_indices, neighbor_dists, strict=False),
+            key=lambda x: x[0],
         ):
             site_indices, neighbor_idx, neighbor_dist = zip(
-                *sorted(idx_group, key=lambda x: x[2])  # sort by distance
+                *sorted(idx_group, key=lambda x: x[2]),
+                strict=False,  # sort by distance
             )
             _center_indices.extend(site_indices[:max_num_nbr])
             _neighbor_indices.extend(neighbor_idx[:max_num_nbr])

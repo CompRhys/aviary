@@ -1,11 +1,6 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from torch import Tensor, nn
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 class SimpleNetwork(nn.Module):
@@ -50,7 +45,7 @@ class SimpleNetwork(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass through network."""
-        for fc, bn, act in zip(self.fcs, self.bns, self.acts):
+        for fc, bn, act in zip(self.fcs, self.bns, self.acts, strict=False):
             x = act(bn(fc(x)))
 
         return self.fc_out(x)
@@ -117,7 +112,9 @@ class ResidualNetwork(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass through network."""
-        for fc, bn, res_fc, act in zip(self.fcs, self.bns, self.res_fcs, self.acts):
+        for fc, bn, res_fc, act in zip(
+            self.fcs, self.bns, self.res_fcs, self.acts, strict=False
+        ):
             x = act(bn(fc(x))) + res_fc(x)
 
         return self.fc_out(x)

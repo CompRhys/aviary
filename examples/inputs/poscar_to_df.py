@@ -1,6 +1,4 @@
 # %%
-from __future__ import annotations
-
 import glob
 import os
 
@@ -64,14 +62,16 @@ df = df.drop_duplicates(subset="material_id", keep="first")
 print(f"Number of points in dataset: {len(df)}")
 
 # takes ~ 15mins
-df["wyckoff"] = df.final_structure.progress_map(get_protostructure_label_from_spglib)
+df["protostructure"] = df.final_structure.progress_map(
+    get_protostructure_label_from_spglib
+)
 
 # lattice, sites = zip(*df.final_structure.progress_map(get_cgcnn_input))
 
 df["composition"] = df.final_structure.map(lambda x: x.composition.reduced_formula)
 df["nelements"] = df.final_structure.map(lambda x: len(x.composition.elements))
 df["volume"] = df.final_structure.map(lambda x: x.volume)
-df["nsites"] = df.final_structure.map(lambda x: x.num_sites)
+df["n_sites"] = df.final_structure.map(lambda x: x.num_sites)
 
 # df["lattice"] = lattice
 # df["sites"] = sites
@@ -83,7 +83,7 @@ df_el = df[df["nelements"] == 1]
 df_el = df_el.sort_values(by=["composition", "E_vasp_per_atom"], ascending=True)
 el_refs = {
     c.composition.elements[0]: e
-    for c, e in zip(df_el.final_structure, df_el.E_vasp_per_atom)
+    for c, e in zip(df_el.final_structure, df_el.E_vasp_per_atom, strict=False)
 }
 
 
@@ -113,7 +113,7 @@ df["E_f"] = [
 
 # %%
 # Remove invalid Wyckoff Sequences
-df["nwyckoff"] = df["wyckoff"].map(count_wyckoff_positions)
+df["n_wyckoff"] = df["protostructure"].map(count_wyckoff_positions)
 
 df = df.query("'Invalid' not in wyckoff")
 print(f"Valid Wyckoff representation {len(df)}")
@@ -121,8 +121,8 @@ print(f"Valid Wyckoff representation {len(df)}")
 
 # %%
 # Drop duplicated wyckoff representations
-df = df.sort_values(by=["wyckoff", "E_vasp_per_atom"], ascending=True)
-df_wyk = df.drop_duplicates(["wyckoff"], keep="first")
+df = df.sort_values(by=["protostructure", "E_vasp_per_atom"], ascending=True)
+df_wyk = df.drop_duplicates(["protostructure"], keep="first")
 print(f"Lowest energy unique wyckoff sequences: {len(df_wyk)}")
 
 
@@ -141,25 +141,25 @@ print("\n~~~~ DATA CLEANING ~~~~")
 print(f"Total systems: {len(df_wyk)}")
 
 wyk_lim = 16
-df_wyk = df_wyk[df_wyk["nwyckoff"] <= wyk_lim]
+df_wyk = df_wyk[df_wyk["n_wyckoff"] <= wyk_lim]
 print(f"Less than {wyk_lim} Wyckoff species in cell: {len(df_wyk)}")
 
 cell_lim = 64
-df_wyk = df_wyk[df_wyk["nsites"] <= cell_lim]
+df_wyk = df_wyk[df_wyk["n_sites"] <= cell_lim]
 print(f"Less than {cell_lim} atoms in cell: {len(df_wyk)}")
 
 vol_lim = 500
-df_wyk = df_wyk[df_wyk["volume"] / df_wyk["nsites"] < vol_lim]
+df_wyk = df_wyk[df_wyk["volume"] / df_wyk["n_sites"] < vol_lim]
 print(f"Less than {vol_lim} A^3 per site: {len(df_wyk)}")
 
-fields = ["material_id", "composition", "E_f", "wyckoff"]  # , "lattice", "sites"]
+fields = ["material_id", "composition", "E_f", "protostructure"]  # , "lattice", "sites"]
 
-df_wyk[["material_id", "composition", "E_f", "wyckoff"]].to_csv(
+df_wyk[["material_id", "composition", "E_f", "protostructure"]].to_csv(
     final_dir + "/examples.csv", index=False
 )
 
 df_wyk["structure"] = df_wyk["final_structure"].map(lambda x: x.as_dict())
 
-df_wyk[["material_id", "composition", "E_f", "wyckoff", "structure"]].to_json(
+df_wyk[["material_id", "composition", "E_f", "protostructure", "structure"]].to_json(
     final_dir + "/examples.json"
 )

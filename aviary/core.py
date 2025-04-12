@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import gc
 import os
 import shutil
 from abc import ABC
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from collections.abc import Callable, Mapping
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -13,17 +12,12 @@ import wandb
 from sklearn.metrics import f1_score
 from torch import BoolTensor, Tensor, nn
 from torch.nn.functional import softmax
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from aviary import ROOT
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from torch.utils.data import DataLoader
-
-    from aviary.data import InMemoryDataLoader
+from aviary.data import InMemoryDataLoader, Normalizer
 
 TaskType = Literal["regression", "classification"]
 
@@ -129,6 +123,14 @@ class BaseModelClass(nn.Module, ABC):
                         for metric, val in metrics.items():
                             writer.add_scalar(f"{task}/train/{metric}", val, epoch)
 
+                if writer == "wandb":
+                    flat_train_metrics = {}
+                    for task, metrics in train_metrics.items():
+                        for metric, val in metrics.items():
+                            flat_train_metrics[f"train_{task}_{metric.lower()}"] = val
+                    flat_train_metrics["epoch"] = epoch
+                    wandb.log(flat_train_metrics)
+
                 # Validation
                 if val_loader is not None:
                     with torch.no_grad():
@@ -148,6 +150,14 @@ class BaseModelClass(nn.Module, ABC):
                                 writer.add_scalar(
                                     f"{task}/validation/{metric}", val, epoch
                                 )
+
+                    if writer == "wandb":
+                        flat_val_metrics = {}
+                        for task, metrics in val_metrics.items():
+                            for metric, val in metrics.items():
+                                flat_val_metrics[f"val_{task}_{metric.lower()}"] = val
+                        flat_val_metrics["epoch"] = epoch
+                        wandb.log(flat_val_metrics)
 
                     # TODO test all tasks to see if they are best,
                     # save a best model if any is best.
@@ -206,9 +216,6 @@ class BaseModelClass(nn.Module, ABC):
 
                 # catch memory leak
                 gc.collect()
-
-                if writer == "wandb":
-                    wandb.log({"train": train_metrics, "validation": val_metrics})
 
         except KeyboardInterrupt:
             pass
@@ -271,7 +278,11 @@ class BaseModelClass(nn.Module, ABC):
             mixed_loss: Tensor = 0  # type: ignore[assignment]
 
             for target_name, targets, output, normalizer in zip(
-                self.target_names, targets_list, outputs, normalizer_dict.values()
+                self.target_names,
+                targets_list,
+                outputs,
+                normalizer_dict.values(),
+                strict=False,
             ):
                 task, loss_func = loss_dict[target_name]
                 target_metrics = epoch_metrics[target_name]
@@ -318,7 +329,7 @@ class BaseModelClass(nn.Module, ABC):
                 else:
                     raise ValueError(f"invalid task: {task}")
 
-                epoch_metrics[target_name]["Loss"].append(loss.cpu().item())
+                target_metrics["Loss"].append(loss.cpu().item())
 
                 # NOTE multitasking currently just uses a direct sum of individual
                 # target losses this should be okay but is perhaps sub-optimal
@@ -396,11 +407,13 @@ class BaseModelClass(nn.Module, ABC):
         # for multitask learning
         targets = tuple(
             torch.cat(targets, dim=0).view(-1).cpu().numpy()
-            for targets in zip(*test_targets)
+            for targets in zip(*test_targets, strict=False)
         )
-        predictions = tuple(torch.cat(preds, dim=0) for preds in zip(*test_preds))
+        predictions = tuple(
+            torch.cat(preds, dim=0) for preds in zip(*test_preds, strict=False)
+        )
         # identifier columns
-        ids = tuple(np.concatenate(x) for x in zip(*test_ids))
+        ids = tuple(np.concatenate(x) for x in zip(*test_ids, strict=False))
         return targets, predictions, ids
 
     @torch.no_grad()
@@ -443,83 +456,6 @@ class BaseModelClass(nn.Module, ABC):
         n_params, n_epochs = self.num_params, self.epoch
         cls_name = type(self).__name__
         return f"{cls_name} with {n_params:,} trainable params at {n_epochs:,} epochs"
-
-
-class Normalizer:
-    """Normalize a Tensor and restore it later."""
-
-    def __init__(self) -> None:
-        """Initialize Normalizer with mean 0 and std 1."""
-        self.mean = torch.tensor(0)
-        self.std = torch.tensor(1)
-
-    def fit(self, tensor: Tensor, dim: int = 0, keepdim: bool = False) -> None:
-        """Compute the mean and standard deviation of the given tensor.
-
-        Args:
-            tensor (Tensor): Tensor to determine the mean and standard deviation over.
-            dim (int, optional): Which dimension to take mean and standard deviation
-                over. Defaults to 0.
-            keepdim (bool, optional): Whether to keep the reduced dimension in Tensor.
-                Defaults to False.
-        """
-        self.mean = torch.mean(tensor, dim, keepdim)
-        self.std = torch.std(tensor, dim, keepdim)
-
-    def norm(self, tensor: Tensor) -> Tensor:
-        """Normalize a Tensor.
-
-        Args:
-            tensor (Tensor): Tensor to be normalized
-
-        Returns:
-            Tensor: Normalized Tensor
-        """
-        return (tensor - self.mean) / self.std
-
-    def denorm(self, normed_tensor: Tensor) -> Tensor:
-        """Restore normalized Tensor to original.
-
-        Args:
-            normed_tensor (Tensor): Tensor to be restored
-
-        Returns:
-            Tensor: Restored Tensor
-        """
-        return normed_tensor * self.std + self.mean
-
-    def state_dict(self) -> dict[str, Tensor]:
-        """Get Normalizer parameters mean and std.
-
-        Returns:
-            dict[str, Tensor]: Dictionary storing Normalizer parameters.
-        """
-        return {"mean": self.mean, "std": self.std}
-
-    def load_state_dict(self, state_dict: dict[str, Tensor]) -> None:
-        """Overwrite Normalizer parameters given a new state_dict.
-
-        Args:
-            state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
-        """
-        self.mean = state_dict["mean"].cpu()
-        self.std = state_dict["std"].cpu()
-
-    @classmethod
-    def from_state_dict(cls, state_dict: dict[str, Tensor]) -> Normalizer:
-        """Create a new Normalizer given a state_dict.
-
-        Args:
-            state_dict (dict[str, Tensor]): Dictionary storing Normalizer parameters.
-
-        Returns:
-            Normalizer
-        """
-        instance = cls()
-        instance.mean = state_dict["mean"].cpu()
-        instance.std = state_dict["std"].cpu()
-
-        return instance
 
 
 def save_checkpoint(
@@ -662,3 +598,12 @@ def masked_min(x: Tensor, mask: BoolTensor, dim: int = 0) -> Tensor:
     x_inf = x.float().masked_fill(~mask, float("inf"))
     x_min, _ = x_inf.min(dim=dim)
     return x_min
+
+
+AGGREGATORS: dict[str, Callable[[Tensor, BoolTensor, int], Tensor]] = {
+    "mean": masked_mean,
+    "std": masked_std,
+    "max": masked_max,
+    "min": masked_min,
+    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
+}

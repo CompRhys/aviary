@@ -1,5 +1,9 @@
 # %%
-from __future__ import annotations
+import sys
+from pathlib import Path
+
+# Add the parent directory to system path
+sys.path.append(str(Path(__file__).parent.parent))
 
 import json
 import logging
@@ -11,22 +15,18 @@ from glob import glob
 import pandas as pd
 import plotly.express as px
 import pymatviz as pmv
-from sklearn.metrics import r2_score, roc_auc_score
-
-from examples.wrenformer.matbench import DATA_PATHS
-from examples.wrenformer.matbench.plotting_functions import (
+from matbench import MatbenchBenchmark
+from matbench.constants import CLF_KEY, REG_KEY
+from matbench.metadata import mbv01_metadata as matbench_metadata
+from matbench_example.plotting_functions import (
     dataset_labels_html,
     error_heatmap,
     plot_leaderboard,
     scale_errors,
 )
-from examples.wrenformer.matbench.utils import recursive_dict_merge
-from matbench import MatbenchBenchmark
-from matbench.constants import CLF_KEY, REG_KEY
-from matbench.metadata import mbv01_metadata as matbench_metadata
-
-__author__ = "Janosh Riebesell"
-__date__ = "2022-04-25"
+from matbench_example.prepare_matbench_datasets import DATA_PATHS
+from matbench_example.utils import recursive_dict_merge
+from sklearn.metrics import r2_score, roc_auc_score
 
 logging.getLogger("matbench").setLevel("ERROR")
 
@@ -187,7 +187,7 @@ df = df.dropna(axis=1)  # drop models with missing predictions
 target = df.columns[0]
 
 
-y_cols = [c for c in df if c not in [target, "composition", "wyckoff"]]
+y_cols = [c for c in df if c not in [target, "composition", "protostructure"]]
 labels = {}
 
 for y_col in y_cols:

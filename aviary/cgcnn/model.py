@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
@@ -10,9 +8,6 @@ from torch import LongTensor, Tensor, nn
 from aviary.core import BaseModelClass
 from aviary.networks import SimpleNetwork
 from aviary.scatter import scatter_reduce
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @due.dcite(Doi("10.1103/PhysRevLett.120.145301"), description="CGCNN model")
@@ -215,7 +210,7 @@ class CGCNNConv(nn.Module):
         Args:
             atom_in_fea (Tensor): Atom hidden features before convolution
             nbr_fea (Tensor): Bond features of each atom's neighbors
-            self_idx (LongTensor): _description_
+            self_idx (LongTensor): Indices of the atom's self
             nbr_idx (LongTensor): Indices of M neighbors of each atom
 
         Returns:

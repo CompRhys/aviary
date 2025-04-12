@@ -1,17 +1,12 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
 from pymatgen.util.due import Doi, due
 from torch import BoolTensor, Tensor, nn
 
-from aviary.core import BaseModelClass, masked_max, masked_mean, masked_min, masked_std
+from aviary.core import AGGREGATORS, BaseModelClass
 from aviary.networks import ResidualNetwork
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @due.dcite(Doi("10.48550/arXiv.2308.14920"), description="Wrenformer model")
@@ -36,14 +31,15 @@ class Wrenformer(BaseModelClass):
 
     def __init__(
         self,
+        robust: bool,
         n_targets: Sequence[int],
         n_features: int,
         d_model: int = 128,
         n_attn_layers: int = 6,
         n_attn_heads: int = 4,
+        dropout: float = 0.0,
         trunk_hidden: Sequence[int] = (1024, 512),
         out_hidden: Sequence[int] = (256, 128, 64),
-        robust: bool = False,
         embedding_aggregations: Sequence[str] = ("mean",),
         **kwargs,
     ) -> None:
@@ -60,6 +56,8 @@ class Wrenformer(BaseModelClass):
                 to 3.
             n_attn_heads (int): Number of attention heads to use in the transformer.
                 d_model needs to be divisible by this number. Defaults to 4.
+            dropout (float, optional): Dropout rate for the transformer encoder. Defaults
+                to 0.
             trunk_hidden (list[int], optional): Number of hidden units in the trunk
                 network which is shared across tasks when multitasking. Defaults to
                 [1024, 512].
@@ -77,14 +75,32 @@ class Wrenformer(BaseModelClass):
         """
         super().__init__(robust=robust, **kwargs)
 
+        model_params = {
+            "robust": robust,
+            "n_targets": n_targets,
+            "n_features": n_features,
+            "d_model": d_model,
+            "n_attn_layers": n_attn_layers,
+            "n_attn_heads": n_attn_heads,
+            "dropout": dropout,
+            "trunk_hidden": trunk_hidden,
+            "out_hidden": out_hidden,
+            "embedding_aggregations": embedding_aggregations,
+        }
+        self.model_params.update(model_params)
+
         # up- or down-size embedding dimension (n_features) to model dimension (d_model)
         self.resize_embedding = nn.Linear(n_features, d_model)
 
         transformer_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=n_attn_heads, batch_first=True
+            d_model=d_model,
+            nhead=n_attn_heads,
+            batch_first=True,
+            norm_first=True,
+            dropout=dropout,
         )
         self.transformer_encoder = nn.TransformerEncoder(
-            transformer_layer, num_layers=n_attn_layers
+            transformer_layer, num_layers=n_attn_layers, enable_nested_tensor=False
         )
 
         if self.robust:
@@ -103,9 +119,7 @@ class Wrenformer(BaseModelClass):
             ResidualNetwork(out_hidden[0], n, out_hidden[1:]) for n in n_targets
         )
 
-    def forward(  # type: ignore[override]
-        self, features: Tensor, mask: BoolTensor, *args
-    ) -> tuple[Tensor, ...]:
+    def forward(self, features: Tensor, mask: BoolTensor, *args) -> tuple[Tensor, ...]:
         """Forward pass through the Wrenformer.
 
         Args:
@@ -146,7 +160,7 @@ class Wrenformer(BaseModelClass):
         # careful to ignore padded values when taking the mean
         inv_mask: torch.BoolTensor = ~mask[..., None]
 
-        aggregation_funcs = [aggregators[key] for key in self.embedding_aggregations]
+        aggregation_funcs = [AGGREGATORS[key] for key in self.embedding_aggregations]
         aggregated_embeddings = torch.cat(
             [func(embeddings, inv_mask, 1) for func in aggregation_funcs], dim=1
         )
@@ -155,13 +169,3 @@ class Wrenformer(BaseModelClass):
         predictions = F.relu(self.trunk_nn(aggregated_embeddings))
 
         return tuple(output_nn(predictions) for output_nn in self.output_nns)
-
-
-# map aggregation types to functions
-aggregators: dict[str, Callable[[Tensor, BoolTensor, int], Tensor]] = {
-    "mean": masked_mean,
-    "std": masked_std,
-    "max": masked_max,
-    "min": masked_min,
-    "sum": lambda x, mask, dim: (x * mask).sum(dim=dim),
-}
