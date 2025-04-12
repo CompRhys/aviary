@@ -4,7 +4,7 @@ This directory contains the files needed to create Matbench submissions for Roos
 
 Added in [aviary#44](https://github.com/CompRhys/aviary/pull/44).
 
-Directory is named `mat_bench` to avoid shadowing the `matbench` package.
+Directory is named `matbench` to avoid shadowing the `matbench` package.
 
 The important files are:
 
@@ -24,8 +24,8 @@ According to Rhys, Wren could run 500 epochs in 5.5 h on a P100 training on 120k
 
 ```py
 import pandas as pd
-from aviary.wren.utils import count_wyckoff_positions
-from examples.wrenformer.mat_bench import DATA_PATHS
+from pymatgen.analysis.prototypes import count_wyckoff_positions
+from examples.wrenformer.matbench import DATA_PATHS
 
 df = pd.read_json(DATA_PATHS["matbench_mp_e_form"])
 

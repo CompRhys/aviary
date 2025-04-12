@@ -7,16 +7,16 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
+from pymatgen.analysis.prototypes import (
+    RE_SUBST_ONE_PREFIX,
+    RE_WYCKOFF_NO_PREFIX,
+    WYCKOFF_MULTIPLICITY_DICT,
+    WYCKOFF_POSITION_RELAB_DICT,
+)
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
-from aviary.wren.utils import (
-    RE_SUBST_ONE_PREFIX,
-    RE_WYCKOFF_NO_PREFIX,
-    relab_dict,
-    wyckoff_multiplicity_dict,
-)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -300,13 +300,13 @@ def parse_protostructure_label(
             elements.extend([el] * mult)
             wyckoff_set.extend([letter] * mult)
             wyckoff_site_multiplicities.extend(
-                [float(wyckoff_multiplicity_dict[spg_num][letter])] * mult
+                [float(WYCKOFF_MULTIPLICITY_DICT[spg_num][letter])] * mult
             )
 
     # Create augmented Wyckoff set
     augmented_wyckoff_set = {
         tuple(",".join(wyckoff_set).translate(str.maketrans(trans)).split(","))
-        for trans in relab_dict[spg_num]
+        for trans in WYCKOFF_POSITION_RELAB_DICT[spg_num]
     }
 
     return spg_num, wyckoff_site_multiplicities, elements, list(augmented_wyckoff_set)

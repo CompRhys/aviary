@@ -1,9 +1,9 @@
 import pandas as pd
-from matbench import MatbenchBenchmark
+from pymatgen.analysis.prototypes import get_protostructure_label_from_spglib
 from tqdm import tqdm
 
 from aviary import ROOT
-from aviary.wren.utils import get_protostructure_label_from_spglib
+from matbench import MatbenchBenchmark
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-04-11"
