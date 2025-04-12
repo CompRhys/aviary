@@ -1,10 +1,10 @@
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Self
 
 import numpy as np
 import torch
 from torch import Tensor
+from typing_extensions import Self
 
 
 class Normalizer:
