@@ -1,10 +1,13 @@
+import json
 from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
+from pymatgen.core import Element
 from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
 
+from aviary import PKG_DIR
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.scatter import scatter_reduce
@@ -26,8 +29,8 @@ class Wren(BaseModelClass):
         self,
         robust: bool,
         n_targets: Sequence[int],
-        elem_emb_len: int,
-        sym_emb_len: int,
+        elem_embedding: str = "matscholar200",
+        sym_embedding: str = "bra-alg-off",
         elem_fea_len: int = 32,
         sym_fea_len: int = 32,
         n_graph: int = 3,
@@ -43,6 +46,42 @@ class Wren(BaseModelClass):
     ) -> None:
         """Protostructure based model."""
         super().__init__(robust=robust, **kwargs)
+
+        # load the element embedding
+        if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
+
+        with open(elem_embedding) as file:
+            self.elem_features = json.load(file)
+
+        max_z = max(Element(elem).Z for elem in self.elem_features)
+        elem_emb_len = len(next(iter(self.elem_features.values())))
+        elem_feature_matrix = torch.zeros((max_z + 1, elem_emb_len))
+        for elem, feature in self.elem_features.items():
+            elem_feature_matrix[Element(elem).Z] = torch.tensor(feature)
+
+        self.elem_embedding = nn.Embedding(max_z + 1, elem_emb_len)
+        self.elem_embedding.weight.data.copy_(elem_feature_matrix)
+
+        # load the Wyckoff embedding
+        if sym_embedding in ("bra-alg-off", "spg-alg-off"):
+            sym_embedding = f"{PKG_DIR}/embeddings/wyckoff/{sym_embedding}.json"
+
+        with open(sym_embedding) as sym_file:
+            self.sym_features = json.load(sym_file)
+
+        sym_emb_len = len(next(iter(next(iter(self.sym_features.values())).values())))
+
+        len_sym_features = sum(len(feature) for feature in self.sym_features.values())
+        sym_feature_matrix = torch.zeros((len_sym_features, sym_emb_len))
+        sym_idx = 0
+        for embeddings in self.sym_features.values():
+            for feature in embeddings.values():
+                sym_feature_matrix[sym_idx] = torch.tensor(feature)
+                sym_idx += 1
+
+        self.sym_embedding = nn.Embedding(len_sym_features, sym_emb_len)
+        self.sym_embedding.weight.data.copy_(sym_feature_matrix)
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -62,6 +101,8 @@ class Wren(BaseModelClass):
 
         model_params = {
             "robust": robust,
+            "elem_embedding": elem_embedding,
+            "sym_embedding": sym_embedding,
             "n_targets": n_targets,
             "out_hidden": out_hidden,
             "trunk_hidden": trunk_hidden,
@@ -92,6 +133,8 @@ class Wren(BaseModelClass):
         aug_cry_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
         """Forward pass through the material_nn and output_nn."""
+        elem_fea = self.elem_embedding(elem_fea)
+        sym_fea = self.sym_embedding(sym_fea)
         crys_fea = self.material_nn(
             elem_weights,
             elem_fea,

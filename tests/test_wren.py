@@ -13,7 +13,7 @@ from aviary.wren.model import Wren
 def base_config():
     return {
         "elem_embedding": "matscholar200",
-        "sym_emb": "bra-alg-off",
+        "sym_embedding": "bra-alg-off",
         "robust": True,
         "ensemble": 2,
         "run_id": 1,
@@ -71,13 +71,9 @@ def test_wren_regression(
 
     dataset = WyckoffData(
         df=df_matbench_phonons_wyckoff,
-        elem_embedding=base_config["elem_embedding"],
-        sym_emb=base_config["sym_emb"],
         task_dict=task_dict,
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    sym_emb_len = dataset.sym_emb_len
 
     train_idx = list(range(len(dataset)))
     train_idx, test_idx = split(
@@ -122,8 +118,8 @@ def test_wren_regression(
         "task_dict": task_dict,
         "robust": base_config["robust"],
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "sym_emb_len": sym_emb_len,
+        "elem_embedding": base_config["elem_embedding"],
+        "sym_embedding": base_config["sym_embedding"],
         **model_architecture,
     }
 
@@ -186,13 +182,9 @@ def test_wren_clf(
 
     dataset = WyckoffData(
         df=df_matbench_phonons_wyckoff,
-        elem_embedding=base_config["elem_embedding"],
-        sym_emb=base_config["sym_emb"],
         task_dict=task_dict,
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    sym_emb_len = dataset.sym_emb_len
 
     train_idx = list(range(len(dataset)))
     train_idx, test_idx = split(
@@ -237,8 +229,8 @@ def test_wren_clf(
         "task_dict": task_dict,
         "robust": base_config["robust"],
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "sym_emb_len": sym_emb_len,
+        "elem_embedding": base_config["elem_embedding"],
+        "sym_embedding": base_config["sym_embedding"],
         **model_architecture,
     }
 
