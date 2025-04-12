@@ -41,6 +41,7 @@ dependencies = [
   "tensorboard",
   "torch>=2.3.0",
   "tqdm",
+  "typing-extensions",
   "wandb",
 ]
 
