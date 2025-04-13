@@ -20,6 +20,11 @@ def base_config():
         "log": False,
         "sample": 1,
         "test_size": 0.2,
+        "radius": 5,
+        "max_num_nbr": 12,
+        "dmin": 0,
+        "step": 0.2,
+        "patience": None,
     }
 
 
@@ -63,12 +68,11 @@ def test_cgcnn_regression(
 
     dataset = CrystalGraphData(
         df=df_matbench_phonons,
-        elem_embedding=base_config["elem_embedding"],
         task_dict=task_dict,
+        max_num_nbr=base_config["max_num_nbr"],
+        radius_cutoff=base_config["radius"],
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
     train_idx, test_idx = split(
@@ -112,8 +116,10 @@ def test_cgcnn_regression(
         "task_dict": task_dict,
         "robust": base_config["robust"],
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "nbr_fea_len": nbr_fea_len,
+        "elem_embedding": base_config["elem_embedding"],
+        "radius_cutoff": base_config["radius"],
+        "radius_min": base_config["dmin"],
+        "radius_step": base_config["step"],
         **model_architecture,
     }
 
@@ -123,6 +129,7 @@ def test_cgcnn_regression(
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
         epochs=epochs,
+        patience=base_config["patience"],
         train_loader=train_loader,
         val_loader=val_loader,
         log=base_config["log"],
@@ -154,12 +161,12 @@ def test_cgcnn_regression(
     targets = results_dict[target_name]["targets"]
 
     y_ens = np.mean(preds, axis=0)
-    mae, rmse, r2 = get_metrics(targets, y_ens, task).values()
+    metrics = get_metrics(targets, y_ens, task)
 
     assert len(targets) == len(test_set) == len(test_idx)
-    assert r2 > 0.7
-    assert mae < 150
-    assert rmse < 300
+    assert metrics["R2"] > 0.7
+    assert metrics["MAE"] < 150
+    assert metrics["RMSE"] < 300
 
 
 def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, training_config):
@@ -174,30 +181,20 @@ def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, trainin
 
     dataset = CrystalGraphData(
         df=df_matbench_phonons,
-        elem_embedding=base_config["elem_embedding"],
         task_dict=task_dict,
+        max_num_nbr=base_config["max_num_nbr"],
+        radius_cutoff=base_config["radius"],
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
-
-    print(f"using {base_config['test_size']} of training set as test set")
     train_idx, test_idx = split(
         train_idx,
         random_state=base_config["data_seed"],
         test_size=base_config["test_size"],
     )
     test_set = torch.utils.data.Subset(dataset, test_idx)
-
-    print("No validation set used, using test set for evaluation purposes")
-    # NOTE that when using this option care must be taken not to
-    # peak at the test-set. The only valid model to use is the one
-    # obtained after the final epoch where the epoch count is
-    # decided in advance of the experiment.
     val_set = test_set
-
     train_set = torch.utils.data.Subset(dataset, train_idx[0 :: base_config["sample"]])
 
     data_params = {
@@ -232,8 +229,10 @@ def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, trainin
         "task_dict": task_dict,
         "robust": base_config["robust"],
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "nbr_fea_len": nbr_fea_len,
+        "elem_embedding": base_config["elem_embedding"],
+        "radius_cutoff": base_config["radius"],
+        "radius_min": base_config["dmin"],
+        "radius_step": base_config["step"],
         **model_architecture,
     }
 
@@ -243,6 +242,7 @@ def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, trainin
         run_id=base_config["run_id"],
         ensemble_folds=base_config["ensemble"],
         epochs=epochs,
+        patience=base_config["patience"],
         train_loader=train_loader,
         val_loader=val_loader,
         log=base_config["log"],
@@ -273,14 +273,12 @@ def test_cgcnn_clf(df_matbench_phonons, base_config, model_architecture, trainin
     logits = results_dict["phdos_clf"]["logits"]
     targets = results_dict["phdos_clf"]["targets"]
 
-    # calculate metrics and errors with associated errors for ensembles
     ens_logits = np.mean(logits, axis=0)
-
-    ens_acc, *_, ens_roc_auc = get_metrics(targets, ens_logits, task).values()
+    metrics = get_metrics(targets, ens_logits, task)
 
     assert len(targets) == len(test_set) == len(test_idx)
-    assert ens_acc > 0.85
-    assert ens_roc_auc > 0.9
+    assert metrics["accuracy"] > 0.85
+    assert metrics["ROCAUC"] > 0.9
 
 
 if __name__ == "__main__":

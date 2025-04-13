@@ -1,5 +1,4 @@
 import itertools
-import json
 from collections.abc import Sequence
 from functools import cache
 from typing import Any
@@ -12,8 +11,6 @@ from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from aviary import PKG_DIR
-
 
 class CrystalGraphData(Dataset):
     """Dataset class for the CGCNN structure model."""
@@ -22,13 +19,10 @@ class CrystalGraphData(Dataset):
         self,
         df: pd.DataFrame,
         task_dict: dict[str, str],
-        elem_embedding: str = "cgcnn92",
         structure_col: str = "structure",
         identifiers: Sequence[str] = (),
-        radius: float = 5,
+        radius_cutoff: float = 5,
         max_num_nbr: int = 12,
-        dmin: float = 0,
-        step: float = 0.2,
     ):
         """Featurize crystal structures into neighborhood graphs with this data class
         for CGCNN.
@@ -36,43 +30,20 @@ class CrystalGraphData(Dataset):
         Args:
             df (pd.Dataframe): Pandas dataframe holding input and target values.
             task_dict ({target: task}): task dict for multi-task learning
-            elem_embedding (str, optional): One of matscholar200, cgcnn92, megnet16,
-                onehot112 or path to a file with custom element embeddings.
-                Defaults to matscholar200.
             structure_col (str, optional): df column holding pymatgen Structure objects
                 as input.
             identifiers (list[str], optional): df columns for distinguishing data
                 points. Will be copied over into the model's output CSV. Defaults to ().
-            radius (float, optional): Cut-off radius for neighborhood. Defaults to 5.
+            radius_cutoff (float, optional): Cut-off radius for neighborhood.
+                Defaults to 5.
             max_num_nbr (int, optional): maximum number of neighbors to consider.
                 Defaults to 12.
-            dmin (float, optional): minimum distance in Gaussian basis. Defaults to 0.
-            step (float, optional): increment size of Gaussian basis. Defaults to 0.2.
         """
         self.task_dict = task_dict
         self.identifiers = list(identifiers)
 
-        self.radius = radius
+        self.radius_cutoff = radius_cutoff
         self.max_num_nbr = max_num_nbr
-
-        if elem_embedding in ("matscholar200", "cgcnn92", "megnet16", "onehot112"):
-            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-
-        with open(elem_embedding) as file:
-            self.elem_features = json.load(file)
-
-        for key, value in self.elem_features.items():
-            self.elem_features[key] = np.array(value, dtype=float)
-            if not hasattr(self, "elem_emb_len"):
-                self.elem_emb_len = len(value)
-            elif self.elem_emb_len != len(value):
-                raise ValueError(
-                    f"Element embedding length mismatch: len({key})="
-                    f"{len(value)}, expected {self.elem_emb_len}"
-                )
-
-        self.gaussian_dist_func = GaussianDistance(dmin=dmin, dmax=radius, step=step)
-        self.nbr_fea_dim = self.gaussian_dist_func.embedding_size
 
         self.df = df
         self.structure_col = structure_col
@@ -84,7 +55,7 @@ class CrystalGraphData(Dataset):
             self.df[structure_col].items(), total=len(df), desc=desc, disable=None
         ):
             self_idx, nbr_idx, _ = get_structure_neighbor_info(
-                struct, radius, max_num_nbr
+                struct, self.radius_cutoff, self.max_num_nbr
             )
             material_ids = [idx, *self.df.loc[idx][self.identifiers]]
             if 0 in (len(self_idx), len(nbr_idx)):
@@ -140,16 +111,10 @@ class CrystalGraphData(Dataset):
         material_ids = [self.df.index[idx], *row[self.identifiers]]
 
         # atom features for disordered sites
-        site_atoms = [atom.species.as_dict() for atom in struct]
-        atom_features = np.vstack(
-            [
-                np.sum([self.elem_features[el] * amt for el, amt in site.items()], axis=0)
-                for site in site_atoms
-            ]
-        )
+        atom_features = [atom.specie.Z for atom in struct]
 
         self_idx, nbr_idx, nbr_dist = get_structure_neighbor_info(
-            struct, self.radius, self.max_num_nbr
+            struct, self.radius_cutoff, self.max_num_nbr
         )
 
         if len(self_idx) == 0:
@@ -161,9 +126,7 @@ class CrystalGraphData(Dataset):
         if set(self_idx) != set(range(len(struct))):
             raise ValueError(f"At least one atom in {material_ids} is isolated")
 
-        nbr_dist = self.gaussian_dist_func.expand(nbr_dist)
-
-        atom_fea_t = Tensor(atom_features)
+        atom_fea_t = LongTensor(atom_features)
         nbr_dist_t = Tensor(nbr_dist)
         self_idx_t = LongTensor(self_idx)
         nbr_idx_t = LongTensor(nbr_idx)
@@ -278,7 +241,7 @@ class GaussianDistance:
                 "Max radii below minimum radii + step size - please increase dmax."
             )
 
-        self.filter = np.arange(dmin, dmax + step, step)
+        self.filter = torch.arange(dmin, dmax + step, step)
         self.embedding_size = len(self.filter)
 
         if var is None:
@@ -296,9 +259,9 @@ class GaussianDistance:
             np.ndarray: Expanded distance matrix with the last dimension of length
                 len(self.filter)
         """
-        distances = np.array(distances)
+        distances = torch.tensor(distances)
 
-        return np.exp(-((distances[..., None] - self.filter) ** 2) / self.var**2)
+        return torch.exp(-((distances[..., None] - self.filter) ** 2) / self.var**2)
 
 
 def get_structure_neighbor_info(

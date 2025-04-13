@@ -89,24 +89,18 @@ def main(
     task_dict = dict(zip(targets, tasks, strict=False))
     loss_dict = dict(zip(targets, losses, strict=False))
 
-    dist_dict = {
-        "radius": radius,
-        "max_num_nbr": max_num_nbr,
-        "dmin": dmin,
-        "step": step,
-    }
-
     # NOTE make sure to use dense datasets, here do not use the default na
     # as they can clash with "NaN" which is a valid material
     df = pd.read_json(data_path)
     df["structure"] = df.structure.map(Structure.from_dict)
 
     dataset = CrystalGraphData(
-        df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
+        df=df,
+        task_dict=task_dict,
+        max_num_nbr=max_num_nbr,
+        radius_cutoff=radius,
     )
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    nbr_fea_len = dataset.nbr_fea_dim
 
     train_idx = list(range(len(dataset)))
 
@@ -119,7 +113,10 @@ def main(
 
             print(f"using independent test set: {test_path}")
             test_set = CrystalGraphData(
-                df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
+                df=df,
+                task_dict=task_dict,
+                max_num_nbr=max_num_nbr,
+                radius_cutoff=radius,
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
         elif test_size == 0:
@@ -140,7 +137,10 @@ def main(
 
             print(f"using independent validation set: {val_path}")
             val_set = CrystalGraphData(
-                df=df, elem_embedding=elem_embedding, task_dict=task_dict, **dist_dict
+                df=df,
+                task_dict=task_dict,
+                max_num_nbr=max_num_nbr,
+                radius_cutoff=radius,
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
         elif val_size == 0 and evaluate:
@@ -192,8 +192,10 @@ def main(
         "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "nbr_fea_len": nbr_fea_len,
+        "elem_embedding": elem_embedding,
+        "radius_cutoff": radius,
+        "radius_min": dmin,
+        "radius_step": step,
         "elem_fea_len": elem_fea_len,
         "n_graph": n_graph,
         "h_fea_len": h_fea_len,
