@@ -45,4 +45,4 @@ repos:
     rev: 0.8.1
     hooks:
       - id: nbstripout
-        args: [--drop-empty-cells, --keep-output]
+        args: [--drop-empty-cells]
