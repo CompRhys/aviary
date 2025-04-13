@@ -797,6 +797,8 @@ def get_metrics(
         metrics["F1"] = f1_score(targets, pred_labels)
         class1_probas = predictions[:, 1]
         metrics["ROCAUC"] = roc_auc_score(targets, class1_probas)
+    else:
+        raise ValueError(f"Invalid task type: {type}")
 
     return {key: round(float(val), prec) for key, val in metrics.items()}
 
@@ -810,8 +812,12 @@ def get_element_embedding(elem_embedding: str) -> Embedding:
     Returns:
         Embedding: The element embedding.
     """
-    if elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+    if os.path.isfile(elem_embedding):
+        pass
+    elif elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
         elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
+    else:
+        raise ValueError(f"Invalid element embedding: {elem_embedding}")
 
     with open(elem_embedding) as file:
         elem_features = json.load(file)
@@ -837,8 +843,12 @@ def get_sym_embedding(sym_embedding: str) -> Embedding:
     Returns:
         Embedding: The symmetry embedding.
     """
-    if sym_embedding in ("bra-alg-off", "spg-alg-off"):
+    if os.path.isfile(sym_embedding):
+        pass
+    elif sym_embedding in ("bra-alg-off", "spg-alg-off"):
         sym_embedding = f"{PKG_DIR}/embeddings/wyckoff/{sym_embedding}.json"
+    else:
+        raise ValueError(f"Invalid symmetry embedding: {sym_embedding}")
 
     with open(sym_embedding) as sym_file:
         sym_features = json.load(sym_file)
