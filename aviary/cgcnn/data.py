@@ -249,18 +249,16 @@ class GaussianDistance:
 
         self.var = var
 
-    def expand(self, distances: np.ndarray) -> np.ndarray:
+    def expand(self, distances: Tensor) -> Tensor:
         """Apply Gaussian distance filter to a numpy distance array.
 
         Args:
             distances (ArrayLike): A distance matrix of any shape.
 
         Returns:
-            np.ndarray: Expanded distance matrix with the last dimension of length
+            Tensor: Expanded distance matrix with the last dimension of length
                 len(self.filter)
         """
-        distances = torch.tensor(distances)
-
         return torch.exp(-((distances[..., None] - self.filter) ** 2) / self.var**2)
 
 
