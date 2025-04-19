@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.2"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "aviary"
@@ -52,14 +52,14 @@ Repo = "https://github.com/CompRhys/aviary"
 test = ["matminer", "moyopy>=0.3.3", "pytest", "pytest-cov"]
 moyopy = ["moyopy>=0.3.3"]
 
-[tool.setuptools.packages]
-find = { include = ["aviary*"], exclude = ["tests*"] }
+[tool.hatch.build.targets.wheel]
+packages = ["aviary"]
 
-[tool.setuptools.package-data]
-aviary = ["**/**/*.json", "**/*.json"]
-
-[tool.distutils.bdist_wheel]
-universal = true
+[tool.hatch.build]
+include = [
+  "aviary/**/*.py",
+  "aviary/**/*.json",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
