@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from collections.abc import Sequence
 from functools import cache
 from itertools import groupby
@@ -13,10 +14,22 @@ from pymatgen.analysis.prototypes import (
     WYCKOFF_MULTIPLICITY_DICT,
     WYCKOFF_POSITION_RELAB_DICT,
 )
+from pymatgen.core import Element
 from torch import LongTensor, Tensor
 from torch.utils.data import Dataset
 
 from aviary import PKG_DIR
+
+with open(f"{PKG_DIR}/embeddings/wyckoff/bra-alg-off.json") as f:
+    sym_embeddings = json.load(f)
+WYCKOFF_SPG_LETTER_MAP: dict[str, dict[str, int]] = defaultdict(dict)
+i = 0
+for spg_num, embeddings in sym_embeddings.items():
+    for wyckoff_letter in embeddings:
+        WYCKOFF_SPG_LETTER_MAP[spg_num][wyckoff_letter] = i
+        i += 1
+
+del sym_embeddings
 
 
 class WyckoffData(Dataset):
@@ -26,8 +39,6 @@ class WyckoffData(Dataset):
         self,
         df: pd.DataFrame,
         task_dict: dict[str, str],
-        elem_embedding: str = "matscholar200",
-        sym_emb: str = "bra-alg-off",
         inputs: str = "protostructure",
         identifiers: Sequence[str] = ("material_id", "composition", "protostructure"),
     ):
@@ -37,11 +48,6 @@ class WyckoffData(Dataset):
             df (pd.DataFrame): Pandas dataframe holding input and target values.
             task_dict (dict[str, "regression" | "classification"]): Map from target
                 names to task type for multi-task learning.
-            elem_embedding (str, optional): One of "matscholar200", "cgcnn92",
-                "megnet16", "onehot112" or path to a file with custom element
-                embeddings. Defaults to "matscholar200".
-            sym_emb (str): Symmetry embedding. One of "bra-alg-off" (default) or
-                "spg-alg-off" or path to a file with custom symmetry embeddings.
             inputs (str, optional): df columns to be used for featurization.
                 Defaults to "protostructure".
             identifiers (list, optional): df columns for distinguishing data points.
@@ -55,24 +61,6 @@ class WyckoffData(Dataset):
         self.task_dict = task_dict
         self.identifiers = list(identifiers)
         self.df = df
-
-        if elem_embedding in ("matscholar200", "cgcnn92", "megnet16", "onehot112"):
-            elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
-
-        with open(elem_embedding) as emb_file:
-            self.elem_features = json.load(emb_file)
-
-        self.elem_emb_len = len(next(iter(self.elem_features.values())))
-
-        if sym_emb in ("bra-alg-off", "spg-alg-off"):
-            sym_emb = f"{PKG_DIR}/embeddings/wyckoff/{sym_emb}.json"
-
-        with open(sym_emb) as sym_file:
-            self.sym_features = json.load(sym_file)
-
-        self.sym_emb_len = len(
-            next(iter(next(iter(self.sym_features.values())).values()))
-        )
 
         self.n_targets = []
         for target, task in self.task_dict.items():
@@ -113,23 +101,13 @@ class WyckoffData(Dataset):
             wyk_site_multiplcities
         )
 
-        try:
-            element_features = np.vstack([self.elem_features[el] for el in elements])
-        except AssertionError:
-            print(f"Failed to process elements for {material_ids}")
-            raise
+        element_features = [Element(el).Z for el in elements]
 
-        try:
-            symmetry_features = np.vstack(
-                [
-                    self.sym_features[spg_num][wyk_site]
-                    for wyckoff_sites in augmented_wyks
-                    for wyk_site in wyckoff_sites
-                ]
-            )
-        except AssertionError:
-            print(f"Failed to process Wyckoff positions for {material_ids}")
-            raise
+        symmetry_features = [
+            WYCKOFF_SPG_LETTER_MAP[spg_num][wyk_site]
+            for wyckoff_sites in augmented_wyks
+            for wyk_site in wyckoff_sites
+        ]
 
         n_wyks = len(elements)
         self_idx = []
@@ -147,8 +125,8 @@ class WyckoffData(Dataset):
 
         # convert all data to tensors
         wyckoff_weights = Tensor(wyk_site_multiplcities)
-        element_features = Tensor(element_features)
-        symmetry_features = Tensor(symmetry_features)
+        element_features = LongTensor(element_features)
+        symmetry_features = LongTensor(symmetry_features)
         self_idx = LongTensor(self_aug_fea_idx)
         nbr_idx = LongTensor(nbr_aug_fea_idx)
 
@@ -198,7 +176,7 @@ def collate_batch(
 
         # batch the features together
         batch_mult_weights.append(mult_weights.repeat((n_aug, 1)))
-        batch_elem_fea.append(elem_fea.repeat((n_aug, 1)))
+        batch_elem_fea.append(elem_fea.repeat(n_aug))
         batch_sym_fea.append(sym_fea)
 
         # mappings from bonds to atoms

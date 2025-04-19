@@ -5,9 +5,11 @@ import torch.nn.functional as F
 from pymatgen.util.due import Doi, due
 from torch import LongTensor, Tensor, nn
 
+from aviary.cgcnn.data import GaussianDistance
 from aviary.core import BaseModelClass
 from aviary.networks import SimpleNetwork
 from aviary.scatter import scatter_reduce
+from aviary.utils import get_element_embedding
 
 
 @due.dcite(Doi("10.1103/PhysRevLett.120.145301"), description="CGCNN model")
@@ -25,8 +27,10 @@ class CrystalGraphConvNet(BaseModelClass):
         self,
         robust: bool,
         n_targets: Sequence[int],
-        elem_emb_len: int,
-        nbr_fea_len: int,
+        elem_embedding: str = "cgcnn92",
+        radius_cutoff: float = 5.0,
+        radius_min: float = 0.0,
+        radius_step: float = 0.2,
         elem_fea_len: int = 64,
         n_graph: int = 4,
         h_fea_len: int = 128,
@@ -42,8 +46,15 @@ class CrystalGraphConvNet(BaseModelClass):
                 (uncertainty inherent to the sample) which can be used with a robust
                 loss function to attenuate the weighting of uncertain samples.
             n_targets (list[int]): Number of targets to train on
-            elem_emb_len (int): Number of atom features in the input.
-            nbr_fea_len (int): Number of bond features.
+            elem_embedding (str, optional): One of matscholar200, cgcnn92, megnet16,
+                onehot112 or path to a file with custom element embeddings.
+                Defaults to matscholar200.
+            radius_cutoff (float, optional): Cut-off radius for neighborhood.
+                Defaults to 5.
+            radius_min (float, optional): minimum distance in Gaussian basis.
+                Defaults to 0.
+            radius_step (float, optional): increment size of Gaussian basis.
+                Defaults to 0.2.
             elem_fea_len (int, optional): Number of hidden atom features in the
                 convolutional layers. Defaults to 64.
             n_graph (int, optional): Number of convolutional layers. Defaults to 4.
@@ -56,6 +67,14 @@ class CrystalGraphConvNet(BaseModelClass):
             **kwargs: Additional keyword arguments to pass to BaseModelClass.
         """
         super().__init__(robust=robust, **kwargs)
+
+        self.elem_embedding = get_element_embedding(elem_embedding)
+        elem_emb_len = self.elem_embedding.weight.shape[1]
+
+        self.gaussian_dist_func = GaussianDistance(
+            dmin=radius_min, dmax=radius_cutoff, step=radius_step
+        )
+        nbr_fea_len = self.gaussian_dist_func.embedding_size
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -107,6 +126,9 @@ class CrystalGraphConvNet(BaseModelClass):
         Returns:
             tuple[Tensor, ...]: tuple of predictions for all targets
         """
+        nbr_fea = self.gaussian_dist_func.expand(nbr_fea)
+        atom_fea = self.elem_embedding(atom_fea)
+
         atom_fea = self.node_nn(atom_fea, nbr_fea, self_idx, nbr_idx)
 
         crys_fea = scatter_reduce(atom_fea, crystal_atom_idx, dim=0, reduce="mean")

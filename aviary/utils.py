@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -13,6 +14,7 @@ import numpy as np
 import pandas as pd
 import torch
 import wandb
+from pymatgen.core import Element
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -22,13 +24,13 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from torch import LongTensor, Tensor
-from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, NLLLoss
+from torch.nn import CrossEntropyLoss, Embedding, L1Loss, MSELoss, NLLLoss
 from torch.optim import SGD, Adam, AdamW, Optimizer
 from torch.optim.lr_scheduler import MultiStepLR, _LRScheduler
 from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
-from aviary import ROOT
+from aviary import PKG_DIR, ROOT
 from aviary.core import BaseModelClass, Normalizer, TaskType, sampled_softmax
 from aviary.data import InMemoryDataLoader
 from aviary.losses import robust_l1_loss, robust_l2_loss
@@ -795,8 +797,76 @@ def get_metrics(
         metrics["F1"] = f1_score(targets, pred_labels)
         class1_probas = predictions[:, 1]
         metrics["ROCAUC"] = roc_auc_score(targets, class1_probas)
+    else:
+        raise ValueError(f"Invalid task type: {type}")
 
     return {key: round(float(val), prec) for key, val in metrics.items()}
+
+
+def get_element_embedding(elem_embedding: str) -> Embedding:
+    """Get an element embedding from a file.
+
+    Args:
+        elem_embedding (str): The path to the element embedding file.
+
+    Returns:
+        Embedding: The element embedding.
+    """
+    if os.path.isfile(elem_embedding):
+        pass
+    elif elem_embedding in ["matscholar200", "cgcnn92", "megnet16", "onehot112"]:
+        elem_embedding = f"{PKG_DIR}/embeddings/element/{elem_embedding}.json"
+    else:
+        raise ValueError(f"Invalid element embedding: {elem_embedding}")
+
+    with open(elem_embedding) as file:
+        elem_features = json.load(file)
+
+    max_z = max(Element(elem).Z for elem in elem_features)
+    elem_emb_len = len(next(iter(elem_features.values())))
+    elem_feature_matrix = torch.zeros((max_z + 1, elem_emb_len))
+    for elem, feature in elem_features.items():
+        elem_feature_matrix[Element(elem).Z] = torch.tensor(feature)
+
+    embedding = Embedding(max_z + 1, elem_emb_len)
+    embedding.weight.data.copy_(elem_feature_matrix)
+
+    return embedding
+
+
+def get_sym_embedding(sym_embedding: str) -> Embedding:
+    """Get a symmetry embedding from a file.
+
+    Args:
+        sym_embedding (str): The path to the symmetry embedding file.
+
+    Returns:
+        Embedding: The symmetry embedding.
+    """
+    if os.path.isfile(sym_embedding):
+        pass
+    elif sym_embedding in ("bra-alg-off", "spg-alg-off"):
+        sym_embedding = f"{PKG_DIR}/embeddings/wyckoff/{sym_embedding}.json"
+    else:
+        raise ValueError(f"Invalid symmetry embedding: {sym_embedding}")
+
+    with open(sym_embedding) as sym_file:
+        sym_features = json.load(sym_file)
+
+    sym_emb_len = len(next(iter(next(iter(sym_features.values())).values())))
+
+    len_sym_features = sum(len(feature) for feature in sym_features.values())
+    sym_feature_matrix = torch.zeros((len_sym_features, sym_emb_len))
+    sym_idx = 0
+    for embeddings in sym_features.values():
+        for feature in embeddings.values():
+            sym_feature_matrix[sym_idx] = torch.tensor(feature)
+            sym_idx += 1
+
+    embedding = Embedding(len_sym_features, sym_emb_len)
+    embedding.weight.data.copy_(sym_feature_matrix)
+
+    return embedding
 
 
 def as_dict_handler(obj: Any) -> dict[str, Any] | None:

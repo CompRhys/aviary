@@ -8,6 +8,7 @@ from torch import LongTensor, Tensor, nn
 from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.segments import MessageLayer, WeightedAttentionPooling
+from aviary.utils import get_element_embedding
 
 
 @due.dcite(Doi("10.1038/s41467-020-19964-7"), description="Roost model")
@@ -25,7 +26,7 @@ class Roost(BaseModelClass):
         self,
         robust: bool,
         n_targets: Sequence[int],
-        elem_emb_len: int,
+        elem_embedding: str = "matscholar200",
         elem_fea_len: int = 64,
         n_graph: int = 3,
         elem_heads: int = 3,
@@ -41,6 +42,8 @@ class Roost(BaseModelClass):
         """Composition-only model."""
         super().__init__(robust=robust, **kwargs)
 
+        self.elem_embedding = get_element_embedding(elem_embedding)
+        elem_emb_len = self.elem_embedding.weight.shape[1]
         desc_dict = {
             "elem_emb_len": elem_emb_len,
             "elem_fea_len": elem_fea_len,
@@ -60,6 +63,7 @@ class Roost(BaseModelClass):
             "n_targets": n_targets,
             "out_hidden": out_hidden,
             "trunk_hidden": trunk_hidden,
+            "elem_embedding": elem_embedding,
             **desc_dict,
         }
         self.model_params.update(model_params)
@@ -83,6 +87,8 @@ class Roost(BaseModelClass):
         cry_elem_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
         """Forward pass through the material_nn and output_nn."""
+        elem_fea = self.elem_embedding(elem_fea)
+
         crys_fea = self.material_nn(
             elem_weights, elem_fea, self_idx, nbr_idx, cry_elem_idx
         )

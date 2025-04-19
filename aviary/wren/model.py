@@ -9,6 +9,7 @@ from aviary.core import BaseModelClass
 from aviary.networks import ResidualNetwork, SimpleNetwork
 from aviary.scatter import scatter_reduce
 from aviary.segments import MessageLayer, WeightedAttentionPooling
+from aviary.utils import get_element_embedding, get_sym_embedding
 
 
 @due.dcite(Doi("10.1126/sciadv.abn4117"), description="Wren model")
@@ -26,8 +27,8 @@ class Wren(BaseModelClass):
         self,
         robust: bool,
         n_targets: Sequence[int],
-        elem_emb_len: int,
-        sym_emb_len: int,
+        elem_embedding: str = "matscholar200",
+        sym_embedding: str = "bra-alg-off",
         elem_fea_len: int = 32,
         sym_fea_len: int = 32,
         n_graph: int = 3,
@@ -43,6 +44,12 @@ class Wren(BaseModelClass):
     ) -> None:
         """Protostructure based model."""
         super().__init__(robust=robust, **kwargs)
+
+        self.elem_embedding = get_element_embedding(elem_embedding)
+        elem_emb_len = self.elem_embedding.weight.shape[1]
+
+        self.sym_embedding = get_sym_embedding(sym_embedding)
+        sym_emb_len = self.sym_embedding.weight.shape[1]
 
         desc_dict = {
             "elem_emb_len": elem_emb_len,
@@ -62,6 +69,8 @@ class Wren(BaseModelClass):
 
         model_params = {
             "robust": robust,
+            "elem_embedding": elem_embedding,
+            "sym_embedding": sym_embedding,
             "n_targets": n_targets,
             "out_hidden": out_hidden,
             "trunk_hidden": trunk_hidden,
@@ -92,6 +101,8 @@ class Wren(BaseModelClass):
         aug_cry_idx: LongTensor,
     ) -> tuple[Tensor, ...]:
         """Forward pass through the material_nn and output_nn."""
+        elem_fea = self.elem_embedding(elem_fea)
+        sym_fea = self.sym_embedding(sym_fea)
         crys_fea = self.material_nn(
             elem_weights,
             elem_fea,

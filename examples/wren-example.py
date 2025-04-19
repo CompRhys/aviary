@@ -18,7 +18,7 @@ def main(
     losses,
     robust,
     elem_embedding="matscholar200",
-    sym_emb="bra-alg-off",
+    sym_embedding="bra-alg-off",
     model_name="wren",
     sym_fea_len=32,
     elem_fea_len=32,
@@ -90,12 +90,8 @@ def main(
     # NOTE do not use default_na as "NaN" is a valid material composition
     df = pd.read_csv(data_path, keep_default_na=False, na_values=[])
 
-    dataset = WyckoffData(
-        df=df, elem_embedding=elem_embedding, sym_emb=sym_emb, task_dict=task_dict
-    )
+    dataset = WyckoffData(df=df, task_dict=task_dict)
     n_targets = dataset.n_targets
-    elem_emb_len = dataset.elem_emb_len
-    sym_emb_len = dataset.sym_emb_len
 
     train_idx = list(range(len(dataset)))
 
@@ -108,8 +104,6 @@ def main(
             print(f"using independent test set: {test_path}")
             test_set = WyckoffData(
                 df=df,
-                elem_embedding=elem_embedding,
-                sym_emb=sym_emb,
                 task_dict=task_dict,
             )
             test_set = torch.utils.data.Subset(test_set, range(len(test_set)))
@@ -131,8 +125,6 @@ def main(
             print(f"using independent validation set: {val_path}")
             val_set = WyckoffData(
                 df=df,
-                elem_embedding=elem_embedding,
-                sym_emb=sym_emb,
                 task_dict=task_dict,
             )
             val_set = torch.utils.data.Subset(val_set, range(len(val_set)))
@@ -184,8 +176,8 @@ def main(
         "task_dict": task_dict,
         "robust": robust,
         "n_targets": n_targets,
-        "elem_emb_len": elem_emb_len,
-        "sym_emb_len": sym_emb_len,
+        "elem_embedding": elem_embedding,
+        "sym_embedding": sym_embedding,
         "elem_fea_len": elem_fea_len,
         "sym_fea_len": sym_fea_len,
         "n_graph": n_graph,
