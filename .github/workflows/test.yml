@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu --system
           uv pip install .[test] --system
 
       - name: Run Tests
