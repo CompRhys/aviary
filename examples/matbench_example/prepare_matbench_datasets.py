@@ -1,6 +1,5 @@
 import os
 from glob import glob
-from typing import Literal
 
 from matbench.data_ops import load
 from pymatgen.analysis.prototypes import get_protostructure_label_from_spglib
@@ -30,8 +29,6 @@ matbench_datasets = [
 
 if SMOKE_TEST:
     matbench_datasets = matbench_datasets[2:3]
-
-MatbenchDatasets = Literal[*matbench_datasets]
 
 os.makedirs(f"{current_dir}/datasets", exist_ok=True)
 for dataset in matbench_datasets:

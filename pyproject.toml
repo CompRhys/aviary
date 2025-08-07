@@ -109,6 +109,7 @@ ignore = [
   "E731",   # Do not assign a lambda expression, use a def
   "ISC001",
   "PD901",  # pandas-df-variable-name
+  "PLC0415",
   "PLR",    # pylint refactor
   "PT006",  # pytest-parametrize-names-wrong-type
 ]
