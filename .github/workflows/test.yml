@@ -2,11 +2,15 @@ name: Tests
 
 on:
   push:
-    paths: ["**/*.py", .github/workflows/test.yml]
+    paths: ["**/*.py", ".github/workflows/test.yml"]
     branches: [main]
   pull_request:
-    paths: ["**/*.py", .github/workflows/test.yml]
+    paths: ["**/*.py", ".github/workflows/test.yml"]
     branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+  workflow_call:
 
 concurrency:
   # Cancel only on same PR number
