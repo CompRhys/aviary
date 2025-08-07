@@ -1,0 +1,29 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  tests:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    runs-on: ubuntu-latest
+    needs: tests
+    if: needs.tests.result == 'success'
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build package with uv
+        run: uv build
+
+      - name: Publish package distributions to PyPI with uv
+        run: uv publish -t ${{ secrets.PYPI_TOKEN }}
