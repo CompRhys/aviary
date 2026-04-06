@@ -28,7 +28,7 @@ MODULE_DIR = os.path.dirname(__file__)
 epochs = 10
 folds = list(range(5))
 timestamp = f"{datetime.now():%Y-%m-%d@%H-%M-%S}"
-today = timestamp.split("@")[0]
+today = timestamp.split("@", maxsplit=1)[0]
 # job_name unlike run_name doesn't include dataset and fold since not yet known without
 # SLURM_ARRAY_TASK_ID
 job_name = f"matbench-wrenformer-robust-{epochs=}"
