@@ -109,6 +109,21 @@ If you use this code please cite the relevant work:
 }
 ```
 
+`wrenformer` - A framework to evaluate machine learning crystal stability predictions. [[Paper]]([https://www.science.org/doi/10.1126/sciadv.abn4117](https://www.nature.com/articles/s42256-025-01055-1)) [[arXiv]](https://arxiv.org/abs/2308.14920)
+
+```bibtex
+@article{riebesell_2025_framework,
+  title={A framework to evaluate machine learning crystal stability predictions},
+  author={Riebesell, Janosh and Goodall, Rhys EA and Benner, Philipp and Chiang, Yuan and Deng, Bowen and Ceder, Gerbrand and Asta, Mark and Lee, Alpha A and Jain, Anubhav and Persson, Kristin A},
+  journal={Nature Machine Intelligence},
+  volume={7},
+  number={6},
+  pages={836--847},
+  year={2025},
+  publisher={Nature Publishing Group UK London}
+}
+```
+
 `cgcnn` - Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties. [[Paper]](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.120.145301) [[arXiv]](https://arxiv.org/abs/1710.10324)
 
 ```bibtex
