@@ -37,7 +37,7 @@ To test the input files generation and cleaning/canonicalization please run:
 python examples/inputs/poscar_to_df.py
 ```
 
-This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` and `datasets/examples/examples.json` files used for the next example.
+This script will load and parse a subset of raw POSCAR files from the TAATA dataset and produce the `datasets/examples/examples.csv` and `datasets/examples/examples.json` files used for the next examples.
 For the coordinate-free `roost` and `wren` models where the inputs are easily expressed as strings we use CSV inputs.
 For the structure-based `cgcnn` model we first construct `pymatgen` structures from the raw POSCAR files then determine their dictionary serializations before saving in a JSON format.
 The raw POSCAR files have been selected to ensure that the subset contains all the correct endpoints for the 5 elemental species in the `Hf-N-Ti-Zr-Zn` chemical system.
@@ -59,17 +59,17 @@ python examples/wrenformer-example.py --train --evaluate --data-path examples/in
 python examples/cgcnn-example.py --train --evaluate --data-path examples/inputs/examples.json --targets E_f --tasks regression --losses L1 --robust --epoch 10
 ```
 
-Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30 sec. These examples do not have sufficient data or training to make accurate predictions, however, the same scripts were used for all experiments conducted as part of the development and publication of these models.
+Please note that for speed/demonstration purposes this example runs on only ~68 materials for 10 epochs - running all these examples should take < 30 sec. These examples do not have sufficient data to be used as a meaningful scientific benchmark, but should be enough to ensure the code runs correctly.
 Consequently understanding these examples will ensure you can deploy the models as intended for your research.
 
 ## Notebooks
 
-We also provide some notebooks that show more a more pythonic way to interact with the codebase, these examples make use of the TAATA dataset examined in the `wren` manuscript:
+We also provide some notebooks that show a more pythonic way to interact with the codebase; these examples make use of the TAATA dataset examined in the `wren` manuscript:
 
-|                                                                                          |                                      |                                                                                                                              |
-| ---------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+|                                                                                          |                                      |                                                                 |
+| ---------------------------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------- |
 | **[Roost](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb)** | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Roost.ipynb) |
-| **[Wren](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)**   | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)  |
+| **[Wren](https://github.com/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb)**   | [![Launch Codespace]][codespace url] | [![Open in Google Colab]](https://colab.research.google.com/github/CompRhys/aviary/blob/main/examples/notebooks/Wren.ipynb) |
 
 [Open in Google Colab]: https://colab.research.google.com/assets/colab-badge.svg
 [Launch Codespace]: https://img.shields.io/badge/Launch-Codespace-darkblue?logo=github
@@ -109,7 +109,7 @@ If you use this code please cite the relevant work:
 }
 ```
 
-`wrenformer` - A framework to evaluate machine learning crystal stability predictions. [[Paper]]([https://www.science.org/doi/10.1126/sciadv.abn4117](https://www.nature.com/articles/s42256-025-01055-1)) [[arXiv]](https://arxiv.org/abs/2308.14920)
+`wrenformer` - A framework to evaluate machine learning crystal stability predictions. [[Paper]](https://www.nature.com/articles/s42256-025-01055-1) [[arXiv]](https://arxiv.org/abs/2308.14920)
 
 ```bibtex
 @article{riebesell_2025_framework,

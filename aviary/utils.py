@@ -361,8 +361,6 @@ def train_ensemble(
         elif log == "wandb":
             wandb.init(
                 project="lightning_logs",
-                # https://docs.wandb.ai/guides/track/launch#init-start-error
-                settings=wandb.Settings(start_method="fork"),
                 name=f"{model_name}-r{r_id}",
                 config={
                     "model_params": model_params,
